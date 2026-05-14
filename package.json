@@ -1,0 +1,28 @@
+{
+  "name": "boxscore",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "generate": "tsx scripts/generate.ts",
+    "store": "tsx --env-file=.env.local scripts/generate-and-store.ts",
+    "backfill": "tsx --env-file=.env.local scripts/backfill.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

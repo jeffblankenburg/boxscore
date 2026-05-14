@@ -1,0 +1,17 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/generate?sport=mlb",
+      "schedule": "0 9 * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/.well-known/atproto-did",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  ]
+}
+
