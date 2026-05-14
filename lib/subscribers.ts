@@ -1,0 +1,95 @@
+import { supabaseAdmin } from "./supabase";
+
+export type SubscriberStatus = "pending" | "active" | "unsubscribed";
+
+export type Subscriber = {
+  id: string;
+  email: string;
+  status: SubscriberStatus;
+  created_at: string;
+  confirmed_at: string | null;
+  unsubscribed_at: string | null;
+  confirm_token: string;
+  unsubscribe_token: string;
+};
+
+const COLS =
+  "id, email, status, created_at, confirmed_at, unsubscribed_at, confirm_token, unsubscribe_token";
+
+/**
+ * Idempotent: starting a subscription for an email that already exists in any
+ * state resets it to pending and rotates the tokens. The caller decides what to
+ * tell the user (e.g., "if you were already subscribed, you'll get a fresh
+ * confirmation email").
+ */
+export async function startSubscription(email: string): Promise<Subscriber> {
+  const normalized = email.trim().toLowerCase();
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .upsert(
+      {
+        email: normalized,
+        status: "pending" as const,
+        confirmed_at: null,
+        unsubscribed_at: null,
+        confirm_token: crypto.randomUUID(),
+        unsubscribe_token: crypto.randomUUID(),
+      },
+      { onConflict: "email" },
+    )
+    .select(COLS)
+    .single<Subscriber>();
+  if (error) throw new Error(`startSubscription: ${error.message}`);
+  return data;
+}
+
+export async function findByConfirmToken(token: string): Promise<Subscriber | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .select(COLS)
+    .eq("confirm_token", token)
+    .maybeSingle<Subscriber>();
+  if (error) throw new Error(`findByConfirmToken: ${error.message}`);
+  return data ?? null;
+}
+
+export async function findByUnsubscribeToken(token: string): Promise<Subscriber | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .select(COLS)
+    .eq("unsubscribe_token", token)
+    .maybeSingle<Subscriber>();
+  if (error) throw new Error(`findByUnsubscribeToken: ${error.message}`);
+  return data ?? null;
+}
+
+/**
+ * Flips pending → active. Idempotent on already-active subscribers (returns
+ * the existing row without doing work). No-op if status is "unsubscribed".
+ */
+export async function confirmSubscriber(id: string): Promise<Subscriber> {
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .update({ status: "active" as const, confirmed_at: new Date().toISOString() })
+    .eq("id", id)
+    .in("status", ["pending", "active"])
+    .select(COLS)
+    .single<Subscriber>();
+  if (error) throw new Error(`confirmSubscriber: ${error.message}`);
+  return data;
+}
+
+/**
+ * Flips active → unsubscribed. Idempotent — works regardless of current state
+ * so the unsubscribe URL works forever.
+ */
+export async function unsubscribeSubscriber(id: string): Promise<Subscriber> {
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .update({ status: "unsubscribed" as const, unsubscribed_at: new Date().toISOString() })
+    .eq("id", id)
+    .select(COLS)
+    .single<Subscriber>();
+  if (error) throw new Error(`unsubscribeSubscriber: ${error.message}`);
+  return data;
+}
