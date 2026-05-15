@@ -16,8 +16,16 @@ export type ScheduleGame = {
   gameDate: string;
   status: { abstractGameState: string; detailedState: string; codedGameState: string };
   teams: {
-    away: { team: { id: number; name: string; abbreviation?: string }; score?: number; isWinner?: boolean };
-    home: { team: { id: number; name: string; abbreviation?: string }; score?: number; isWinner?: boolean };
+    away: {
+      team: { id: number; name: string; abbreviation?: string };
+      score?: number; isWinner?: boolean;
+      probablePitcher?: { id: number; fullName: string };
+    };
+    home: {
+      team: { id: number; name: string; abbreviation?: string };
+      score?: number; isWinner?: boolean;
+      probablePitcher?: { id: number; fullName: string };
+    };
   };
   linescore?: {
     currentInning?: number;
@@ -254,4 +262,36 @@ function guessStatGroup(category: string): "hitting" | "pitching" {
     "wins", "earnedRunAverage", "strikeouts", "saves", "whip", "inningsPitched",
   ]);
   return pitching.has(category) ? "pitching" : "hitting";
+}
+
+// ─── Teams ────────────────────────────────────────────────────────────────
+// One call per season returns every team's id, name, and short abbreviation.
+// Used to build a current id→abbreviation map at render time.
+export type TeamMeta = { id: number; name: string; abbreviation?: string };
+
+export async function fetchTeamsRaw(season: number): Promise<unknown> {
+  return getRaw(`/v1/teams?sportId=1&season=${season}`);
+}
+
+export function parseTeams(raw: unknown): TeamMeta[] {
+  const data = raw as { teams?: TeamMeta[] };
+  return data?.teams ?? [];
+}
+
+// ─── Person season stats ──────────────────────────────────────────────────
+// Used for probable-pitcher W-L on Today's Games. Single-person call returns
+// season pitching stats including wins and losses.
+export async function fetchPersonSeasonPitchingRaw(personId: number, season: number): Promise<unknown> {
+  return getRaw(
+    `/v1/people/${personId}/stats?stats=season&group=pitching&season=${season}`,
+  );
+}
+
+export function parsePersonWL(raw: unknown): { wins: number; losses: number } {
+  const data = raw as { stats?: Array<{ splits?: Array<{ stat?: { wins?: number; losses?: number } }> }> };
+  const stat = data?.stats?.[0]?.splits?.[0]?.stat;
+  return {
+    wins: typeof stat?.wins === "number" ? stat.wins : 0,
+    losses: typeof stat?.losses === "number" ? stat.losses : 0,
+  };
 }

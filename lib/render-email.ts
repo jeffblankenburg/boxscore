@@ -21,7 +21,7 @@ import type {
   DivisionStandings, BoxTeam, BoxPlayer,
   WildCardLeagueStandings,
 } from "./mlb";
-import type { DailyData, GameDetail, LeaderGroup } from "./render";
+import type { DailyData, GameDetail, LeaderGroup, UpcomingGame } from "./render";
 
 // ─── styles ───────────────────────────────────────────────────────────────
 
@@ -152,8 +152,28 @@ const NICKNAME_OF: Record<string, string> = {
   "Washington Nationals": "Nationals",
 };
 
+const TLA_OF: Record<string, string> = {
+  "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL",
+  "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS",
+  "Chicago Cubs": "CHC", "Chicago White Sox": "CWS",
+  "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE",
+  "Colorado Rockies": "COL", "Detroit Tigers": "DET",
+  "Houston Astros": "HOU", "Kansas City Royals": "KC",
+  "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD",
+  "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL",
+  "Minnesota Twins": "MIN", "New York Mets": "NYM",
+  "New York Yankees": "NYY", "Athletics": "ATH",
+  "Oakland Athletics": "ATH", "Philadelphia Phillies": "PHI",
+  "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD",
+  "San Francisco Giants": "SF", "Seattle Mariners": "SEA",
+  "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
+  "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR",
+  "Washington Nationals": "WSH",
+};
+
 const city = (n: string) => CITY_OF[n] ?? n;
 const nickname = (n: string) => NICKNAME_OF[n] ?? n;
+const tla = (n: string, live?: Record<string, string>) => live?.[n] ?? TLA_OF[n] ?? n;
 
 const esc = (s: string | number | undefined): string =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -313,10 +333,10 @@ function renderLeagueStandings(label: string, key: "AL" | "NL", data: DailyData)
 
 // ─── leaders (two columns: AL, NL) ────────────────────────────────────────
 
-function renderLeaderCategory(g: LeaderGroup): string {
+function renderLeaderCategory(g: LeaderGroup, liveAbbrev: Record<string, string>): string {
   const rows = g.rows.map((L) =>
     `<tr>
-      <td align="left">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(nickname(L.team?.name ?? ""))}</td>
+      <td align="left">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
       <td align="right">${esc(L.value)}</td>
     </tr>`
   ).join("");
@@ -326,16 +346,16 @@ function renderLeaderCategory(g: LeaderGroup): string {
     </table>`;
 }
 
-function renderLeadersColumn(leagueLabel: string, groups: LeaderGroup[]): string {
-  return `${colH(leagueLabel)}${groups.map(renderLeaderCategory).join("")}`;
+function renderLeadersColumn(leagueLabel: string, groups: LeaderGroup[], liveAbbrev: Record<string, string>): string {
+  return `${colH(leagueLabel)}${groups.map((g) => renderLeaderCategory(g, liveAbbrev)).join("")}`;
 }
 
 function renderLeaders(data: DailyData): string {
   return `${sectionH("Leaders")}
     <table class="es-leaders-cols" cellpadding="0" cellspacing="0" border="0">
       <tbody><tr>
-        <td width="50%">${renderLeadersColumn("American League", data.leaders.AL)}</td>
-        <td width="50%">${renderLeadersColumn("National League", data.leaders.NL)}</td>
+        <td width="50%">${renderLeadersColumn("American League", data.leaders.AL, data.teamAbbrev)}</td>
+        <td width="50%">${renderLeadersColumn("National League", data.leaders.NL, data.teamAbbrev)}</td>
       </tr></tbody>
     </table>`;
 }
@@ -478,7 +498,7 @@ function renderScoring(plays: ScoringPlay[]): string {
   </div>`;
 }
 
-function renderGame({ game, box, scoring }: Required<GameDetail>): string {
+function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Record<string, string>): string {
   const a = game.teams.away, h = game.teams.home;
   const aScore = a.score ?? 0, hScore = h.score ?? 0;
   const winnerFirst = hScore >= aScore
@@ -503,8 +523,8 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
     ${gameH(winnerFirst)}
     <table cellpadding="0" cellspacing="0" border="0" width="100%">
       <tbody>
-        ${renderInningLine(city(a.team.name), aLine)}
-        ${renderInningLine(city(h.team.name), hLine)}
+        ${renderInningLine(tla(a.team.name, liveAbbrev), aLine)}
+        ${renderInningLine(tla(h.team.name, liveAbbrev), hLine)}
       </tbody>
     </table>
     ${decisionLine ? `<p class="es-note">${decisionLine}</p>` : ""}
@@ -515,11 +535,32 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
   </div>`;
 }
 
-function renderBoxScores(games: GameDetail[]): string {
+function renderBoxScores(games: GameDetail[], liveAbbrev: Record<string, string>): string {
   const completed = games.filter((g) => g.game.status.codedGameState === "F" && g.box);
   if (completed.length === 0) return "";
   return `${sectionH("Box Scores")}
-    ${completed.map((g) => renderGame(g as Required<GameDetail>)).join("")}`;
+    ${completed.map((g) => renderGame(g as Required<GameDetail>, liveAbbrev)).join("")}`;
+}
+
+function renderTodaysGames(games: UpcomingGame[]): string {
+  if (games.length === 0) return "";
+  const probable = (full?: string, record?: string) => {
+    if (!full) return "";
+    const wl = record ? ` ${esc(record)}` : "";
+    return ` <span style="color:#6a6354;font-weight:400;">(${esc(lastName(full))}${wl})</span>`;
+  };
+  const rows = games.map((g) => {
+    const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
+    const right = isOff ? g.status : g.startTime;
+    return `<tr>
+      <td align="left" style="font-size:13px;padding:1px 0;">${esc(nickname(g.awayName))}${probable(g.awayProbable, g.awayProbableRecord)} @ ${esc(nickname(g.homeName))}${probable(g.homeProbable, g.homeProbableRecord)}</td>
+      <td align="right" style="font-size:13px;color:#6a6354;padding:1px 0;white-space:nowrap;">${esc(right)}</td>
+    </tr>`;
+  }).join("");
+  return `${sectionH("Today's Games")}
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;">
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 // ─── entry ────────────────────────────────────────────────────────────────
@@ -530,6 +571,7 @@ ${dateline(data.prettyDate)}
 ${renderLeagueStandings("American League", "AL", data)}
 ${renderLeagueStandings("National League", "NL", data)}
 ${renderLeaders(data)}
-${renderBoxScores(data.games)}
+${renderTodaysGames(data.todaysGames)}
+${renderBoxScores(data.games, data.teamAbbrev)}
 </div>`;
 }

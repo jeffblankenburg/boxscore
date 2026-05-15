@@ -5,10 +5,15 @@ import {
   fetchLeadersRaw, parseLeaders,
   fetchBoxscoreRaw, parseBoxscore,
   fetchPlayByPlayRaw, parseScoringPlays,
+  fetchTeamsRaw, parseTeams,
+  fetchPersonSeasonPitchingRaw, parsePersonWL,
 } from "./mlb";
-import type { GameDetail, DailyData } from "./render";
-import { prettyDate } from "./dates";
-import { getDailyRaw, upsertDailyRaw, type DailyRaw } from "./daily-raw";
+import type { GameDetail, DailyData, UpcomingGame } from "./render";
+import { prettyDate, nextDay, timeInET } from "./dates";
+import {
+  getDailyRaw, upsertDailyRaw,
+  type DailyRaw, type StoredScoringPlay, type ProbablePitcherStats,
+} from "./daily-raw";
 
 const LEADER_CATEGORIES = [
   { category: "battingAverage", label: "Batting Average", valueLabel: "AVG" },
@@ -21,21 +26,39 @@ const LEADER_CATEGORIES = [
   { category: "saves", label: "Saves", valueLabel: "SV" },
 ] as const;
 
+// Extract probable pitcher IDs from a parsed schedule.
+function probablePitcherIds(scheduleRaw: unknown): number[] {
+  if (!scheduleRaw) return [];
+  const games = parseSchedule(scheduleRaw);
+  const ids = new Set<number>();
+  for (const g of games) {
+    if (g.teams.away.probablePitcher?.id) ids.add(g.teams.away.probablePitcher.id);
+    if (g.teams.home.probablePitcher?.id) ids.add(g.teams.home.probablePitcher.id);
+  }
+  return Array.from(ids);
+}
+
 // Fetch every MLB endpoint needed for a single date, returning the unmodified
-// envelopes. This is the only function that hits MLB; everything else parses
-// what we already have.
+// envelopes plus pre-parsed scoring plays and probable-pitcher records. This
+// is the only function that hits MLB; everything else parses what we already
+// have in daily_raw.
 async function fetchDailyRaw(date: string): Promise<DailyRaw> {
   const season = Number(date.slice(0, 4));
 
-  // First wave: schedule + standings + wildCard + all leaders, in parallel.
+  // First wave: schedules + standings + leaders + teams, in parallel.
   const leaderCalls = LEADER_CATEGORIES.flatMap((c) => [
     fetchLeadersRaw(c.category, season, 103, 5),
     fetchLeadersRaw(c.category, season, 104, 5),
   ]);
-  const [scheduleRaw, standingsRaw, wildCardRaw, ...leaderResults] = await Promise.all([
+  const [
+    scheduleRaw, standingsRaw, wildCardRaw, nextDayScheduleRaw, teamsRaw,
+    ...leaderResults
+  ] = await Promise.all([
     fetchScheduleRaw(date),
     fetchStandingsRaw(season, date),
     fetchWildCardRaw(season, date),
+    fetchScheduleRaw(nextDay(date)),
+    fetchTeamsRaw(season),
     ...leaderCalls,
   ]);
 
@@ -46,26 +69,83 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
     leaders[`104/${c.category}`] = leaderResults[i * 2 + 1];
   }
 
-  // Second wave: per-game boxscore + playByPlay for completed games only.
+  // Second wave: per-game boxscore + scoringPlays for completed games, and
+  // season W-L for each probable pitcher on the next day's schedule.
   const schedule = parseSchedule(scheduleRaw);
   const finalGamePks = schedule
     .filter((g) => g.status.codedGameState === "F")
     .map((g) => g.gamePk);
 
-  const gameRaw = await Promise.all(
-    finalGamePks.map(async (pk) => {
-      const [boxscore, playByPlay] = await Promise.all([
-        fetchBoxscoreRaw(pk),
-        fetchPlayByPlayRaw(pk),
-      ]);
-      return [pk, { boxscore, playByPlay }] as const;
-    }),
-  );
+  const pitcherIds = probablePitcherIds(nextDayScheduleRaw);
+
+  const [gameResults, pitcherResults] = await Promise.all([
+    Promise.all(
+      finalGamePks.map(async (pk) => {
+        const [boxscore, playByPlay] = await Promise.all([
+          fetchBoxscoreRaw(pk),
+          fetchPlayByPlayRaw(pk),
+        ]);
+        const scoringPlays: StoredScoringPlay[] = parseScoringPlays(playByPlay);
+        return [pk, { boxscore, scoringPlays }] as const;
+      }),
+    ),
+    Promise.all(
+      pitcherIds.map(async (id) => {
+        const wl = parsePersonWL(await fetchPersonSeasonPitchingRaw(id, season));
+        return [String(id), wl] as const;
+      }),
+    ),
+  ]);
 
   const games: DailyRaw["games"] = {};
-  for (const [pk, g] of gameRaw) games[String(pk)] = g;
+  for (const [pk, g] of gameResults) games[String(pk)] = g;
 
-  return { schedule: scheduleRaw, standings: standingsRaw, wildCard: wildCardRaw, leaders, games };
+  const probablePitcherStats: Record<string, ProbablePitcherStats> = {};
+  for (const [id, wl] of pitcherResults) probablePitcherStats[id] = wl;
+
+  return {
+    schedule: scheduleRaw,
+    standings: standingsRaw,
+    wildCard: wildCardRaw,
+    leaders,
+    games,
+    nextDaySchedule: nextDayScheduleRaw,
+    teams: teamsRaw,
+    probablePitcherStats,
+  };
+}
+
+function upcomingFromRaw(
+  scheduleRaw: unknown,
+  pitcherStats: Record<string, ProbablePitcherStats> | undefined,
+): UpcomingGame[] {
+  if (!scheduleRaw) return [];
+  return parseSchedule(scheduleRaw).map((g) => {
+    const ap = g.teams.away.probablePitcher;
+    const hp = g.teams.home.probablePitcher;
+    const apStats = ap ? pitcherStats?.[String(ap.id)] : undefined;
+    const hpStats = hp ? pitcherStats?.[String(hp.id)] : undefined;
+    return {
+      gamePk: g.gamePk,
+      awayName: g.teams.away.team.name,
+      homeName: g.teams.home.team.name,
+      awayProbable: ap?.fullName,
+      homeProbable: hp?.fullName,
+      awayProbableRecord: apStats ? `${apStats.wins}-${apStats.losses}` : undefined,
+      homeProbableRecord: hpStats ? `${hpStats.wins}-${hpStats.losses}` : undefined,
+      startTime: timeInET(g.gameDate),
+      status: g.status.detailedState,
+    };
+  });
+}
+
+function buildTeamAbbrevMap(teamsRaw: unknown): Record<string, string> {
+  if (!teamsRaw) return {};
+  const out: Record<string, string> = {};
+  for (const t of parseTeams(teamsRaw)) {
+    if (t.abbreviation) out[t.name] = t.abbreviation;
+  }
+  return out;
 }
 
 // Pure transform: raw payloads → DailyData. No network.
@@ -78,7 +158,7 @@ function rawToDailyData(raw: DailyRaw, date: string): DailyData {
     return {
       game,
       box: parseBoxscore(stored.boxscore),
-      scoring: parseScoringPlays(stored.playByPlay),
+      scoring: stored.scoringPlays,
     };
   });
 
@@ -98,13 +178,26 @@ function rawToDailyData(raw: DailyRaw, date: string): DailyData {
         rows: parseLeaders(raw.leaders[`104/${c.category}`]),
       })),
     },
+    todaysGames: upcomingFromRaw(raw.nextDaySchedule, raw.probablePitcherStats),
+    teamAbbrev: buildTeamAbbrevMap(raw.teams),
   };
 }
 
-// Read-through: stored raw → DailyData. If raw is missing, fetch from MLB
-// and write through so the next caller gets the cached version.
+// Pre-shape rows lack `teams` and store playByPlay instead of scoringPlays.
+// Treat those as cache misses so the next load refetches.
+function isOldShape(raw: DailyRaw): boolean {
+  if (!raw.teams) return true;
+  for (const g of Object.values(raw.games)) {
+    if (!Array.isArray((g as { scoringPlays?: unknown }).scoringPlays)) return true;
+  }
+  return false;
+}
+
+// Read-through: stored raw → DailyData. If raw is missing, in the old shape,
+// or refetch=true was passed, fetch from MLB and write through.
 export async function loadDailyData(date: string, opts?: { refetch?: boolean }): Promise<DailyData> {
   let raw = opts?.refetch ? null : await getDailyRaw("mlb", date);
+  if (raw && isOldShape(raw)) raw = null;
   if (!raw) {
     raw = await fetchDailyRaw(date);
     await upsertDailyRaw("mlb", date, raw);

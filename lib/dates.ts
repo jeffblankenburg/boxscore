@@ -27,3 +27,22 @@ export function isValidIsoDate(s: string): boolean {
       && dt.getUTCMonth() === m - 1
       && dt.getUTCDate() === d;
 }
+
+// Returns the date one day after `iso` in ISO format. Used to fetch the
+// "tomorrow" schedule for the Today's Games section of a yesterday-dated digest.
+export function nextDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Format an ISO-8601 timestamp (UTC) as a short ET clock time, e.g. "7:05 PM".
+export function timeInET(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "TBD";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(date);
+}

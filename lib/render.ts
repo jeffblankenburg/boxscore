@@ -12,6 +12,20 @@ export type GameDetail = {
 
 export type LeaderGroup = { label: string; rows: Leader[]; valueLabel: string };
 
+export type UpcomingGame = {
+  gamePk: number;
+  awayName: string;
+  homeName: string;
+  // Full name of probable pitcher; renderer applies lastName() formatting.
+  awayProbable?: string;
+  homeProbable?: string;
+  // Season W-L for each probable pitcher, pre-formatted ("4-2").
+  awayProbableRecord?: string;
+  homeProbableRecord?: string;
+  startTime: string;  // already formatted in ET, e.g. "7:05 PM" or "TBD"
+  status: string;     // detailedState, e.g. "Scheduled", "Postponed"
+};
+
 export type DailyData = {
   date: string;
   prettyDate: string;
@@ -19,6 +33,10 @@ export type DailyData = {
   standings: DivisionStandings[];
   wildCard: WildCardLeagueStandings[];
   leaders: { AL: LeaderGroup[]; NL: LeaderGroup[] };
+  todaysGames: UpcomingGame[];
+  // Live id/name→abbreviation map built from /v1/teams at fetch time. Falls
+  // back to the static TLA_OF for older cache rows that didn't capture it.
+  teamAbbrev: Record<string, string>;
 };
 
 const DIVISIONS = {
@@ -72,8 +90,34 @@ const NICKNAME_OF: Record<string, string> = {
   "Washington Nationals": "Nationals",
 };
 
+// Standard MLB three-letter abbreviations. Used in dense lists (leaders) where
+// "Reds" reads cleaner as "CIN". MLB's /v1/stats/leaders only returns the
+// team's full name; a static map is the cheapest correct path since the team
+// set is stable.
+const TLA_OF: Record<string, string> = {
+  "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL",
+  "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS",
+  "Chicago Cubs": "CHC", "Chicago White Sox": "CWS",
+  "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE",
+  "Colorado Rockies": "COL", "Detroit Tigers": "DET",
+  "Houston Astros": "HOU", "Kansas City Royals": "KC",
+  "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD",
+  "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL",
+  "Minnesota Twins": "MIN", "New York Mets": "NYM",
+  "New York Yankees": "NYY", "Athletics": "ATH",
+  "Oakland Athletics": "ATH", "Philadelphia Phillies": "PHI",
+  "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD",
+  "San Francisco Giants": "SF", "Seattle Mariners": "SEA",
+  "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
+  "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR",
+  "Washington Nationals": "WSH",
+};
+
 const city = (name: string): string => CITY_OF[name] ?? name;
 const nickname = (name: string): string => NICKNAME_OF[name] ?? name;
+// Live → static fallback. Pass the current map from DailyData when rendering.
+const tla = (name: string, live?: Record<string, string>): string =>
+  live?.[name] ?? TLA_OF[name] ?? name;
 
 const esc = (s: string | number | undefined): string =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -113,8 +157,10 @@ export function renderContent(data: DailyData): string {
 
 ${renderSchedule(data.games)}
 
+${renderTodaysGames(data.todaysGames)}
+
 <div class="boxscores-title">Yesterday's Box Scores</div>
-${renderGames(data.games)}`;
+${renderGames(data.games, data.teamAbbrev)}`;
 }
 
 
@@ -131,7 +177,7 @@ function renderLeague(label: string, leagueId: 103 | 104, data: DailyData): stri
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league.id === leagueId);
   const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord) : "";
-  const leadersHtml = renderLeagueLeaders(data.leaders[key]);
+  const leadersHtml = renderLeagueLeaders(data.leaders[key], data.teamAbbrev);
   void leagueId;
   return `<div class="league-band">
   <div class="league-name">${esc(label)}</div>
@@ -244,11 +290,11 @@ function renderDivisionTable(label: string, d: DivisionStandings): string {
 </table></div>`;
 }
 
-function renderLeagueLeaders(groups: LeaderGroup[]): string {
+function renderLeagueLeaders(groups: LeaderGroup[], liveAbbrev: Record<string, string>): string {
   const cards = groups.map((g) => {
     const rows = g.rows.map((L) => `
       <tr>
-        <td class="player-col">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(nickname(L.team?.name ?? ""))}</td>
+        <td class="player-col">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
         <td>${esc(L.value)}</td>
       </tr>`).join("");
     return `<div class="leaders-section">
@@ -279,10 +325,33 @@ function renderSchedule(games: GameDetail[]): string {
 </div>`;
 }
 
-function renderGames(games: GameDetail[]): string {
+function renderTodaysGames(games: UpcomingGame[]): string {
+  if (games.length === 0) return "";
+  const probable = (full?: string, record?: string) => {
+    if (!full) return "";
+    const wl = record ? ` ${esc(record)}` : "";
+    return ` <span class="probable">(${esc(lastName(full))}${wl})</span>`;
+  };
+  const lines = games.map((g) => {
+    // MLB returns Postponed/Cancelled in detailedState; replace the time with
+    // the status so the line still communicates what's happening.
+    const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
+    const right = isOff ? g.status : g.startTime;
+    return `<div class="game-score-line">
+      <span>${esc(nickname(g.awayName))}${probable(g.awayProbable, g.awayProbableRecord)} @ ${esc(nickname(g.homeName))}${probable(g.homeProbable, g.homeProbableRecord)}</span>
+      <span class="game-time">${esc(right)}</span>
+    </div>`;
+  }).join("");
+  return `<div class="games-section">
+  <div class="games-section-title">Today's Games</div>
+  <div class="games-grid games-grid-upcoming">${lines}</div>
+</div>`;
+}
+
+function renderGames(games: GameDetail[], liveAbbrev: Record<string, string>): string {
   const completed = games.filter((g) => g.game.status.codedGameState === "F" && g.box);
   return `<div class="boxscores-container">
-${completed.map((g) => renderGame(g as Required<GameDetail>)).join("")}
+${completed.map((g) => renderGame(g as Required<GameDetail>, liveAbbrev)).join("")}
 </div>`;
 }
 
@@ -310,6 +379,10 @@ const padRhe = (n: number | undefined) =>
   n == null ? FIG_SPACE + "—" : String(n).padStart(2, FIG_SPACE);
 
 function inningGroups(innings: InningsArray, side: "away" | "home", width: number): string {
+  // Pad each digit cell with FIG_SPACE so " 1" and "15" align vertically when
+  // one team has a 10-run inning. Use regular spaces *between* cells — they're
+  // consistent within a line and narrower than digits, which keeps the whole
+  // score line compact.
   const digits = innings.map((inn) => {
     const v = side === "away" ? inn.away?.runs : inn.home?.runs;
     const s = v == null ? "x" : String(v);
@@ -317,12 +390,12 @@ function inningGroups(innings: InningsArray, side: "away" | "home", width: numbe
   });
   const reg = digits.slice(0, 9);
   while (reg.length < 9) reg.push(FIG_SPACE.repeat(width));
-  const groups = [reg.slice(0, 3).join(FIG_SPACE), reg.slice(3, 6).join(FIG_SPACE), reg.slice(6, 9).join(FIG_SPACE)];
+  const groups = [reg.slice(0, 3).join(" "), reg.slice(3, 6).join(" "), reg.slice(6, 9).join(" ")];
   const extras = digits.slice(9);
-  return groups.join(FIG_SPACE) + (extras.length ? FIG_SPACE + extras.join(FIG_SPACE) : "");
+  return groups.join(" ") + (extras.length ? " " + extras.join(" ") : "");
 }
 
-function renderGame({ game, box, scoring }: Required<GameDetail>): string {
+function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Record<string, string>): string {
   const a = game.teams.away, h = game.teams.home;
   const aScore = a.score ?? 0, hScore = h.score ?? 0;
   const innings = game.linescore?.innings ?? [];
@@ -333,9 +406,8 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
     : `${nickname(a.team.name)} ${aScore}, ${nickname(h.team.name)} ${hScore}`;
 
   const w = inningCellWidth(innings);
-  const SEP = FIG_SPACE + FIG_SPACE;
-  const aLine = `${inningGroups(innings, "away", w)}${SEP}—${SEP}${padRhe(ls?.away.runs)}${SEP}${padRhe(ls?.away.hits)}${SEP}${padRhe(ls?.away.errors)}`;
-  const hLine = `${inningGroups(innings, "home", w)}${SEP}—${SEP}${padRhe(ls?.home.runs)}${SEP}${padRhe(ls?.home.hits)}${SEP}${padRhe(ls?.home.errors)}`;
+  const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(ls?.away.runs)}  ${padRhe(ls?.away.hits)}  ${padRhe(ls?.away.errors)}`;
+  const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(ls?.home.runs)}  ${padRhe(ls?.home.hits)}  ${padRhe(ls?.home.errors)}`;
 
   const d = game.decisions;
   const decisionParts = [
@@ -354,11 +426,11 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
   return `<div class="game-container">
   <div class="game-header">${esc(winnerFirst)}</div>
   <div class="team-line">
-    <div class="team-name">${esc(city(a.team.name))}</div>
+    <div class="team-name">${esc(tla(a.team.name, liveAbbrev))}</div>
     <div class="team-score">${aLine}</div>
   </div>
   <div class="team-line">
-    <div class="team-name">${esc(city(h.team.name))}</div>
+    <div class="team-name">${esc(tla(h.team.name, liveAbbrev))}</div>
     <div class="team-score">${hLine}</div>
   </div>
 
