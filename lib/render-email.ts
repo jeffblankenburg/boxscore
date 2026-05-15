@@ -498,6 +498,28 @@ function renderScoring(plays: ScoringPlay[]): string {
   </div>`;
 }
 
+function renderScoringNotes(plays: { inning: number; halfInning: "top" | "bottom"; event: string; description: string; awayScore: number; homeScore: number }[]): string {
+  if (plays.length === 0) return "";
+  const items = plays.map((p) => {
+    const arrow = p.halfInning === "top" ? "▲" : "▼";
+    const inn = `${arrow}${p.inning}`;
+    const score = `${p.awayScore}-${p.homeScore}`;
+    return `<p><span class="inn">${inn} ${score}</span> <span class="ev">${esc(p.description)}</span></p>`;
+  }).join("");
+  return `<div class="es-scoring-block es-scoring">${items}</div>`;
+}
+
+function renderGameInfo(boxInfo: Array<{ label: string; value?: string }>): string {
+  // Mirror the web's order. Keep this short — it's the agate footer.
+  const order = ["Umpires", "Weather", "T", "Att"];
+  const map = new Map(boxInfo.map((i) => [i.label, i.value ?? ""]));
+  const parts = order
+    .filter((label) => map.has(label))
+    .map((label) => `<b>${esc(label)}:</b> ${esc(map.get(label) ?? "")}`);
+  if (parts.length === 0) return "";
+  return `<p class="es-info">${parts.join(" &nbsp; ")}</p>`;
+}
+
 function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Record<string, string>): string {
   const a = game.teams.away, h = game.teams.home;
   const aScore = a.score ?? 0, hScore = h.score ?? 0;
@@ -515,9 +537,6 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
     d?.loser && `<b>L:</b> ${esc(lastName(d.loser.fullName))}`,
     d?.save && `<b>Sv:</b> ${esc(lastName(d.save.fullName))}`,
   ].filter(Boolean).join(" &nbsp;·&nbsp; ");
-  // Scoring plays + umpires/weather/T/A are intentionally omitted in email
-  // to save vertical space. Both remain on the web.
-  void scoring;
 
   return `<div class="es-game">
     ${gameH(winnerFirst)}
@@ -532,6 +551,8 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
     ${renderBatting(box.teams.home, city(h.team.name))}
     ${renderPitching(box.teams.away, city(a.team.name))}
     ${renderPitching(box.teams.home, city(h.team.name))}
+    ${renderScoringNotes(scoring)}
+    ${renderGameInfo(box.info)}
   </div>`;
 }
 
