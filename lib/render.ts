@@ -344,12 +344,11 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
     d?.save && `<b>Sv:</b> ${esc(lastName(d.save.fullName))}`,
   ].filter(Boolean).join(" · ");
 
-  const info = box.info
-    .filter((i) => ["Umpires", "T", "A", "WP", "Weather"].includes(i.label))
-    .map((i) => {
-      const label = i.label === "T" ? "T" : i.label === "A" ? "A" : i.label;
-      return `<b>${esc(label)}:</b> ${esc(i.value ?? "")}`;
-    })
+  const infoOrder = ["Umpires", "Weather", "T", "Att", "WP"];
+  const infoMap = new Map(box.info.map((i) => [i.label, i.value ?? ""]));
+  const info = infoOrder
+    .filter((label) => infoMap.has(label))
+    .map((label) => `<b>${esc(label)}:</b> ${esc(infoMap.get(label) ?? "")}`)
     .join(" ");
 
   return `<div class="game-container">

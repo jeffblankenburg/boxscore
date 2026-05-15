@@ -172,6 +172,45 @@ footer.site-footer {
 }
 footer.site-footer a { color: var(--text-secondary); }
 .site-footer-credit { font-style: italic; }
+.site-footer-legal { display: inline-flex; gap: 12px; font-style: normal; }
+.site-footer-legal a { color: var(--text-muted); text-decoration: none; }
+.site-footer-legal a:hover { text-decoration: underline; }
+
+.legal-page {
+  max-width: 680px;
+  margin: 40px auto;
+  padding: 0 20px;
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+.legal-page h1 {
+  font-size: 32px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.005em;
+  margin: 0 0 6px;
+}
+.legal-page h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 28px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-strong);
+  font-style: normal;
+}
+.legal-page p { margin: 0 0 12px; }
+.legal-page a { color: var(--text-secondary); }
+.legal-updated {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0 0 24px;
+}
 
 .subscribe-card {
   max-width: 560px; margin: 40px auto;
@@ -345,9 +384,6 @@ body:has(.paper-mode) {
 /* Hide the stored web dateline — the paper masthead replaces it. */
 .paper-mode .dateline { display: none; }
 
-/* Hide the site header in paper mode for full-page immersion. The toggle
-   stays accessible via browser back / URL. */
-.paper-mode + .site-footer { display: none; }
 
 /* Section masthead: "SPORTS" big bold on the left, edition info small on
    the right, thin black rules above and below. Matches the running-head
@@ -427,6 +463,15 @@ body:has(.paper-mode) {
   font-size: 16px;
   font-style: normal;
   line-height: 1;
+}
+/* The ⬜ glyph in paper mode is nearly invisible against gray newsprint —
+   add a 1px black ring via text-shadow to outline it. */
+body:has(.paper-mode) .paper-toggle {
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000;
 }
 
 @media (max-width: 900px) {

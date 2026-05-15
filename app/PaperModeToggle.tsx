@@ -22,7 +22,7 @@ export function PaperModeToggle() {
       title={on ? "Web view" : "Newspaper mode"}
       aria-label={on ? "Switch to web view" : "Switch to newspaper mode"}
     >
-      📰
+      {on ? "⬜" : "📰"}
     </a>
   );
 }

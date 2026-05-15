@@ -8,8 +8,8 @@ export const metadata = {
   title: "boxscore.email",
   description: "Daily MLB digest. Sent every morning at 5am ET.",
   icons: {
-    icon: "/icon.png",
-    apple: "/icon.png",
+    icon: "/background_icon.png",
+    apple: "/background_icon.png",
   },
 };
 
@@ -51,6 +51,10 @@ function SiteFooter() {
     <footer className="site-footer">
       <span className="site-footer-credit">
         <a href="/">{BRAND.name}</a> · {BRAND.tagline}
+      </span>
+      <span className="site-footer-legal">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
       </span>
       <Suspense fallback={null}>
         <PaperModeToggle />

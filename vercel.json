@@ -21,6 +21,10 @@
     "app/api/cron/post-bluesky/route.ts": {
       "memory": 1024,
       "maxDuration": 120
+    },
+    "app/api/cron/post-facebook/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
     }
   },
   "headers": [

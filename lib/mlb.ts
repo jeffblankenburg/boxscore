@@ -1,9 +1,14 @@
 const BASE = "https://statsapi.mlb.com/api";
 
-async function get<T>(path: string): Promise<T> {
+// Each MLB endpoint is split into a fetcher (network, returns the unmodified
+// envelope) and a parser (pure, returns the trimmed shape callers want). The
+// daily_raw cache stores fetcher output; callers run that output through the
+// parsers without re-hitting the API.
+
+async function getRaw(path: string): Promise<unknown> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`MLB API ${res.status} for ${path}`);
-  return res.json() as Promise<T>;
+  return res.json();
 }
 
 export type ScheduleGame = {
@@ -31,12 +36,15 @@ export type ScheduleGame = {
   venue?: { name: string };
 };
 
-export async function getSchedule(date: string): Promise<ScheduleGame[]> {
-  type Res = { dates: Array<{ games: ScheduleGame[] }> };
-  const data = await get<Res>(
-    `/v1/schedule?sportId=1&date=${date}&hydrate=linescore,team,decisions,probablePitcher`
-  );
+export async function fetchScheduleRaw(date: string): Promise<unknown> {
+  return getRaw(`/v1/schedule?sportId=1&date=${date}&hydrate=linescore,team,decisions,probablePitcher`);
+}
+export function parseSchedule(raw: unknown): ScheduleGame[] {
+  const data = raw as { dates: Array<{ games: ScheduleGame[] }> };
   return data.dates.flatMap((d) => d.games);
+}
+export async function getSchedule(date: string): Promise<ScheduleGame[]> {
+  return parseSchedule(await fetchScheduleRaw(date));
 }
 
 export type PlayerStats = {
@@ -85,8 +93,14 @@ export type Boxscore = {
   officials?: Array<{ official: { fullName: string }; officialType: string }>;
 };
 
+export async function fetchBoxscoreRaw(gamePk: number): Promise<unknown> {
+  return getRaw(`/v1/game/${gamePk}/boxscore`);
+}
+export function parseBoxscore(raw: unknown): Boxscore {
+  return raw as Boxscore;
+}
 export async function getBoxscore(gamePk: number): Promise<Boxscore> {
-  return get<Boxscore>(`/v1/game/${gamePk}/boxscore`);
+  return parseBoxscore(await fetchBoxscoreRaw(gamePk));
 }
 
 export type ScoringPlay = {
@@ -99,14 +113,17 @@ export type ScoringPlay = {
   rbi: number;
 };
 
-export async function getScoringPlays(gamePk: number): Promise<ScoringPlay[]> {
-  type PlayByPlay = {
-    allPlays: Array<{
-      result: { event: string; description: string; rbi: number; awayScore: number; homeScore: number };
-      about: { isScoringPlay: boolean; inning: number; halfInning: "top" | "bottom" };
-    }>;
-  };
-  const data = await get<PlayByPlay>(`/v1/game/${gamePk}/playByPlay`);
+type PlayByPlay = {
+  allPlays: Array<{
+    result: { event: string; description: string; rbi: number; awayScore: number; homeScore: number };
+    about: { isScoringPlay: boolean; inning: number; halfInning: "top" | "bottom" };
+  }>;
+};
+export async function fetchPlayByPlayRaw(gamePk: number): Promise<unknown> {
+  return getRaw(`/v1/game/${gamePk}/playByPlay`);
+}
+export function parseScoringPlays(raw: unknown): ScoringPlay[] {
+  const data = raw as PlayByPlay;
   return data.allPlays
     .filter((p) => p.about.isScoringPlay)
     .map((p) => ({
@@ -118,6 +135,9 @@ export async function getScoringPlays(gamePk: number): Promise<ScoringPlay[]> {
       homeScore: p.result.homeScore,
       rbi: p.result.rbi,
     }));
+}
+export async function getScoringPlays(gamePk: number): Promise<ScoringPlay[]> {
+  return parseScoringPlays(await fetchPlayByPlayRaw(gamePk));
 }
 
 export type TeamRecord = {
@@ -143,10 +163,14 @@ export type DivisionStandings = {
   teamRecords: TeamRecord[];
 };
 
+export async function fetchStandingsRaw(season: number, date: string): Promise<unknown> {
+  return getRaw(`/v1/standings?leagueId=103,104&season=${season}&date=${date}`);
+}
+export function parseStandings(raw: unknown): DivisionStandings[] {
+  return (raw as { records: DivisionStandings[] }).records;
+}
 export async function getStandings(season: number, date: string): Promise<DivisionStandings[]> {
-  type Res = { records: DivisionStandings[] };
-  const data = await get<Res>(`/v1/standings?leagueId=103,104&season=${season}&date=${date}`);
-  return data.records;
+  return parseStandings(await fetchStandingsRaw(season, date));
 }
 
 export type WildCardLeagueStandings = {
@@ -154,12 +178,14 @@ export type WildCardLeagueStandings = {
   teamRecords: TeamRecord[];
 };
 
+export async function fetchWildCardRaw(season: number, date: string): Promise<unknown> {
+  return getRaw(`/v1/standings?leagueId=103,104&season=${season}&date=${date}&standingsTypes=wildCard`);
+}
+export function parseWildCard(raw: unknown): WildCardLeagueStandings[] {
+  return (raw as { records: WildCardLeagueStandings[] }).records;
+}
 export async function getWildCardStandings(season: number, date: string): Promise<WildCardLeagueStandings[]> {
-  type Res = { records: WildCardLeagueStandings[] };
-  const data = await get<Res>(
-    `/v1/standings?leagueId=103,104&season=${season}&date=${date}&standingsTypes=wildCard`
-  );
-  return data.records;
+  return parseWildCard(await fetchWildCardRaw(season, date));
 }
 
 export type Leader = {
@@ -169,14 +195,21 @@ export type Leader = {
   team?: { id: number; name: string };
 };
 
+export async function fetchLeadersRaw(
+  category: string, season: number, leagueId: 103 | 104, limit = 5,
+): Promise<unknown> {
+  return getRaw(
+    `/v1/stats/leaders?leaderCategories=${category}&season=${season}&sportId=1&leagueId=${leagueId}&limit=${limit}&statGroup=${guessStatGroup(category)}`
+  );
+}
+export function parseLeaders(raw: unknown): Leader[] {
+  const data = raw as { leagueLeaders: Array<{ leaderCategory: string; leaders: Leader[] }> };
+  return data.leagueLeaders[0]?.leaders ?? [];
+}
 export async function getLeaders(
   category: string, season: number, leagueId: 103 | 104, limit = 5,
 ): Promise<Leader[]> {
-  type Res = { leagueLeaders: Array<{ leaderCategory: string; leaders: Leader[] }> };
-  const data = await get<Res>(
-    `/v1/stats/leaders?leaderCategories=${category}&season=${season}&sportId=1&leagueId=${leagueId}&limit=${limit}&statGroup=${guessStatGroup(category)}`
-  );
-  return data.leagueLeaders[0]?.leaders ?? [];
+  return parseLeaders(await fetchLeadersRaw(category, season, leagueId, limit));
 }
 
 function guessStatGroup(category: string): "hitting" | "pitching" {
