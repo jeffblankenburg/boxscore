@@ -22,8 +22,12 @@ export type RenderedImage = {
   png: Uint8Array;
 };
 
+// Must match the installed version of @sparticuz/chromium-min. The `pack.x64`
+// asset is the x86_64 Linux binary that Vercel functions need.
+// When bumping the npm package, update this constant to match.
+const SPARTICUZ_VERSION = "147.0.0";
 const SPARTICUZ_CHROMIUM_URL =
-  "https://github.com/Sparticuz/chromium/releases/download/v140.0.0/chromium-v140.0.0-pack.tar";
+  `https://github.com/Sparticuz/chromium/releases/download/v${SPARTICUZ_VERSION}/chromium-v${SPARTICUZ_VERSION}-pack.x64.tar`;
 
 function isServerless(): boolean {
   // Vercel sets VERCEL_ENV; AWS Lambda sets AWS_LAMBDA_FUNCTION_NAME.
