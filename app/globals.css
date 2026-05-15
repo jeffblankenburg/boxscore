@@ -87,12 +87,17 @@ th, td { text-align: right; overflow: hidden; line-height: 1.15; padding: 0 2px;
 th:first-child, td:first-child { text-align: left; }
 th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 
-.standings-table { margin-bottom: 8px; }
+.standings-wrap { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+.standings-table { margin-bottom: 8px; table-layout: fixed; min-width: 380px; }
 .standings-table th { border-top: none; border-bottom: 1px solid var(--border-strong); }
-.standings-table .team-col { width: 24%; }
-.standings-table .num-col { width: 6%; }
+.standings-table .team-col { width: 22%; }
+.standings-table .w-col,
+.standings-table .l-col { width: 5%; }
 .standings-table .pct-col { width: 8%; }
-.standings-table .diff-col { width: 8%; }
+.standings-table .gb-col { width: 7%; }
+.standings-table .diff-col { width: 9%; }
+.standings-table .rec-col { width: 10%; }
+.standings-table .strk-col { width: 9%; }
 .standings-table tr.wc-cutoff td { border-top: 2px dashed var(--border-strong); }
 
 .leaders-section { margin-bottom: 10px; }

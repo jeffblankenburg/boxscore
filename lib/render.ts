@@ -173,35 +173,35 @@ function renderWildCardTable(wc: WildCardLeagueStandings): string {
     const cutoffClass = i === 3 ? " wc-cutoff" : "";
     return `<tr class="${cutoffClass.trim()}">
       <td class="team-col">${esc(nickname(t.team.name))}</td>
-      <td class="num-col">${t.wins}</td>
-      <td class="num-col">${t.losses}</td>
+      <td class="w-col">${t.wins}</td>
+      <td class="l-col">${t.losses}</td>
       <td class="pct-col">${esc(t.leagueRecord.pct).replace(/^0/, "")}</td>
-      <td class="pct-col">${esc(t.wildCardGamesBack ?? "—")}</td>
+      <td class="gb-col">${esc(t.wildCardGamesBack ?? "—")}</td>
       <td class="diff-col">${fmtDiff(t.runsScored, t.runsAllowed)}</td>
-      <td class="pct-col">${home ? home.wins + "-" + home.losses : "—"}</td>
-      <td class="pct-col">${away ? away.wins + "-" + away.losses : "—"}</td>
-      <td class="pct-col">${l10 ? l10.wins + "-" + l10.losses : "—"}</td>
-      <td class="pct-col">${esc(t.streak?.streakCode ?? "—")}</td>
+      <td class="rec-col">${home ? home.wins + "-" + home.losses : "—"}</td>
+      <td class="rec-col">${away ? away.wins + "-" + away.losses : "—"}</td>
+      <td class="rec-col">${l10 ? l10.wins + "-" + l10.losses : "—"}</td>
+      <td class="strk-col">${esc(t.streak?.streakCode ?? "—")}</td>
     </tr>`;
   }).join("");
   return `<div class="stats-subheader">Wild Card</div>
-<table class="standings-table">
+<div class="standings-wrap"><table class="standings-table">
   <thead>
     <tr>
       <th class="team-col">Team</th>
-      <th class="num-col">W</th>
-      <th class="num-col">L</th>
+      <th class="w-col">W</th>
+      <th class="l-col">L</th>
       <th class="pct-col">Pct</th>
-      <th class="pct-col">WCGB</th>
+      <th class="gb-col">WCGB</th>
       <th class="diff-col">Diff</th>
-      <th class="pct-col">Home</th>
-      <th class="pct-col">Away</th>
-      <th class="pct-col">L10</th>
-      <th class="pct-col">Strk</th>
+      <th class="rec-col">Home</th>
+      <th class="rec-col">Away</th>
+      <th class="rec-col">L10</th>
+      <th class="strk-col">Strk</th>
     </tr>
   </thead>
   <tbody>${rows}</tbody>
-</table>`;
+</table></div>`;
 }
 
 function renderDivisionTable(label: string, d: DivisionStandings): string {
@@ -213,35 +213,35 @@ function renderDivisionTable(label: string, d: DivisionStandings): string {
       const l10 = t.records?.splitRecords?.find((s) => s.type === "lastTen");
       return `<tr>
         <td class="team-col">${esc(nickname(t.team.name))}</td>
-        <td class="num-col">${t.wins}</td>
-        <td class="num-col">${t.losses}</td>
+        <td class="w-col">${t.wins}</td>
+        <td class="l-col">${t.losses}</td>
         <td class="pct-col">${esc(t.leagueRecord.pct).replace(/^0/, "")}</td>
-        <td class="pct-col">${esc(t.gamesBack)}</td>
+        <td class="gb-col">${esc(t.gamesBack)}</td>
         <td class="diff-col">${fmtDiff(t.runsScored, t.runsAllowed)}</td>
-        <td class="pct-col">${home ? home.wins + "-" + home.losses : "—"}</td>
-        <td class="pct-col">${away ? away.wins + "-" + away.losses : "—"}</td>
-        <td class="pct-col">${l10 ? l10.wins + "-" + l10.losses : "—"}</td>
-        <td class="pct-col">${esc(t.streak?.streakCode ?? "—")}</td>
+        <td class="rec-col">${home ? home.wins + "-" + home.losses : "—"}</td>
+        <td class="rec-col">${away ? away.wins + "-" + away.losses : "—"}</td>
+        <td class="rec-col">${l10 ? l10.wins + "-" + l10.losses : "—"}</td>
+        <td class="strk-col">${esc(t.streak?.streakCode ?? "—")}</td>
       </tr>`;
     }).join("");
   return `<div class="stats-subheader">${esc(label)}</div>
-<table class="standings-table">
+<div class="standings-wrap"><table class="standings-table">
   <thead>
     <tr>
       <th class="team-col">Team</th>
-      <th class="num-col">W</th>
-      <th class="num-col">L</th>
+      <th class="w-col">W</th>
+      <th class="l-col">L</th>
       <th class="pct-col">Pct</th>
-      <th class="pct-col">GB</th>
+      <th class="gb-col">GB</th>
       <th class="diff-col">Diff</th>
-      <th class="pct-col">Home</th>
-      <th class="pct-col">Away</th>
-      <th class="pct-col">L10</th>
-      <th class="pct-col">Strk</th>
+      <th class="rec-col">Home</th>
+      <th class="rec-col">Away</th>
+      <th class="rec-col">L10</th>
+      <th class="strk-col">Strk</th>
     </tr>
   </thead>
   <tbody>${rows}</tbody>
-</table>`;
+</table></div>`;
 }
 
 function renderLeagueLeaders(groups: LeaderGroup[]): string {

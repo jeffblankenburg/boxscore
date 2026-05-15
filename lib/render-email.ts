@@ -191,13 +191,22 @@ const colH = (t: string) => `<div class="es-col-h">${esc(t)}</div>`;
 
 // ─── standings + wildcard ─────────────────────────────────────────────────
 
-function standingsTableHead(): string {
+function standingsColgroup(): string {
+  // Pinned column widths so "14-10", "+105" etc. don't push columns around.
+  return `<colgroup>
+    <col width="22%"><col width="5%"><col width="5%"><col width="8%">
+    <col width="7%"><col width="9%"><col width="10%"><col width="10%">
+    <col width="9%"><col width="9%">
+  </colgroup>`;
+}
+
+function standingsTableHead(label: string = "GB"): string {
   return `<thead><tr>
     <th align="left">Team</th>
     <th align="right">W</th>
     <th align="right">L</th>
     <th align="right">Pct</th>
-    <th align="right">GB</th>
+    <th align="right">${label}</th>
     <th align="right">Diff</th>
     <th align="right">Home</th>
     <th align="right">Away</th>
@@ -248,7 +257,8 @@ function renderDivisionStandings(label: string, d: DivisionStandings): string {
       });
     }).join("");
   return `${subH(label + " Division")}
-    <table class="es-table" cellpadding="0" cellspacing="0" border="0">
+    <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
+      ${standingsColgroup()}
       ${standingsTableHead()}
       <tbody>${rows}</tbody>
     </table>`;
@@ -283,8 +293,9 @@ function renderWildCard(wc: WildCardLeagueStandings): string {
     }, i === 3 ? "es-cutoff" : "");
   }).join("");
   return `${subH("Wild Card")}
-    <table class="es-table" cellpadding="0" cellspacing="0" border="0">
-      ${standingsTableHead()}
+    <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
+      ${standingsColgroup()}
+      ${standingsTableHead("WCGB")}
       <tbody>${rows}</tbody>
     </table>`;
 }
