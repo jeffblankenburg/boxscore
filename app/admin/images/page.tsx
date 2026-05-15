@@ -5,13 +5,23 @@ import { regenerateShareImages } from "../actions";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Share images · admin · boxscore.email", robots: { index: false } };
 
-export default async function AdminImagesView() {
+export default async function AdminImagesView({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const defaultDate = yesterdayInET();
   const { date, images } = await listStoredImages();
+  const { error } = await searchParams;
 
   return (
     <main className="admin">
       <h1>Share images</h1>
+      {error && (
+        <p className="admin-error">
+          <strong>Regenerate failed:</strong> {error}
+        </p>
+      )}
       <p className="admin-meta">
         {date
           ? `${images.length} images in Storage for ${prettyDate(date)}.`

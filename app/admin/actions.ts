@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getDigest } from "@/lib/digests";
 import { sendEmail } from "@/lib/email";
@@ -38,11 +39,26 @@ export async function sendAdminPreview(date: string): Promise<void> {
 export async function regenerateShareImages(formData: FormData): Promise<void> {
   const raw = formData.get("date");
   const date = typeof raw === "string" && raw ? raw : yesterdayInET();
-  if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
 
-  const origin = await siteOrigin();
-  const images = await renderShareImages({ date, baseUrl: origin });
-  await uploadShareImages({ date, images });
+  try {
+    if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
 
-  revalidatePath("/admin/images");
+    const origin = await siteOrigin();
+    console.log(`[regen] start ${date} origin=${origin}`);
+
+    const t0 = Date.now();
+    const images = await renderShareImages({ date, baseUrl: origin });
+    console.log(`[regen] rendered ${images.length} images in ${Date.now() - t0}ms`);
+
+    const t1 = Date.now();
+    await uploadShareImages({ date, images });
+    console.log(`[regen] uploaded in ${Date.now() - t1}ms`);
+
+    revalidatePath("/admin/images");
+  } catch (err) {
+    const msg = (err as Error).message;
+    const stack = (err as Error).stack ?? "";
+    console.error(`[regen] FAILED for ${date}: ${msg}\n${stack}`);
+    redirect(`/admin/images?error=${encodeURIComponent(msg)}`);
+  }
 }
