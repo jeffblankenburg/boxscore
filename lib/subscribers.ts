@@ -64,19 +64,34 @@ export async function findByUnsubscribeToken(token: string): Promise<Subscriber 
 }
 
 /**
- * Flips pending → active. Idempotent on already-active subscribers (returns
- * the existing row without doing work). No-op if status is "unsubscribed".
+ * Atomically flip pending → active. Returns the updated row only if THIS call
+ * caused the transition (i.e., previous status was "pending"); returns null
+ * if the subscriber was already active or unsubscribed.
+ *
+ * This is what lets us send the welcome email *exactly once* even when the
+ * confirm URL gets clicked multiple times — by Gmail's link safety scanner,
+ * link previews, the user themselves, etc.
  */
-export async function confirmSubscriber(id: string): Promise<Subscriber> {
+export async function confirmSubscriberIfPending(id: string): Promise<Subscriber | null> {
   const { data, error } = await supabaseAdmin()
     .from("subscribers")
     .update({ status: "active" as const, confirmed_at: new Date().toISOString() })
     .eq("id", id)
-    .in("status", ["pending", "active"])
+    .eq("status", "pending")
     .select(COLS)
-    .single<Subscriber>();
-  if (error) throw new Error(`confirmSubscriber: ${error.message}`);
-  return data;
+    .maybeSingle<Subscriber>();
+  if (error) throw new Error(`confirmSubscriberIfPending: ${error.message}`);
+  return data ?? null;
+}
+
+export async function getActiveSubscribers(): Promise<Subscriber[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .select(COLS)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`getActiveSubscribers: ${error.message}`);
+  return (data ?? []) as Subscriber[];
 }
 
 /**

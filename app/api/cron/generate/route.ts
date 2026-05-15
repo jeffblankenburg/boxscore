@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadDailyData } from "@/lib/daily";
 import { renderContent } from "@/lib/render";
+import { renderEmailContent } from "@/lib/render-email";
 import { upsertDigest } from "@/lib/digests";
 import { yesterdayInET, isValidIsoDate } from "@/lib/dates";
 
@@ -27,13 +28,17 @@ export async function GET(req: Request) {
 
   const data = await loadDailyData(date);
   const html = renderContent(data);
-  await upsertDigest("mlb", date, html, data.games.length);
+  const email_html = renderEmailContent(data);
+  await upsertDigest({
+    sport: "mlb", date, html, email_html, game_count: data.games.length,
+  });
 
   return NextResponse.json({
     ok: true,
     sport: "mlb",
     date,
     game_count: data.games.length,
-    bytes: html.length,
+    html_bytes: html.length,
+    email_bytes: email_html.length,
   });
 }

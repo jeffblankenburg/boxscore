@@ -1,5 +1,6 @@
 import { loadDailyData } from "../lib/daily";
 import { renderContent } from "../lib/render";
+import { renderEmailContent } from "../lib/render-email";
 import { upsertDigest } from "../lib/digests";
 import { supabaseAdmin } from "../lib/supabase";
 import { yesterdayInET } from "../lib/dates";
@@ -47,7 +48,8 @@ function eachDate(startIso: string, endIso: string): string[] {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const season = Number(process.argv[2] ?? "2026");
+  const positional = process.argv.slice(2).filter((a) => !a.startsWith("-"));
+  const season = Number(positional[0] ?? "2026");
   const force = process.argv.includes("--force");
   const delayMs = Number(process.env.BACKFILL_DELAY_MS ?? "1500");
 
@@ -73,9 +75,12 @@ async function main() {
     try {
       const data = await loadDailyData(date);
       const html = renderContent(data);
-      await upsertDigest("mlb", date, html, data.games.length);
+      const email_html = renderEmailContent(data);
+      await upsertDigest({
+        sport: "mlb", date, html, email_html, game_count: data.games.length,
+      });
       console.log(
-        `${prefix}  store  ${data.games.length} games, ${(html.length / 1024).toFixed(0)} KB`
+        `${prefix}  store  ${data.games.length} games, web ${(html.length / 1024).toFixed(0)} KB, email ${(email_html.length / 1024).toFixed(0)} KB`,
       );
       stored++;
     } catch (err) {

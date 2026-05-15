@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/generate?sport=mlb",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-email?sport=mlb",
+      "schedule": "15 9 * * *"
     }
   ],
   "headers": [
