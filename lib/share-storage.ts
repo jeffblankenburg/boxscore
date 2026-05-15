@@ -1,17 +1,32 @@
 import { supabaseAdmin } from "./supabase";
-import type { RenderedImage } from "./render-images";
+import type { ManifestEntry, RenderedImage } from "./render-images";
 
 // Storage strategy for share images:
 //   - One set of images in the bucket at a time. No history.
-//   - Filenames carry the date prefix: "2026-05-14_al-standings.png".
+//   - Images: "2026-05-14_al-standings.png" at bucket root.
+//   - Manifest: "_manifest.json" — full entry metadata (titles, teams, league)
+//     for downstream consumers like the admin Twitter page that need to
+//     compose post text without re-rendering.
 //   - Each generate clears the bucket first, then uploads the new set.
 //   - Public bucket → <img> tags work without auth.
 
 const BUCKET = "share-images";
+const MANIFEST_FILE = "_manifest.json";
 
 export type StoredImage = {
   file: string;        // e.g. "al-standings.png" (without the date_ prefix)
   url: string;
+};
+
+export type ManifestImage = {
+  entry: ManifestEntry;
+  url: string;
+};
+
+export type StoredManifest = {
+  date: string;
+  prettyDate: string;
+  entries: ManifestImage[];
 };
 
 export async function clearShareImages(): Promise<number> {
@@ -29,11 +44,12 @@ export async function clearShareImages(): Promise<number> {
 
 export async function uploadShareImages(args: {
   date: string;
+  prettyDate: string;
   images: RenderedImage[];
-}): Promise<StoredImage[]> {
+}): Promise<StoredManifest> {
   await clearShareImages();
   const supa = supabaseAdmin();
-  const out: StoredImage[] = [];
+  const entries: ManifestImage[] = [];
   for (const { entry, png } of args.images) {
     const path = `${args.date}_${entry.file}`;
     const { error } = await supa.storage.from(BUCKET).upload(path, png, {
@@ -42,9 +58,34 @@ export async function uploadShareImages(args: {
     });
     if (error) throw new Error(`storage upload ${path}: ${error.message}`);
     const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(path);
-    out.push({ file: entry.file, url: urlData.publicUrl });
+    entries.push({ entry, url: urlData.publicUrl });
   }
-  return out;
+
+  const manifest: StoredManifest = {
+    date: args.date,
+    prettyDate: args.prettyDate,
+    entries,
+  };
+  const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
+  const { error: mErr } = await supa.storage.from(BUCKET).upload(MANIFEST_FILE, manifestBytes, {
+    contentType: "application/json",
+    upsert: true,
+  });
+  if (mErr) throw new Error(`storage upload manifest: ${mErr.message}`);
+
+  return manifest;
+}
+
+export async function getStoredManifest(): Promise<StoredManifest | null> {
+  const supa = supabaseAdmin();
+  const { data, error } = await supa.storage.from(BUCKET).download(MANIFEST_FILE);
+  if (error || !data) return null;
+  try {
+    const text = await data.text();
+    return JSON.parse(text) as StoredManifest;
+  } catch {
+    return null;
+  }
 }
 
 export async function listStoredImages(): Promise<{ date: string | null; images: StoredImage[] }> {

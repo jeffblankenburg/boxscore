@@ -255,6 +255,38 @@ footer.site-footer a { color: var(--text-secondary); }
                                 font-family: ui-monospace, monospace;
                                 margin-top: 6px; word-break: break-all; }
 
+.admin.admin-wide { max-width: 1100px; }
+.twitter-post-list { list-style: none; padding: 0; margin: 16px 0 0;
+                     display: flex; flex-direction: column; gap: 20px; }
+.twitter-post-card { display: grid;
+                     grid-template-columns: 280px 1fr; gap: 18px;
+                     padding: 14px; border: 1px solid var(--border-light);
+                     background: #fff; border-radius: 6px;
+                     align-items: start; }
+.twitter-post-image img { width: 100%; height: auto; display: block;
+                          border: 1px solid var(--border-light); }
+.twitter-post-body { display: flex; flex-direction: column; gap: 10px; }
+.twitter-post-label { font-family: ui-monospace, monospace; font-size: 11px;
+                      color: var(--text-muted); text-transform: lowercase;
+                      letter-spacing: 0.04em; }
+.twitter-post-text { font: 13px/1.5 ui-monospace, "Menlo", monospace;
+                     background: #f6f3eb; padding: 10px 12px;
+                     border: 1px solid var(--border-light);
+                     border-radius: 4px; margin: 0;
+                     white-space: pre-wrap; word-break: break-word;
+                     color: var(--text-primary); }
+.copy-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-btn-small { padding: 5px 12px; font-size: 12px; }
+.admin-btn-ghost { background: #fff; color: var(--text-primary);
+                   border: 1px solid var(--border-strong);
+                   text-decoration: none; }
+.admin-btn-ghost:hover { background: #f3efe5; }
+.admin-btn-ok { background: #2a7a2a !important; border-color: #2a7a2a !important; }
+
+@media (max-width: 640px) {
+  .twitter-post-card { grid-template-columns: 1fr; }
+}
+
 .not-found-game {
   max-width: 560px; margin: 40px auto;
   padding: 16px 20px;

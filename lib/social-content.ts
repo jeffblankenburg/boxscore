@@ -28,3 +28,38 @@ export function tweetText(ctx: DailyPostContext): string {
 export function blueskyText(ctx: DailyPostContext): string {
   return dailyPostBody(ctx);
 }
+
+// Per-image post content used by both the BlueSky cron (auto) and the admin
+// Twitter compose page (manual paste). Same wording across platforms.
+import type { ManifestEntry } from "./render-images";
+
+const hashtag = (team: string): string => "#" + team.replace(/\s+/g, "");
+
+export function imagePostContent(
+  entry: ManifestEntry,
+  prettyDate: string,
+  digestUrl: string,
+): { text: string; alt: string } {
+  if (entry.type === "standings") {
+    const name = entry.league === "AL" ? "American League" : "National League";
+    return {
+      text: `${name} Standings · ${prettyDate}\n\n#MLB ${digestUrl}`,
+      alt: `${name} Standings for ${prettyDate}.`,
+    };
+  }
+  if (entry.type === "leaders") {
+    const name = entry.league === "AL" ? "American League" : "National League";
+    return {
+      text: `${name} Leaders · ${prettyDate}\n\n#MLB ${digestUrl}`,
+      alt: `${name} Leaders as of ${prettyDate}.`,
+    };
+  }
+  const tags = entry.teams
+    .filter((t) => t.length > 0)
+    .map(hashtag)
+    .join(" ");
+  return {
+    text: `${entry.title} · ${prettyDate}\n\n${tags} #MLB ${digestUrl}`.trim(),
+    alt: `Box score: ${entry.title} on ${prettyDate}.`,
+  };
+}

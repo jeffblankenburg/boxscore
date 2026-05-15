@@ -82,6 +82,13 @@ export default async function AdminDashboard({
           <a href="/admin/images">View share images (and regenerate)</a>
         </p>
       </section>
+
+      <section>
+        <h2>Twitter compose</h2>
+        <p>
+          <a href="/admin/twitter">Copy posts to clipboard for manual Twitter posting</a>
+        </p>
+      </section>
     </main>
   );
 }

@@ -64,7 +64,7 @@ export async function regenerateShareImages(formData: FormData): Promise<void> {
     console.log(`[regen] rendered ${images.length} images in ${Date.now() - t0}ms`);
 
     const t1 = Date.now();
-    await uploadShareImages({ date, images });
+    await uploadShareImages({ date, prettyDate: prettyDate(date), images });
     console.log(`[regen] uploaded in ${Date.now() - t1}ms`);
 
     revalidatePath("/admin/images");

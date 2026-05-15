@@ -4,8 +4,9 @@ import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
 import { deleteBlueskyPost, postToBlueskyWithImage } from "@/lib/bluesky";
 import { siteOrigin } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
-import { renderShareImages, type ManifestEntry } from "@/lib/render-images";
+import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
+import { imagePostContent } from "@/lib/social-content";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -15,37 +16,6 @@ function isAuthorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
-const hashtag = (team: string): string => "#" + team.replace(/\s+/g, "");
-
-function postContent(
-  entry: ManifestEntry,
-  pretty: string,
-  digestUrl: string,
-): { text: string; alt: string } {
-  if (entry.type === "standings") {
-    const name = entry.league === "AL" ? "American League" : "National League";
-    return {
-      text: `${name} Standings · ${pretty}\n\n#MLB ${digestUrl}`,
-      alt: `${name} Standings for ${pretty}.`,
-    };
-  }
-  if (entry.type === "leaders") {
-    const name = entry.league === "AL" ? "American League" : "National League";
-    return {
-      text: `${name} Leaders · ${pretty}\n\n#MLB ${digestUrl}`,
-      alt: `${name} Leaders as of ${pretty}.`,
-    };
-  }
-  const tags = entry.teams
-    .filter((t) => t.length > 0)
-    .map(hashtag)
-    .join(" ");
-  return {
-    text: `${entry.title} · ${pretty}\n\n${tags} #MLB ${digestUrl}`.trim(),
-    alt: `Box score: ${entry.title} on ${pretty}.`,
-  };
 }
 
 // Read width/height from PNG header (IHDR chunk). Used so BlueSky renders
@@ -113,10 +83,11 @@ export async function GET(req: Request) {
     );
   }
 
-  // Mirror to Supabase Storage so the admin gallery shows the latest set.
-  // Failure here doesn't block posting; BlueSky uploads use the in-memory PNGs.
+  // Mirror to Supabase Storage so the admin gallery + Twitter compose page
+  // can show + serve the latest set. Failure here doesn't block posting —
+  // BlueSky uploads use the in-memory PNGs directly.
   try {
-    await uploadShareImages({ date, images });
+    await uploadShareImages({ date, prettyDate: pretty, images });
   } catch (err) {
     console.error(`share-storage upload failed: ${(err as Error).message}`);
   }
@@ -131,7 +102,7 @@ export async function GET(req: Request) {
       continue;
     }
 
-    const { text, alt } = postContent(entry, pretty, digestUrl);
+    const { text, alt } = imagePostContent(entry, pretty, digestUrl);
     const dims = readPngDimensions(png) ?? undefined;
 
     try {
