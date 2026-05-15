@@ -67,7 +67,7 @@ export function confirmationEmail(opts: { confirmUrl: string }): { subject: stri
     ${button(opts.confirmUrl, "Confirm subscription →")}
     ${pasteLink(opts.confirmUrl)}
     <p style="font-size:12px; color:${MUTED}; margin-top:28px; padding-top:14px; border-top:1px dotted ${RULE};">
-      Didn't sign up? Ignore this email and you'll never hear from us.
+      Didn't sign up? Ignore this email and you'll never hear from us. Promise.
     </p>
     `,
     { previewText: "Click to confirm your subscription." },
