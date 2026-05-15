@@ -40,9 +40,6 @@ function SiteHeader() {
         {BRAND.social.map((s) => (
           <a key={s.label} href={s.href}>{s.label}</a>
         ))}
-        <Suspense fallback={null}>
-          <PaperModeToggle />
-        </Suspense>
       </nav>
       <a className="subscribe" href={BRAND.subscribeUrl}>Subscribe →</a>
     </header>
@@ -52,7 +49,12 @@ function SiteHeader() {
 function SiteFooter() {
   return (
     <footer className="site-footer">
-      <a href="/">{BRAND.name}</a> · {BRAND.tagline}
+      <span className="site-footer-credit">
+        <a href="/">{BRAND.name}</a> · {BRAND.tagline}
+      </span>
+      <Suspense fallback={null}>
+        <PaperModeToggle />
+      </Suspense>
     </footer>
   );
 }

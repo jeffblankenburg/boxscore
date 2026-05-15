@@ -29,9 +29,9 @@ export function PaperMasthead({ date }: { date: string }) {
   const issueNo = dayOfYear(date);
   return (
     <div className="paper-masthead">
-      <div className="paper-masthead-name">The Boxscore</div>
+      <div className="paper-masthead-section">Sports</div>
       <div className="paper-masthead-edition">
-        Vol. {volume} · No. {issueNo} · Est. {ESTABLISHED} · {prettyDate(date)}
+        Vol. {volume} · No. {issueNo} · {prettyDate(date)}
       </div>
     </div>
   );

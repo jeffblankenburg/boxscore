@@ -16,8 +16,13 @@ export function PaperModeToggle() {
   const href = query ? `${pathname}?${query}` : pathname;
 
   return (
-    <a href={href} className="paper-toggle">
-      {on ? "← Web view" : "Newspaper mode →"}
+    <a
+      href={href}
+      className="paper-toggle"
+      title={on ? "Web view" : "Newspaper mode"}
+      aria-label={on ? "Switch to web view" : "Switch to newspaper mode"}
+    >
+      📰
     </a>
   );
 }
