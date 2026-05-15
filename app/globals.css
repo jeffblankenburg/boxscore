@@ -221,6 +221,12 @@ footer.site-footer a { color: var(--text-secondary); }
 .admin-btn:hover { background: #333; }
 .admin-email-frame { width: 100%; height: 85vh; border: 1px solid var(--border-strong);
                      margin-top: 12px; background: #fff; }
+.admin-regen-form { display: flex; gap: 12px; align-items: center;
+                    margin: 12px 0; flex-wrap: wrap; }
+.admin-input { font: inherit; font-size: 14px;
+               padding: 6px 8px;
+               border: 1px solid var(--border-strong); background: #fff;
+               border-radius: 4px; }
 .admin-image-grid { display: grid; gap: 18px;
                     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
                     margin-top: 16px; }

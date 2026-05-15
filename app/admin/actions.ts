@@ -1,19 +1,18 @@
 "use server";
 
-import { mkdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { revalidatePath } from "next/cache";
 import { getDigest } from "@/lib/digests";
 import { sendEmail } from "@/lib/email";
 import { dailyEmail } from "@/lib/emails/templates";
-import { prettyDate, isValidIsoDate } from "@/lib/dates";
+import { prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates";
 import { renderShareImages } from "@/lib/render-images";
+import { uploadShareImages } from "@/lib/share-storage";
 import { siteOrigin } from "@/lib/site";
 
 export async function sendAdminPreview(date: string): Promise<void> {
   if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
   const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) throw new Error("ADMIN_EMAIL not set in .env.local");
+  if (!adminEmail) throw new Error("ADMIN_EMAIL not set");
 
   const digest = await getDigest("mlb", date);
   if (!digest || !digest.email_html) {
@@ -36,28 +35,14 @@ export async function sendAdminPreview(date: string): Promise<void> {
   });
 }
 
-export async function regenerateShareImages(date: string): Promise<void> {
+export async function regenerateShareImages(formData: FormData): Promise<void> {
+  const raw = formData.get("date");
+  const date = typeof raw === "string" && raw ? raw : yesterdayInET();
   if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
 
   const origin = await siteOrigin();
   const images = await renderShareImages({ date, baseUrl: origin });
+  await uploadShareImages({ date, images });
 
-  const outDir = resolve("out/share", date);
-  await mkdir(outDir, { recursive: true });
-
-  const entries = [];
-  for (const { entry, png } of images) {
-    await writeFile(resolve(outDir, entry.file), png);
-    entries.push(entry);
-  }
-
-  const manifest = {
-    sport: "mlb" as const,
-    date,
-    prettyDate: prettyDate(date),
-    entries,
-  };
-  await writeFile(resolve(outDir, "manifest.json"), JSON.stringify(manifest, null, 2));
-
-  revalidatePath(`/admin/images/${date}`);
+  revalidatePath("/admin/images");
 }

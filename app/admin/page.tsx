@@ -66,9 +66,7 @@ export default async function AdminDashboard() {
       <section>
         <h2>Share images</h2>
         <p>
-          <a href={`/admin/images/${date}`}>
-            View share images for {date}
-          </a>
+          <a href="/admin/images">View share images (and regenerate)</a>
         </p>
       </section>
     </main>

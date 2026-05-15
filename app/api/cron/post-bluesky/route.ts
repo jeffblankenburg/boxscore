@@ -5,6 +5,7 @@ import { deleteBlueskyPost, postToBlueskyWithImage } from "@/lib/bluesky";
 import { siteOrigin } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
 import { renderShareImages, type ManifestEntry } from "@/lib/render-images";
+import { uploadShareImages } from "@/lib/share-storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -110,6 +111,14 @@ export async function GET(req: Request) {
       { error: `render failed: ${(err as Error).message}` },
       { status: 500 },
     );
+  }
+
+  // Mirror to Supabase Storage so the admin gallery shows the latest set.
+  // Failure here doesn't block posting; BlueSky uploads use the in-memory PNGs.
+  try {
+    await uploadShareImages({ date, images });
+  } catch (err) {
+    console.error(`share-storage upload failed: ${(err as Error).message}`);
   }
 
   let posted = 0, skipped = 0, failed = 0;
