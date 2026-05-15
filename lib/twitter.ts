@@ -19,12 +19,28 @@ function client(): TwitterApi {
 }
 
 export async function postTweet(text: string): Promise<{ id: string; url: string }> {
-  const res = await client().v2.tweet(text);
-  if (!res.data?.id) {
-    throw new Error(`twitter: no id returned (${JSON.stringify(res)})`);
+  try {
+    const res = await client().v2.tweet(text);
+    if (!res.data?.id) {
+      throw new Error(`twitter: no id returned (${JSON.stringify(res)})`);
+    }
+    const handle = process.env.TWITTER_HANDLE ?? "boxscoreemail";
+    return { id: res.data.id, url: `https://twitter.com/${handle}/status/${res.data.id}` };
+  } catch (err) {
+    // twitter-api-v2 throws ApiResponseError with rich diagnostics. Surface
+    // the parts that actually help us debug (status, code, error array).
+    const e = err as {
+      code?: number;
+      data?: unknown;
+      errors?: Array<{ message?: string; code?: number }>;
+      message?: string;
+    };
+    const detail = {
+      status: e.code,
+      twitterErrors: e.errors,
+      twitterData: e.data,
+      message: e.message,
+    };
+    throw new Error(`twitter: ${JSON.stringify(detail)}`);
   }
-  // Use the project's own handle from env, falling back to the @boxscoreemail
-  // placeholder. The post URL works regardless once Twitter rewrites it.
-  const handle = process.env.TWITTER_HANDLE ?? "boxscoreemail";
-  return { id: res.data.id, url: `https://twitter.com/${handle}/status/${res.data.id}` };
 }

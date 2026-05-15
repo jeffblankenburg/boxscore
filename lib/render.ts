@@ -288,15 +288,11 @@ ${completed.map((g) => renderGame(g as Required<GameDetail>)).join("")}
 
 type InningsArray = Array<{ away?: { runs?: number }; home?: { runs?: number } }>;
 
-function inningCellWidth(innings: InningsArray): number {
-  let w = 1;
-  for (const inn of innings) {
-    const av = inn.away?.runs ?? 0;
-    const hv = inn.home?.runs ?? 0;
-    w = Math.max(w, String(av).length, String(hv).length);
-  }
-  return w;
-}
+// Always reserve 2 chars per inning so columns stay aligned regardless of values.
+const INNING_CELL_WIDTH = 2;
+
+// Pad R/H/E to 2-char width so single- and double-digit values line up.
+const padRhe = (n: number | undefined) => (n == null ? " —" : String(n).padStart(2));
 
 function inningGroups(innings: InningsArray, side: "away" | "home", width: number): string {
   const digits = innings.map((inn) => {
@@ -321,9 +317,9 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
     ? `${nickname(h.team.name)} ${hScore}, ${nickname(a.team.name)} ${aScore}`
     : `${nickname(a.team.name)} ${aScore}, ${nickname(h.team.name)} ${hScore}`;
 
-  const w = inningCellWidth(innings);
-  const aLine = `${inningGroups(innings, "away", w)}  —  ${pad(ls?.away.runs)}  ${pad(ls?.away.hits)}  ${pad(ls?.away.errors)}`;
-  const hLine = `${inningGroups(innings, "home", w)}  —  ${pad(ls?.home.runs)}  ${pad(ls?.home.hits)}  ${pad(ls?.home.errors)}`;
+  const w = INNING_CELL_WIDTH;
+  const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(ls?.away.runs)}  ${padRhe(ls?.away.hits)}  ${padRhe(ls?.away.errors)}`;
+  const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(ls?.home.runs)}  ${padRhe(ls?.home.hits)}  ${padRhe(ls?.home.errors)}`;
 
   const d = game.decisions;
   const decisionParts = [

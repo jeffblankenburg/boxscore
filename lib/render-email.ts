@@ -342,17 +342,11 @@ function renderLeaders(data: DailyData): string {
 
 // ─── boxscores ────────────────────────────────────────────────────────────
 
-function inningCellWidth(
-  innings: NonNullable<ScheduleGame["linescore"]>["innings"],
-): number {
-  let w = 1;
-  for (const inn of innings) {
-    const av = inn.away?.runs ?? 0;
-    const hv = inn.home?.runs ?? 0;
-    w = Math.max(w, String(av).length, String(hv).length);
-  }
-  return w;
-}
+// Always reserve 2 chars per inning so columns stay aligned across games and
+// rows — a 10-run inning in one game won't shift other games' alignment, and
+// inning N for the away team always lines up with inning N for the home team
+// regardless of which is 1-digit and which is 2.
+const INNING_CELL_WIDTH = 2;
 
 function inningGroups(
   innings: NonNullable<ScheduleGame["linescore"]>["innings"],
@@ -489,7 +483,7 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
     : `${nickname(a.team.name)} ${aScore}, ${nickname(h.team.name)} ${hScore}`;
   const innings = game.linescore?.innings ?? [];
   const ls = game.linescore?.teams;
-  const w = inningCellWidth(innings);
+  const w = INNING_CELL_WIDTH;
   const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(ls?.away.runs)}  ${padRhe(ls?.away.hits)}  ${padRhe(ls?.away.errors)}`;
   const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(ls?.home.runs)}  ${padRhe(ls?.home.hits)}  ${padRhe(ls?.home.errors)}`;
   const d = game.decisions;

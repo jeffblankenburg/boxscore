@@ -11,9 +11,20 @@ export type DailyPostContext = {
 
 const SPORT_LABEL: Record<string, string> = { mlb: "MLB" };
 
-export function tweetText(ctx: DailyPostContext): string {
+function dailyPostBody(ctx: DailyPostContext): string {
   const sport = SPORT_LABEL[ctx.sport] ?? ctx.sport.toUpperCase();
   return `⚾ ${sport} box scores · ${ctx.prettyDate} · ${ctx.gameCount} games
 
 ${ctx.digestUrl}`;
+}
+
+// Twitter and BlueSky use the same body for now. If we ever need
+// platform-specific tweaks (different limits, hashtag conventions, etc.),
+// they diverge here.
+export function tweetText(ctx: DailyPostContext): string {
+  return dailyPostBody(ctx);
+}
+
+export function blueskyText(ctx: DailyPostContext): string {
+  return dailyPostBody(ctx);
 }

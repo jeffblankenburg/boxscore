@@ -11,8 +11,18 @@
     {
       "path": "/api/cron/post-twitter?sport=mlb",
       "schedule": "20 9 * * *"
+    },
+    {
+      "path": "/api/cron/post-bluesky?sport=mlb",
+      "schedule": "25 9 * * *"
     }
   ],
+  "functions": {
+    "app/api/cron/post-bluesky/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
+    }
+  },
   "headers": [
     {
       "source": "/.well-known/atproto-did",

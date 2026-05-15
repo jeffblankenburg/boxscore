@@ -134,7 +134,11 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
   display: flex; justify-content: space-between; font-size: 13px;
   font-weight: 700; line-height: 1.25; margin-top: 1px;
 }
-.team-line .team-score { font-variant-numeric: tabular-nums; letter-spacing: 0; white-space: pre; }
+.team-line .team-score {
+  font-family: 'Courier New', Courier, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0; white-space: pre;
+}
 
 .batting-table, .pitching-table { font-size: 13px; margin-top: 4px; }
 .batting-table .player-col, .pitching-table .player-col { width: 38%; }
@@ -193,6 +197,39 @@ footer.site-footer a { color: var(--text-secondary); }
 .subscribe-error { color: #a40000; font-size: 13px; margin: 4px 0 0; }
 .subscribe-fine { font-size: 13px; color: var(--text-muted); margin: 18px 0 0; }
 .subscribe-card a { color: var(--text-secondary); }
+
+.admin { max-width: 920px; margin: 32px auto; padding: 0 20px;
+         font-family: Georgia, 'Times New Roman', serif; color: var(--text-primary); }
+.admin h1 { font-size: 24px; font-style: italic; font-weight: 800; margin: 0 0 8px;
+            letter-spacing: -0.005em; }
+.admin h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em;
+            font-weight: 700; color: var(--text-muted); margin: 28px 0 8px;
+            padding-bottom: 4px; border-bottom: 1px solid var(--border-strong); }
+.admin section { margin: 18px 0; }
+.admin a { color: var(--text-secondary); }
+.admin a:hover { color: var(--text-primary); }
+.admin code { font-family: ui-monospace, monospace; font-size: 12px;
+              background: rgba(0,0,0,0.04); padding: 1px 4px; border-radius: 3px; }
+.admin-meta { font-size: 13px; color: var(--text-muted); font-style: italic; }
+.admin-stats { list-style: none; padding: 0; margin: 0; font-size: 14px;
+               line-height: 1.6; }
+.admin-stats strong { color: var(--text-primary); }
+.admin-btn { font: inherit; font-size: 14px; font-weight: 700;
+             background: #000; color: #fff; border: 1px solid #000;
+             padding: 8px 14px; border-radius: 999px; cursor: pointer;
+             letter-spacing: 0.02em; }
+.admin-btn:hover { background: #333; }
+.admin-email-frame { width: 100%; height: 85vh; border: 1px solid var(--border-strong);
+                     margin-top: 12px; background: #fff; }
+.admin-image-grid { display: grid; gap: 18px;
+                    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                    margin-top: 16px; }
+.admin-image-grid figure { margin: 0; padding: 8px;
+                            border: 1px solid var(--border-light); background: #fff; }
+.admin-image-grid img { width: 100%; height: auto; display: block; }
+.admin-image-grid figcaption { font-size: 12px; color: var(--text-muted);
+                                font-family: ui-monospace, monospace;
+                                margin-top: 6px; word-break: break-all; }
 
 .not-found-game {
   max-width: 560px; margin: 40px auto;
