@@ -131,11 +131,16 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .game-container { break-inside: avoid; page-break-inside: avoid; margin-bottom: 18px; }
 .game-header { font-weight: 700; font-size: 18px; border-bottom: 1px solid var(--border-strong); }
 .team-line {
-  display: flex; justify-content: space-between; font-size: 13px;
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 6px; font-size: 13px;
   font-weight: 700; line-height: 1.25; margin-top: 1px;
 }
+.team-line .team-name {
+  min-width: 0; flex: 1 1 auto;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .team-line .team-score {
-  font-family: 'Courier New', Courier, monospace;
+  flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0; white-space: pre;
 }

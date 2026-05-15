@@ -288,23 +288,38 @@ ${completed.map((g) => renderGame(g as Required<GameDetail>)).join("")}
 
 type InningsArray = Array<{ away?: { runs?: number }; home?: { runs?: number } }>;
 
-// Always reserve 2 chars per inning so columns stay aligned regardless of values.
-const INNING_CELL_WIDTH = 2;
+// Use the widest digit across both teams' innings so columns stay aligned within
+// a game, without paying for 2-char padding on the common all-single-digit case.
+function inningCellWidth(innings: InningsArray): number {
+  let w = 1;
+  for (const inn of innings) {
+    const av = inn.away?.runs ?? 0;
+    const hv = inn.home?.runs ?? 0;
+    w = Math.max(w, String(av).length, String(hv).length);
+  }
+  return w;
+}
+
+// U+2007 figure space is the same width as a digit in fonts with tabular
+// numerals — lets us pad/separate scores cleanly in the proportional body
+// font instead of falling back to a different (monospace) typeface.
+const FIG_SPACE = "\u2007";
 
 // Pad R/H/E to 2-char width so single- and double-digit values line up.
-const padRhe = (n: number | undefined) => (n == null ? " —" : String(n).padStart(2));
+const padRhe = (n: number | undefined) =>
+  n == null ? FIG_SPACE + "—" : String(n).padStart(2, FIG_SPACE);
 
 function inningGroups(innings: InningsArray, side: "away" | "home", width: number): string {
   const digits = innings.map((inn) => {
     const v = side === "away" ? inn.away?.runs : inn.home?.runs;
     const s = v == null ? "x" : String(v);
-    return s.padStart(width);
+    return s.padStart(width, FIG_SPACE);
   });
   const reg = digits.slice(0, 9);
-  while (reg.length < 9) reg.push(" ".repeat(width));
-  const groups = [reg.slice(0, 3).join(""), reg.slice(3, 6).join(""), reg.slice(6, 9).join("")];
+  while (reg.length < 9) reg.push(FIG_SPACE.repeat(width));
+  const groups = [reg.slice(0, 3).join(FIG_SPACE), reg.slice(3, 6).join(FIG_SPACE), reg.slice(6, 9).join(FIG_SPACE)];
   const extras = digits.slice(9);
-  return groups.join(" ") + (extras.length ? " " + extras.join(" ") : "");
+  return groups.join(FIG_SPACE) + (extras.length ? FIG_SPACE + extras.join(FIG_SPACE) : "");
 }
 
 function renderGame({ game, box, scoring }: Required<GameDetail>): string {
@@ -317,9 +332,10 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
     ? `${nickname(h.team.name)} ${hScore}, ${nickname(a.team.name)} ${aScore}`
     : `${nickname(a.team.name)} ${aScore}, ${nickname(h.team.name)} ${hScore}`;
 
-  const w = INNING_CELL_WIDTH;
-  const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(ls?.away.runs)}  ${padRhe(ls?.away.hits)}  ${padRhe(ls?.away.errors)}`;
-  const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(ls?.home.runs)}  ${padRhe(ls?.home.hits)}  ${padRhe(ls?.home.errors)}`;
+  const w = inningCellWidth(innings);
+  const SEP = FIG_SPACE + FIG_SPACE;
+  const aLine = `${inningGroups(innings, "away", w)}${SEP}—${SEP}${padRhe(ls?.away.runs)}${SEP}${padRhe(ls?.away.hits)}${SEP}${padRhe(ls?.away.errors)}`;
+  const hLine = `${inningGroups(innings, "home", w)}${SEP}—${SEP}${padRhe(ls?.home.runs)}${SEP}${padRhe(ls?.home.hits)}${SEP}${padRhe(ls?.home.errors)}`;
 
   const d = game.decisions;
   const decisionParts = [
