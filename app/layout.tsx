@@ -5,6 +5,10 @@ import { BRAND } from "@/lib/brand";
 export const metadata = {
   title: "boxscore.email",
   description: "Daily MLB digest. Sent every morning at 5am ET.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -25,7 +29,10 @@ function SiteHeader() {
   return (
     <header className="site-header">
       <div className="brand">
-        <a href="/">boxscore<span className="dot">.</span>email</a>
+        <a href="/">
+          <img src="/icon.png" alt="" width={28} height={28} className="brand-icon" />
+          <span>boxscore<span className="dot">.</span>email</span>
+        </a>
       </div>
       <nav className="social">
         {BRAND.social.map((s) => (

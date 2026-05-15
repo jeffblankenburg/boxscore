@@ -157,7 +157,7 @@ ${preview}
 
       <tr><td style="padding-bottom:10px; border-bottom:2px solid ${INK}; text-align:center;">
         <a href="https://boxscore.email/" style="text-decoration:none; color:${INK}; font-weight:800; font-size:20px; letter-spacing:-0.01em; font-family:Georgia, serif;">
-          boxscore<span style="color:${MUTED};">.</span>email
+          <img src="https://boxscore.email/icon.png" alt="" width="24" height="24" style="vertical-align:middle; margin-right:6px; border-radius:4px;">boxscore<span style="color:${MUTED};">.</span>email
         </a>
       </td></tr>
 

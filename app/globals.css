@@ -32,7 +32,14 @@ a { color: inherit; }
   gap: 12px; padding: 4px 0 10px; flex-wrap: wrap;
 }
 .site-header .brand { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
-.site-header .brand a { color: inherit; text-decoration: none; }
+.site-header .brand a {
+  color: inherit; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.site-header .brand-icon {
+  display: block; width: 28px; height: 28px;
+  border-radius: 4px; flex-shrink: 0;
+}
 .site-header .brand .dot { color: var(--text-muted); }
 .site-header .social { font-size: 13px; }
 .site-header .social a {
