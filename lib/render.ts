@@ -344,7 +344,7 @@ function renderGame({ game, box, scoring }: Required<GameDetail>): string {
     d?.save && `<b>Sv:</b> ${esc(lastName(d.save.fullName))}`,
   ].filter(Boolean).join(" · ");
 
-  const infoOrder = ["Umpires", "Weather", "T", "Att", "WP"];
+  const infoOrder = ["Umpires", "Weather", "T", "Att"];
   const infoMap = new Map(box.info.map((i) => [i.label, i.value ?? ""]));
   const info = infoOrder
     .filter((label) => infoMap.has(label))
@@ -432,8 +432,12 @@ function renderPitching(team: BoxTeam, cityName: string): string {
   const rows = ordered.map((p) => {
     const pi = p.stats.pitching;
     const era = fmtEra(p.seasonStats.pitching.era);
+    // MLB pre-formats decision notes like "(W, 2-1)", "(L, 0-3)", "(S, 7)",
+    // "(H, 4)", "(BS, 2)" on each pitcher's game stats. Render alongside the
+    // name when present so readers see who got the win/loss/save/hold inline.
+    const note = pi.note ? ` <span class="pitcher-note">${esc(pi.note)}</span>` : "";
     return `<tr>
-      <td class="player-col">${esc(lastName(p.person.fullName))}</td>
+      <td class="player-col">${esc(lastName(p.person.fullName))}${note}</td>
       <td class="ip-col">${esc(pi.inningsPitched ?? "-")}</td>
       <td class="stat-col">${pad(pi.hits)}</td>
       <td class="stat-col">${pad(pi.runs)}</td>

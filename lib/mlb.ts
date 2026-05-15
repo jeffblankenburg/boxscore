@@ -113,10 +113,19 @@ export type ScoringPlay = {
   rbi: number;
 };
 
+type PlayRunner = {
+  details?: {
+    event?: string;
+    isScoringEvent?: boolean;
+    runner?: { fullName?: string };
+  };
+  movement?: { end?: string | null };
+};
 type PlayByPlay = {
   allPlays: Array<{
     result: { event: string; description: string; rbi: number; awayScore: number; homeScore: number };
     about: { isScoringPlay: boolean; inning: number; halfInning: "top" | "bottom" };
+    runners?: PlayRunner[];
   }>;
 };
 export async function fetchPlayByPlayRaw(gamePk: number): Promise<unknown> {
@@ -125,16 +134,44 @@ export async function fetchPlayByPlayRaw(gamePk: number): Promise<unknown> {
 export function parseScoringPlays(raw: unknown): ScoringPlay[] {
   const data = raw as PlayByPlay;
   return data.allPlays
-    .filter((p) => p.about.isScoringPlay)
-    .map((p) => ({
-      inning: p.about.inning,
-      halfInning: p.about.halfInning,
-      event: p.result.event,
-      description: p.result.description,
-      awayScore: p.result.awayScore,
-      homeScore: p.result.homeScore,
-      rbi: p.result.rbi,
-    }));
+    .filter((p) => {
+      if (p.about.isScoringPlay) return true;
+      // MLB's isScoringPlay is keyed to the *batter's* at-bat result, so it
+      // misses runs that score mid-at-bat (wild pitches, balks, passed balls,
+      // errors). Catch those by inspecting the runners array.
+      return p.runners?.some(
+        (r) => r.details?.isScoringEvent && r.movement?.end === "score",
+      ) ?? false;
+    })
+    .map((p) => {
+      // For mid-at-bat scoring (batter didn't drive it in), synthesize a
+      // description from the runner who scored, since result.description only
+      // covers the at-bat outcome ("Tena strikes out swinging").
+      let event = p.result.event;
+      let description = p.result.description;
+      if (!p.about.isScoringPlay) {
+        const scoringRunners = (p.runners ?? []).filter(
+          (r) => r.details?.isScoringEvent && r.movement?.end === "score",
+        );
+        if (scoringRunners.length > 0) {
+          const names = scoringRunners
+            .map((r) => r.details?.runner?.fullName ?? "runner")
+            .join(" and ");
+          const ev = scoringRunners[0]?.details?.event ?? "play";
+          event = ev;
+          description = `${names} scores on ${ev.toLowerCase()}.`;
+        }
+      }
+      return {
+        inning: p.about.inning,
+        halfInning: p.about.halfInning,
+        event,
+        description,
+        awayScore: p.result.awayScore,
+        homeScore: p.result.homeScore,
+        rbi: p.result.rbi,
+      };
+    });
 }
 export async function getScoringPlays(gamePk: number): Promise<ScoringPlay[]> {
   return parseScoringPlays(await fetchPlayByPlayRaw(gamePk));

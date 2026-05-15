@@ -430,8 +430,11 @@ function renderPitching(team: BoxTeam, cityName: string): string {
   const rows = ordered.map((p) => {
     const pi = p.stats.pitching;
     const era = fmtEra(p.seasonStats.pitching.era);
+    const note = pi.note
+      ? ` <span style="color:#6a6354;font-weight:400;">${esc(pi.note)}</span>`
+      : "";
     return `<tr>
-      <td align="left">${esc(lastName(p.person.fullName))}</td>
+      <td align="left">${esc(lastName(p.person.fullName))}${note}</td>
       <td align="right">${esc(pi.inningsPitched ?? "-")}</td>
       <td align="right">${pad(pi.hits)}</td>
       <td align="right">${pad(pi.runs)}</td>
