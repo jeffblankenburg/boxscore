@@ -1,6 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import { yesterdayInET } from "@/lib/dates";
 
+export const dynamic = "force-dynamic";
+
 export default async function SportLatest({
   params,
 }: {
