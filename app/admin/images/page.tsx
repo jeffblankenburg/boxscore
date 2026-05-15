@@ -8,15 +8,20 @@ export const metadata = { title: "Share images · admin · boxscore.email", robo
 export default async function AdminImagesView({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
   const defaultDate = yesterdayInET();
   const { date, images } = await listStoredImages();
-  const { error } = await searchParams;
+  const { error, ok } = await searchParams;
 
   return (
     <main className="admin">
       <h1>Share images</h1>
+      {ok && (
+        <p className="admin-success">
+          <strong>✓</strong> {ok}
+        </p>
+      )}
       {error && (
         <p className="admin-error">
           <strong>Regenerate failed:</strong> {error}

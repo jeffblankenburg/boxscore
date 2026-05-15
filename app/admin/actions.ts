@@ -11,35 +11,48 @@ import { uploadShareImages } from "@/lib/share-storage";
 import { siteOrigin } from "@/lib/site";
 
 export async function sendAdminPreview(date: string): Promise<void> {
-  if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) throw new Error("ADMIN_EMAIL not set");
+  // Redirect must happen outside try/catch — Next.js implements redirects via
+  // a thrown signal that would otherwise get swallowed.
+  let target: string;
+  try {
+    if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) throw new Error("ADMIN_EMAIL not set");
 
-  const digest = await getDigest("mlb", date);
-  if (!digest || !digest.email_html) {
-    throw new Error(`No email_html for ${date}`);
+    const digest = await getDigest("mlb", date);
+    if (!digest || !digest.email_html) {
+      throw new Error(`No email_html for ${date}`);
+    }
+
+    const origin = await siteOrigin();
+    const { subject, html, text } = dailyEmail({
+      digestPrettyDate: prettyDate(date),
+      digestUrl: `${origin}/mlb/${date}`,
+      unsubscribeUrl: `${origin}/u/admin-preview`,
+      digestEmailHtml: digest.email_html,
+    });
+
+    await sendEmail({
+      to: adminEmail,
+      subject: `[ADMIN PREVIEW] ${subject}`,
+      html,
+      text,
+    });
+
+    target = `/admin?ok=${encodeURIComponent(`Sent ${prettyDate(date)} digest to ${adminEmail}.`)}`;
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`[send-admin-preview] FAILED: ${msg}`);
+    target = `/admin?error=${encodeURIComponent(msg)}`;
   }
-
-  const origin = await siteOrigin();
-  const { subject, html, text } = dailyEmail({
-    digestPrettyDate: prettyDate(date),
-    digestUrl: `${origin}/mlb/${date}`,
-    unsubscribeUrl: `${origin}/u/admin-preview`,
-    digestEmailHtml: digest.email_html,
-  });
-
-  await sendEmail({
-    to: adminEmail,
-    subject: `[ADMIN PREVIEW] ${subject}`,
-    html,
-    text,
-  });
+  redirect(target);
 }
 
 export async function regenerateShareImages(formData: FormData): Promise<void> {
   const raw = formData.get("date");
   const date = typeof raw === "string" && raw ? raw : yesterdayInET();
 
+  let target: string;
   try {
     if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
 
@@ -55,10 +68,13 @@ export async function regenerateShareImages(formData: FormData): Promise<void> {
     console.log(`[regen] uploaded in ${Date.now() - t1}ms`);
 
     revalidatePath("/admin/images");
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    target = `/admin/images?ok=${encodeURIComponent(`Generated ${images.length} images for ${date} in ${elapsed}s.`)}`;
   } catch (err) {
     const msg = (err as Error).message;
     const stack = (err as Error).stack ?? "";
     console.error(`[regen] FAILED for ${date}: ${msg}\n${stack}`);
-    redirect(`/admin/images?error=${encodeURIComponent(msg)}`);
+    target = `/admin/images?error=${encodeURIComponent(msg)}`;
   }
+  redirect(target);
 }

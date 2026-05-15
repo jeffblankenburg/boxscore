@@ -5,10 +5,15 @@ import { supabaseAdmin } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · boxscore.email", robots: { index: false } };
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; error?: string }>;
+}) {
   const date = yesterdayInET();
   const pretty = prettyDate(date);
   const digest = await getDigest("mlb", date);
+  const { ok, error } = await searchParams;
 
   // Quick status counts
   const { count: subscriberCount } = await supabaseAdmin()
@@ -31,6 +36,13 @@ export default async function AdminDashboard() {
   return (
     <main className="admin">
       <h1>Admin</h1>
+
+      {ok && (
+        <p className="admin-success"><strong>✓</strong> {ok}</p>
+      )}
+      {error && (
+        <p className="admin-error"><strong>Failed:</strong> {error}</p>
+      )}
 
       <section>
         <h2>Status</h2>

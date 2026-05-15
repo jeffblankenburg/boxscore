@@ -225,6 +225,10 @@ footer.site-footer a { color: var(--text-secondary); }
                padding: 10px 12px; margin: 12px 0;
                font-size: 14px; color: #a40000;
                border-radius: 4px; }
+.admin-success { background: #e6f7e6; border: 1px solid #2a7a2a;
+                 padding: 10px 12px; margin: 12px 0;
+                 font-size: 14px; color: #1f5f1f;
+                 border-radius: 4px; }
 .admin-regen-form { display: flex; gap: 12px; align-items: center;
                     margin: 12px 0; flex-wrap: wrap; }
 .admin-input { font: inherit; font-size: 14px;
