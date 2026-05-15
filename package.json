@@ -9,6 +9,7 @@
     "generate": "tsx scripts/generate.ts",
     "store": "tsx --env-file=.env.local scripts/generate-and-store.ts",
     "backfill": "tsx --env-file=.env.local scripts/backfill.ts",
+    "screenshot": "tsx scripts/screenshot-sections.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "playwright": "^1.60.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import { yesterdayInET } from "@/lib/dates";
 
-// Force per-request rendering — otherwise Next.js prerenders the homepage
-// at build time and the redirect is frozen to whatever yesterday was when
-// we last deployed.
+// Redirects "/" to the bookmarkable league page. Eventually this becomes a
+// sport picker (mlb / nba / nfl / ...). For now there's only mlb.
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  redirect(`/mlb/${yesterdayInET()}`);
+  redirect("/mlb");
 }
