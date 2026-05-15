@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { isValidIsoDate, prettyDate } from "@/lib/dates";
 import { getDigest } from "@/lib/digests";
+import { PaperMasthead } from "@/app/PaperMasthead";
 
 export const dynamicParams = true;
 export const revalidate = false;
@@ -16,8 +17,10 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
 
 export default async function DayPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sport: string; date: string }>;
+  searchParams: Promise<{ paper?: string }>;
 }) {
   const { sport, date } = await params;
   if (sport !== "mlb") notFound();
@@ -26,5 +29,13 @@ export default async function DayPage({
   const digest = await getDigest(sport, date);
   if (!digest) notFound();
 
-  return <div dangerouslySetInnerHTML={{ __html: digest.html }} />;
+  const { paper } = await searchParams;
+  const paperMode = paper === "1";
+
+  return (
+    <div className={paperMode ? "paper-mode" : undefined}>
+      {paperMode && <PaperMasthead date={date} />}
+      <div dangerouslySetInnerHTML={{ __html: digest.html }} />
+    </div>
+  );
 }

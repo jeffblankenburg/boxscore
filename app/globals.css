@@ -305,6 +305,60 @@ footer.site-footer a { color: var(--text-secondary); }
 .not-found-game .gameinfo b { font-style: normal; color: var(--text-secondary); }
 .not-found-game a { color: var(--text-primary); font-weight: 700; }
 
+/* ─── Newspaper mode (?paper=1) ──────────────────────────────────────── */
+/* Inline SVG noise filter for a subtle paper grain. Tinted slightly to */
+/* push the cream feel without obscuring the content underneath.        */
+.paper-mode {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.42  0 0 0 0 0.36  0 0 0 0 0.22  0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-blend-mode: multiply;
+  background-color: #f4ecd6;
+}
+.paper-mode .dateline { display: none; }
+.paper-masthead {
+  text-align: center;
+  border-top: 3px double var(--border-strong);
+  border-bottom: 3px double var(--border-strong);
+  padding: 14px 0 12px;
+  margin-bottom: 18px;
+  font-family: Georgia, "Times New Roman", Times, serif;
+}
+.paper-masthead-name {
+  font-size: 56px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.015em;
+  line-height: 1.0;
+  margin-bottom: 6px;
+}
+.paper-masthead-edition {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-top: 1px solid #c4baa5;
+  padding-top: 6px;
+  margin-top: 6px;
+  font-style: italic;
+}
+.paper-mode .league-band .league-name { font-style: italic; }
+.paper-mode .game-header { font-style: italic; }
+.paper-mode .boxscores-title {
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+.paper-mode .newspaper {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+}
+
+/* Toggle link in the site header — small, italic, matches the social
+   row's tone but distinguishable. */
+.paper-toggle {
+  font-style: italic; color: var(--text-secondary);
+  text-decoration: none; margin-left: 6px;
+  padding-left: 6px; border-left: 1px solid var(--border-light);
+}
+.paper-toggle:hover { text-decoration: underline; }
+
 @media (max-width: 900px) {
   .boxscores-container { column-count: 2; }
   .column-container { flex-direction: column; }

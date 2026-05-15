@@ -1,6 +1,8 @@
 import "./globals.css";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import { BRAND } from "@/lib/brand";
+import { PaperModeToggle } from "./PaperModeToggle";
 
 export const metadata = {
   title: "boxscore.email",
@@ -38,6 +40,9 @@ function SiteHeader() {
         {BRAND.social.map((s) => (
           <a key={s.label} href={s.href}>{s.label}</a>
         ))}
+        <Suspense fallback={null}>
+          <PaperModeToggle />
+        </Suspense>
       </nav>
       <a className="subscribe" href={BRAND.subscribeUrl}>Subscribe →</a>
     </header>

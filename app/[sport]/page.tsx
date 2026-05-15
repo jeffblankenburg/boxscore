@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDigest } from "@/lib/digests";
 import { prettyDate, yesterdayInET } from "@/lib/dates";
+import { PaperMasthead } from "@/app/PaperMasthead";
 
 // Bookmarkable league page. URL stays as `/mlb` while rendering the latest
 // finalized day's digest. The dated route `/mlb/[date]` continues to serve
@@ -25,8 +26,10 @@ export async function generateMetadata({
 
 export default async function SportLatest({
   params,
+  searchParams,
 }: {
   params: Promise<{ sport: string }>;
+  searchParams: Promise<{ paper?: string }>;
 }) {
   const { sport } = await params;
   if (!VALID_SPORTS.has(sport)) notFound();
@@ -35,5 +38,13 @@ export default async function SportLatest({
   const digest = await getDigest(sport, date);
   if (!digest) notFound();
 
-  return <div dangerouslySetInnerHTML={{ __html: digest.html }} />;
+  const { paper } = await searchParams;
+  const paperMode = paper === "1";
+
+  return (
+    <div className={paperMode ? "paper-mode" : undefined}>
+      {paperMode && <PaperMasthead date={date} />}
+      <div dangerouslySetInnerHTML={{ __html: digest.html }} />
+    </div>
+  );
 }
