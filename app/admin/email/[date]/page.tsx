@@ -3,6 +3,7 @@ import { getDigest } from "@/lib/digests";
 import { dailyEmail } from "@/lib/emails/templates";
 import { isValidIsoDate, prettyDate } from "@/lib/dates";
 import { siteOrigin } from "@/lib/site";
+import { requireAdmin } from "../../require-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Email preview · admin · boxscore.email", robots: { index: false } };
@@ -12,6 +13,7 @@ export default async function AdminEmailPreview({
 }: {
   params: Promise<{ date: string }>;
 }) {
+  await requireAdmin();
   const { date } = await params;
   if (!isValidIsoDate(date)) notFound();
 

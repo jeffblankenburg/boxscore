@@ -48,6 +48,46 @@ export async function sendAdminPreview(date: string): Promise<void> {
   redirect(target);
 }
 
+// Trigger a cron route on demand. Calls the existing route handler over HTTP
+// with the CRON_SECRET auth header so the route logs to cron_runs the same
+// way a scheduled run would (with trigger="manual"). Awaits the result so the
+// admin gets a redirect with success/error flash.
+export async function triggerCron(formData: FormData): Promise<void> {
+  const route = String(formData.get("route") ?? "");
+  const rawDate = formData.get("date");
+  const date = typeof rawDate === "string" && rawDate ? rawDate : yesterdayInET();
+  const reset = formData.get("reset") === "1";
+
+  let target: string;
+  try {
+    if (!["generate", "send-email", "post-bluesky"].includes(route)) {
+      throw new Error(`Unknown cron route: ${route}`);
+    }
+    if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
+
+    const origin = await siteOrigin();
+    const params = new URLSearchParams({ trigger: "manual", date, sport: "mlb" });
+    if (reset) params.set("reset", "1");
+    const url = `${origin}/api/cron/${route}?${params}`;
+
+    const headers: HeadersInit = {};
+    const secret = process.env.CRON_SECRET;
+    if (secret) headers.Authorization = `Bearer ${secret}`;
+
+    const res = await fetch(url, { headers });
+    const body = (await res.json()) as { error?: string; ok?: boolean } & Record<string, unknown>;
+    if (!res.ok || body.error) {
+      throw new Error(body.error ?? `HTTP ${res.status}`);
+    }
+    target = `/admin?ok=${encodeURIComponent(`${route} for ${date} → ${JSON.stringify(body)}`)}`;
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`[trigger-cron] ${route} ${date}: ${msg}`);
+    target = `/admin?error=${encodeURIComponent(`${route}: ${msg}`)}`;
+  }
+  redirect(target);
+}
+
 export async function regenerateShareImages(formData: FormData): Promise<void> {
   const raw = formData.get("date");
   const date = typeof raw === "string" && raw ? raw : yesterdayInET();

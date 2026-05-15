@@ -2,6 +2,7 @@ import { listStoredImages } from "@/lib/share-storage";
 import { yesterdayInET, prettyDate } from "@/lib/dates";
 import { regenerateShareImages } from "../actions";
 import { SubmitButton } from "../SubmitButton";
+import { requireAdmin } from "../require-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Share images · admin · boxscore.email", robots: { index: false } };
@@ -11,6 +12,7 @@ export default async function AdminImagesView({
 }: {
   searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
+  await requireAdmin();
   const defaultDate = yesterdayInET();
   const { date, images } = await listStoredImages();
   const { error, ok } = await searchParams;

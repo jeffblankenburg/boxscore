@@ -7,6 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
 import { imagePostContent } from "@/lib/social-content";
+import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -37,9 +38,14 @@ export async function GET(req: Request) {
   const date = url.searchParams.get("date") ?? yesterdayInET();
   const sport = url.searchParams.get("sport") ?? "mlb";
   const reset = url.searchParams.get("reset") === "1";
+  const trigger = url.searchParams.get("trigger") === "manual" ? "manual" : "cron";
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
+
+  const runId = await startCronRun({ route: "post-bluesky", sport, date, trigger });
+
+  try {
 
   if (reset) {
     const { data: prior, error: priorErr } = await supabaseAdmin()
@@ -48,9 +54,7 @@ export async function GET(req: Request) {
       .eq("platform", "bluesky")
       .eq("sport", sport)
       .eq("date", date);
-    if (priorErr) {
-      return NextResponse.json({ error: `reset query: ${priorErr.message}` }, { status: 500 });
-    }
+    if (priorErr) throw new Error(`reset query: ${priorErr.message}`);
     for (const row of prior ?? []) {
       if (row.remote_id) {
         try { await deleteBlueskyPost(row.remote_id); } catch { /* gone */ }
@@ -62,9 +66,7 @@ export async function GET(req: Request) {
       .eq("platform", "bluesky")
       .eq("sport", sport)
       .eq("date", date);
-    if (delErr) {
-      return NextResponse.json({ error: `reset delete: ${delErr.message}` }, { status: 500 });
-    }
+    if (delErr) throw new Error(`reset delete: ${delErr.message}`);
   }
 
   const origin = await siteOrigin();
@@ -77,10 +79,7 @@ export async function GET(req: Request) {
   try {
     images = await renderShareImages({ date, baseUrl: origin });
   } catch (err) {
-    return NextResponse.json(
-      { error: `render failed: ${(err as Error).message}` },
-      { status: 500 },
-    );
+    throw new Error(`render failed: ${(err as Error).message}`);
   }
 
   // Mirror to Supabase Storage so the admin gallery + Twitter compose page
@@ -128,11 +127,20 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({
-    ok: failed === 0,
-    sport, date,
-    total: images.length,
-    posted, skipped, failed,
-    results,
-  });
+    const result = {
+      sport, date,
+      total: images.length,
+      posted, skipped, failed,
+    };
+    await finishCronRun(runId, {
+      status: failed > 0 && posted === 0 ? "failed" : "ok",
+      error: failed > 0 ? `${failed} of ${images.length} failed` : null,
+      result,
+    });
+    return NextResponse.json({ ok: failed === 0, ...result, results });
+  } catch (err) {
+    const msg = (err as Error).message;
+    await finishCronRun(runId, { status: "failed", error: msg });
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
