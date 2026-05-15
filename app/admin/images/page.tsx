@@ -1,6 +1,7 @@
 import { listStoredImages } from "@/lib/share-storage";
 import { yesterdayInET, prettyDate } from "@/lib/dates";
 import { regenerateShareImages } from "../actions";
+import { SubmitButton } from "../SubmitButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Share images · admin · boxscore.email", robots: { index: false } };
@@ -43,9 +44,11 @@ export default async function AdminImagesView({
             className="admin-input"
           />
         </label>
-        <button className="admin-btn" type="submit">
-          {images.length > 0 ? "Regenerate" : "Generate"}
-        </button>
+        <SubmitButton
+          idleLabel={images.length > 0 ? "Regenerate" : "Generate"}
+          pendingLabel="Generating… (10–30s)"
+        />
+        <span className="admin-meta">Renders the page, screenshots each section, uploads to Storage.</span>
       </form>
 
       <div className="admin-image-grid">

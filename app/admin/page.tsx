@@ -1,6 +1,7 @@
 import { yesterdayInET, prettyDate } from "@/lib/dates";
 import { getDigest } from "@/lib/digests";
 import { supabaseAdmin } from "@/lib/supabase";
+import { SubmitButton } from "./SubmitButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · boxscore.email", robots: { index: false } };
@@ -92,9 +93,10 @@ function SendEmailForm({ date }: { date: string }) {
       const { sendAdminPreview } = await import("./actions");
       await sendAdminPreview(date);
     }}>
-      <button className="admin-btn" type="submit">
-        Send today's email to me
-      </button>
+      <SubmitButton
+        idleLabel="Send today's email to me"
+        pendingLabel="Sending…"
+      />
     </form>
   );
 }
