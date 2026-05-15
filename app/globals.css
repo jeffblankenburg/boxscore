@@ -124,7 +124,6 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
   font-size: 14px; line-height: 1.5; margin: 0; padding: 2px 0;
   border-bottom: 1px dotted var(--border-light);
 }
-.game-score-line:last-child { border-bottom: none; }
 .game-score-line .winner { font-weight: 700; }
 .games-grid-upcoming .game-score-line {
   display: flex; justify-content: space-between; gap: 8px; align-items: baseline;

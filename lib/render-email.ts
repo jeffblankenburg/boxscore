@@ -542,7 +542,7 @@ function renderBoxScores(games: GameDetail[], liveAbbrev: Record<string, string>
     ${completed.map((g) => renderGame(g as Required<GameDetail>, liveAbbrev)).join("")}`;
 }
 
-function renderTodaysGames(games: UpcomingGame[]): string {
+function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
   if (games.length === 0) return "";
   const probable = (full?: string, record?: string) => {
     if (!full) return "";
@@ -553,7 +553,7 @@ function renderTodaysGames(games: UpcomingGame[]): string {
     const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
     const right = isOff ? g.status : g.startTime;
     return `<tr>
-      <td align="left" style="font-size:13px;padding:1px 0;">${esc(nickname(g.awayName))}${probable(g.awayProbable, g.awayProbableRecord)} @ ${esc(nickname(g.homeName))}${probable(g.homeProbable, g.homeProbableRecord)}</td>
+      <td align="left" style="font-size:13px;padding:1px 0;">${esc(tla(g.awayName, liveAbbrev))}${probable(g.awayProbable, g.awayProbableRecord)} @ ${esc(tla(g.homeName, liveAbbrev))}${probable(g.homeProbable, g.homeProbableRecord)}</td>
       <td align="right" style="font-size:13px;color:#6a6354;padding:1px 0;white-space:nowrap;">${esc(right)}</td>
     </tr>`;
   }).join("");
@@ -571,7 +571,7 @@ ${dateline(data.prettyDate)}
 ${renderLeagueStandings("American League", "AL", data)}
 ${renderLeagueStandings("National League", "NL", data)}
 ${renderLeaders(data)}
-${renderTodaysGames(data.todaysGames)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
 ${renderBoxScores(data.games, data.teamAbbrev)}
 </div>`;
 }

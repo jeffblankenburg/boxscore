@@ -37,12 +37,14 @@ export function nextDay(iso: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
-// Format an ISO-8601 timestamp (UTC) as a short ET clock time, e.g. "7:05 PM".
+// Format an ISO-8601 timestamp (UTC) as a short ET clock time, e.g. "7:05 PM ET".
+// Returns "TBD" without the suffix when the input isn't a valid date.
 export function timeInET(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "TBD";
-  return new Intl.DateTimeFormat("en-US", {
+  const clock = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     hour: "numeric", minute: "2-digit", hour12: true,
   }).format(date);
+  return `${clock} ET`;
 }

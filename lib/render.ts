@@ -157,7 +157,7 @@ export function renderContent(data: DailyData): string {
 
 ${renderSchedule(data.games)}
 
-${renderTodaysGames(data.todaysGames)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
 
 <div class="boxscores-title">Yesterday's Box Scores</div>
 ${renderGames(data.games, data.teamAbbrev)}`;
@@ -325,7 +325,7 @@ function renderSchedule(games: GameDetail[]): string {
 </div>`;
 }
 
-function renderTodaysGames(games: UpcomingGame[]): string {
+function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
   if (games.length === 0) return "";
   const probable = (full?: string, record?: string) => {
     if (!full) return "";
@@ -338,7 +338,7 @@ function renderTodaysGames(games: UpcomingGame[]): string {
     const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
     const right = isOff ? g.status : g.startTime;
     return `<div class="game-score-line">
-      <span>${esc(nickname(g.awayName))}${probable(g.awayProbable, g.awayProbableRecord)} @ ${esc(nickname(g.homeName))}${probable(g.homeProbable, g.homeProbableRecord)}</span>
+      <span>${esc(tla(g.awayName, liveAbbrev))}${probable(g.awayProbable, g.awayProbableRecord)} @ ${esc(tla(g.homeName, liveAbbrev))}${probable(g.homeProbable, g.homeProbableRecord)}</span>
       <span class="game-time">${esc(right)}</span>
     </div>`;
   }).join("");
