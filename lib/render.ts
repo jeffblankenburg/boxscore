@@ -1,7 +1,7 @@
 import type {
   ScheduleGame, Boxscore, ScoringPlay,
   DivisionStandings, Leader, BoxTeam, BoxPlayer,
-  WildCardLeagueStandings,
+  WildCardLeagueStandings, Transaction,
 } from "./mlb";
 
 export type GameDetail = {
@@ -37,6 +37,9 @@ export type DailyData = {
   // Live id/name→abbreviation map built from /v1/teams at fetch time. Falls
   // back to the static TLA_OF for older cache rows that didn't capture it.
   teamAbbrev: Record<string, string>;
+  // Roster moves for the digest's date (signings, trades, IL, DFA, rehab,
+  // etc.). Pre-formatted by MLB as human-readable sentences.
+  transactions: Transaction[];
 };
 
 const DIVISIONS = {
@@ -160,7 +163,20 @@ ${renderSchedule(data.games)}
 ${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
 
 <div class="boxscores-title">Yesterday's Box Scores</div>
-${renderGames(data.games, data.teamAbbrev)}`;
+${renderGames(data.games, data.teamAbbrev)}
+
+${renderTransactions(data.transactions)}`;
+}
+
+function renderTransactions(txs: Transaction[]): string {
+  if (txs.length === 0) return "";
+  const items = txs
+    .map((t) => `<li><span class="tx-type">${esc(t.typeDesc)}</span> ${esc(t.description)}</li>`)
+    .join("");
+  return `<div class="transactions-section">
+  <div class="boxscores-title">Transactions</div>
+  <ul class="transactions-list">${items}</ul>
+</div>`;
 }
 
 

@@ -278,6 +278,30 @@ export function parseTeams(raw: unknown): TeamMeta[] {
   return data?.teams ?? [];
 }
 
+// ─── Transactions ────────────────────────────────────────────────────────
+// Daily roster moves: signings, trades, IL placements, DFA, rehab
+// assignments, etc. MLB pre-writes each as a human-readable sentence.
+export type Transaction = {
+  typeCode: string;
+  typeDesc: string;
+  description: string;
+};
+
+export async function fetchTransactionsRaw(date: string): Promise<unknown> {
+  return getRaw(`/v1/transactions?sportId=1&startDate=${date}&endDate=${date}`);
+}
+
+export function parseTransactions(raw: unknown): Transaction[] {
+  const data = raw as { transactions?: Array<{ typeCode?: string; typeDesc?: string; description?: string }> };
+  return (data?.transactions ?? [])
+    .filter((t) => typeof t.description === "string" && t.description.length > 0)
+    .map((t) => ({
+      typeCode: t.typeCode ?? "",
+      typeDesc: t.typeDesc ?? "",
+      description: t.description ?? "",
+    }));
+}
+
 // ─── Person season stats ──────────────────────────────────────────────────
 // Used for probable-pitcher W-L on Today's Games. Single-person call returns
 // season pitching stats including wins and losses.

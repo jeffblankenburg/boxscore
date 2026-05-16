@@ -40,6 +40,9 @@ export type DailyRaw = {
   // Season pitching W-L for each probable pitcher in nextDaySchedule, keyed by
   // pitcher ID (stringified).
   probablePitcherStats?: Record<string, ProbablePitcherStats>;
+  // Raw /v1/transactions envelope for this date. One fetch per date; renders
+  // as a "Transactions" section at the bottom of the digest.
+  transactions?: unknown;
 };
 
 export async function getDailyRaw(sport: string, date: string): Promise<DailyRaw | null> {

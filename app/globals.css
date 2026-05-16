@@ -168,6 +168,21 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .scoring-block .ev { font-style: italic; }
 .scoring-block .inn { font-weight: 700; }
 
+.transactions-section { margin-top: 20px; }
+.transactions-list { list-style: none; padding: 0; margin: 0;
+                     column-count: 2; column-gap: 24px; font-size: 13px;
+                     line-height: 1.4; }
+.transactions-list li { break-inside: avoid; page-break-inside: avoid;
+                        margin: 0 0 6px; padding: 4px 0;
+                        border-bottom: 1px dotted var(--border-light); }
+.transactions-list .tx-type { font-weight: 700; color: var(--text-muted);
+                              text-transform: uppercase; letter-spacing: 0.03em;
+                              font-size: 11px; display: block;
+                              margin-bottom: 1px; }
+@media (max-width: 720px) {
+  .transactions-list { column-count: 1; }
+}
+
 footer.site-footer {
   margin-top: 30px; padding-top: 8px;
   border-top: 1px solid var(--border-light);

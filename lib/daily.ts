@@ -7,6 +7,7 @@ import {
   fetchPlayByPlayRaw, parseScoringPlays,
   fetchTeamsRaw, parseTeams,
   fetchPersonSeasonPitchingRaw, parsePersonWL,
+  fetchTransactionsRaw, parseTransactions,
 } from "./mlb";
 import type { GameDetail, DailyData, UpcomingGame } from "./render";
 import { prettyDate, nextDay, timeInET } from "./dates";
@@ -51,7 +52,7 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
     fetchLeadersRaw(c.category, season, 104, 5),
   ]);
   const [
-    scheduleRaw, standingsRaw, wildCardRaw, nextDayScheduleRaw, teamsRaw,
+    scheduleRaw, standingsRaw, wildCardRaw, nextDayScheduleRaw, teamsRaw, transactionsRaw,
     ...leaderResults
   ] = await Promise.all([
     fetchScheduleRaw(date),
@@ -59,6 +60,7 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
     fetchWildCardRaw(season, date),
     fetchScheduleRaw(nextDay(date)),
     fetchTeamsRaw(season),
+    fetchTransactionsRaw(date),
     ...leaderCalls,
   ]);
 
@@ -112,6 +114,7 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
     nextDaySchedule: nextDayScheduleRaw,
     teams: teamsRaw,
     probablePitcherStats,
+    transactions: transactionsRaw,
   };
 }
 
@@ -180,6 +183,7 @@ function rawToDailyData(raw: DailyRaw, date: string): DailyData {
     },
     todaysGames: upcomingFromRaw(raw.nextDaySchedule, raw.probablePitcherStats),
     teamAbbrev: buildTeamAbbrevMap(raw.teams),
+    transactions: raw.transactions ? parseTransactions(raw.transactions) : [],
   };
 }
 
@@ -194,12 +198,16 @@ function isOldShape(raw: DailyRaw): boolean {
 }
 
 // Read-through: stored raw → DailyData. If raw is missing, in the old shape,
-// or refetch=true was passed, fetch from MLB and write through.
+// or refetch=true was passed, fetch from MLB and write through. For rows that
+// just lack `transactions` (added later), lazy-patch with one extra fetch.
 export async function loadDailyData(date: string, opts?: { refetch?: boolean }): Promise<DailyData> {
   let raw = opts?.refetch ? null : await getDailyRaw("mlb", date);
   if (raw && isOldShape(raw)) raw = null;
   if (!raw) {
     raw = await fetchDailyRaw(date);
+    await upsertDailyRaw("mlb", date, raw);
+  } else if (!raw.transactions) {
+    raw = { ...raw, transactions: await fetchTransactionsRaw(date) };
     await upsertDailyRaw("mlb", date, raw);
   }
   return rawToDailyData(raw, date);

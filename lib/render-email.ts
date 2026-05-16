@@ -22,6 +22,7 @@ import type {
   WildCardLeagueStandings,
 } from "./mlb";
 import type { DailyData, GameDetail, LeaderGroup, UpcomingGame } from "./render";
+import type { Transaction } from "./mlb";
 
 // ─── styles ───────────────────────────────────────────────────────────────
 
@@ -97,6 +98,14 @@ export const EMAIL_STYLES = `
   .es-leaders-cols > tbody > tr > td:last-child { padding-right: 0; padding-left: 12px; }
 
   .es-game { margin-top: 18px; padding-top: 6px; border-top: 1px solid #c4baa5; }
+
+  .es-tx-block { margin-top: 6px; }
+  .es-tx { font-size: 12px; line-height: 1.4; margin: 0 0 6px; padding: 4px 0;
+           border-bottom: 1px dotted #e8e2d4; }
+  .es-tx:last-child { border-bottom: none; }
+  .es-tx-type { display: block; font-size: 10px; font-weight: 700;
+                text-transform: uppercase; letter-spacing: 0.03em;
+                color: #6a6354; margin-bottom: 1px; }
 `;
 
 // ─── data ────────────────────────────────────────────────────────────────
@@ -563,6 +572,14 @@ function renderBoxScores(games: GameDetail[], liveAbbrev: Record<string, string>
     ${completed.map((g) => renderGame(g as Required<GameDetail>, liveAbbrev)).join("")}`;
 }
 
+function renderTransactions(txs: Transaction[]): string {
+  if (txs.length === 0) return "";
+  const items = txs.map((t) => `<p class="es-tx">
+    <span class="es-tx-type">${esc(t.typeDesc)}</span> ${esc(t.description)}
+  </p>`).join("");
+  return `${sectionH("Transactions")}<div class="es-tx-block">${items}</div>`;
+}
+
 function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
   if (games.length === 0) return "";
   const probable = (full?: string, record?: string) => {
@@ -594,5 +611,6 @@ ${renderLeagueStandings("National League", "NL", data)}
 ${renderLeaders(data)}
 ${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
 ${renderBoxScores(data.games, data.teamAbbrev)}
+${renderTransactions(data.transactions)}
 </div>`;
 }
