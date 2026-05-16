@@ -53,36 +53,44 @@ function FlashButton({
 }
 
 export function CopyButtons({ text, imageUrl }: { text: string; imageUrl: string }) {
-  const copyPost = async () => {
-    if (!navigator.clipboard?.write) {
-      // No image-clipboard support — fall back to text-only.
-      await navigator.clipboard.writeText(text);
-      throw new Error(
-        "Image clipboard not supported in this browser — copied text only. Download the image separately.",
-      );
+  // One-click hybrid: open X's compose URL with text already filled in, AND
+  // put the image on the clipboard so Cmd/Ctrl+V in the new tab attaches it.
+  //
+  // Why split text and image instead of combining them: Twitter's paste
+  // handler grabs the image from a multi-type ClipboardItem and ignores the
+  // text — a Twitter-side quirk, not a clipboard limitation. Splitting the
+  // channels (URL for text, clipboard for image) gets us closest to a
+  // single-paste flow.
+  //
+  // Why open the window first: popup blockers require window.open to fire
+  // synchronously from a user gesture. Awaiting fetch + clipboard first
+  // loses that context in Safari.
+  const tweetThis = async () => {
+    const intentUrl = `https://x.com/intent/post?text=${encodeURIComponent(text)}`;
+    const win = window.open(intentUrl, "_blank", "noopener,noreferrer");
+    if (!win) {
+      throw new Error("Popup blocked — allow popups for this site and try again.");
     }
-    // Fetch the image (public Supabase Storage URL has CORS) and write a
-    // single ClipboardItem with BOTH text and image. Pasting into Twitter's
-    // compose box inserts the text and attaches the image in one action.
+
+    if (!navigator.clipboard?.write) {
+      throw new Error("Image clipboard not supported — use Download image and attach manually.");
+    }
     const res = await fetch(imageUrl);
-    if (!res.ok) throw new Error(`fetch ${res.status}`);
+    if (!res.ok) throw new Error(`image fetch ${res.status}`);
     const blob = await res.blob();
     const imageType = blob.type || "image/png";
     await navigator.clipboard.write([
-      new ClipboardItem({
-        "text/plain": new Blob([text], { type: "text/plain" }),
-        [imageType]: blob,
-      }),
+      new ClipboardItem({ [imageType]: blob }),
     ]);
   };
 
   return (
     <div className="copy-buttons">
       <FlashButton
-        onClick={copyPost}
-        idle="Copy post (text + image)"
-        pending="Copying…"
-        done="✓ Copied — paste into X"
+        onClick={tweetThis}
+        idle="Tweet this →"
+        pending="Opening X…"
+        done="✓ Paste image in new tab"
       />
       <a href={imageUrl} download className="admin-btn admin-btn-small admin-btn-ghost">
         Download image
