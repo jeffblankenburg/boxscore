@@ -2,20 +2,30 @@ import { NextResponse } from "next/server";
 import { getDigest } from "@/lib/digests";
 import { getActiveSubscribers } from "@/lib/subscribers";
 import { hasAlreadySent, recordSend } from "@/lib/sends";
-import { sendEmail } from "@/lib/email";
+import { sendEmailBatch } from "@/lib/email";
 import { dailyEmail } from "@/lib/emails/templates";
 import { isValidIsoDate, prettyDate, yesterdayInET } from "@/lib/dates";
 import { siteOrigin } from "@/lib/site";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Resend's batch API does ~100 sends in one HTTP round-trip, so even 5k+
+// subscribers finish in seconds; 300s is gross overkill but cheap insurance.
+export const maxDuration = 300;
+
+const BATCH_SIZE = 100;
 
 function isAuthorized(req: Request): boolean {
   if (process.env.NODE_ENV === "development") return true;
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   return req.headers.get("authorization") === `Bearer ${secret}`;
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }
 
 export async function GET(req: Request) {
@@ -45,24 +55,31 @@ export async function GET(req: Request) {
     const digestPrettyDate = prettyDate(date);
 
     const subscribers = await getActiveSubscribers();
-    let sent = 0, skipped = 0, failed = 0;
-
+    // Filter out already-sent before constructing the batch payload. Doing
+    // the check up front means we don't pay to build a hydrated email body
+    // we're not going to send.
+    const toSend: typeof subscribers = [];
+    let skipped = 0;
     for (const sub of subscribers) {
       if (await hasAlreadySent(sub.id, sport, date)) {
         skipped++;
         continue;
       }
+      toSend.push(sub);
+    }
 
-      const unsubscribeUrl = `${origin}/u/${sub.unsubscribe_token}`;
-      const { subject, html, text } = dailyEmail({
-        digestPrettyDate,
-        digestUrl,
-        unsubscribeUrl,
-        digestEmailHtml: digest.email_html,
-      });
+    let sent = 0, failed = 0;
 
-      try {
-        const { id } = await sendEmail({
+    for (const group of chunk(toSend, BATCH_SIZE)) {
+      const payload = group.map((sub) => {
+        const unsubscribeUrl = `${origin}/u/${sub.unsubscribe_token}`;
+        const { subject, html, text } = dailyEmail({
+          digestPrettyDate,
+          digestUrl,
+          unsubscribeUrl,
+          digestEmailHtml: digest.email_html!,
+        });
+        return {
           to: sub.email,
           subject,
           html,
@@ -73,20 +90,37 @@ export async function GET(req: Request) {
             "List-Unsubscribe": `<${unsubscribeUrl}>`,
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
           },
-        });
-        await recordSend({
-          subscriberId: sub.id, sport, date,
-          resendId: id, error: null,
-        });
-        sent++;
+        };
+      });
+
+      let results;
+      try {
+        results = await sendEmailBatch(payload);
       } catch (err) {
+        // Whole-batch transport failure (rare). Mark every row in this batch
+        // failed so we can retry from /admin via the manual trigger button —
+        // hasAlreadySent will skip the ones that did go through.
         const msg = (err as Error).message;
+        for (const sub of group) {
+          await recordSend({ subscriberId: sub.id, sport, date, resendId: null, error: msg });
+          failed++;
+        }
+        continue;
+      }
+
+      for (let i = 0; i < group.length; i++) {
+        const sub = group[i]!;
+        const r = results[i] ?? { id: null, error: "missing result" };
         await recordSend({
           subscriberId: sub.id, sport, date,
-          resendId: null, error: msg,
+          resendId: r.id, error: r.error,
         });
-        console.error(`send failed for ${sub.email}: ${msg}`);
-        failed++;
+        if (r.error) {
+          failed++;
+          console.error(`send failed for ${sub.email}: ${r.error}`);
+        } else {
+          sent++;
+        }
       }
     }
 
@@ -95,10 +129,6 @@ export async function GET(req: Request) {
       total_active_subscribers: subscribers.length,
       sent, skipped, failed,
     };
-    // If any sends failed we still record "ok" but include counts — the cron
-    // didn't crash, it just had a partial failure. A complete failure (no sends
-    // attempted because the digest was missing, for example) lands in the
-    // catch block below as "failed".
     await finishCronRun(runId, { status: "ok", result });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
