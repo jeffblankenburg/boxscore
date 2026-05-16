@@ -582,16 +582,18 @@ function renderTransactions(txs: Transaction[]): string {
 
 function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
   if (games.length === 0) return "";
-  const probable = (full?: string, record?: string) => {
+  const probable = (full?: string, record?: string, era?: string | null) => {
     if (!full) return "";
-    const wl = record ? ` ${esc(record)}` : "";
-    return ` <span style="color:#6a6354;font-weight:400;">(${esc(lastName(full))}${wl})</span>`;
+    const parts: string[] = [esc(lastName(full))];
+    if (record) parts.push(esc(record));
+    if (era && era !== "-.--" && era !== "—") parts.push(esc(era));
+    return ` <span style="color:#6a6354;font-weight:400;">(${parts.join(", ")})</span>`;
   };
   const rows = games.map((g) => {
     const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
     const right = isOff ? g.status : g.startTime;
     return `<tr>
-      <td align="left" style="font-size:13px;padding:1px 0;">${esc(tla(g.awayName, liveAbbrev))}${probable(g.awayProbable, g.awayProbableRecord)} @ ${esc(tla(g.homeName, liveAbbrev))}${probable(g.homeProbable, g.homeProbableRecord)}</td>
+      <td align="left" style="font-size:13px;padding:1px 0;">${esc(tla(g.awayName, liveAbbrev))}${probable(g.awayProbable, g.awayProbableRecord, g.awayProbableEra)} @ ${esc(tla(g.homeName, liveAbbrev))}${probable(g.homeProbable, g.homeProbableRecord, g.homeProbableEra)}</td>
       <td align="right" style="font-size:13px;color:#6a6354;padding:1px 0;white-space:nowrap;">${esc(right)}</td>
     </tr>`;
   }).join("");

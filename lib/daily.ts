@@ -136,6 +136,8 @@ function upcomingFromRaw(
       homeProbable: hp?.fullName,
       awayProbableRecord: apStats ? `${apStats.wins}-${apStats.losses}` : undefined,
       homeProbableRecord: hpStats ? `${hpStats.wins}-${hpStats.losses}` : undefined,
+      awayProbableEra: apStats?.era ?? null,
+      homeProbableEra: hpStats?.era ?? null,
       startTime: timeInET(g.gameDate),
       status: g.status.detailedState,
     };
@@ -197,18 +199,58 @@ function isOldShape(raw: DailyRaw): boolean {
   return false;
 }
 
+// Older probablePitcherStats rows captured only {wins, losses} — ERA was
+// added later. Re-fetch the per-pitcher stats batch when any stored row lacks
+// the era field.
+function probableStatsMissingEra(raw: DailyRaw): boolean {
+  const stats = raw.probablePitcherStats;
+  if (!stats) return false;
+  for (const v of Object.values(stats)) {
+    if (typeof (v as { era?: unknown }).era === "undefined") return true;
+  }
+  return false;
+}
+
+async function refetchProbablePitcherStats(scheduleRaw: unknown, season: number): Promise<Record<string, ProbablePitcherStats>> {
+  if (!scheduleRaw) return {};
+  const ids = new Set<number>();
+  for (const g of parseSchedule(scheduleRaw)) {
+    if (g.teams.away.probablePitcher?.id) ids.add(g.teams.away.probablePitcher.id);
+    if (g.teams.home.probablePitcher?.id) ids.add(g.teams.home.probablePitcher.id);
+  }
+  const results = await Promise.all(
+    Array.from(ids).map(async (id) => {
+      const wl = parsePersonWL(await fetchPersonSeasonPitchingRaw(id, season));
+      return [String(id), wl] as const;
+    }),
+  );
+  const out: Record<string, ProbablePitcherStats> = {};
+  for (const [id, wl] of results) out[id] = wl;
+  return out;
+}
+
 // Read-through: stored raw → DailyData. If raw is missing, in the old shape,
 // or refetch=true was passed, fetch from MLB and write through. For rows that
-// just lack `transactions` (added later), lazy-patch with one extra fetch.
+// just lack newer fields (transactions, ERA on probables), lazy-patch with
+// the minimum extra fetches.
 export async function loadDailyData(date: string, opts?: { refetch?: boolean }): Promise<DailyData> {
   let raw = opts?.refetch ? null : await getDailyRaw("mlb", date);
   if (raw && isOldShape(raw)) raw = null;
   if (!raw) {
     raw = await fetchDailyRaw(date);
     await upsertDailyRaw("mlb", date, raw);
-  } else if (!raw.transactions) {
-    raw = { ...raw, transactions: await fetchTransactionsRaw(date) };
-    await upsertDailyRaw("mlb", date, raw);
+  } else {
+    let dirty = false;
+    if (!raw.transactions) {
+      raw = { ...raw, transactions: await fetchTransactionsRaw(date) };
+      dirty = true;
+    }
+    if (probableStatsMissingEra(raw)) {
+      const season = Number(date.slice(0, 4));
+      raw = { ...raw, probablePitcherStats: await refetchProbablePitcherStats(raw.nextDaySchedule, season) };
+      dirty = true;
+    }
+    if (dirty) await upsertDailyRaw("mlb", date, raw);
   }
   return rawToDailyData(raw, date);
 }

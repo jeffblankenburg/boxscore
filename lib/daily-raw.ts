@@ -19,7 +19,9 @@ export type StoredScoringPlay = {
 
 // Season-to-date pitching record for a probable pitcher. Looked up once at
 // fetch time and stored so the renderer doesn't need any extra API calls.
-export type ProbablePitcherStats = { wins: number; losses: number };
+// ERA is a string from MLB (e.g. "3.42", "—", "-.--") — keep it as-is and let
+// the renderer format. null when MLB returned no stats for the pitcher yet.
+export type ProbablePitcherStats = { wins: number; losses: number; era: string | null };
 
 export type DailyRaw = {
   schedule: unknown;

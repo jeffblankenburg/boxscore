@@ -125,6 +125,10 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
   border-bottom: 1px dotted var(--border-light);
 }
 .game-score-line .winner { font-weight: 700; }
+/* Today's Games gets a denser two-column grid (vs the three-column "Yesterday's
+   Results" above it). Pitcher names + W-L + ERA push the line too wide for
+   three columns at the digest's body width. */
+.games-grid-upcoming { grid-template-columns: 1fr 1fr; }
 .games-grid-upcoming .game-score-line {
   display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
 }

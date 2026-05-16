@@ -22,6 +22,9 @@ export type UpcomingGame = {
   // Season W-L for each probable pitcher, pre-formatted ("4-2").
   awayProbableRecord?: string;
   homeProbableRecord?: string;
+  // Season ERA as MLB returns it (e.g. "3.42"); null if unavailable yet.
+  awayProbableEra?: string | null;
+  homeProbableEra?: string | null;
   startTime: string;  // already formatted in ET, e.g. "7:05 PM" or "TBD"
   status: string;     // detailedState, e.g. "Scheduled", "Postponed"
 };
@@ -343,10 +346,12 @@ function renderSchedule(games: GameDetail[]): string {
 
 function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
   if (games.length === 0) return "";
-  const probable = (full?: string, record?: string) => {
+  const probable = (full?: string, record?: string, era?: string | null) => {
     if (!full) return "";
-    const wl = record ? ` ${esc(record)}` : "";
-    return ` <span class="probable">(${esc(lastName(full))}${wl})</span>`;
+    const parts: string[] = [esc(lastName(full))];
+    if (record) parts.push(esc(record));
+    if (era && era !== "-.--" && era !== "—") parts.push(esc(era));
+    return ` <span class="probable">(${parts.join(", ")})</span>`;
   };
   const lines = games.map((g) => {
     // MLB returns Postponed/Cancelled in detailedState; replace the time with
@@ -354,7 +359,7 @@ function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, str
     const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
     const right = isOff ? g.status : g.startTime;
     return `<div class="game-score-line">
-      <span>${esc(tla(g.awayName, liveAbbrev))}${probable(g.awayProbable, g.awayProbableRecord)} @ ${esc(tla(g.homeName, liveAbbrev))}${probable(g.homeProbable, g.homeProbableRecord)}</span>
+      <span>${esc(tla(g.awayName, liveAbbrev))}${probable(g.awayProbable, g.awayProbableRecord, g.awayProbableEra)} @ ${esc(tla(g.homeName, liveAbbrev))}${probable(g.homeProbable, g.homeProbableRecord, g.homeProbableEra)}</span>
       <span class="game-time">${esc(right)}</span>
     </div>`;
   }).join("");

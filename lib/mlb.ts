@@ -311,11 +311,12 @@ export async function fetchPersonSeasonPitchingRaw(personId: number, season: num
   );
 }
 
-export function parsePersonWL(raw: unknown): { wins: number; losses: number } {
-  const data = raw as { stats?: Array<{ splits?: Array<{ stat?: { wins?: number; losses?: number } }> }> };
+export function parsePersonWL(raw: unknown): { wins: number; losses: number; era: string | null } {
+  const data = raw as { stats?: Array<{ splits?: Array<{ stat?: { wins?: number; losses?: number; era?: string } }> }> };
   const stat = data?.stats?.[0]?.splits?.[0]?.stat;
   return {
     wins: typeof stat?.wins === "number" ? stat.wins : 0,
     losses: typeof stat?.losses === "number" ? stat.losses : 0,
+    era: typeof stat?.era === "string" ? stat.era : null,
   };
 }
