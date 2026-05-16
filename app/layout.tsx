@@ -1,6 +1,8 @@
 import "./globals.css";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { BRAND } from "@/lib/brand";
 import { PaperModeToggle } from "./PaperModeToggle";
 
@@ -22,6 +24,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {children}
           <SiteFooter />
         </div>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
