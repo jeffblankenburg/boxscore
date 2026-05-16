@@ -267,6 +267,23 @@ footer.site-footer a { color: var(--text-secondary); }
 .subscribe-error { color: #a40000; font-size: 13px; margin: 4px 0 0; }
 .subscribe-fine { font-size: 13px; color: var(--text-muted); margin: 18px 0 0; }
 .subscribe-card a { color: var(--text-secondary); }
+.subscribe-subhead {
+  font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em;
+  font-weight: 700; color: var(--text-muted); margin: 24px 0 8px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--border-strong);
+}
+.subscribe-checklist {
+  list-style: none; padding: 0; margin: 0;
+  font-size: 14px; line-height: 1.5;
+}
+.subscribe-checklist li {
+  padding: 8px 0; border-bottom: 1px dotted var(--border-light);
+}
+.subscribe-checklist li:last-child { border-bottom: none; }
+.subscribe-checklist code {
+  font-family: ui-monospace, monospace; font-size: 12px;
+  background: rgba(0,0,0,0.04); padding: 1px 4px; border-radius: 3px;
+}
 
 .admin { max-width: 920px; margin: 32px auto; padding: 0 20px;
          font-family: Georgia, 'Times New Roman', serif; color: var(--text-primary); }
