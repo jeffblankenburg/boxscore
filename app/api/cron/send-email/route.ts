@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDigest } from "@/lib/digests";
 import { getActiveSubscribers } from "@/lib/subscribers";
-import { hasAlreadySent, recordSend } from "@/lib/sends";
+import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
 import { dailyEmail } from "@/lib/emails/templates";
 import { isValidIsoDate, prettyDate, yesterdayInET } from "@/lib/dates";
@@ -55,18 +55,12 @@ export async function GET(req: Request) {
     const digestPrettyDate = prettyDate(date);
 
     const subscribers = await getActiveSubscribers();
-    // Filter out already-sent before constructing the batch payload. Doing
-    // the check up front means we don't pay to build a hydrated email body
-    // we're not going to send.
-    const toSend: typeof subscribers = [];
-    let skipped = 0;
-    for (const sub of subscribers) {
-      if (await hasAlreadySent(sub.id, sport, date)) {
-        skipped++;
-        continue;
-      }
-      toSend.push(sub);
-    }
+    // One bulk fetch instead of one round-trip per subscriber. At thousands
+    // of subscribers the serial-check pattern can use as much wall-clock as
+    // the actual sending did.
+    const alreadySent = await getSentSubscriberIds(sport, date);
+    const toSend = subscribers.filter((s) => !alreadySent.has(s.id));
+    const skipped = subscribers.length - toSend.length;
 
     let sent = 0, failed = 0;
 

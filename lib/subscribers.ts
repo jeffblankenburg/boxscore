@@ -85,13 +85,22 @@ export async function confirmSubscriberIfPending(id: string): Promise<Subscriber
 }
 
 export async function getActiveSubscribers(): Promise<Subscriber[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("subscribers")
-    .select(COLS)
-    .eq("status", "active")
-    .order("created_at", { ascending: true });
-  if (error) throw new Error(`getActiveSubscribers: ${error.message}`);
-  return (data ?? []) as Subscriber[];
+  // Supabase silently caps SELECT at 1000 rows; paginate so we get everyone.
+  const out: Subscriber[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin()
+      .from("subscribers")
+      .select(COLS)
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`getActiveSubscribers: ${error.message}`);
+    const page = (data ?? []) as Subscriber[];
+    out.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return out;
 }
 
 /**
