@@ -8,6 +8,7 @@
 //     Gmail's ~102KB cap.
 
 import { EMAIL_STYLES } from "../render-email";
+import { shortPrettyDate } from "../dates";
 
 const PAPER = "#f9f7f1";
 const INK = "#161410";
@@ -111,21 +112,27 @@ export function welcomeEmail(opts: {
 /**
  * Daily email — same shell as the welcome but no welcome banner. Used by the
  * 5:15am ET send cron for every active subscriber.
+ *
+ * `sport` becomes the league/sport tag in the subject line (e.g. "MLB"). Once
+ * we add more sports/leagues the caller will pass the right value per send.
  */
 export function dailyEmail(opts: {
-  digestPrettyDate: string;
+  sport: string;
+  digestDate: string;          // ISO "YYYY-MM-DD" of the digest
+  digestPrettyDate: string;    // long form, used in preview text + plain-text body
   digestUrl: string;
   unsubscribeUrl: string;
   digestEmailHtml: string;
 }): { subject: string; html: string; text: string } {
-  const subject = `boxscore · ${opts.digestPrettyDate}`;
+  const sportTag = opts.sport.toUpperCase();
+  const subject = `boxscore - ${sportTag} - ${shortPrettyDate(opts.digestDate)}`;
   const html = wrapWithDigest({
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
-    previewText: `${opts.digestPrettyDate} · MLB digest from boxscore.`,
+    previewText: `${opts.digestPrettyDate} · ${sportTag} digest from boxscore.`,
   });
-  const text = `boxscore — ${opts.digestPrettyDate}\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `${subject}\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 

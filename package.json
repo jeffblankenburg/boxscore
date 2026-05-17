@@ -20,6 +20,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "jszip": "^3.10.1",
     "next": "^16.2.6",
+    "posthog-js": "^1.373.5",
     "puppeteer-core": "^25.0.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

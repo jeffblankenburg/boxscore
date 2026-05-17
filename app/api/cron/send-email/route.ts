@@ -72,6 +72,8 @@ export async function GET(req: Request) {
         // GET requests from link scanners can't auto-unsubscribe real users.
         const oneClickUrl = `${origin}/api/u/${sub.unsubscribe_token}`;
         const { subject, html, text } = dailyEmail({
+          sport,
+          digestDate: date,
           digestPrettyDate,
           digestUrl,
           unsubscribeUrl,

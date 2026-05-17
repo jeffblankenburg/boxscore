@@ -31,6 +31,8 @@ export default async function AdminEmailPreview({
 
   const origin = await siteOrigin();
   const { html } = dailyEmail({
+    sport: "mlb",
+    digestDate: date,
     digestPrettyDate: prettyDate(date),
     digestUrl: `${origin}/mlb/${date}`,
     unsubscribeUrl: `${origin}/u/admin-preview`,

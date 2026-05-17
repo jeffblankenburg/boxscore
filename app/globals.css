@@ -432,6 +432,79 @@ footer.site-footer a { color: var(--text-secondary); }
 .admin-btn-ghost:hover { background: #f3efe5; }
 .admin-btn-ok { background: #2a7a2a !important; border-color: #2a7a2a !important; }
 
+/* Dashboard --------------------------------------------------------------- */
+.admin-window-selector { display: flex; flex-wrap: wrap; align-items: center;
+                         gap: 0; margin: 0 0 18px; font-size: 12px;
+                         font-family: ui-monospace, monospace; }
+.admin-window-label { font-family: Georgia, serif; font-style: italic;
+                      color: var(--text-muted); margin-right: 10px;
+                      text-transform: uppercase; letter-spacing: 0.08em;
+                      font-size: 11px; }
+.admin-window-selector a { padding: 4px 10px; color: var(--text-secondary);
+                           text-decoration: none; border: 1px solid var(--border-strong);
+                           border-right: none; letter-spacing: 0.04em; }
+.admin-window-selector a:last-of-type { border-right: 1px solid var(--border-strong); }
+.admin-window-selector a:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
+.admin-window-selector a.current { background: var(--text-primary); color: #f9f7f1;
+                                   font-weight: 700; }
+
+.admin-kpis { display: grid; gap: 14px; margin: 14px 0 8px;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.admin-kpi { border: 1px solid var(--border-strong); padding: 12px 14px;
+             background: var(--bg-paper);
+             display: flex; flex-direction: column; gap: 4px; }
+.admin-kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+                   color: var(--text-muted); font-weight: 700; }
+.admin-kpi-value { font: 800 28px/1.1 Georgia, 'Times New Roman', serif;
+                   color: var(--text-primary); font-style: italic;
+                   letter-spacing: -0.01em; }
+.admin-kpi-delta { font: 700 13px/1 ui-monospace, monospace; }
+.admin-kpi-delta-good { color: #1f5f1f; }
+.admin-kpi-delta-bad { color: #a40000; }
+.admin-kpi-delta-neutral { color: var(--text-muted); }
+.admin-kpi-sub { font-size: 12px; color: var(--text-muted); font-style: italic; }
+
+.admin-chart { margin: 8px 0 0; }
+.admin-chart svg { width: 100%; height: auto; max-width: 100%;
+                   border: 1px solid var(--border-light); background: var(--bg-paper);
+                   padding: 4px; }
+.admin-chart-axis { font: 10px ui-monospace, monospace; fill: var(--text-muted); }
+.admin-chart-grid { stroke: var(--border-light); stroke-width: 1;
+                    stroke-dasharray: 2 3; }
+.admin-chart-line { fill: none; stroke: var(--text-primary); stroke-width: 1.5; }
+.admin-chart-line-dot { fill: var(--text-primary); }
+.admin-chart-bar-new { fill: #2a7a2a; }
+.admin-chart-bar-unsub { fill: #a40000; }
+.admin-chart-bar-ok { fill: #1f1f1f; }
+.admin-chart-bar-fail { fill: #a40000; }
+.admin-chart-legend { font: 12px ui-monospace, monospace; color: var(--text-muted);
+                      margin: 6px 0 0; display: flex; flex-wrap: wrap;
+                      gap: 16px; align-items: center; }
+.admin-chart-swatch { display: inline-block; width: 10px; height: 10px;
+                      margin-right: 6px; vertical-align: -1px; border: 1px solid rgba(0,0,0,0.1); }
+.admin-chart-swatch-line { background: var(--text-primary); border-color: var(--text-primary);
+                           height: 2px; vertical-align: 2px; }
+.admin-chart-swatch-new { background: #2a7a2a; }
+.admin-chart-swatch-unsub { background: #a40000; }
+.admin-chart-swatch-ok { background: #1f1f1f; }
+.admin-chart-swatch-fail { background: #a40000; }
+
+.admin-heat-label { font: 11px ui-monospace, monospace; fill: var(--text-secondary); }
+.admin-heat-cell { stroke: rgba(0,0,0,0.05); stroke-width: 1; }
+/* These classes are used both as SVG cell fills and as legend swatch
+   backgrounds — set both properties so they work in either context. */
+.admin-heat-pass { fill: #2a7a2a; background: #2a7a2a; }
+.admin-heat-fail { fill: #a40000; background: #a40000; }
+.admin-heat-none { fill: #e0ddd5; background: #e0ddd5; }
+.admin-heat-running { fill: #999; background: #999; }
+
+.admin-sparkline { display: block; border: 1px solid var(--border-light);
+                   background: var(--bg-paper); padding: 4px; margin-top: 6px;
+                   max-width: 100%; height: auto; }
+.admin-sparkline-path { fill: none; stroke: var(--text-primary); stroke-width: 1.5; }
+.admin-sparkline-dot { fill: var(--text-primary); }
+.admin-sparkline-threshold { stroke: #a40000; stroke-width: 1; stroke-dasharray: 3 3; }
+
 @media (max-width: 640px) {
   .twitter-post-card { grid-template-columns: 1fr; }
 }

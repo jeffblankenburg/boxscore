@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { BRAND } from "@/lib/brand";
 import { PaperModeToggle } from "./PaperModeToggle";
+import { PostHogPageview } from "./PostHogProvider";
 
 export const metadata = {
   title: "boxscore",
@@ -26,6 +27,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </div>
         <Analytics />
         <SpeedInsights />
+        <Suspense fallback={null}>
+          <PostHogPageview />
+        </Suspense>
       </body>
     </html>
   );

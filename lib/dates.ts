@@ -17,6 +17,17 @@ export function prettyDate(iso: string): string {
   }).format(date);
 }
 
+// Shorter form for email subject lines: "May 18, 2026". No weekday so the
+// subject stays scannable in a crowded inbox.
+export function shortPrettyDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long", day: "numeric", year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 export const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isValidIsoDate(s: string): boolean {

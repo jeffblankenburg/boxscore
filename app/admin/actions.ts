@@ -26,6 +26,8 @@ export async function sendAdminPreview(date: string): Promise<void> {
 
     const origin = await siteOrigin();
     const { subject, html, text } = dailyEmail({
+      sport: "mlb",
+      digestDate: date,
       digestPrettyDate: prettyDate(date),
       digestUrl: `${origin}/mlb/${date}`,
       unsubscribeUrl: `${origin}/u/admin-preview`,

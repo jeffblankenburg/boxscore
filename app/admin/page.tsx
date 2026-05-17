@@ -1,67 +1,163 @@
 import { yesterdayInET, prettyDate } from "@/lib/dates";
-import { getDigest } from "@/lib/digests";
-import { supabaseAdmin } from "@/lib/supabase";
 import { recentCronRuns, type CronRun } from "@/lib/cron-runs";
 import { SubmitButton } from "./SubmitButton";
 import { requireAdmin } from "./require-admin";
 import { AdminNav } from "./AdminNav";
+import {
+  parseWindow,
+  WINDOW_OPTIONS,
+  windowDays,
+  getKpis,
+  getSubscriberSeries,
+  getSendSeries,
+  getCronHeatMap,
+  getContentSnapshot,
+  type Window,
+} from "@/lib/dashboard";
+import {
+  SubscriberGrowthChart,
+  SendHealthChart,
+  CronHeatMapView,
+  Sparkline,
+} from "./charts";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · boxscore", robots: { index: false } };
 
+const GMAIL_CLIP_BYTES = 102 * 1024;
+
 export default async function AdminDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ ok?: string; error?: string; window?: string }>;
 }) {
   await requireAdmin();
+  const { ok, error, window: windowParam } = await searchParams;
+  const w = parseWindow(windowParam);
   const date = yesterdayInET();
-  const pretty = prettyDate(date);
-  const digest = await getDigest("mlb", date);
-  const { ok, error } = await searchParams;
 
-  // Quick status counts
-  const { count: subscriberCount } = await supabaseAdmin()
-    .from("subscribers")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active");
-
-  const { count: sendsToday } = await supabaseAdmin()
-    .from("sends")
-    .select("id", { count: "exact", head: true })
-    .eq("digest_date", date)
-    .is("error", null);
-
-  const { count: socialPostsToday } = await supabaseAdmin()
-    .from("social_posts")
-    .select("id", { count: "exact", head: true })
-    .eq("date", date)
-    .is("error", null);
-
-  const runs = await recentCronRuns(20);
+  const [kpis, subSeries, sendSeries, heatMap, content, runs] = await Promise.all([
+    getKpis(w),
+    getSubscriberSeries(w),
+    getSendSeries(w),
+    getCronHeatMap(windowDays(w)),
+    getContentSnapshot(w),
+    recentCronRuns(20),
+  ]);
 
   return (
-    <main className="admin">
+    <main className="admin admin-wide">
       <AdminNav />
       <h1>Admin</h1>
 
-      {ok && (
-        <p className="admin-success"><strong>✓</strong> {ok}</p>
-      )}
-      {error && (
-        <p className="admin-error"><strong>Failed:</strong> {error}</p>
-      )}
+      {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}
+      {error && <p className="admin-error"><strong>Failed:</strong> {error}</p>}
 
+      <WindowSelector current={w} />
+
+      {/* 1. Hero KPI strip */}
+      <section className="admin-kpis">
+        <KpiCard
+          label="Active subscribers"
+          value={kpis.activeSubscribers.toLocaleString()}
+          delta={formatDelta(kpis.activeSubscribersDelta)}
+          deltaTone={toneFor(kpis.activeSubscribersDelta)}
+          sub={`vs. ${w} ago`}
+        />
+        <KpiCard
+          label={`Send rate (${w})`}
+          value={kpis.sendSuccess.total === 0
+            ? "—"
+            : `${(kpis.sendSuccess.rate * 100).toFixed(1)}%`}
+          sub={kpis.sendSuccess.total === 0
+            ? "no sends in window"
+            : `${kpis.sendSuccess.ok.toLocaleString()} / ${kpis.sendSuccess.total.toLocaleString()}`}
+          deltaTone={kpis.sendSuccess.failed > 0 ? "bad" : "good"}
+        />
+        <KpiCard
+          label={`Net growth (${w})`}
+          value={formatDelta(kpis.netGrowth.net)}
+          deltaTone={toneFor(kpis.netGrowth.net)}
+          sub={`+${kpis.netGrowth.newSubs} new / −${kpis.netGrowth.unsubs} unsub`}
+        />
+        <KpiCard
+          label={`Churn (${w})`}
+          value={kpis.churn.activeAtStart === 0
+            ? "—"
+            : `${(kpis.churn.rate * 100).toFixed(2)}%`}
+          sub={kpis.churn.activeAtStart === 0
+            ? "no subs at window start"
+            : `${kpis.churn.unsubs} / ${kpis.churn.activeAtStart.toLocaleString()} unsub`}
+          deltaTone={kpis.churn.rate > 0.01 ? "bad" : kpis.churn.unsubs === 0 ? "good" : "neutral"}
+        />
+        <KpiCard
+          label="Pending subscribers"
+          value={kpis.pending.count.toLocaleString()}
+          delta={formatDelta(kpis.pending.delta)}
+          deltaTone={kpis.pending.delta > 0 ? "bad" : kpis.pending.delta < 0 ? "good" : "neutral"}
+          sub="signed up, never confirmed"
+        />
+      </section>
+
+      {/* 2. Subscriber growth */}
       <section>
-        <h2>Status</h2>
+        <h2>Subscriber growth ({w})</h2>
+        <SubscriberGrowthChart series={subSeries} window={w} />
+      </section>
+
+      {/* 3. Send health */}
+      <section>
+        <h2>Send health ({w})</h2>
+        <SendHealthChart series={sendSeries} window={w} />
+      </section>
+
+      {/* 4. Cron heat-map */}
+      <section>
+        <h2>Cron health ({w})</h2>
+        <CronHeatMapView data={heatMap} />
+      </section>
+
+      {/* 5. Content snapshot */}
+      <section>
+        <h2>Content snapshot</h2>
+        {content.yesterday ? (
+          <ul className="admin-stats">
+            <li><strong>{prettyDate(content.yesterday.date)}</strong></li>
+            <li><strong>Games:</strong> {content.yesterday.gameCount}</li>
+            <li>
+              <strong>Web HTML:</strong> {(content.yesterday.htmlSize / 1024).toFixed(1)} KB
+              {" · "}
+              <strong>Email HTML:</strong> {(content.yesterday.emailSize / 1024).toFixed(1)} KB
+              {content.yesterday.emailSize > GMAIL_CLIP_BYTES && (
+                <span className="admin-cron-error"> ⚠ over Gmail clip threshold</span>
+              )}
+            </li>
+            <li><strong>Emails delivered:</strong> {content.yesterday.sendCount.toLocaleString()}</li>
+          </ul>
+        ) : (
+          <p className="admin-meta">No digest for {prettyDate(date)}.</p>
+        )}
+        <p className="admin-meta">Email size trend ({w}) — red dashed line = Gmail clip threshold (102 KB)</p>
+        <Sparkline
+          values={content.emailSizeTrend.map((p) => p.size)}
+          labels={content.emailSizeTrend.map((p) => p.date)}
+          threshold={GMAIL_CLIP_BYTES}
+          formatValue={(v) => `${(v / 1024).toFixed(0)}K`}
+        />
+      </section>
+
+      {/* 6. Quick links (kept for now; will move) */}
+      <section>
+        <h2>Quick links</h2>
         <ul className="admin-stats">
-          <li><strong>Latest digest:</strong> {digest ? `${pretty} · ${digest.game_count} games · ${(digest.html.length / 1024).toFixed(0)} KB web / ${digest.email_html ? (digest.email_html.length / 1024).toFixed(0) + " KB email" : "no email_html"}` : "(none for yesterday)"}</li>
-          <li><strong>Active subscribers:</strong> {subscriberCount ?? 0}</li>
-          <li><strong>Emails sent today:</strong> {sendsToday ?? 0}</li>
-          <li><strong>Social posts today:</strong> {socialPostsToday ?? 0}</li>
+          <li><a href={`/mlb/${date}`} target="_blank" rel="noreferrer">View /mlb/{date}</a></li>
+          <li><a href={`/admin/email/${date}`} target="_blank" rel="noreferrer">Preview today&apos;s email</a></li>
+          <li><a href="/admin/images">Share images</a></li>
+          <li><a href="/admin/twitter">Twitter compose</a></li>
         </ul>
       </section>
 
+      {/* 7. Actions — pushed to the bottom (eventually move to /admin/cron) */}
       <section>
         <h2>Run a cron</h2>
         <p className="admin-meta">
@@ -73,49 +169,63 @@ export default async function AdminDashboard({
         <TriggerForm route="post-bluesky" date={date} label="Post to BlueSky" allowReset />
         <TriggerForm route="post-twitter" date={date} label="Post to Twitter" allowReset />
         <RegenerateAllForm />
+        <SendEmailForm date={date} />
       </section>
 
       <section>
         <h2>Recent cron runs</h2>
         <CronRunsTable runs={runs} />
       </section>
-
-      <section>
-        <h2>Web</h2>
-        <p>
-          <a href={`/mlb/${date}`} target="_blank" rel="noreferrer">
-            View /mlb/{date}
-          </a>
-          {" · "}
-          <a href="/mlb" target="_blank" rel="noreferrer">/mlb</a>
-        </p>
-      </section>
-
-      <section>
-        <h2>Email preview (just to me)</h2>
-        <p>
-          <a href={`/admin/email/${date}`} target="_blank" rel="noreferrer">
-            Preview today&apos;s email (in browser)
-          </a>
-        </p>
-        <SendEmailForm date={date} />
-      </section>
-
-      <section>
-        <h2>Share images</h2>
-        <p>
-          <a href="/admin/images">View share images (and regenerate)</a>
-        </p>
-      </section>
-
-      <section>
-        <h2>Twitter compose</h2>
-        <p>
-          <a href="/admin/twitter">Copy posts to clipboard for manual Twitter posting</a>
-        </p>
-      </section>
     </main>
   );
+}
+
+// ---- helpers ----------------------------------------------------------
+
+function WindowSelector({ current }: { current: Window }) {
+  return (
+    <nav className="admin-window-selector" aria-label="Trend window">
+      <span className="admin-window-label">Window</span>
+      {WINDOW_OPTIONS.map((o) => (
+        <a
+          key={o.value}
+          href={`/admin?window=${o.value}`}
+          className={o.value === current ? "current" : ""}
+        >{o.label}</a>
+      ))}
+    </nav>
+  );
+}
+
+function KpiCard({
+  label, value, sub, delta, deltaTone = "neutral",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  delta?: string;
+  deltaTone?: "good" | "bad" | "neutral";
+}) {
+  return (
+    <div className="admin-kpi">
+      <div className="admin-kpi-label">{label}</div>
+      <div className="admin-kpi-value">{value}</div>
+      {delta && <div className={`admin-kpi-delta admin-kpi-delta-${deltaTone}`}>{delta}</div>}
+      {sub && <div className="admin-kpi-sub">{sub}</div>}
+    </div>
+  );
+}
+
+function formatDelta(n: number): string {
+  if (n > 0) return `+${n.toLocaleString()}`;
+  if (n < 0) return `−${Math.abs(n).toLocaleString()}`;
+  return "0";
+}
+
+function toneFor(n: number): "good" | "bad" | "neutral" {
+  if (n > 0) return "good";
+  if (n < 0) return "bad";
+  return "neutral";
 }
 
 function RegenerateAllForm() {
@@ -140,11 +250,9 @@ function SendEmailForm({ date }: { date: string }) {
       "use server";
       const { sendAdminPreview } = await import("./actions");
       await sendAdminPreview(date);
-    }}>
-      <SubmitButton
-        idleLabel="Send today's email to me"
-        pendingLabel="Sending…"
-      />
+    }} className="admin-trigger-form">
+      <span className="admin-trigger-label">Send today&apos;s email to me ({date})</span>
+      <SubmitButton idleLabel="Send to me" pendingLabel="Sending…" />
     </form>
   );
 }
@@ -215,9 +323,7 @@ function CronRunsTable({ runs }: { runs: CronRun[] }) {
               <td><code>{r.route}</code></td>
               <td>{r.date ?? "—"}</td>
               <td>{r.trigger}</td>
-              <td>
-                <span className={`status-${r.status}`}>{statusLabel(r.status)}</span>
-              </td>
+              <td><span className={`status-${r.status}`}>{statusLabel(r.status)}</span></td>
               <td>{dur}</td>
               <td className="admin-meta">{new Date(r.started_at).toLocaleString()}</td>
               <td>{detail}</td>
