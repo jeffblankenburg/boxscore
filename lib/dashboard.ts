@@ -107,6 +107,10 @@ export type DashboardKpis = {
   // Pending: subscribers still stuck at 'pending' (signed up, never confirmed),
   // with delta vs. window-ago to surface confirmation-funnel degradation.
   pending: { count: number; delta: number };
+  // Open rate: distinct sends in window that got at least one open event.
+  // `tracked` is false when there's never been an open event recorded — used
+  // to show "—" instead of "0.0%" before open tracking is configured at Resend.
+  openRate: { rate: number; opened: number; sends: number; tracked: boolean };
 };
 
 export async function getKpis(w: Window): Promise<DashboardKpis> {
@@ -179,6 +183,49 @@ export async function getKpis(w: Window): Promise<DashboardKpis> {
   const failedSends = failedSendsCount ?? 0;
   const okSends = totalSends - failedSends;
 
+  // Open rate: intersect successful sends in window with opens that arrived
+  // for those sends. Opens can land days after a send, so we intentionally
+  // don't filter the opens by window — we filter by the send window and
+  // accept any open of those sends.
+  const sendsWithIds = await fetchAll<{ resend_id: string | null }>(
+    () => db.from("sends")
+      .select("resend_id")
+      .gte("sent_at", windowStartIso)
+      .is("error", null) as unknown as QueryBuilder<{ resend_id: string | null }>,
+    "getKpis sends-with-ids",
+  );
+  const sendIds = new Set<string>();
+  for (const r of sendsWithIds) if (r.resend_id) sendIds.add(r.resend_id);
+
+  let openedInWindow = 0;
+  let openTracked = false;
+  if (sendIds.size > 0) {
+    // Pull opens for any of the in-window resend_ids. We bound by event_at
+    // back to windowStart for performance — opens of in-window sends can't
+    // physically precede the send itself.
+    const opens = await fetchAll<{ resend_id: string }>(
+      () => db.from("email_events")
+        .select("resend_id")
+        .eq("event_type", "email.opened")
+        .gte("event_at", windowStartIso) as unknown as QueryBuilder<{ resend_id: string }>,
+      "getKpis email_events",
+    );
+    const openedIds = new Set<string>();
+    for (const r of opens) if (r.resend_id) openedIds.add(r.resend_id);
+    openTracked = openedIds.size > 0;
+    for (const id of sendIds) if (openedIds.has(id)) openedInWindow++;
+  } else {
+    // No sends in window. Check once whether opens have *ever* been recorded
+    // so we can distinguish "not tracked yet" from "tracked but no sends".
+    const { count } = await db
+      .from("email_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "email.opened")
+      .limit(1);
+    openTracked = (count ?? 0) > 0;
+  }
+  const openRate = sendIds.size === 0 ? 0 : openedInWindow / sendIds.size;
+
   void windowStartDate;
 
   return {
@@ -199,6 +246,12 @@ export async function getKpis(w: Window): Promise<DashboardKpis> {
       activeAtStart,
     },
     pending: { count: pendingNow, delta: pendingNow - pendingAtStart },
+    openRate: {
+      rate: openRate,
+      opened: openedInWindow,
+      sends: sendIds.size,
+      tracked: openTracked,
+    },
   };
 }
 

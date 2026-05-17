@@ -40,3 +40,44 @@ export async function recordWebhookEvent(args: {
   if (code === "23505" || /duplicate key/i.test(error.message)) return;
   throw new Error(`recordWebhookEvent: ${error.message}`);
 }
+
+// Engagement log: one row per Resend open/click event. Allows duplicates
+// (a subscriber can open a message many times) — that's intentional and
+// drives the trend visualizations.
+export async function recordEmailEvent(args: {
+  resendId: string;
+  eventType: string;
+  eventAt?: string;
+  userAgent?: string | null;
+  ip?: string | null;
+  payload?: unknown;
+}): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("email_events")
+    .insert({
+      resend_id: args.resendId,
+      event_type: args.eventType,
+      event_at: args.eventAt ?? new Date().toISOString(),
+      user_agent: args.userAgent ?? null,
+      ip: args.ip ?? null,
+      payload: args.payload ?? null,
+    });
+  if (error) throw new Error(`recordEmailEvent: ${error.message}`);
+}
+
+// Truncate an IP address for privacy. IPv4 → keep first three octets and zero
+// the fourth (/24). IPv6 → keep first three 16-bit groups (/48). Best-effort:
+// returns null if the input isn't a parseable address.
+export function truncateIp(ip: string | null | undefined): string | null {
+  if (!ip) return null;
+  const trimmed = ip.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes(":")) {
+    const parts = trimmed.split(":");
+    if (parts.length < 3) return null;
+    return `${parts.slice(0, 3).join(":")}::`;
+  }
+  const parts = trimmed.split(".");
+  if (parts.length !== 4) return null;
+  return `${parts[0]}.${parts[1]}.${parts[2]}.0`;
+}

@@ -23,7 +23,12 @@
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { unsubscribeByEmail } from "@/lib/subscribers";
-import { hasWebhookEvent, recordWebhookEvent } from "@/lib/webhooks";
+import {
+  hasWebhookEvent,
+  recordEmailEvent,
+  recordWebhookEvent,
+  truncateIp,
+} from "@/lib/webhooks";
 
 export const runtime = "nodejs";
 
@@ -41,6 +46,12 @@ type ResendWebhookEvent = {
     // bounced / complained envelopes:
     bounce?: { type?: string; subType?: string; message?: string };
     complaint?: { feedbackType?: string };
+    // opened / clicked envelopes:
+    user_agent?: string;
+    userAgent?: string;
+    ip_address?: string;
+    ipAddress?: string;
+    link?: string;            // clicked-link URL
   };
 };
 
@@ -125,6 +136,25 @@ export async function POST(req: Request) {
         // Soft signal; Resend retries on its own. Logging is enough.
         actionResult = { action: "logged" };
         break;
+      case "email.opened":
+      case "email.clicked": {
+        const resendId = event.data?.email_id;
+        if (!resendId) {
+          console.warn(`${event.type} event ${svixId} has no email_id`);
+          actionResult = { action: "no_email_id" };
+          break;
+        }
+        await recordEmailEvent({
+          resendId,
+          eventType: event.type,
+          eventAt: event.created_at,
+          userAgent: event.data?.user_agent ?? event.data?.userAgent ?? null,
+          ip: truncateIp(event.data?.ip_address ?? event.data?.ipAddress ?? null),
+          payload: event.data,
+        });
+        actionResult = { action: "recorded", resendId };
+        break;
+      }
     }
   } catch (e) {
     console.error(`Resend webhook handler error for ${event.type}: ${(e as Error).message}`);

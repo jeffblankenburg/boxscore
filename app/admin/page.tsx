@@ -97,6 +97,23 @@ export default async function AdminDashboard({
           deltaTone={kpis.pending.delta > 0 ? "bad" : kpis.pending.delta < 0 ? "good" : "neutral"}
           sub="signed up, never confirmed"
         />
+        <KpiCard
+          label={`Open rate (${w})`}
+          value={!kpis.openRate.tracked
+            ? "—"
+            : kpis.openRate.sends === 0
+              ? "—"
+              : `${(kpis.openRate.rate * 100).toFixed(1)}%`}
+          sub={!kpis.openRate.tracked
+            ? "tracking not enabled"
+            : kpis.openRate.sends === 0
+              ? "no sends in window"
+              : `${kpis.openRate.opened.toLocaleString()} / ${kpis.openRate.sends.toLocaleString()} sends opened`}
+          deltaTone={!kpis.openRate.tracked ? "neutral"
+            : kpis.openRate.rate >= 0.3 ? "good"
+            : kpis.openRate.rate >= 0.15 ? "neutral"
+            : "bad"}
+        />
       </section>
 
       {/* 2. Subscriber growth */}
