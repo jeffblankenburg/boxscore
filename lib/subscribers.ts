@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase";
+import { ensureLeagueSubscription } from "./email-subscriptions";
 
 export type SubscriberStatus = "pending" | "active" | "unsubscribed";
 
@@ -86,7 +87,18 @@ export async function confirmSubscriberIfPending(id: string): Promise<Subscriber
     .select(COLS)
     .maybeSingle<Subscriber>();
   if (error) throw new Error(`confirmSubscriberIfPending: ${error.message}`);
-  return data ?? null;
+  if (!data) return null;
+  // Opt the newly-active subscriber into the default league newsletter (MLB).
+  // Idempotent — safe if a row already exists from a prior subscription cycle.
+  // Errors are logged but don't fail confirmation; missing the opt-in row is
+  // fixable later (the backfill migration is the same shape), losing the
+  // confirmed_at flip would not be.
+  try {
+    await ensureLeagueSubscription(data.id);
+  } catch (e) {
+    console.error(`ensureLeagueSubscription(${data.id}) failed: ${(e as Error).message}`);
+  }
+  return data;
 }
 
 export async function getActiveSubscribers(): Promise<Subscriber[]> {
