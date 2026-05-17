@@ -60,7 +60,7 @@ export async function triggerCron(formData: FormData): Promise<void> {
 
   let target: string;
   try {
-    if (!["generate", "send-email", "post-bluesky"].includes(route)) {
+    if (!["generate", "send-email", "post-bluesky", "post-twitter"].includes(route)) {
       throw new Error(`Unknown cron route: ${route}`);
     }
     if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);

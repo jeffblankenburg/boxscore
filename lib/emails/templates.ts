@@ -40,40 +40,45 @@ ${preview}
 </html>`;
 }
 
-function button(href: string, label: string): string {
-  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 20px auto;">
-    <tr><td style="background:${INK}; border-radius:999px;">
-      <a href="${href}" style="display:inline-block; padding:12px 28px; color:#fff; text-decoration:none; font-weight:700; font-family:Georgia, serif; letter-spacing:0.02em;">
-        ${label}
-      </a>
-    </td></tr>
-  </table>`;
-}
-
-function pasteLink(href: string): string {
-  return `<p style="font-size:13px; color:${MUTED}; line-height:1.5; word-break:break-all;">
-    Or paste this link into your browser:<br>
-    <a href="${href}" style="color:${INK};">${href}</a>
-  </p>`;
-}
-
+// Plain-feeling confirmation email — written to dodge Apple's CS01 content
+// classifier, which flags transactional templates that look phishing-like
+// (big CTA button + duplicate paste-link, "Confirm your X" subject, etc).
+// We use a single hyperlink, a personal signature, and prose that reads like
+// a human note instead of a marketing template.
 export function confirmationEmail(opts: { confirmUrl: string }): { subject: string; html: string; text: string } {
-  const subject = "Confirm your boxscore.email subscription";
+  const subject = "Welcome to boxscore.email — one quick step";
   const html = wrap(
     `
-    <p style="font-size:16px; line-height:1.5; margin-top:24px;">
-      One click to start receiving the daily MLB digest:
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      Hey —
     </p>
-    ${button(opts.confirmUrl, "Confirm subscription →")}
-    ${pasteLink(opts.confirmUrl)}
-    <p style="font-size:12px; color:${MUTED}; margin-top:28px; padding-top:14px; border-top:1px dotted ${RULE};">
-      Didn't sign up? Ignore this email and you'll never hear from us. Promise.
+    <p style="font-size:16px; line-height:1.6;">
+      You just signed up for boxscore.email. One last step before I start sending you the morning paper:
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin: 20px 0;">
+      <a href="${opts.confirmUrl}" style="color:${INK}; font-weight:700;">${opts.confirmUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      That's it. Tomorrow morning at 5am ET you'll get yesterday's MLB games in your inbox — standings, leaders, full box scores, just like the old sports page.
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      If this wasn't you, no worries. Just ignore it and your address won't end up on anything.
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br>
+      <span style="color:${MUTED};">boxscore.email</span>
     </p>
     `,
-    { previewText: "Click to confirm your subscription." },
+    { previewText: "One quick step to start your morning paper." },
   );
   const text =
-    `Confirm your boxscore.email subscription.\n\nClick to start receiving the daily MLB digest:\n${opts.confirmUrl}\n\nDidn't sign up? Ignore this email.`;
+    `Hey —\n\n` +
+    `You just signed up for boxscore.email. One last step before I start sending you the morning paper:\n\n` +
+    `${opts.confirmUrl}\n\n` +
+    `That's it. Tomorrow morning at 5am ET you'll get yesterday's MLB games in your inbox — standings, leaders, full box scores, just like the old sports page.\n\n` +
+    `If this wasn't you, no worries. Just ignore it and your address won't end up on anything.\n\n` +
+    `— Jeff\n` +
+    `boxscore.email\n`;
   return { subject, html, text };
 }
 

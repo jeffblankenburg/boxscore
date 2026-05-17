@@ -69,6 +69,7 @@ export default async function AdminDashboard({
         <TriggerForm route="generate" date={date} label="Generate digest" />
         <TriggerForm route="send-email" date={date} label="Send email to subscribers" />
         <TriggerForm route="post-bluesky" date={date} label="Post to BlueSky" allowReset />
+        <TriggerForm route="post-twitter" date={date} label="Post to Twitter" allowReset />
       </section>
 
       <section>

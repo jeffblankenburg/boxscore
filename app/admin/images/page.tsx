@@ -53,6 +53,14 @@ export default async function AdminImagesView({
         <span className="admin-meta">Renders the page, screenshots each section, uploads to Storage.</span>
       </form>
 
+      {images.length > 0 && (
+        <p className="admin-meta">
+          <a href="/api/admin/share-images-zip" className="admin-link">
+            Download all as ZIP
+          </a>
+        </p>
+      )}
+
       <div className="admin-image-grid">
         {images.map((img) => (
           <figure key={img.file}>

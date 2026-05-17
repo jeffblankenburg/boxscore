@@ -35,31 +35,93 @@ import type { ManifestEntry } from "./render-images";
 
 const hashtag = (team: string): string => "#" + team.replace(/\s+/g, "");
 
+// Nickname → MLB tricode. Adds findability hashtags like #BOS, #NYY.
+const TRICODE: Record<string, string> = {
+  // AL East
+  Orioles: "BAL", "Red Sox": "BOS", Yankees: "NYY", Rays: "TB", "Blue Jays": "TOR",
+  // AL Central
+  "White Sox": "CWS", Guardians: "CLE", Tigers: "DET", Royals: "KC", Twins: "MIN",
+  // AL West
+  Astros: "HOU", Angels: "LAA", Athletics: "ATH", Mariners: "SEA", Rangers: "TEX",
+  // NL East
+  Braves: "ATL", Marlins: "MIA", Mets: "NYM", Phillies: "PHI", Nationals: "WSH",
+  // NL Central
+  Cubs: "CHC", Reds: "CIN", Brewers: "MIL", Pirates: "PIT", Cardinals: "STL",
+  // NL West
+  Diamondbacks: "ARI", "D-backs": "ARI", Rockies: "COL", Dodgers: "LAD", Padres: "SD", Giants: "SF",
+};
+
+// Nickname → official 2026 MLB team hashtag (the "hashflag" tags that trigger
+// team-branded emoji on X). Source: MLB's official 2026 announcement.
+const OFFICIAL_HASHTAG: Record<string, string> = {
+  Diamondbacks: "Dbacks", "D-backs": "Dbacks",
+  Athletics: "Athletics",
+  Braves: "BravesCountry",
+  Orioles: "Birdland",
+  "Red Sox": "DirtyWater",
+  Cubs: "Cubs",
+  "White Sox": "WhiteSox",
+  Reds: "ATOBTTR",
+  Guardians: "GuardsBall",
+  Rockies: "Rockies",
+  Tigers: "DNMW",
+  Astros: "ChaseTheFight",
+  Royals: "FountainsUp",
+  Angels: "RepTheHalo",
+  Dodgers: "Dodgers",
+  Marlins: "FightinFish",
+  Brewers: "ThisIsMyCrew",
+  Twins: "NoPlaceLikeHERE",
+  Mets: "LGM",
+  Yankees: "RepBX",
+  Phillies: "RingTheBell",
+  Pirates: "LetsGoBucs",
+  Padres: "ForTheFaithful",
+  Mariners: "TridentsUp",
+  Giants: "SFGiants",
+  Cardinals: "STLCards",
+  Rays: "RaysUp",
+  Rangers: "AllForTX",
+  "Blue Jays": "BlueJays50",
+  Nationals: "Natitude",
+};
+
 export function imagePostContent(
   entry: ManifestEntry,
   prettyDate: string,
-  digestUrl: string,
+  digestUrl?: string,
 ): { text: string; alt: string } {
+  // Twitter charges $0.20/post when a URL is present (vs $0.015 without), so
+  // the Twitter paths pass digestUrl=undefined. Bluesky still includes it.
+  const tail = digestUrl ? ` ${digestUrl}` : "";
   if (entry.type === "standings") {
     const name = entry.league === "AL" ? "American League" : "National League";
     return {
-      text: `${name} Standings · ${prettyDate}\n\n#MLB ${digestUrl}`,
+      text: `${name} Standings · ${prettyDate}\n\n#MLB${tail}`,
       alt: `${name} Standings for ${prettyDate}.`,
     };
   }
   if (entry.type === "leaders") {
     const name = entry.league === "AL" ? "American League" : "National League";
     return {
-      text: `${name} Leaders · ${prettyDate}\n\n#MLB ${digestUrl}`,
+      text: `${name} Leaders · ${prettyDate}\n\n#MLB${tail}`,
       alt: `${name} Leaders as of ${prettyDate}.`,
     };
   }
-  const tags = entry.teams
-    .filter((t) => t.length > 0)
-    .map(hashtag)
-    .join(" ");
+  const validTeams = entry.teams.filter((t) => t.length > 0);
+  const nameTags = validTeams.map(hashtag);
+  const tricodeTags = validTeams
+    .map((t) => TRICODE[t])
+    .filter((c): c is string => Boolean(c))
+    .map((c) => `#${c}`);
+  const officialTags = validTeams
+    .map((t) => OFFICIAL_HASHTAG[t])
+    .filter((c): c is string => Boolean(c))
+    .map((c) => `#${c}`);
+  // Dedupe — for some teams the nickname IS the official tag (#Cubs, #Dodgers).
+  const tags = Array.from(new Set([...nameTags, ...tricodeTags, ...officialTags])).join(" ");
   return {
-    text: `${entry.title} · ${prettyDate}\n\n${tags} #MLB ${digestUrl}`.trim(),
+    text: `${entry.title} · ${prettyDate}\n\n${tags} #MLB${tail}`.trim(),
     alt: `Box score: ${entry.title} on ${prettyDate}.`,
   };
 }

@@ -1,7 +1,5 @@
-import { notFound } from "next/navigation";
 import { getStoredManifest } from "@/lib/share-storage";
 import { imagePostContent } from "@/lib/social-content";
-import { siteOrigin } from "@/lib/site";
 import { CopyButtons } from "./CopyButtons";
 import { requireAdmin } from "../require-admin";
 
@@ -23,11 +21,8 @@ export default async function AdminTwitterCompose() {
     );
   }
 
-  const origin = await siteOrigin();
-  const digestUrl = `${origin}/mlb/${manifest.date}`;
-
   const posts = manifest.entries.map(({ entry, url }) => {
-    const { text } = imagePostContent(entry, manifest.prettyDate, digestUrl);
+    const { text } = imagePostContent(entry, manifest.prettyDate);
     return { entry, url, text };
   });
 
