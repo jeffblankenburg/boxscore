@@ -4,7 +4,7 @@ import {
   unsubscribeSubscriber,
 } from "@/lib/subscribers";
 
-export const metadata = { title: "Unsubscribed — boxscore.email" };
+export const metadata = { title: "Unsubscribed — boxscore" };
 
 export default async function UnsubscribePage({
   params,

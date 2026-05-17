@@ -11,7 +11,7 @@ import { getDigest } from "@/lib/digests";
 import { yesterdayInET, prettyDate } from "@/lib/dates";
 import { isLikelyBot } from "@/lib/bot-detect";
 
-export const metadata = { title: "You're in — boxscore.email" };
+export const metadata = { title: "You're in — boxscore" };
 export const dynamic = "force-dynamic";
 
 export default async function ConfirmPage({

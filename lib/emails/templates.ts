@@ -31,7 +31,7 @@ ${preview}
 <div style="max-width:560px; margin:0 auto; padding:32px 24px; background:#fff; box-shadow:0 0 10px rgba(0,0,0,0.08);">
   <div style="text-align:center; padding-bottom:14px; border-bottom:1px solid ${INK};">
     <a href="https://boxscore.email/" style="text-decoration:none; color:${INK}; font-weight:800; font-size:22px; letter-spacing:-0.01em;">
-      boxscore<span style="color:${MUTED};">.</span>email
+      boxscore
     </a>
   </div>
   ${inner}
@@ -46,14 +46,14 @@ ${preview}
 // We use a single hyperlink, a personal signature, and prose that reads like
 // a human note instead of a marketing template.
 export function confirmationEmail(opts: { confirmUrl: string }): { subject: string; html: string; text: string } {
-  const subject = "Welcome to boxscore.email — one quick step";
+  const subject = "Welcome to boxscore — one quick step";
   const html = wrap(
     `
     <p style="font-size:16px; line-height:1.6; margin-top:24px;">
       Hey —
     </p>
     <p style="font-size:16px; line-height:1.6;">
-      You just signed up for boxscore.email. One last step before I start sending you the morning paper:
+      You just signed up for boxscore. One last step before I start sending you the morning paper:
     </p>
     <p style="font-size:16px; line-height:1.6; margin: 20px 0;">
       <a href="${opts.confirmUrl}" style="color:${INK}; font-weight:700;">${opts.confirmUrl}</a>
@@ -66,19 +66,19 @@ export function confirmationEmail(opts: { confirmUrl: string }): { subject: stri
     </p>
     <p style="font-size:16px; line-height:1.6; margin-top:24px;">
       — Jeff<br>
-      <span style="color:${MUTED};">boxscore.email</span>
+      <span style="color:${MUTED};">boxscore</span>
     </p>
     `,
     { previewText: "One quick step to start your morning paper." },
   );
   const text =
     `Hey —\n\n` +
-    `You just signed up for boxscore.email. One last step before I start sending you the morning paper:\n\n` +
+    `You just signed up for boxscore. One last step before I start sending you the morning paper:\n\n` +
     `${opts.confirmUrl}\n\n` +
     `That's it. Tomorrow morning at 5am ET you'll get yesterday's MLB games in your inbox — standings, leaders, full box scores, just like the old sports page.\n\n` +
     `If this wasn't you, no worries. Just ignore it and your address won't end up on anything.\n\n` +
     `— Jeff\n` +
-    `boxscore.email\n`;
+    `boxscore\n`;
   return { subject, html, text };
 }
 
@@ -94,7 +94,7 @@ export function welcomeEmail(opts: {
   unsubscribeUrl: string;
   digestEmailHtml: string;
 }): { subject: string; html: string; text: string } {
-  const subject = `Welcome — boxscore.email · ${opts.digestPrettyDate}`;
+  const subject = `Welcome — boxscore · ${opts.digestPrettyDate}`;
   const html = wrapWithDigest({
     welcomeBanner: `<p style="font-family:Georgia, serif; font-size:15px; line-height:1.5; color:${INK}; margin:0;">
       You're in. The full digest below is for <i>${opts.digestPrettyDate}</i>. Another one will hit your inbox tomorrow morning at <b>5am&nbsp;ET</b>.
@@ -102,9 +102,9 @@ export function welcomeEmail(opts: {
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
-    previewText: `Welcome — your boxscore.email digest for ${opts.digestPrettyDate} is below.`,
+    previewText: `Welcome — your boxscore digest for ${opts.digestPrettyDate} is below.`,
   });
-  const text = `Welcome to boxscore.email!\n\nThe full digest for ${opts.digestPrettyDate} is in this email. You'll get one every morning at 5am ET.\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `Welcome to boxscore!\n\nThe full digest for ${opts.digestPrettyDate} is in this email. You'll get one every morning at 5am ET.\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
@@ -118,14 +118,14 @@ export function dailyEmail(opts: {
   unsubscribeUrl: string;
   digestEmailHtml: string;
 }): { subject: string; html: string; text: string } {
-  const subject = `boxscore.email · ${opts.digestPrettyDate}`;
+  const subject = `boxscore · ${opts.digestPrettyDate}`;
   const html = wrapWithDigest({
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
-    previewText: `${opts.digestPrettyDate} · MLB digest from boxscore.email.`,
+    previewText: `${opts.digestPrettyDate} · MLB digest from boxscore.`,
   });
-  const text = `boxscore.email — ${opts.digestPrettyDate}\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `boxscore — ${opts.digestPrettyDate}\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
@@ -162,7 +162,7 @@ ${preview}
 
       <tr><td style="padding-bottom:10px; border-bottom:2px solid ${INK}; text-align:center;">
         <a href="https://boxscore.email/" style="text-decoration:none; color:${INK}; font-weight:800; font-size:20px; letter-spacing:-0.01em; font-family:Georgia, serif;">
-          <img src="https://boxscore.email/icon.png" alt="" width="24" height="24" style="vertical-align:middle; margin-right:6px; border-radius:4px;">boxscore<span style="color:${MUTED};">.</span>email
+          <img src="https://boxscore.email/icon.png" alt="" width="24" height="24" style="vertical-align:middle; margin-right:6px; border-radius:4px;">boxscore
         </a>
       </td></tr>
 

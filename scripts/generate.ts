@@ -28,13 +28,13 @@ async function main() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Boxscore — ${data.prettyDate}</title>
+<title>boxscore — ${data.prettyDate}</title>
 <style>${css}</style>
 </head>
 <body>
 <div class="newspaper">
 <header class="site-header">
-  <div class="brand"><a href="/">boxscore<span class="dot">.</span>email</a></div>
+  <div class="brand"><a href="/">boxscore</a></div>
   <nav class="social">${social}</nav>
   <a class="subscribe" href="${BRAND.subscribeUrl}">Subscribe →</a>
 </header>

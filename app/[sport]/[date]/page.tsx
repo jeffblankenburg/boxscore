@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
   const { sport, date } = await params;
   if (sport !== "mlb" || !isValidIsoDate(date)) return {};
   return {
-    title: `MLB — ${prettyDate(date)} | boxscore.email`,
+    title: `MLB — ${prettyDate(date)} | boxscore`,
     description: `Daily MLB digest for ${prettyDate(date)}.`,
   };
 }

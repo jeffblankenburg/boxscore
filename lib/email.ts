@@ -10,7 +10,7 @@ function client(): Resend {
   return cached;
 }
 
-const FROM = process.env.EMAIL_FROM ?? "boxscore.email <digest@boxscore.email>";
+const FROM = process.env.EMAIL_FROM ?? "boxscore <digest@boxscore.email>";
 
 export type SendArgs = {
   to: string;

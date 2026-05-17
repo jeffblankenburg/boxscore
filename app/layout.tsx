@@ -7,7 +7,7 @@ import { BRAND } from "@/lib/brand";
 import { PaperModeToggle } from "./PaperModeToggle";
 
 export const metadata = {
-  title: "boxscore.email",
+  title: "boxscore",
   description: "Daily MLB digest. Sent every morning at 5am ET.",
   icons: {
     icon: "/background_icon.png",
@@ -37,7 +37,7 @@ function SiteHeader() {
       <div className="brand">
         <a href="/">
           <img src="/icon.png" alt="" width={28} height={28} className="brand-icon" />
-          <span>boxscore<span className="dot">.</span>email</span>
+          <span>boxscore</span>
         </a>
       </div>
       <nav className="social">

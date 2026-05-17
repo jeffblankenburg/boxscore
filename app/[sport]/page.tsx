@@ -19,7 +19,7 @@ export async function generateMetadata({
   if (!VALID_SPORTS.has(sport)) return {};
   const date = yesterdayInET();
   return {
-    title: `${sport.toUpperCase()} — ${prettyDate(date)} | boxscore.email`,
+    title: `${sport.toUpperCase()} — ${prettyDate(date)} | boxscore`,
     description: `Daily ${sport.toUpperCase()} digest for ${prettyDate(date)}.`,
   };
 }

@@ -6,7 +6,7 @@ import { SubmitButton } from "./SubmitButton";
 import { requireAdmin } from "./require-admin";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin · boxscore.email", robots: { index: false } };
+export const metadata = { title: "Admin · boxscore", robots: { index: false } };
 
 export default async function AdminDashboard({
   searchParams,

@@ -5,7 +5,7 @@ import { SubmitButton } from "../SubmitButton";
 import { requireAdmin } from "../require-admin";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Share images · admin · boxscore.email", robots: { index: false } };
+export const metadata = { title: "Share images · admin · boxscore", robots: { index: false } };
 
 export default async function AdminImagesView({
   searchParams,

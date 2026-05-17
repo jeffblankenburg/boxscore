@@ -1,7 +1,7 @@
 import { subscribe } from "./actions";
 
 export const metadata = {
-  title: "Subscribe — boxscore.email",
+  title: "Subscribe — boxscore",
   description: "Daily MLB digest in your inbox, 5am ET.",
 };
 

@@ -4,7 +4,7 @@ import { CopyButtons } from "./CopyButtons";
 import { requireAdmin } from "../require-admin";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Twitter compose · admin · boxscore.email", robots: { index: false } };
+export const metadata = { title: "Twitter compose · admin · boxscore", robots: { index: false } };
 
 export default async function AdminTwitterCompose() {
   await requireAdmin();

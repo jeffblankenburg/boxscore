@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Check your inbox — boxscore.email",
+  title: "Check your inbox — boxscore",
 };
 
 export default function SubscribeSentPage() {

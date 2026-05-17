@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Terms — boxscore.email",
-  description: "Terms of service for boxscore.email.",
+  title: "Terms — boxscore",
+  description: "Terms of service for boxscore.",
 };
 
 const UPDATED = "May 15, 2026";
@@ -13,7 +13,7 @@ export default function TermsPage() {
 
       <h2>The deal</h2>
       <p>
-        boxscore.email is a free daily newsletter that summarizes the previous
+        boxscore is a free daily newsletter that summarizes the previous
         day&apos;s Major League Baseball games. You give us an email address; we
         send you the digest each morning. You can stop receiving it at any time
         by clicking the unsubscribe link in any email.
@@ -31,7 +31,7 @@ export default function TermsPage() {
 
       <h2>Not affiliated with MLB</h2>
       <p>
-        boxscore.email is an independent project. It is not affiliated with,
+        boxscore is an independent project. It is not affiliated with,
         endorsed by, or sponsored by Major League Baseball, any MLB club, or any
         of their licensees. All team names, marks, and logos are the property of
         their respective owners and used here only for informational reference.

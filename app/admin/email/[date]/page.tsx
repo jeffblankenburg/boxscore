@@ -6,7 +6,7 @@ import { siteOrigin } from "@/lib/site";
 import { requireAdmin } from "../../require-admin";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Email preview · admin · boxscore.email", robots: { index: false } };
+export const metadata = { title: "Email preview · admin · boxscore", robots: { index: false } };
 
 export default async function AdminEmailPreview({
   params,

@@ -25,11 +25,11 @@ export async function requestCode(formData: FormData): Promise<void> {
       const { plaintext } = await issueCode(email);
       await sendEmail({
         to: email,
-        subject: `boxscore.email admin code: ${plaintext}`,
-        html: `<p>Your boxscore.email admin sign-in code is:</p>
+        subject: `boxscore admin code: ${plaintext}`,
+        html: `<p>Your boxscore admin sign-in code is:</p>
                <p style="font-size:24px; font-weight:700; letter-spacing:4px;">${plaintext}</p>
                <p style="color:#666; font-size:13px;">Good for 10 minutes. If you didn&rsquo;t request this, you can ignore the message.</p>`,
-        text: `Your boxscore.email admin sign-in code: ${plaintext}\n\nGood for 10 minutes.`,
+        text: `Your boxscore admin sign-in code: ${plaintext}\n\nGood for 10 minutes.`,
       });
     } catch (err) {
       console.error(`[admin/login] requestCode for ${email}: ${(err as Error).message}`);

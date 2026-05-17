@@ -1,5 +1,6 @@
 export const BRAND = {
-  name: "boxscore.email",
+  name: "boxscore",
+  domain: "boxscore.email",
   tagline: "the sports page for your inbox",
   subscribeUrl: "/subscribe",
   social: [

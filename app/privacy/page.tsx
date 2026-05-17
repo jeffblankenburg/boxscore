@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Privacy — boxscore.email",
-  description: "How boxscore.email handles your data.",
+  title: "Privacy — boxscore",
+  description: "How boxscore handles your data.",
 };
 
 const UPDATED = "May 15, 2026";

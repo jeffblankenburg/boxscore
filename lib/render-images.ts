@@ -128,7 +128,7 @@ async function injectShareChrome(page: Page, dateStr: string): Promise<void> {
       <div class="share-header">
         <div class="brand-cell">
           <img src="/icon.png" alt="">
-          <span class="brand">boxscore<span class="dot">.</span>email</span>
+          <span class="brand">boxscore</span>
         </div>
         <div class="share-date">${d}</div>
       </div>`;
