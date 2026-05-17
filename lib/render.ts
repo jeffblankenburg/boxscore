@@ -404,8 +404,9 @@ const FIG_SPACE = "\u2007";
 const padRhe = (n: number | undefined) =>
   n == null ? FIG_SPACE + "—" : String(n).padStart(2, FIG_SPACE);
 
-// Web caps inline display at 9 innings (vs email's 19) because the 270px-min
-// box-score column doesn't have horizontal room for 18 inning cells.
+// Web caps inline display at 12 innings (vs email's 19) to fit the narrower
+// box-score column. Past 12, the "Extras: Game ended in the Nth" note + the
+// per-play Scoring section cover the detail.
 const MAX_INNINGS_INLINE = 12;
 const EXTRAS_THRESHOLD = 13;
 
@@ -415,12 +416,15 @@ function inningGroups(innings: InningsArray, side: "away" | "home", width: numbe
     const s = v == null ? "x" : String(v);
     return s.padStart(width, FIG_SPACE);
   });
-  while (digits.length < 9) digits.push(FIG_SPACE.repeat(width));
-  const groups = [
-    digits.slice(0, 3).join(" "),
-    digits.slice(3, 6).join(" "),
-    digits.slice(6, 9).join(" "),
-  ];
+  // Pad to at least 9 cells, and round up to a multiple of 3 so every group
+  // has three cells. Extra-inning games yield 4 groups (10-12 innings) instead
+  // of the standard 3.
+  const padTo = Math.max(9, Math.ceil(digits.length / 3) * 3);
+  while (digits.length < padTo) digits.push(FIG_SPACE.repeat(width));
+  const groups: string[] = [];
+  for (let i = 0; i < digits.length; i += 3) {
+    groups.push(digits.slice(i, i + 3).join(" "));
+  }
   return groups.join("  ");
 }
 
