@@ -70,6 +70,7 @@ export default async function AdminDashboard({
         <TriggerForm route="send-email" date={date} label="Send email to subscribers" />
         <TriggerForm route="post-bluesky" date={date} label="Post to BlueSky" allowReset />
         <TriggerForm route="post-twitter" date={date} label="Post to Twitter" allowReset />
+        <RegenerateAllForm />
       </section>
 
       <section>
@@ -112,6 +113,22 @@ export default async function AdminDashboard({
         </p>
       </section>
     </main>
+  );
+}
+
+function RegenerateAllForm() {
+  return (
+    <form
+      action={async () => {
+        "use server";
+        const { regenerateAllDigests } = await import("./actions");
+        await regenerateAllDigests();
+      }}
+      className="admin-trigger-form"
+    >
+      <span className="admin-trigger-label">Regenerate ALL digests (re-renders every date in DB)</span>
+      <SubmitButton idleLabel="Regenerate all" pendingLabel="Regenerating… (may take ~1 min)" />
+    </form>
   );
 }
 

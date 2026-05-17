@@ -347,20 +347,25 @@ function renderSchedule(games: GameDetail[]): string {
 function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
   if (games.length === 0) return "";
   const probable = (full?: string, record?: string, era?: string | null) => {
-    if (!full) return "";
+    if (!full) return "TBD";
     const parts: string[] = [esc(lastName(full))];
-    if (record) parts.push(esc(record));
-    if (era && era !== "-.--" && era !== "—") parts.push(esc(era));
-    return ` <span class="probable">(${parts.join(", ")})</span>`;
+    const detail: string[] = [];
+    if (record) detail.push(esc(record));
+    if (era && era !== "-.--" && era !== "—") detail.push(esc(era));
+    if (detail.length > 0) parts.push(`(${detail.join(", ")})`);
+    return parts.join(" ");
   };
   const lines = games.map((g) => {
-    // MLB returns Postponed/Cancelled in detailedState; replace the time with
-    // the status so the line still communicates what's happening.
     const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
     const right = isOff ? g.status : g.startTime;
-    return `<div class="game-score-line">
-      <span>${esc(tla(g.awayName, liveAbbrev))}${probable(g.awayProbable, g.awayProbableRecord, g.awayProbableEra)} @ ${esc(tla(g.homeName, liveAbbrev))}${probable(g.homeProbable, g.homeProbableRecord, g.homeProbableEra)}</span>
-      <span class="game-time">${esc(right)}</span>
+    const matchup = `${esc(tla(g.awayName, liveAbbrev))} @ ${esc(tla(g.homeName, liveAbbrev))}`;
+    const pitchers = `${probable(g.awayProbable, g.awayProbableRecord, g.awayProbableEra)} vs ${probable(g.homeProbable, g.homeProbableRecord, g.homeProbableEra)}`;
+    return `<div class="game-upcoming">
+      <div class="game-score-line">
+        <span class="game-matchup">${matchup}</span>
+        <span class="game-time">${esc(right)}</span>
+      </div>
+      <div class="game-pitchers probable">${pitchers}</div>
     </div>`;
   }).join("");
   return `<div class="games-section">
@@ -400,20 +405,27 @@ const padRhe = (n: number | undefined) =>
   n == null ? FIG_SPACE + "—" : String(n).padStart(2, FIG_SPACE);
 
 function inningGroups(innings: InningsArray, side: "away" | "home", width: number): string {
-  // Pad each digit cell with FIG_SPACE so " 1" and "15" align vertically when
-  // one team has a 10-run inning. Use regular spaces *between* cells — they're
-  // consistent within a line and narrower than digits, which keeps the whole
-  // score line compact.
-  const digits = innings.map((inn) => {
+  // Cap displayed line score at 9 innings — newspaper convention. Extra-inning
+  // scoring is in the Scoring section below; trying to show 14+ inning columns
+  // inline overflows mobile and looks broken.
+  const digits = innings.slice(0, 9).map((inn) => {
     const v = side === "away" ? inn.away?.runs : inn.home?.runs;
     const s = v == null ? "x" : String(v);
     return s.padStart(width, FIG_SPACE);
   });
-  const reg = digits.slice(0, 9);
-  while (reg.length < 9) reg.push(FIG_SPACE.repeat(width));
-  const groups = [reg.slice(0, 3).join(" "), reg.slice(3, 6).join(" "), reg.slice(6, 9).join(" ")];
-  const extras = digits.slice(9);
-  return groups.join(" ") + (extras.length ? " " + extras.join(" ") : "");
+  while (digits.length < 9) digits.push(FIG_SPACE.repeat(width));
+  const groups = [digits.slice(0, 3).join(" "), digits.slice(3, 6).join(" "), digits.slice(6, 9).join(" ")];
+  return groups.join("  ");
+}
+
+function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  const last = n % 10;
+  if (last === 1) return `${n}st`;
+  if (last === 2) return `${n}nd`;
+  if (last === 3) return `${n}rd`;
+  return `${n}th`;
 }
 
 function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Record<string, string>): string {
@@ -460,6 +472,7 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
   ${renderPitching(box.teams.away, city(a.team.name))}
   ${renderPitching(box.teams.home, city(h.team.name))}
 
+  ${innings.length > 9 ? `<div class="notes"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</div>` : ""}
   ${decisionParts ? `<div class="notes">${decisionParts}</div>` : ""}
   ${renderScoringNotes(scoring)}
   ${info ? `<div class="notes">${info}</div>` : ""}
@@ -500,6 +513,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     <td class="avg-col"></td>
   </tr>`;
 
+  const extras = hittingExtras(ordered);
   return `<table class="batting-table">
     <thead>
       <tr>
@@ -514,7 +528,29 @@ function renderBatting(team: BoxTeam, cityName: string): string {
       </tr>
     </thead>
     <tbody>${rows}${totals}</tbody>
-  </table>`;
+  </table>
+  ${extras ? `<div class="notes">${extras}</div>` : ""}`;
+}
+
+function hittingExtras(players: BoxPlayer[]): string {
+  type Bucket = { last: string; season: number };
+  const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[] };
+  for (const p of players) {
+    const b = p.stats.batting;
+    const s = p.seasonStats.batting;
+    const name = lastName(p.person.fullName);
+    if ((b.doubles ?? 0) > 0) cat["2B"].push({ last: name, season: s.doubles ?? 0 });
+    if ((b.triples ?? 0) > 0) cat["3B"].push({ last: name, season: s.triples ?? 0 });
+    if ((b.homeRuns ?? 0) > 0) cat.HR.push({ last: name, season: s.homeRuns ?? 0 });
+    if ((b.stolenBases ?? 0) > 0) cat.SB.push({ last: name, season: s.stolenBases ?? 0 });
+  }
+  const parts: string[] = [];
+  for (const [label, list] of Object.entries(cat)) {
+    if (list.length === 0) continue;
+    const names = list.map((p) => `${esc(p.last)} (${p.season})`).join(", ");
+    parts.push(`<b>${label}:</b> ${names}.`);
+  }
+  return parts.join(" ");
 }
 
 function renderPitching(team: BoxTeam, cityName: string): string {

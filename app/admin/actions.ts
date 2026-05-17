@@ -88,6 +88,62 @@ export async function triggerCron(formData: FormData): Promise<void> {
   redirect(target);
 }
 
+export async function regenerateAllDigests(): Promise<void> {
+  let target: string;
+  try {
+    const { supabaseAdmin } = await import("@/lib/supabase");
+    const { data, error } = await supabaseAdmin()
+      .from("daily_digests")
+      .select("date,sport")
+      .order("date", { ascending: true });
+    if (error) throw new Error(`query digests: ${error.message}`);
+    const rows = (data ?? []) as Array<{ date: string; sport: string }>;
+    if (rows.length === 0) {
+      target = `/admin?ok=${encodeURIComponent("No digests to regenerate.")}`;
+      redirect(target);
+    }
+
+    const origin = await siteOrigin();
+    const headers: HeadersInit = {};
+    const secret = process.env.CRON_SECRET;
+    if (secret) headers.Authorization = `Bearer ${secret}`;
+
+    const t0 = Date.now();
+    let ok = 0, fail = 0;
+    const failures: string[] = [];
+    // Sequential — MLB API responses are cached server-side, so each call is
+    // sub-second. Total time for ~50 dates is well under the 60s budget.
+    for (const row of rows) {
+      try {
+        const res = await fetch(
+          `${origin}/api/cron/generate?date=${row.date}&sport=${row.sport}&trigger=manual`,
+          { headers },
+        );
+        const body = (await res.json()) as { error?: string };
+        if (!res.ok || body.error) {
+          fail++;
+          failures.push(`${row.date}: ${body.error ?? `HTTP ${res.status}`}`);
+        } else {
+          ok++;
+        }
+      } catch (err) {
+        fail++;
+        failures.push(`${row.date}: ${(err as Error).message}`);
+      }
+    }
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    const msg = fail === 0
+      ? `Regenerated ${ok} digests in ${elapsed}s.`
+      : `Regenerated ${ok} of ${rows.length} in ${elapsed}s. Failures: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? "…" : ""}`;
+    target = fail === 0
+      ? `/admin?ok=${encodeURIComponent(msg)}`
+      : `/admin?error=${encodeURIComponent(msg)}`;
+  } catch (err) {
+    target = `/admin?error=${encodeURIComponent(`regenerate-all: ${(err as Error).message}`)}`;
+  }
+  redirect(target);
+}
+
 export async function regenerateShareImages(formData: FormData): Promise<void> {
   const raw = formData.get("date");
   const date = typeof raw === "string" && raw ? raw : yesterdayInET();

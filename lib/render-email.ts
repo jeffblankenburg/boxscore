@@ -69,11 +69,23 @@ export const EMAIL_STYLES = `
   }
 
   .es-table { width: 100%; border-collapse: collapse; margin: 0 0 4px; }
-  .es-table th, .es-table td { font-size: 12px; padding: 1px 3px; }
+  .es-table th, .es-table td {
+    font-size: 12px; padding: 1px 3px;
+    /* Prevents Gmail/iOS Mail from wrapping headers like "STRK" into "STR\nK"
+       and data like "29" into "2\n9" on narrow mobile widths. */
+    white-space: nowrap;
+  }
   .es-table th {
     font-size: 10px; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.04em;
     padding-bottom: 3px; border-bottom: 1px solid #161410;
+  }
+  /* Mobile: every byte of horizontal space matters. Shrink the body text
+     and trim padding so the 10-column standings table fits on a 375px phone
+     without horizontal scroll. */
+  @media only screen and (max-width: 480px) {
+    .es-table td { font-size: 11px; padding: 1px 2px; }
+    .es-table th { font-size: 9px; padding-bottom: 2px; }
   }
   .es-totals td { font-weight: 700; border-top: 1px solid #161410; }
   .es-cutoff td { border-top: 2px dashed #161410; }
@@ -382,16 +394,27 @@ function inningGroups(
   side: "away" | "home",
   width: number,
 ): string {
-  const digits = innings.map((inn) => {
+  // Cap displayed line score at 9 innings — newspaper convention. Extra-inning
+  // scoring is already conveyed in the Scoring section below; trying to show
+  // 14+ inning columns inline overflows mobile email and looks broken.
+  const digits = innings.slice(0, 9).map((inn) => {
     const v = side === "away" ? inn.away?.runs : inn.home?.runs;
     const s = v == null ? "x" : String(v);
     return s.padStart(width);
   });
-  const reg = digits.slice(0, 9);
-  while (reg.length < 9) reg.push(" ".repeat(width));
-  const groups = [reg.slice(0, 3).join(""), reg.slice(3, 6).join(""), reg.slice(6, 9).join("")];
-  const extras = digits.slice(9);
-  return groups.join(" ") + (extras.length ? " " + extras.join(" ") : "");
+  while (digits.length < 9) digits.push(" ".repeat(width));
+  const groups = [digits.slice(0, 3).join(""), digits.slice(3, 6).join(""), digits.slice(6, 9).join("")];
+  return groups.join(" ");
+}
+
+function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  const last = n % 10;
+  if (last === 1) return `${n}st`;
+  if (last === 2) return `${n}nd`;
+  if (last === 3) return `${n}rd`;
+  return `${n}th`;
 }
 
 function renderInningLine(team: string, line: string): string {
@@ -432,6 +455,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     <td align="right">${pad(ts.strikeOuts)}</td>
     <td></td>
   </tr>`;
+  const extras = hittingExtras(ordered);
   return `<div class="es-team-label">${esc(cityName)} Batting</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
@@ -449,7 +473,32 @@ function renderBatting(team: BoxTeam, cityName: string): string {
         <th align="right">Avg</th>
       </tr></thead>
       <tbody>${rows}${totals}</tbody>
-    </table>`;
+    </table>
+    ${extras ? `<p class="es-info">${extras}</p>` : ""}`;
+}
+
+// "Newspaper extras" line under a team's batting table: 2B, 3B, HR, SB lines
+// with each player's season total in parentheses. Returns "" if nothing to
+// show (e.g., bunt-only game).
+function hittingExtras(players: BoxPlayer[]): string {
+  type Bucket = { last: string; season: number };
+  const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[] };
+  for (const p of players) {
+    const b = p.stats.batting;
+    const s = p.seasonStats.batting;
+    const name = lastName(p.person.fullName);
+    if ((b.doubles ?? 0) > 0) cat["2B"].push({ last: name, season: s.doubles ?? 0 });
+    if ((b.triples ?? 0) > 0) cat["3B"].push({ last: name, season: s.triples ?? 0 });
+    if ((b.homeRuns ?? 0) > 0) cat.HR.push({ last: name, season: s.homeRuns ?? 0 });
+    if ((b.stolenBases ?? 0) > 0) cat.SB.push({ last: name, season: s.stolenBases ?? 0 });
+  }
+  const parts: string[] = [];
+  for (const [label, list] of Object.entries(cat)) {
+    if (list.length === 0) continue;
+    const names = list.map((p) => `${esc(p.last)} (${p.season})`).join(", ");
+    parts.push(`<b>${label}:</b> ${names}.`);
+  }
+  return parts.join(" ");
 }
 
 function renderPitching(team: BoxTeam, cityName: string): string {
@@ -555,6 +604,7 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
         ${renderInningLine(tla(h.team.name, liveAbbrev), hLine)}
       </tbody>
     </table>
+    ${innings.length > 9 ? `<p class="es-info"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</p>` : ""}
     ${decisionLine ? `<p class="es-note">${decisionLine}</p>` : ""}
     ${renderBatting(box.teams.away, city(a.team.name))}
     ${renderBatting(box.teams.home, city(h.team.name))}
@@ -583,18 +633,28 @@ function renderTransactions(txs: Transaction[]): string {
 function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
   if (games.length === 0) return "";
   const probable = (full?: string, record?: string, era?: string | null) => {
-    if (!full) return "";
+    if (!full) return "TBD";
     const parts: string[] = [esc(lastName(full))];
-    if (record) parts.push(esc(record));
-    if (era && era !== "-.--" && era !== "—") parts.push(esc(era));
-    return ` <span style="color:#6a6354;font-weight:400;">(${parts.join(", ")})</span>`;
+    const detail: string[] = [];
+    if (record) detail.push(esc(record));
+    if (era && era !== "-.--" && era !== "—") detail.push(esc(era));
+    if (detail.length > 0) parts.push(`(${detail.join(", ")})`);
+    return parts.join(" ");
   };
   const rows = games.map((g) => {
     const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
     const right = isOff ? g.status : g.startTime;
+    const matchup = `${esc(tla(g.awayName, liveAbbrev))} @ ${esc(tla(g.homeName, liveAbbrev))}`;
+    const pitchers = `${probable(g.awayProbable, g.awayProbableRecord, g.awayProbableEra)} vs ${probable(g.homeProbable, g.homeProbableRecord, g.homeProbableEra)}`;
+    // Two rows per game: matchup + time on row 1, probable pitchers (muted) on
+    // row 2 spanning both columns. A small bottom border on the pitcher row
+    // gives visual separation between games.
     return `<tr>
-      <td align="left" style="font-size:13px;padding:1px 0;">${esc(tla(g.awayName, liveAbbrev))}${probable(g.awayProbable, g.awayProbableRecord, g.awayProbableEra)} @ ${esc(tla(g.homeName, liveAbbrev))}${probable(g.homeProbable, g.homeProbableRecord, g.homeProbableEra)}</td>
-      <td align="right" style="font-size:13px;color:#6a6354;padding:1px 0;white-space:nowrap;">${esc(right)}</td>
+      <td align="left" style="font-size:13px;font-weight:700;padding:3px 0 0;">${matchup}</td>
+      <td align="right" style="font-size:13px;color:#6a6354;padding:3px 0 0;white-space:nowrap;">${esc(right)}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="font-size:12px;color:#6a6354;padding:0 0 4px;border-bottom:1px dotted #e8e2d4;">${pitchers}</td>
     </tr>`;
   }).join("");
   return `${sectionH("Today's Games")}
