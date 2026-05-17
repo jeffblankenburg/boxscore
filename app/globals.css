@@ -148,6 +148,11 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .boxscores-container { column-count: 4; column-gap: 20px; margin-top: 16px; }
 .game-container { break-inside: avoid; page-break-inside: avoid; margin-bottom: 18px; }
 .game-header { font-weight: 700; font-size: 18px; border-bottom: 1px solid var(--border-strong); }
+/* Default view shows the full nickname ("Diamondbacks"). Paper-mode swaps in
+   the short form ("D-Backs") so it fits the narrow 4-column tiles. */
+.game-header .nick-short { display: none; }
+.paper-mode .game-header .nick-full { display: none; }
+.paper-mode .game-header .nick-short { display: inline; }
 .team-line {
   display: flex; justify-content: space-between; align-items: baseline;
   gap: 6px; font-size: 13px;
@@ -432,6 +437,28 @@ footer.site-footer a { color: var(--text-secondary); }
 .admin-btn-ghost:hover { background: #f3efe5; }
 .admin-btn-ok { background: #2a7a2a !important; border-color: #2a7a2a !important; }
 
+/* Customer-email guard: two-step modal with typed confirmation. */
+.admin-guard-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; z-index: 100;
+}
+.admin-guard-modal {
+  background: var(--bg-paper); color: var(--text-primary);
+  border: 2px solid var(--text-primary); padding: 24px 24px 20px;
+  max-width: 480px; width: 100%; font-family: Georgia, serif;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.admin-guard-title { font: 800 italic 22px/1.2 Georgia, serif;
+                     margin: 0 0 12px; letter-spacing: -0.005em; }
+.admin-guard-body { font-size: 14px; line-height: 1.5; margin: 0 0 12px; }
+.admin-guard-input { width: 100%; font-size: 18px;
+                     letter-spacing: 4px; text-align: center;
+                     padding: 10px 12px; margin: 8px 0 14px;
+                     font-family: ui-monospace, monospace; }
+.admin-guard-actions { display: flex; gap: 12px; justify-content: flex-end;
+                       margin-top: 4px; }
+
 /* Dashboard --------------------------------------------------------------- */
 .admin-window-selector { display: flex; flex-wrap: wrap; align-items: center;
                          gap: 0; margin: 0 0 18px; font-size: 12px;
@@ -614,7 +641,7 @@ body:has(.paper-mode) {
 }
 .paper-mode .game-header {
   font-family: Georgia, "Times New Roman", Times, serif;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 900;
   font-style: normal;
   letter-spacing: -0.005em;

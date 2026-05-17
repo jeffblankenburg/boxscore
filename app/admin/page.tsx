@@ -3,6 +3,7 @@ import { recentCronRuns, type CronRun } from "@/lib/cron-runs";
 import { SubmitButton } from "./SubmitButton";
 import { requireAdmin } from "./require-admin";
 import { AdminNav } from "./AdminNav";
+import { SendEmailGuard } from "./SendEmailGuard";
 import {
   parseWindow,
   WINDOW_OPTIONS,
@@ -182,7 +183,7 @@ export default async function AdminDashboard({
           the cron-runs table below.
         </p>
         <TriggerForm route="generate" date={date} label="Generate digest" />
-        <TriggerForm route="send-email" date={date} label="Send email to subscribers" />
+        <SendEmailGuard defaultDate={date} activeSubscribers={kpis.activeSubscribers} />
         <TriggerForm route="post-bluesky" date={date} label="Post to BlueSky" allowReset />
         <TriggerForm route="post-twitter" date={date} label="Post to Twitter" allowReset />
         <RegenerateAllForm />

@@ -119,8 +119,36 @@ const TLA_OF: Record<string, string> = {
   "Washington Nationals": "WSH",
 };
 
+// Shorter team nicknames for the dense newsprint (.paper-mode) view, where
+// nicknames sit in narrow 4-column boxscore tiles and longer names like
+// "Diamondbacks" wrap. Keep this map sparse — only entries that visibly
+// wrap need a short form. The default (non-paper) view always shows the
+// full nickname.
+const PAPER_NICKNAME_OF: Record<string, string> = {
+  Diamondbacks: "D-Backs",
+  Nationals: "Nats",
+  Guardians: "Guards",
+  "Blue Jays": "Jays",
+  Athletics: "A's",
+  Orioles: "O's",
+  Cardinals: "Cards",
+  Yankees: "Yanks",
+  Phillies: "Phils",
+
+};
+
 const city = (name: string): string => CITY_OF[name] ?? name;
 const nickname = (name: string): string => NICKNAME_OF[name] ?? name;
+
+// Emit pre-escaped HTML for a team's game-header nickname. When a paper-mode
+// abbreviation exists, both forms ship in the markup and CSS swaps which one
+// is visible. When there's no abbreviation, returns the bare escaped nickname.
+function nicknameHtml(teamName: string): string {
+  const full = nickname(teamName);
+  const short = PAPER_NICKNAME_OF[full];
+  if (!short) return esc(full);
+  return `<span class="nick-full">${esc(full)}</span><span class="nick-short">${esc(short)}</span>`;
+}
 // Live → static fallback. Pass the current map from DailyData when rendering.
 const tla = (name: string, live?: Record<string, string>): string =>
   live?.[name] ?? TLA_OF[name] ?? name;
@@ -444,9 +472,10 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
   const innings = game.linescore?.innings ?? [];
   const ls = game.linescore?.teams;
 
+  // Pre-escaped HTML so the paper-mode nickname span markup survives intact.
   const winnerFirst = hScore >= aScore
-    ? `${nickname(h.team.name)} ${hScore}, ${nickname(a.team.name)} ${aScore}`
-    : `${nickname(a.team.name)} ${aScore}, ${nickname(h.team.name)} ${hScore}`;
+    ? `${nicknameHtml(h.team.name)} ${hScore}, ${nicknameHtml(a.team.name)} ${aScore}`
+    : `${nicknameHtml(a.team.name)} ${aScore}, ${nicknameHtml(h.team.name)} ${hScore}`;
 
   const w = inningCellWidth(innings);
   const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(ls?.away.runs)}  ${padRhe(ls?.away.hits)}  ${padRhe(ls?.away.errors)}`;
@@ -467,7 +496,7 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
     .join(" ");
 
   return `<div class="game-container">
-  <div class="game-header">${esc(winnerFirst)}</div>
+  <div class="game-header">${winnerFirst}</div>
   <div class="team-line">
     <div class="team-name">${esc(tla(a.team.name, liveAbbrev))}</div>
     <div class="team-score">${aLine}</div>

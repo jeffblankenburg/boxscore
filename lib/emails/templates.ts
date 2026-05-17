@@ -41,6 +41,44 @@ ${preview}
 </html>`;
 }
 
+// Magic-link sign-in email. Same plain-prose / single-link style as the
+// confirmation email — avoids the "click this big button" template that
+// Apple's CS01 classifier flags. The link goes to /auth/[token] which
+// shows a "Sign in" button (POST verifies); we never grant a session on
+// GET, so a link-prefetcher can't claim the token.
+export function magicLinkEmail(opts: { signInUrl: string }): { subject: string; html: string; text: string } {
+  const subject = "Your boxscore sign-in link";
+  const html = wrap(
+    `
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      Hey —
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      Use this link to sign in to your boxscore settings. It's good for 15 minutes and only works once.
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin: 20px 0;">
+      <a href="${opts.signInUrl}" style="color:${INK}; font-weight:700;">${opts.signInUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      If you didn't ask for this, you can ignore it. Nothing changes until you click the link.
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br>
+      <span style="color:${MUTED};">boxscore</span>
+    </p>
+    `,
+    { previewText: "Tap to sign in. Good for 15 minutes." },
+  );
+  const text =
+    `Hey —\n\n` +
+    `Use this link to sign in to your boxscore settings. It's good for 15 minutes and only works once.\n\n` +
+    `${opts.signInUrl}\n\n` +
+    `If you didn't ask for this, you can ignore it. Nothing changes until you click the link.\n\n` +
+    `— Jeff\n` +
+    `boxscore\n`;
+  return { subject, html, text };
+}
+
 // Plain-feeling confirmation email — written to dodge Apple's CS01 content
 // classifier, which flags transactional templates that look phishing-like
 // (big CTA button + duplicate paste-link, "Confirm your X" subject, etc).
