@@ -383,27 +383,45 @@ function renderLeaders(data: DailyData): string {
 
 // ─── boxscores ────────────────────────────────────────────────────────────
 
-// Always reserve 2 chars per inning so columns stay aligned across games and
-// rows — a 10-run inning in one game won't shift other games' alignment, and
-// inning N for the away team always lines up with inning N for the home team
-// regardless of which is 1-digit and which is 2.
-const INNING_CELL_WIDTH = 2;
+// Use the widest digit across both teams' innings (1 for the common
+// all-single-digit case, 2 only when someone has a 10+ run inning) so we
+// don't pay for 2-char padding when we don't need to. Keeps the line tight.
+function inningCellWidth(
+  innings: NonNullable<ScheduleGame["linescore"]>["innings"],
+): number {
+  let w = 1;
+  for (const inn of innings.slice(0, 9)) {
+    w = Math.max(w, String(inn.away?.runs ?? 0).length, String(inn.home?.runs ?? 0).length);
+  }
+  return w;
+}
+
+// Cap displayed line score at 19 innings. The "Extras: Game ended in the Nth"
+// note kicks in at 20+; per-play coverage of every scoring play is always in
+// the Scoring section regardless.
+const MAX_INNINGS_INLINE = 19;
+const EXTRAS_THRESHOLD = 20;
 
 function inningGroups(
   innings: NonNullable<ScheduleGame["linescore"]>["innings"],
   side: "away" | "home",
   width: number,
 ): string {
-  // Cap displayed line score at 9 innings — newspaper convention. Extra-inning
-  // scoring is already conveyed in the Scoring section below; trying to show
-  // 14+ inning columns inline overflows mobile email and looks broken.
-  const digits = innings.slice(0, 9).map((inn) => {
+  const digits = innings.slice(0, MAX_INNINGS_INLINE).map((inn) => {
     const v = side === "away" ? inn.away?.runs : inn.home?.runs;
     const s = v == null ? "x" : String(v);
     return s.padStart(width);
   });
-  while (digits.length < 9) digits.push(" ".repeat(width));
-  const groups = [digits.slice(0, 3).join(""), digits.slice(3, 6).join(""), digits.slice(6, 9).join("")];
+  // Pad to a multiple of 3 (and at least 9) so every group has 3 cells.
+  const padTo = Math.max(9, Math.ceil(digits.length / 3) * 3);
+  while (digits.length < padTo) digits.push(" ".repeat(width));
+  // No separator within a group when width=1 (yields "001" / "030"). One
+  // space between groups separates them visually.
+  const sep = width === 1 ? "" : " ";
+  const groups: string[] = [];
+  for (let i = 0; i < digits.length; i += 3) {
+    groups.push(digits.slice(i, i + 3).join(sep));
+  }
   return groups.join(" ");
 }
 
@@ -418,9 +436,12 @@ function ordinal(n: number): string {
 }
 
 function renderInningLine(team: string, line: string): string {
+  // Inline font styles (not just the class) because Gmail strips <style>
+  // blocks and falls back to Georgia (proportional) — which breaks column
+  // alignment between rows when a number is double-digit ("12" vs " 9").
   return `<tr>
-    <td align="left" class="es-team-line">${esc(team)}</td>
-    <td align="right" class="es-score-line">${esc(line)}</td>
+    <td align="left" style="font-size:13px;font-weight:700;padding:1px 0;white-space:nowrap;">${esc(team)}</td>
+    <td align="right" style="font-family:'Courier New',Courier,monospace;font-size:13px;white-space:pre;padding:1px 0;">${esc(line)}</td>
   </tr>`;
 }
 
@@ -474,7 +495,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
       </tr></thead>
       <tbody>${rows}${totals}</tbody>
     </table>
-    ${extras ? `<p class="es-info">${extras}</p>` : ""}`;
+    ${extras ? `<p class="es-info" style="border-bottom:1px dotted #e8e2d4;padding-bottom:4px;">${extras}</p>` : ""}`;
 }
 
 // "Newspaper extras" line under a team's batting table: 2B, 3B, HR, SB lines
@@ -586,9 +607,9 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
     : `${nickname(a.team.name)} ${aScore}, ${nickname(h.team.name)} ${hScore}`;
   const innings = game.linescore?.innings ?? [];
   const ls = game.linescore?.teams;
-  const w = INNING_CELL_WIDTH;
-  const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(ls?.away.runs)}  ${padRhe(ls?.away.hits)}  ${padRhe(ls?.away.errors)}`;
-  const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(ls?.home.runs)}  ${padRhe(ls?.home.hits)}  ${padRhe(ls?.home.errors)}`;
+  const w = inningCellWidth(innings);
+  const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(ls?.away.runs)} ${padRhe(ls?.away.hits)} ${padRhe(ls?.away.errors)}`;
+  const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(ls?.home.runs)} ${padRhe(ls?.home.hits)} ${padRhe(ls?.home.errors)}`;
   const d = game.decisions;
   const decisionLine = [
     d?.winner && `<b>W:</b> ${esc(lastName(d.winner.fullName))}`,
@@ -604,7 +625,7 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
         ${renderInningLine(tla(h.team.name, liveAbbrev), hLine)}
       </tbody>
     </table>
-    ${innings.length > 9 ? `<p class="es-info"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</p>` : ""}
+    ${innings.length >= EXTRAS_THRESHOLD ? `<p class="es-info"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</p>` : ""}
     ${decisionLine ? `<p class="es-note">${decisionLine}</p>` : ""}
     ${renderBatting(box.teams.away, city(a.team.name))}
     ${renderBatting(box.teams.home, city(h.team.name))}

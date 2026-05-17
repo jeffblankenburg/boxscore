@@ -152,10 +152,10 @@ function wrapWithDigest(opts: {
 </head>
 <body style="margin:0; padding:0; background:${PAPER}; font-family:Georgia, serif; color:${INK};">
 ${preview}
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${PAPER};">
-  <tr><td align="center">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; background:#fff; margin:24px auto; padding:24px 20px; box-shadow:0 0 8px rgba(0,0,0,0.06);">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fff;">
+  <tr><td style="padding:8px 8px 24px;">
 
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr><td align="right" style="padding-bottom:6px; font-family:Georgia, serif; font-size:11px; font-style:italic; color:${MUTED};">
         <a href="${opts.digestUrl}" style="color:${MUTED}; text-decoration:underline;">View in browser →</a>
       </td></tr>
@@ -177,8 +177,8 @@ ${preview}
         &nbsp;·&nbsp;
         <a href="${opts.unsubscribeUrl}" style="color:${MUTED};">Unsubscribe in one click</a>
       </td></tr>
-
     </table>
+
   </td></tr>
 </table>
 </body>

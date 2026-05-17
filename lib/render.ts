@@ -404,17 +404,23 @@ const FIG_SPACE = "\u2007";
 const padRhe = (n: number | undefined) =>
   n == null ? FIG_SPACE + "—" : String(n).padStart(2, FIG_SPACE);
 
+// Web caps inline display at 9 innings (vs email's 19) because the 270px-min
+// box-score column doesn't have horizontal room for 18 inning cells.
+const MAX_INNINGS_INLINE = 9;
+const EXTRAS_THRESHOLD = 10;
+
 function inningGroups(innings: InningsArray, side: "away" | "home", width: number): string {
-  // Cap displayed line score at 9 innings — newspaper convention. Extra-inning
-  // scoring is in the Scoring section below; trying to show 14+ inning columns
-  // inline overflows mobile and looks broken.
-  const digits = innings.slice(0, 9).map((inn) => {
+  const digits = innings.slice(0, MAX_INNINGS_INLINE).map((inn) => {
     const v = side === "away" ? inn.away?.runs : inn.home?.runs;
     const s = v == null ? "x" : String(v);
     return s.padStart(width, FIG_SPACE);
   });
   while (digits.length < 9) digits.push(FIG_SPACE.repeat(width));
-  const groups = [digits.slice(0, 3).join(" "), digits.slice(3, 6).join(" "), digits.slice(6, 9).join(" ")];
+  const groups = [
+    digits.slice(0, 3).join(" "),
+    digits.slice(3, 6).join(" "),
+    digits.slice(6, 9).join(" "),
+  ];
   return groups.join("  ");
 }
 
@@ -466,14 +472,14 @@ function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Re
     <div class="team-name">${esc(tla(h.team.name, liveAbbrev))}</div>
     <div class="team-score">${hLine}</div>
   </div>
+  ${innings.length >= EXTRAS_THRESHOLD ? `<div class="notes"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</div>` : ""}
+  ${decisionParts ? `<div class="notes">${decisionParts}</div>` : ""}
 
   ${renderBatting(box.teams.away, city(a.team.name))}
   ${renderBatting(box.teams.home, city(h.team.name))}
   ${renderPitching(box.teams.away, city(a.team.name))}
   ${renderPitching(box.teams.home, city(h.team.name))}
 
-  ${innings.length > 9 ? `<div class="notes"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</div>` : ""}
-  ${decisionParts ? `<div class="notes">${decisionParts}</div>` : ""}
   ${renderScoringNotes(scoring)}
   ${info ? `<div class="notes">${info}</div>` : ""}
 </div>`;
