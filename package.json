@@ -26,6 +26,7 @@
     "react-dom": "^19.2.6",
     "resend": "^6.12.3",
     "server-only": "^0.0.1",
+    "svix": "^1.93.0",
     "twitter-api-v2": "^1.29.0"
   },
   "devDependencies": {

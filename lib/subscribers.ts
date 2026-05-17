@@ -2,6 +2,10 @@ import { supabaseAdmin } from "./supabase";
 
 export type SubscriberStatus = "pending" | "active" | "unsubscribed";
 
+// What ended the subscription. "user" = clicked our unsubscribe URL.
+// "bounce"/"complaint" = Resend webhook auto-unsubscribe. "manual" = admin.
+export type UnsubscribeReason = "user" | "bounce" | "complaint" | "manual";
+
 export type Subscriber = {
   id: string;
   email: string;
@@ -9,12 +13,13 @@ export type Subscriber = {
   created_at: string;
   confirmed_at: string | null;
   unsubscribed_at: string | null;
+  unsubscribe_reason: UnsubscribeReason | null;
   confirm_token: string;
   unsubscribe_token: string;
 };
 
 const COLS =
-  "id, email, status, created_at, confirmed_at, unsubscribed_at, confirm_token, unsubscribe_token";
+  "id, email, status, created_at, confirmed_at, unsubscribed_at, unsubscribe_reason, confirm_token, unsubscribe_token";
 
 /**
  * Idempotent: starting a subscription for an email that already exists in any
@@ -105,15 +110,49 @@ export async function getActiveSubscribers(): Promise<Subscriber[]> {
 
 /**
  * Flips active → unsubscribed. Idempotent — works regardless of current state
- * so the unsubscribe URL works forever.
+ * so the unsubscribe URL works forever. Default reason is "user" for the
+ * customer-facing unsubscribe URL; webhooks pass "bounce"/"complaint".
  */
-export async function unsubscribeSubscriber(id: string): Promise<Subscriber> {
+export async function unsubscribeSubscriber(
+  id: string,
+  reason: UnsubscribeReason = "user",
+): Promise<Subscriber> {
   const { data, error } = await supabaseAdmin()
     .from("subscribers")
-    .update({ status: "unsubscribed" as const, unsubscribed_at: new Date().toISOString() })
+    .update({
+      status: "unsubscribed" as const,
+      unsubscribed_at: new Date().toISOString(),
+      unsubscribe_reason: reason,
+    })
     .eq("id", id)
     .select(COLS)
     .single<Subscriber>();
   if (error) throw new Error(`unsubscribeSubscriber: ${error.message}`);
   return data;
+}
+
+/**
+ * By-email lookup variant used by the Resend webhook. Email is the only
+ * identifier we get in a bounce/complaint payload. Returns null if no
+ * subscriber matches OR if the subscriber is already unsubscribed (so we
+ * don't repeatedly stamp a new reason on top of an old one).
+ */
+export async function unsubscribeByEmail(
+  email: string,
+  reason: UnsubscribeReason,
+): Promise<Subscriber | null> {
+  const normalized = email.trim().toLowerCase();
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .update({
+      status: "unsubscribed" as const,
+      unsubscribed_at: new Date().toISOString(),
+      unsubscribe_reason: reason,
+    })
+    .eq("email", normalized)
+    .neq("status", "unsubscribed")
+    .select(COLS)
+    .maybeSingle<Subscriber>();
+  if (error) throw new Error(`unsubscribeByEmail: ${error.message}`);
+  return data ?? null;
 }
