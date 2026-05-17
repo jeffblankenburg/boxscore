@@ -406,8 +406,8 @@ const padRhe = (n: number | undefined) =>
 
 // Web caps inline display at 9 innings (vs email's 19) because the 270px-min
 // box-score column doesn't have horizontal room for 18 inning cells.
-const MAX_INNINGS_INLINE = 9;
-const EXTRAS_THRESHOLD = 10;
+const MAX_INNINGS_INLINE = 12;
+const EXTRAS_THRESHOLD = 13;
 
 function inningGroups(innings: InningsArray, side: "away" | "home", width: number): string {
   const digits = innings.slice(0, MAX_INNINGS_INLINE).map((inn) => {
@@ -498,7 +498,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     return `<tr>
       <td class="player-col">${esc(lastName(p.person.fullName))} ${esc(pos)}</td>
       <td class="stat-col">${pad(b.atBats)}</td>
-      <td class="stat-col">${pad(b.runs)}</td>
+      <td class="r-col">${pad(b.runs)}</td>
       <td class="stat-col">${pad(b.hits)}</td>
       <td class="stat-col">${pad(b.rbi)}</td>
       <td class="stat-col">${pad(b.baseOnBalls)}</td>
@@ -511,7 +511,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
   const totals = `<tr>
     <td class="player-col">Totals</td>
     <td class="stat-col">${pad(ts.atBats)}</td>
-    <td class="stat-col">${pad(ts.runs)}</td>
+    <td class="r-col">${pad(ts.runs)}</td>
     <td class="stat-col">${pad(ts.hits)}</td>
     <td class="stat-col">${pad(ts.rbi)}</td>
     <td class="stat-col">${pad(ts.baseOnBalls)}</td>
@@ -525,7 +525,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
       <tr>
         <th class="player-col">${esc(cityName)}</th>
         <th class="stat-col">AB</th>
-        <th class="stat-col">R</th>
+        <th class="r-col">R</th>
         <th class="stat-col">H</th>
         <th class="stat-col">RBI</th>
         <th class="stat-col">BB</th>

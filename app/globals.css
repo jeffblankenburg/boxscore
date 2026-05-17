@@ -164,8 +164,9 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 }
 
 .batting-table, .pitching-table { font-size: 13px; margin-top: 4px; }
-.batting-table .player-col, .pitching-table .player-col { width: 38%; }
-.batting-table .stat-col, .pitching-table .stat-col { width: 7%; }
+.batting-table .player-col, .pitching-table .player-col { width: 42%; }
+.batting-table .stat-col, .pitching-table .stat-col { width: 8%; }
+.batting-table .r-col, .pitching-table .r-col { width: 6%; }
 .batting-table .avg-col, .pitching-table .era-col { width: 10%; }
 .batting-table tbody tr:last-child { font-weight: 700; }
 .pitching-table .ip-col { width: 7%; }
