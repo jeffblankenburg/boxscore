@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { recentCronRuns, type CronRun } from "@/lib/cron-runs";
 import { SubmitButton } from "./SubmitButton";
 import { requireAdmin } from "./require-admin";
+import { AdminNav } from "./AdminNav";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · boxscore", robots: { index: false } };
@@ -41,6 +42,7 @@ export default async function AdminDashboard({
 
   return (
     <main className="admin">
+      <AdminNav />
       <h1>Admin</h1>
 
       {ok && (

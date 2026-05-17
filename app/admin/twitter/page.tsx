@@ -2,6 +2,7 @@ import { getStoredManifest } from "@/lib/share-storage";
 import { imagePostContent } from "@/lib/social-content";
 import { CopyButtons } from "./CopyButtons";
 import { requireAdmin } from "../require-admin";
+import { AdminNav } from "../AdminNav";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Twitter compose · admin · boxscore", robots: { index: false } };
@@ -12,6 +13,7 @@ export default async function AdminTwitterCompose() {
   if (!manifest) {
     return (
       <main className="admin">
+        <AdminNav />
         <h1>Twitter compose</h1>
         <p className="admin-meta">
           No share images currently in Storage. Generate them first at{" "}
@@ -28,6 +30,7 @@ export default async function AdminTwitterCompose() {
 
   return (
     <main className="admin admin-wide">
+      <AdminNav />
       <h1>Twitter compose</h1>
       <p className="admin-meta">
         {manifest.entries.length} posts for <i>{manifest.prettyDate}</i>.

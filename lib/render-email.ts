@@ -196,23 +196,23 @@ const city = (n: string) => CITY_OF[n] ?? n;
 const nickname = (n: string) => NICKNAME_OF[n] ?? n;
 const tla = (n: string, live?: Record<string, string>) => live?.[n] ?? TLA_OF[n] ?? n;
 
-const esc = (s: string | number | undefined): string =>
+export const esc = (s: string | number | undefined): string =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const pad = (n: number | undefined) => (n == null ? "—" : String(n));
+export const pad = (n: number | undefined) => (n == null ? "—" : String(n));
 // Pad to 2-char width for inning-line R/H/E columns so 1- and 2-digit values
 // line up cleanly in the monospace score line.
 const padRhe = (n: number | undefined) => (n == null ? " —" : String(n).padStart(2));
-const fmtAvg = (s: string | undefined) =>
+export const fmtAvg = (s: string | undefined) =>
   !s || s === "-.--" ? ".---" : s.replace(/^0/, "");
-const fmtEra = (s: string | undefined) =>
+export const fmtEra = (s: string | undefined) =>
   !s || s === "-.--" ? "—" : s;
 const fmtDiff = (scored: number | undefined, allowed: number | undefined) => {
   if (scored == null || allowed == null) return "—";
   const d = scored - allowed;
   return d > 0 ? `+${d}` : d < 0 ? String(d) : "0";
 };
-const lastName = (full: string) => {
+export const lastName = (full: string) => {
   const parts = full.split(/\s+/);
   const suf = new Set(["Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV"]);
   let i = parts.length - 1;
@@ -222,10 +222,10 @@ const lastName = (full: string) => {
 
 // ─── building blocks ──────────────────────────────────────────────────────
 
-const dateline = (pretty: string) =>
+export const dateline = (pretty: string) =>
   `<div class="es-dateline">${esc(pretty)}</div>`;
 
-const sectionH = (t: string) => `<h2 class="es-section-h">${esc(t)}</h2>`;
+export const sectionH = (t: string) => `<h2 class="es-section-h">${esc(t)}</h2>`;
 const subH = (t: string) => `<h3 class="es-sub-h">${esc(t)}</h3>`;
 const gameH = (t: string) => `<h3 class="es-game-h">${esc(t)}</h3>`;
 const colH = (t: string) => `<div class="es-col-h">${esc(t)}</div>`;
@@ -278,13 +278,18 @@ function standingsRow(
   </tr>`;
 }
 
-function renderDivisionStandings(label: string, d: DivisionStandings): string {
+export function renderDivisionStandings(
+  label: string,
+  d: DivisionStandings,
+  opts?: { highlightTeamId?: number },
+): string {
   const rows = [...d.teamRecords]
     .sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank))
     .map((t) => {
       const home = t.records?.splitRecords?.find((s) => s.type === "home");
       const away = t.records?.splitRecords?.find((s) => s.type === "away");
       const l10 = t.records?.splitRecords?.find((s) => s.type === "lastTen");
+      const rowClass = opts?.highlightTeamId === t.team.id ? "es-totals" : "";
       return standingsRow({
         nickname: nickname(t.team.name),
         wins: t.wins, losses: t.losses,
@@ -295,7 +300,7 @@ function renderDivisionStandings(label: string, d: DivisionStandings): string {
         away: away ? `${away.wins}-${away.losses}` : "—",
         l10: l10 ? `${l10.wins}-${l10.losses}` : "—",
         strk: t.streak?.streakCode ?? "—",
-      });
+      }, rowClass);
     }).join("");
   return `${subH(label + " Division")}
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
@@ -488,7 +493,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
         <th align="right">AB</th>
         <th align="right">R</th>
         <th align="right">H</th>
-        <th align="right">BI</th>
+        <th align="right">RBI</th>
         <th align="right">BB</th>
         <th align="right">SO</th>
         <th align="right">Avg</th>
@@ -599,7 +604,7 @@ function renderGameInfo(boxInfo: Array<{ label: string; value?: string }>): stri
   return `<p class="es-info">${parts.join(" &nbsp; ")}</p>`;
 }
 
-function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Record<string, string>): string {
+export function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Record<string, string>): string {
   const a = game.teams.away, h = game.teams.home;
   const aScore = a.score ?? 0, hScore = h.score ?? 0;
   const winnerFirst = hScore >= aScore

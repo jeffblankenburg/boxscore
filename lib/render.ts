@@ -527,7 +527,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
         <th class="stat-col">AB</th>
         <th class="stat-col">R</th>
         <th class="stat-col">H</th>
-        <th class="stat-col">BI</th>
+        <th class="stat-col">RBI</th>
         <th class="stat-col">BB</th>
         <th class="stat-col">SO</th>
         <th class="avg-col">Avg</th>

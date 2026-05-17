@@ -67,6 +67,10 @@ export async function GET(req: Request) {
     for (const group of chunk(toSend, BATCH_SIZE)) {
       const payload = group.map((sub) => {
         const unsubscribeUrl = `${origin}/u/${sub.unsubscribe_token}`;
+        // Mail-client native "Unsubscribe" buttons POST to this URL (RFC 8058).
+        // It's a separate endpoint from the human-facing /u/[token] page so
+        // GET requests from link scanners can't auto-unsubscribe real users.
+        const oneClickUrl = `${origin}/api/u/${sub.unsubscribe_token}`;
         const { subject, html, text } = dailyEmail({
           digestPrettyDate,
           digestUrl,
@@ -81,7 +85,7 @@ export async function GET(req: Request) {
           headers: {
             // RFC 8058 / 2369 — Gmail and Apple Mail show a native "Unsubscribe"
             // button next to the sender when this header is present.
-            "List-Unsubscribe": `<${unsubscribeUrl}>`,
+            "List-Unsubscribe": `<${oneClickUrl}>`,
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
           },
         };

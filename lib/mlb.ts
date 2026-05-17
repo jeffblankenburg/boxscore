@@ -285,20 +285,35 @@ export type Transaction = {
   typeCode: string;
   typeDesc: string;
   description: string;
+  fromTeamId?: number;
+  toTeamId?: number;
+  personId?: number;
 };
 
 export async function fetchTransactionsRaw(date: string): Promise<unknown> {
   return getRaw(`/v1/transactions?sportId=1&startDate=${date}&endDate=${date}`);
 }
 
+type RawTxn = {
+  typeCode?: string;
+  typeDesc?: string;
+  description?: string;
+  fromTeam?: { id?: number };
+  toTeam?: { id?: number };
+  person?: { id?: number };
+};
+
 export function parseTransactions(raw: unknown): Transaction[] {
-  const data = raw as { transactions?: Array<{ typeCode?: string; typeDesc?: string; description?: string }> };
+  const data = raw as { transactions?: RawTxn[] };
   return (data?.transactions ?? [])
     .filter((t) => typeof t.description === "string" && t.description.length > 0)
     .map((t) => ({
       typeCode: t.typeCode ?? "",
       typeDesc: t.typeDesc ?? "",
       description: t.description ?? "",
+      fromTeamId: t.fromTeam?.id,
+      toTeamId: t.toTeam?.id,
+      personId: t.person?.id,
     }));
 }
 
@@ -319,4 +334,178 @@ export function parsePersonWL(raw: unknown): { wins: number; losses: number; era
     losses: typeof stat?.losses === "number" ? stat.losses : 0,
     era: typeof stat?.era === "string" ? stat.era : null,
   };
+}
+
+// ─── Team roster with season stats ────────────────────────────────────────
+// Active roster for one team, each player hydrated with season hitting +
+// pitching splits. One call returns everything needed for the team-email
+// stat sheet.
+
+export type PersonHittingStats = {
+  gamesPlayed?: number; plateAppearances?: number;
+  atBats?: number; runs?: number; hits?: number;
+  doubles?: number; triples?: number; homeRuns?: number; rbi?: number;
+  baseOnBalls?: number; strikeOuts?: number; stolenBases?: number;
+  avg?: string; obp?: string; slg?: string; ops?: string; babip?: string;
+};
+
+export type PersonPitchingStats = {
+  gamesPlayed?: number; gamesStarted?: number; wins?: number; losses?: number;
+  saves?: number; inningsPitched?: string; strikeOuts?: number;
+  baseOnBalls?: number; earnedRuns?: number; hits?: number; homeRuns?: number;
+  era?: string; whip?: string; babip?: string;
+  strikeoutsPer9Inn?: string; walksPer9Inn?: string;
+  strikeoutWalkRatio?: string; homeRunsPer9?: string;
+};
+
+export type RosterPlayer = {
+  personId: number;
+  fullName: string;
+  jerseyNumber?: string;
+  position: string;
+  hitting?: PersonHittingStats;
+  pitching?: PersonPitchingStats;
+};
+
+export type TeamRoster = {
+  teamId: number;
+  players: RosterPlayer[];
+};
+
+export async function fetchTeamRosterWithStatsRaw(
+  teamId: number,
+  season: number,
+): Promise<unknown> {
+  // Hydrate both `season` (standard counting stats) and `seasonAdvanced`
+  // (sabermetric splits). MLB returns BABIP for pitchers only in advanced.
+  const hydrate = `person(stats(group=[hitting,pitching],type=[season,seasonAdvanced],season=${season}))`;
+  return getRaw(
+    `/v1/teams/${teamId}/roster?rosterType=active&hydrate=${encodeURIComponent(hydrate)}`,
+  );
+}
+
+type RawStatEntry = {
+  group?: { displayName?: string };
+  type?: { displayName?: string };
+  splits?: Array<{ stat?: Record<string, unknown> }>;
+};
+
+type RawRosterEntry = {
+  person?: {
+    id?: number;
+    fullName?: string;
+    stats?: RawStatEntry[];
+  };
+  jerseyNumber?: string;
+  position?: { abbreviation?: string };
+};
+
+function extractStatGroup(
+  stats: RawStatEntry[] | undefined,
+  group: "hitting" | "pitching",
+  type: "season" | "seasonAdvanced" = "season",
+): Record<string, unknown> | undefined {
+  if (!Array.isArray(stats)) return undefined;
+  const entry = stats.find((s) => s.group?.displayName === group && s.type?.displayName === type);
+  return entry?.splits?.[0]?.stat;
+}
+
+function pickHitting(stat: Record<string, unknown> | undefined): PersonHittingStats | undefined {
+  if (!stat) return undefined;
+  return {
+    gamesPlayed: stat.gamesPlayed as number | undefined,
+    plateAppearances: stat.plateAppearances as number | undefined,
+    atBats: stat.atBats as number | undefined,
+    runs: stat.runs as number | undefined,
+    hits: stat.hits as number | undefined,
+    doubles: stat.doubles as number | undefined,
+    triples: stat.triples as number | undefined,
+    homeRuns: stat.homeRuns as number | undefined,
+    rbi: stat.rbi as number | undefined,
+    baseOnBalls: stat.baseOnBalls as number | undefined,
+    strikeOuts: stat.strikeOuts as number | undefined,
+    stolenBases: stat.stolenBases as number | undefined,
+    avg: stat.avg as string | undefined,
+    obp: stat.obp as string | undefined,
+    slg: stat.slg as string | undefined,
+    ops: stat.ops as string | undefined,
+    babip: stat.babip as string | undefined,
+  };
+}
+
+function pickPitching(stat: Record<string, unknown> | undefined): PersonPitchingStats | undefined {
+  if (!stat) return undefined;
+  return {
+    gamesPlayed: stat.gamesPlayed as number | undefined,
+    gamesStarted: stat.gamesStarted as number | undefined,
+    wins: stat.wins as number | undefined,
+    losses: stat.losses as number | undefined,
+    saves: stat.saves as number | undefined,
+    inningsPitched: stat.inningsPitched as string | undefined,
+    strikeOuts: stat.strikeOuts as number | undefined,
+    baseOnBalls: stat.baseOnBalls as number | undefined,
+    earnedRuns: stat.earnedRuns as number | undefined,
+    hits: stat.hits as number | undefined,
+    homeRuns: stat.homeRuns as number | undefined,
+    era: stat.era as string | undefined,
+    whip: stat.whip as string | undefined,
+    babip: stat.babip as string | undefined,
+    strikeoutsPer9Inn: stat.strikeoutsPer9Inn as string | undefined,
+    walksPer9Inn: stat.walksPer9Inn as string | undefined,
+    strikeoutWalkRatio: stat.strikeoutWalkRatio as string | undefined,
+    homeRunsPer9: stat.homeRunsPer9 as string | undefined,
+  };
+}
+
+export function parseTeamRoster(raw: unknown, teamId: number): TeamRoster {
+  const data = raw as { roster?: RawRosterEntry[] };
+  const players = (data.roster ?? []).map((entry): RosterPlayer => {
+    const stats = entry.person?.stats;
+    const hitting = pickHitting(extractStatGroup(stats, "hitting", "season"));
+    const pitching = pickPitching(extractStatGroup(stats, "pitching", "season"));
+
+    // Pitcher BABIP only lives in seasonAdvanced — merge it in.
+    if (pitching) {
+      const adv = extractStatGroup(stats, "pitching", "seasonAdvanced");
+      const advBabip = adv?.babip;
+      if (typeof advBabip === "string" && !pitching.babip) {
+        pitching.babip = advBabip;
+      }
+    }
+
+    return {
+      personId: entry.person?.id ?? 0,
+      fullName: entry.person?.fullName ?? "",
+      jerseyNumber: entry.jerseyNumber,
+      position: entry.position?.abbreviation ?? "",
+      hitting,
+      pitching,
+    };
+  });
+  return { teamId, players };
+}
+
+export async function getTeamRoster(teamId: number, season: number): Promise<TeamRoster> {
+  return parseTeamRoster(await fetchTeamRosterWithStatsRaw(teamId, season), teamId);
+}
+
+// ─── Team schedule over a date range ──────────────────────────────────────
+// Used for "Upcoming this week" in the team email.
+
+export async function fetchTeamScheduleRangeRaw(
+  teamId: number,
+  startDate: string,
+  endDate: string,
+): Promise<unknown> {
+  return getRaw(
+    `/v1/schedule?sportId=1&teamId=${teamId}&startDate=${startDate}&endDate=${endDate}&hydrate=linescore,team,decisions,probablePitcher`,
+  );
+}
+
+export async function getTeamScheduleRange(
+  teamId: number,
+  startDate: string,
+  endDate: string,
+): Promise<ScheduleGame[]> {
+  return parseSchedule(await fetchTeamScheduleRangeRaw(teamId, startDate, endDate));
 }

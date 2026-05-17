@@ -297,6 +297,24 @@ footer.site-footer a { color: var(--text-secondary); }
 
 .admin { max-width: 920px; margin: 32px auto; padding: 0 20px;
          font-family: Georgia, 'Times New Roman', serif; color: var(--text-primary); }
+.admin-wide { max-width: 1200px; }
+.admin-nav { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 20px;
+             padding: 0 0 6px; border-bottom: 2px solid var(--border-strong);
+             font-size: 13px; }
+.admin-nav a { padding: 6px 12px; color: var(--text-secondary);
+               text-decoration: none; border-right: 1px solid var(--border-strong);
+               text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+.admin-nav a:first-child { padding-left: 0; }
+.admin-nav a:last-child { border-right: none; }
+.admin-nav a:hover { color: var(--text-primary); background: rgba(0,0,0,0.03); }
+.admin-team-picker { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 0 14px;
+                     font-family: ui-monospace, monospace; font-size: 12px; }
+.admin-team-picker a { padding: 4px 8px; color: var(--text-secondary);
+                       text-decoration: none; border: 1px solid var(--border-strong);
+                       letter-spacing: 0.04em; }
+.admin-team-picker a:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
+.admin-team-picker a.current { background: var(--text-primary); color: #f9f7f1;
+                               border-color: var(--text-primary); font-weight: 700; }
 .admin h1 { font-size: 24px; font-style: italic; font-weight: 800; margin: 0 0 8px;
             letter-spacing: -0.005em; }
 .admin h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em;
@@ -326,8 +344,9 @@ footer.site-footer a { color: var(--text-secondary); }
   border-radius: 50%; animation: admin-spin 0.7s linear infinite;
 }
 @keyframes admin-spin { to { transform: rotate(360deg); } }
-.admin-email-frame { width: 100%; height: 85vh; border: 1px solid var(--border-strong);
-                     margin-top: 12px; background: #fff; }
+.admin-email-frame { width: 390px; max-width: 100%; height: 85vh;
+                     border: 1px solid var(--border-strong); margin: 12px auto 0;
+                     display: block; background: #fff; }
 .admin-error { background: #ffe6e6; border: 1px solid #a40000;
                padding: 10px 12px; margin: 12px 0;
                font-size: 14px; color: #a40000;

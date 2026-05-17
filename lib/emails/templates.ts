@@ -130,6 +130,29 @@ export function dailyEmail(opts: {
 }
 
 /**
+ * Team-scoped daily email — same chrome as dailyEmail, but the subject and
+ * preview text identify the team. Used for paid subscribers who've added a
+ * specific team. Body comes from renderTeamEmailContent().
+ */
+export function teamDailyEmail(opts: {
+  teamName: string;
+  digestPrettyDate: string;
+  digestUrl: string;
+  unsubscribeUrl: string;
+  digestEmailHtml: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `boxscore: ${opts.teamName} · ${opts.digestPrettyDate}`;
+  const html = wrapWithDigest({
+    digestEmailHtml: opts.digestEmailHtml,
+    unsubscribeUrl: opts.unsubscribeUrl,
+    digestUrl: opts.digestUrl,
+    previewText: `${opts.digestPrettyDate} · ${opts.teamName} digest from boxscore.`,
+  });
+  const text = `boxscore — ${opts.teamName} — ${opts.digestPrettyDate}\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  return { subject, html, text };
+}
+
+/**
  * Used for any email that embeds a daily digest. 600px wide outer table to
  * fit the digest's content, with a thin chrome on top and bottom.
  */
