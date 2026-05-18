@@ -7,7 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
 import { imagePostContent } from "@/lib/social-content";
-import { startCronRun, finishCronRun } from "@/lib/cron-runs";
+import { startCronRun, finishCronRun, summarizeItemErrors } from "@/lib/cron-runs";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -120,7 +120,7 @@ export async function GET(req: Request) {
     };
     await finishCronRun(runId, {
       status: failed > 0 && posted === 0 ? "failed" : "ok",
-      error: failed > 0 ? `${failed} of ${images.length} failed` : null,
+      error: summarizeItemErrors(results, images.length),
       result,
     });
     return NextResponse.json({ ok: failed === 0, ...result, results });

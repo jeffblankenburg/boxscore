@@ -39,6 +39,33 @@ export async function startCronRun(args: {
   return data.id;
 }
 
+// Per-image-loop cron routes (post-twitter, post-bluesky, etc.) collect a
+// `{ subId, error? }` array as they iterate. When the overall run finishes
+// with at least one failure, this helper turns that array into a single
+// human-readable error string that gets stored on cron_runs.error AND surfaced
+// in the failure-alert email. Without this, the only stored error is "N of N
+// failed" — useless when oncall is trying to triage at 6am.
+export function summarizeItemErrors(
+  results: ReadonlyArray<{ subId: string; error?: string | null }>,
+  total: number,
+): string | null {
+  const failures = results.filter(
+    (r): r is { subId: string; error: string } => typeof r.error === "string" && r.error.length > 0,
+  );
+  if (failures.length === 0) return null;
+  const distinct = Array.from(new Set(failures.map((f) => f.error)));
+  const lead = `${failures.length}/${total} failed`;
+  if (distinct.length === 1) {
+    return `${lead}: ${distinct[0]}`;
+  }
+  // Multiple distinct errors — list each with a representative subId.
+  const samples = distinct.map((msg) => {
+    const sample = failures.find((f) => f.error === msg)!;
+    return `[${sample.subId}] ${msg}`;
+  });
+  return `${lead} (${distinct.length} distinct): ${samples.join(" | ")}`;
+}
+
 // Mark a run finished (ok or failed). Safe to call even if the original
 // startCronRun didn't happen (e.g., the route crashed before it could insert)
 // — in that case `id` is null and we no-op.

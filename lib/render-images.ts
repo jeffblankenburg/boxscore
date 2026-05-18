@@ -191,8 +191,16 @@ export async function renderShareImages(args: {
     for (let i = 0; i < games.length; i++) {
       const game = games[i]!;
       const headerEl = await game.$(".game-header");
+      // The header may contain `.nick-full` + `.nick-short` span pairs that
+      // CSS swaps for paper mode (e.g. "Diamondbacks" vs "D-Backs"). Strip
+      // the short forms before reading text so social posts and image
+      // captions only carry the full nickname.
       const text = headerEl
-        ? (await headerEl.evaluate((el) => el.textContent ?? "")) || ""
+        ? (await headerEl.evaluate((el) => {
+            const clone = el.cloneNode(true) as HTMLElement;
+            clone.querySelectorAll(".nick-short").forEach((n) => n.remove());
+            return clone.textContent ?? "";
+          })) || ""
         : "";
       const titleOnly = text.split(" · ")[0]?.trim() ?? text.trim();
       const m = titleOnly.match(/^(.+?)\s+\d+,\s+(.+?)\s+\d+$/);
