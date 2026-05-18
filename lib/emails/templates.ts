@@ -9,7 +9,6 @@
 
 import { EMAIL_STYLES } from "../render-email";
 import { shortPrettyDate } from "../dates";
-import { BRAND } from "../brand";
 
 const PAPER = "#f9f7f1";
 const INK = "#161410";
@@ -238,7 +237,7 @@ ${preview}
               </a>
             </td>
             <td align="right" style="vertical-align:bottom;">
-              <a href="${BRAND.tipJarUrl}" style="display:inline-block; font-family:Georgia, serif; font-size:12px; font-weight:700; background:#fff; color:${INK}; padding:5px 12px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Support</a>
+              <a href="https://boxscore.email/r/support?src=email-header" style="display:inline-block; font-family:Georgia, serif; font-size:12px; font-weight:700; background:#fff; color:${INK}; padding:5px 12px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Support</a>
             </td>
           </tr>
         </table>
@@ -257,7 +256,7 @@ ${preview}
       </td></tr>
 
       <tr><td style="padding-top:8px; text-align:center; font-family:Georgia, serif; font-size:12px; color:${MUTED}; font-style:italic;">
-        Like boxscore? <a href="${BRAND.tipJarUrl}" style="color:${MUTED};">Leave a tip →</a>
+        Like boxscore? <a href="https://boxscore.email/r/support?src=email-footer" style="color:${MUTED};">Leave a tip →</a>
       </td></tr>
     </table>
 

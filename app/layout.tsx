@@ -50,7 +50,7 @@ function SiteHeader() {
         ))}
       </nav>
       <div className="header-cta">
-        <a className="support" href={BRAND.tipJarUrl} target="_blank" rel="noopener noreferrer">Support</a>
+        <a className="support" href="/r/support?src=web-header" target="_blank" rel="noopener noreferrer">Support</a>
         <a className="subscribe" href={BRAND.subscribeUrl}>Subscribe →</a>
       </div>
     </header>
@@ -64,7 +64,7 @@ function SiteFooter() {
         <a href="/">{BRAND.name}</a> · {BRAND.tagline}
       </span>
       <span className="site-footer-legal">
-        <a href={BRAND.tipJarUrl} target="_blank" rel="noopener noreferrer">Tip jar</a>
+        <a href="/r/support?src=web-footer" target="_blank" rel="noopener noreferrer">Tip jar</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
       </span>

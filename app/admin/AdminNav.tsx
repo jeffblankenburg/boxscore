@@ -8,6 +8,7 @@ export function AdminNav() {
     { href: "/admin/team-email/cle", label: "Team email" },
     { href: "/admin/twitter", label: "Twitter" },
     { href: "/admin/images", label: "Images" },
+    { href: "/admin/clicks", label: "Click tracking" },
   ];
   return (
     <nav className="admin-nav">
