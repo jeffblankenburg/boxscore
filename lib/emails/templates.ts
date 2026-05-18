@@ -9,6 +9,7 @@
 
 import { EMAIL_STYLES } from "../render-email";
 import { shortPrettyDate } from "../dates";
+import { BRAND } from "../brand";
 
 const PAPER = "#f9f7f1";
 const INK = "#161410";
@@ -228,10 +229,19 @@ ${preview}
         <a href="${opts.digestUrl}" style="color:${MUTED}; text-decoration:underline;">View in browser →</a>
       </td></tr>
 
-      <tr><td style="padding-bottom:10px; border-bottom:2px solid ${INK}; text-align:center;">
-        <a href="https://boxscore.email/" style="text-decoration:none; color:${INK}; font-weight:800; font-size:20px; letter-spacing:-0.01em; font-family:Georgia, serif;">
-          <img src="https://boxscore.email/icon.png" alt="" width="24" height="24" style="vertical-align:middle; margin-right:6px; border-radius:4px;">boxscore
-        </a>
+      <tr><td style="padding-bottom:4px; border-bottom:2px solid ${INK};">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr>
+            <td align="left" style="vertical-align:bottom; line-height:1;">
+              <a href="https://boxscore.email/" style="text-decoration:none; color:${INK}; font-weight:800; font-size:20px; letter-spacing:-0.01em; font-family:Georgia, serif;">
+                <img src="https://boxscore.email/icon.png" alt="" width="24" height="24" style="vertical-align:bottom; margin-right:6px; border-radius:4px;">boxscore
+              </a>
+            </td>
+            <td align="right" style="vertical-align:bottom;">
+              <a href="${BRAND.tipJarUrl}" style="display:inline-block; font-family:Georgia, serif; font-size:12px; font-weight:700; background:#fff; color:${INK}; padding:5px 12px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Support</a>
+            </td>
+          </tr>
+        </table>
       </td></tr>
 
       ${opts.welcomeBanner ? `<tr><td style="padding:14px 0 8px;">${opts.welcomeBanner}</td></tr>` : ""}
@@ -244,6 +254,10 @@ ${preview}
         <a href="${opts.digestUrl}" style="color:${MUTED};">View in browser</a>
         &nbsp;·&nbsp;
         <a href="${opts.unsubscribeUrl}" style="color:${MUTED};">Unsubscribe in one click</a>
+      </td></tr>
+
+      <tr><td style="padding-top:8px; text-align:center; font-family:Georgia, serif; font-size:12px; color:${MUTED}; font-style:italic;">
+        Like boxscore? <a href="${BRAND.tipJarUrl}" style="color:${MUTED};">Leave a tip →</a>
       </td></tr>
     </table>
 

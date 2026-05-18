@@ -49,7 +49,10 @@ function SiteHeader() {
           <a key={s.label} href={s.href}>{s.label}</a>
         ))}
       </nav>
-      <a className="subscribe" href={BRAND.subscribeUrl}>Subscribe →</a>
+      <div className="header-cta">
+        <a className="support" href={BRAND.tipJarUrl} target="_blank" rel="noopener noreferrer">Support</a>
+        <a className="subscribe" href={BRAND.subscribeUrl}>Subscribe →</a>
+      </div>
     </header>
   );
 }
@@ -61,6 +64,7 @@ function SiteFooter() {
         <a href="/">{BRAND.name}</a> · {BRAND.tagline}
       </span>
       <span className="site-footer-legal">
+        <a href={BRAND.tipJarUrl} target="_blank" rel="noopener noreferrer">Tip jar</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
       </span>

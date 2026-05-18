@@ -28,10 +28,12 @@ a { color: inherit; }
 }
 
 .site-header {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: 4px 0 10px; flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px; padding: 4px 0 10px;
 }
-.site-header .brand { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.site-header .brand { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; justify-self: start; }
 .site-header .brand a {
   color: inherit; text-decoration: none;
   display: inline-flex; align-items: center; gap: 8px;
@@ -41,7 +43,8 @@ a { color: inherit; }
   border-radius: 4px; flex-shrink: 0;
 }
 .site-header .brand .dot { color: var(--text-muted); }
-.site-header .social { font-size: 13px; }
+.site-header .social { font-size: 13px; justify-self: center; }
+.site-header .header-cta { justify-self: end; display: inline-flex; align-items: center; gap: 6px; }
 .site-header .social a {
   color: var(--text-secondary); text-decoration: none;
   margin-right: 6px; padding-right: 6px;
@@ -56,6 +59,13 @@ a { color: inherit; }
   letter-spacing: 0.02em;
 }
 .site-header .subscribe:hover { background: #333; }
+.site-header .support {
+  display: inline-block; font-size: 13px; font-weight: 700;
+  background: transparent; color: inherit; padding: 4px 11px;
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  text-decoration: none; letter-spacing: 0.02em;
+}
+.site-header .support:hover { background: var(--surface-muted, #f0ebde); }
 
 .dateline {
   border-top: 3px double var(--border-strong);
@@ -173,6 +183,7 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .batting-table .stat-col, .pitching-table .stat-col { width: 8%; }
 .batting-table .r-col, .pitching-table .r-col { width: 6%; }
 .batting-table .avg-col, .pitching-table .era-col { width: 10%; }
+.batting-table .player-col.is-sub { padding-left: 10px; }
 .batting-table tbody tr:last-child { font-weight: 700; }
 .pitching-table .ip-col { width: 7%; }
 .pitcher-note { color: var(--text-muted); font-weight: 400; font-size: 0.92em; margin-left: 2px; }
@@ -691,6 +702,10 @@ body:has(.paper-mode) .paper-toggle {
   .leaders-cols { column-count: 1; }
   .dateline { font-size: 18px; }
   .league-band .league-name { font-size: 18px; }
-  .site-header { gap: 8px; }
+  .site-header {
+    display: flex; flex-wrap: wrap;
+    justify-content: space-between; gap: 8px;
+  }
   .site-header .subscribe { padding: 4px 10px; font-size: 12px; }
+  .site-header .support { padding: 3px 9px; font-size: 12px; }
 }

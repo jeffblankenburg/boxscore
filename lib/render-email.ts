@@ -459,8 +459,10 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     if (b.atBats == null && b.baseOnBalls == null && b.strikeOuts == null && b.hits == null) return "";
     const pos = (p.allPositions?.map((x) => x.abbreviation).join("-") ?? p.position.abbreviation).toLowerCase();
     const avg = fmtAvg(p.seasonStats.batting.avg);
+    const isStarter = !!p.battingOrder && p.battingOrder.endsWith("00");
+    const indent = isStarter ? "" : ' style="padding-left:10px;"';
     return `<tr>
-      <td align="left">${esc(lastName(p.person.fullName))} <span class="es-mut">${esc(pos)}</span></td>
+      <td align="left"${indent}>${esc(lastName(p.person.fullName))} <span class="es-mut">${esc(pos)}</span></td>
       <td align="right">${pad(b.atBats)}</td>
       <td align="right">${pad(b.runs)}</td>
       <td align="right">${pad(b.hits)}</td>
