@@ -16,6 +16,7 @@ const MANIFEST_FILE = "_manifest.json";
 export type StoredImage = {
   file: string;        // e.g. "al-standings.png" (without the date_ prefix)
   url: string;
+  updatedAt: string | null;
 };
 
 export type ManifestImage = {
@@ -101,7 +102,7 @@ export async function listStoredImages(): Promise<{ date: string | null; images:
     if (!m) continue;
     if (!date) date = m[1]!;
     const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(f.name);
-    images.push({ file: m[2]!, url: urlData.publicUrl });
+    images.push({ file: m[2]!, url: urlData.publicUrl, updatedAt: f.updated_at ?? null });
   }
 
   images.sort((a, b) => imagePriority(a.file) - imagePriority(b.file));

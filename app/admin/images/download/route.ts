@@ -36,9 +36,9 @@ export async function GET() {
     }),
   );
 
-  const blob = await zip.generateAsync({ type: "blob" });
+  const buf = await zip.generateAsync({ type: "nodebuffer" });
   const filename = `boxscore-images-${date ?? "current"}.zip`;
-  return new NextResponse(blob, {
+  return new NextResponse(new Uint8Array(buf), {
     status: 200,
     headers: {
       "Content-Type": "application/zip",

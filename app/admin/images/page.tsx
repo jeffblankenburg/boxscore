@@ -57,21 +57,25 @@ export default async function AdminImagesView({
 
       {images.length > 0 && (
         <p className="admin-meta">
-          <a href="/api/admin/share-images-zip" className="admin-link">
+          <a href="/admin/images/download" className="admin-link">
             Download all as ZIP
           </a>
         </p>
       )}
 
       <div className="admin-image-grid">
-        {images.map((img) => (
-          <figure key={img.file}>
-            <a href={img.url} target="_blank" rel="noreferrer">
-              <img src={img.url} alt={img.file} loading="lazy" />
-            </a>
-            <figcaption>{img.file}</figcaption>
-          </figure>
-        ))}
+        {images.map((img) => {
+          const bust = img.updatedAt ? `?v=${encodeURIComponent(img.updatedAt)}` : "";
+          const src = `${img.url}${bust}`;
+          return (
+            <figure key={img.file}>
+              <a href={src} target="_blank" rel="noreferrer">
+                <img src={src} alt={img.file} loading="lazy" />
+              </a>
+              <figcaption>{img.file}</figcaption>
+            </figure>
+          );
+        })}
       </div>
     </main>
   );
