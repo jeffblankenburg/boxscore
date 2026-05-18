@@ -10,6 +10,7 @@ import {
   fetchTransactionsRaw, parseTransactions,
 } from "./mlb";
 import type { GameDetail, DailyData, UpcomingGame } from "./render";
+import { classifyDigestMode } from "./mlb-digest-mode";
 import { prettyDate, nextDay, timeInET } from "./dates";
 import {
   getDailyRaw, upsertDailyRaw,
@@ -46,10 +47,12 @@ function probablePitcherIds(scheduleRaw: unknown): number[] {
 async function fetchDailyRaw(date: string): Promise<DailyRaw> {
   const season = Number(date.slice(0, 4));
 
-  // First wave: schedules + standings + leaders + teams, in parallel.
+  // First wave: schedules + standings + leaders + teams, in parallel. Fetch
+  // 15 even though regular game days render only 5 — ASG mode renders all 15
+  // and the marginal storage cost is trivial.
   const leaderCalls = LEADER_CATEGORIES.flatMap((c) => [
-    fetchLeadersRaw(c.category, season, 103, 5),
-    fetchLeadersRaw(c.category, season, 104, 5),
+    fetchLeadersRaw(c.category, season, 103, 15),
+    fetchLeadersRaw(c.category, season, 104, 15),
   ]);
   const [
     scheduleRaw, standingsRaw, wildCardRaw, nextDayScheduleRaw, teamsRaw, transactionsRaw,
@@ -170,6 +173,7 @@ function rawToDailyData(raw: DailyRaw, date: string): DailyData {
   return {
     date,
     prettyDate: prettyDate(date),
+    mode: classifyDigestMode(schedule, date),
     games,
     standings: parseStandings(raw.standings),
     wildCard: parseWildCard(raw.wildCard),

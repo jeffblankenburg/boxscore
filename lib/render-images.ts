@@ -103,7 +103,7 @@ const SHARE_CSS = `
     display: flex; align-items: center; justify-content: space-between;
     padding-bottom: 10px; margin-bottom: 0 !important;
     border-bottom: 1px solid #c4baa5;
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
   }
   .share-header .brand-cell { display: flex; align-items: center; gap: 8px; }
   .share-header .brand-cell img { width: 22px; height: 22px; border-radius: 4px; display: block; }

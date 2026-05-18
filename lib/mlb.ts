@@ -14,6 +14,9 @@ async function getRaw(path: string): Promise<unknown> {
 export type ScheduleGame = {
   gamePk: number;
   gameDate: string;
+  // MLB game type code: R=regular, S=spring, E=exhibition, A=All-Star,
+  // F=Wild Card, D=Division Series, L=LCS, W=World Series, P=postseason.
+  gameType?: string;
   status: { abstractGameState: string; detailedState: string; codedGameState: string };
   teams: {
     away: {

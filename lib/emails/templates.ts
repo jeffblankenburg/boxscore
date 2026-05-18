@@ -15,7 +15,7 @@ const INK = "#161410";
 const MUTED = "#666";
 const RULE = "#c4baa5";
 
-const BASE_STYLES = `font-family: Georgia, "Times New Roman", Times, serif; color: ${INK};`;
+const BASE_STYLES = `font-family: 'Source Sans 3', Helvetica, Arial, sans-serif; color: ${INK};`;
 
 function wrap(inner: string, options: { previewText?: string } = {}): string {
   const preview = options.previewText
@@ -135,7 +135,7 @@ export function welcomeEmail(opts: {
 }): { subject: string; html: string; text: string } {
   const subject = `Welcome — boxscore · ${opts.digestPrettyDate}`;
   const html = wrapWithDigest({
-    welcomeBanner: `<p style="font-family:Georgia, serif; font-size:15px; line-height:1.5; color:${INK}; margin:0;">
+    welcomeBanner: `<p style="font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:15px; line-height:1.5; color:${INK}; margin:0;">
       You're in. The full digest below is for <i>${opts.digestPrettyDate}</i>. Another one will hit your inbox tomorrow morning at <b>5am&nbsp;ET</b>.
     </p>`,
     digestEmailHtml: opts.digestEmailHtml,
@@ -216,15 +216,18 @@ function wrapWithDigest(opts: {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap">
 <style>${EMAIL_STYLES}</style>
 </head>
-<body style="margin:0; padding:0; background:${PAPER}; font-family:Georgia, serif; color:${INK};">
+<body style="margin:0; padding:0; background:${PAPER}; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; color:${INK};">
 ${preview}
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fff;">
   <tr><td style="padding:8px 8px 24px;">
 
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-      <tr><td align="right" style="padding-bottom:6px; font-family:Georgia, serif; font-size:11px; font-style:italic; color:${MUTED};">
+      <tr><td align="right" style="padding-bottom:6px; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; font-style:italic; color:${MUTED};">
         <a href="${opts.digestUrl}" style="color:${MUTED}; text-decoration:underline;">View in browser →</a>
       </td></tr>
 
@@ -232,12 +235,12 @@ ${preview}
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
           <tr>
             <td align="left" style="vertical-align:bottom; line-height:1;">
-              <a href="https://boxscore.email/" style="text-decoration:none; color:${INK}; font-weight:800; font-size:20px; letter-spacing:-0.01em; font-family:Georgia, serif;">
+              <a href="https://boxscore.email/" style="text-decoration:none; color:${INK}; font-weight:800; font-size:20px; letter-spacing:-0.01em; font-family:'Source Sans 3', Helvetica, Arial, sans-serif;">
                 <img src="https://boxscore.email/icon.png" alt="" width="24" height="24" style="vertical-align:bottom; margin-right:6px; border-radius:4px;">boxscore
               </a>
             </td>
             <td align="right" style="vertical-align:bottom;">
-              <a href="https://boxscore.email/r/support?src=email-header" style="display:inline-block; font-family:Georgia, serif; font-size:12px; font-weight:700; background:#fff; color:${INK}; padding:5px 12px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Support</a>
+              <a href="https://boxscore.email/r/support?src=email-header" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; font-weight:700; background:#fff; color:${INK}; padding:5px 12px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Support</a>
             </td>
           </tr>
         </table>
@@ -249,13 +252,13 @@ ${preview}
         ${opts.digestEmailHtml}
       </td></tr>
 
-      <tr><td style="padding-top:18px; border-top:1px solid ${RULE}; text-align:center; font-family:Georgia, serif; font-size:12px; color:${MUTED}; font-style:italic;">
+      <tr><td style="padding-top:18px; border-top:1px solid ${RULE}; text-align:center; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; color:${MUTED}; font-style:italic;">
         <a href="${opts.digestUrl}" style="color:${MUTED};">View in browser</a>
         &nbsp;·&nbsp;
         <a href="${opts.unsubscribeUrl}" style="color:${MUTED};">Unsubscribe in one click</a>
       </td></tr>
 
-      <tr><td style="padding-top:8px; text-align:center; font-family:Georgia, serif; font-size:12px; color:${MUTED}; font-style:italic;">
+      <tr><td style="padding-top:8px; text-align:center; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; color:${MUTED}; font-style:italic;">
         Like boxscore? <a href="https://boxscore.email/r/support?src=email-footer" style="color:${MUTED};">Leave a tip →</a>
       </td></tr>
     </table>

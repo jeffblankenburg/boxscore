@@ -9,6 +9,7 @@ export function AdminNav() {
     { href: "/admin/twitter", label: "Twitter" },
     { href: "/admin/images", label: "Images" },
     { href: "/admin/clicks", label: "Click tracking" },
+    { href: "/admin/preview/mlb", label: "Preview" },
   ];
   return (
     <nav className="admin-nav">

@@ -28,13 +28,18 @@ import type { Transaction } from "./mlb";
 
 export const EMAIL_STYLES = `
   .es * { box-sizing: border-box; }
-  .es { font-family: Georgia, 'Times New Roman', Times, serif; color: #161410; }
+  .es { font-family: 'Source Sans 3', Helvetica, Arial, sans-serif; color: #161410; }
   .es a { color: inherit; }
 
   .es-dateline {
     border-top: 3px double #161410; border-bottom: 1px solid #161410;
     padding: 8px 0; margin: 0 0 14px; text-align: center;
-    font-size: 24px; font-style: italic; font-weight: 800; letter-spacing: -0.005em;
+    font-style: italic; font-weight: 800; letter-spacing: -0.005em;
+    /* Fluid: fit the longest dateline ("Wednesday, September 24, 2025") at
+       any iframe / email-client width without wrapping. Many clients strip
+       clamp() — the explicit font-size fallback below keeps them sane. */
+    font-size: 22px;
+    font-size: clamp(16px, 4.2vw, 24px);
   }
   .es-section-h {
     font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
@@ -91,6 +96,9 @@ export const EMAIL_STYLES = `
   .es-cutoff td { border-top: 2px dashed #161410; }
   .es-fixed { table-layout: fixed; }
   .es-mut { color: #6a6354; font-size: 11px; }
+  .es-no-games { font-size: 13px; font-style: italic; color: #6a6354; text-align: center; margin: 8px 0 12px; }
+  .es-asg-note { font-size: 11px; font-style: italic; color: #6a6354; text-align: center; margin: 4px 0 8px; }
+  .es-edition { font-family: 'Source Sans 3', Helvetica, Arial, sans-serif; font-style: italic; font-weight: 800; font-size: 18px; text-align: center; margin: 0 0 8px; padding: 2px 0 6px; color: #161410; border-bottom: 1px solid #c4baa5; }
 
   .es-team-line { font-size: 13px; font-weight: 700; padding: 1px 0; }
   .es-score-line { font-family: 'Courier New', Courier, monospace; font-size: 13px; white-space: pre; }
@@ -228,7 +236,6 @@ export const dateline = (pretty: string) =>
 export const sectionH = (t: string) => `<h2 class="es-section-h">${esc(t)}</h2>`;
 const subH = (t: string) => `<h3 class="es-sub-h">${esc(t)}</h3>`;
 const gameH = (t: string) => `<h3 class="es-game-h">${esc(t)}</h3>`;
-const colH = (t: string) => `<div class="es-col-h">${esc(t)}</div>`;
 
 // ─── standings + wildcard ─────────────────────────────────────────────────
 
@@ -359,8 +366,8 @@ function renderLeagueStandings(label: string, key: "AL" | "NL", data: DailyData)
 
 // ─── leaders (two columns: AL, NL) ────────────────────────────────────────
 
-function renderLeaderCategory(g: LeaderGroup, liveAbbrev: Record<string, string>): string {
-  const rows = g.rows.map((L) =>
+function renderLeaderCategory(g: LeaderGroup, liveAbbrev: Record<string, string>, limit = 5): string {
+  const rows = g.rows.slice(0, limit).map((L) =>
     `<tr>
       <td align="left">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
       <td align="right">${esc(L.value)}</td>
@@ -372,16 +379,17 @@ function renderLeaderCategory(g: LeaderGroup, liveAbbrev: Record<string, string>
     </table>`;
 }
 
-function renderLeadersColumn(leagueLabel: string, groups: LeaderGroup[], liveAbbrev: Record<string, string>): string {
-  return `${colH(leagueLabel)}${groups.map((g) => renderLeaderCategory(g, liveAbbrev)).join("")}`;
-}
-
-function renderLeaders(data: DailyData): string {
-  return `${sectionH("Leaders")}
+function renderSingleLeagueLeaders(leagueLabel: string, groups: LeaderGroup[], liveAbbrev: Record<string, string>, limit = 5): string {
+  // Split the categories evenly into two columns so each league's leaders
+  // section stays compact instead of running 8 categories deep.
+  const half = Math.ceil(groups.length / 2);
+  const left = groups.slice(0, half);
+  const right = groups.slice(half);
+  return `${sectionH(`${leagueLabel} Leaders`)}
     <table class="es-leaders-cols" cellpadding="0" cellspacing="0" border="0">
       <tbody><tr>
-        <td width="50%">${renderLeadersColumn("American League", data.leaders.AL, data.teamAbbrev)}</td>
-        <td width="50%">${renderLeadersColumn("National League", data.leaders.NL, data.teamAbbrev)}</td>
+        <td width="50%">${left.map((g) => renderLeaderCategory(g, liveAbbrev, limit)).join("")}</td>
+        <td width="50%">${right.map((g) => renderLeaderCategory(g, liveAbbrev, limit)).join("")}</td>
       </tr></tbody>
     </table>`;
 }
@@ -442,8 +450,9 @@ function ordinal(n: number): string {
 
 function renderInningLine(team: string, line: string): string {
   // Inline font styles (not just the class) because Gmail strips <style>
-  // blocks and falls back to Georgia (proportional) — which breaks column
-  // alignment between rows when a number is double-digit ("12" vs " 9").
+  // blocks. Without the inline monospace, Gmail falls back to the body font
+  // (proportional sans), which breaks column alignment between rows when a
+  // number is double-digit ("12" vs " 9").
   return `<tr>
     <td align="left" style="font-size:13px;font-weight:700;padding:1px 0;white-space:nowrap;">${esc(team)}</td>
     <td align="right" style="font-family:'Courier New',Courier,monospace;font-size:13px;white-space:pre;padding:1px 0;">${esc(line)}</td>
@@ -553,8 +562,8 @@ function renderPitching(team: BoxTeam, cityName: string): string {
   return `<div class="es-team-label">${esc(cityName)} Pitching</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
-        <col width="38%"><col width="10%"><col width="7%"><col width="7%">
-        <col width="7%"><col width="7%"><col width="7%"><col width="17%">
+        <col width="38%"><col width="8%"><col width="8%"><col width="8%">
+        <col width="8%"><col width="8%"><col width="8%"><col width="14%">
       </colgroup>
       <thead><tr>
         <th align="left">Pitcher</th>
@@ -646,8 +655,16 @@ export function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbb
 function renderBoxScores(games: GameDetail[], liveAbbrev: Record<string, string>): string {
   const completed = games.filter((g) => g.game.status.codedGameState === "F" && g.box);
   if (completed.length === 0) return "";
-  return `${sectionH("Box Scores")}
+  return `${sectionH("Yesterday's Box Scores")}
     ${completed.map((g) => renderGame(g as Required<GameDetail>, liveAbbrev)).join("")}`;
+}
+
+function renderAllStarGame(games: GameDetail[], liveAbbrev: Record<string, string>): string {
+  const asg = games.find((g) => g.game.gameType === "A");
+  if (!asg || !asg.box) return "";
+  return `${sectionH("All-Star Game")}
+<p class="es-asg-note">Stats don't count toward season totals.</p>
+${renderGame(asg as Required<GameDetail>, liveAbbrev)}`;
 }
 
 function renderTransactions(txs: Transaction[]): string {
@@ -694,11 +711,35 @@ function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, str
 // ─── entry ────────────────────────────────────────────────────────────────
 
 export function renderEmailContent(data: DailyData): string {
+  if (data.mode === "no-games") {
+    return `<div class="es">
+${dateline(data.prettyDate)}
+<p class="es-no-games">No games yesterday.</p>
+${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+${renderTransactions(data.transactions)}
+</div>`;
+  }
+
+  if (data.mode === "all-star") {
+    return `<div class="es">
+${dateline(data.prettyDate)}
+<div class="es-edition">All-Star Game Edition</div>
+${renderLeagueStandings("American League Standings", "AL", data)}
+${renderSingleLeagueLeaders("American League", data.leaders.AL, data.teamAbbrev, 15)}
+${renderLeagueStandings("National League Standings", "NL", data)}
+${renderSingleLeagueLeaders("National League", data.leaders.NL, data.teamAbbrev, 15)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+${renderAllStarGame(data.games, data.teamAbbrev)}
+${renderTransactions(data.transactions)}
+</div>`;
+  }
+
   return `<div class="es">
 ${dateline(data.prettyDate)}
-${renderLeagueStandings("American League", "AL", data)}
-${renderLeagueStandings("National League", "NL", data)}
-${renderLeaders(data)}
+${renderLeagueStandings("American League Standings", "AL", data)}
+${renderSingleLeagueLeaders("American League", data.leaders.AL, data.teamAbbrev)}
+${renderLeagueStandings("National League Standings", "NL", data)}
+${renderSingleLeagueLeaders("National League", data.leaders.NL, data.teamAbbrev)}
 ${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
 ${renderBoxScores(data.games, data.teamAbbrev)}
 ${renderTransactions(data.transactions)}

@@ -111,7 +111,7 @@ async function notifyCronFailure(run: CronRun): Promise<void> {
   const subject = `[boxscore] Cron failed: ${run.route}${run.date ? ` (${run.date})` : ""}`;
   const html = `
     <div style="font-family: ui-monospace, monospace; font-size: 14px; line-height: 1.5;">
-      <p style="font: 700 16px Georgia, serif;">Cron run failed</p>
+      <p style="font: 700 16px 'Source Sans 3', Helvetica, Arial, sans-serif;">Cron run failed</p>
       <table cellpadding="4" style="border-collapse: collapse;">
         <tr><td><strong>Route</strong></td><td><code>${escapeHtml(run.route)}</code></td></tr>
         <tr><td><strong>Date</strong></td><td>${escapeHtml(run.date ?? "—")}</td></tr>

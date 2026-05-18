@@ -3,6 +3,7 @@ import type {
   DivisionStandings, Leader, BoxTeam, BoxPlayer,
   WildCardLeagueStandings, Transaction,
 } from "./mlb";
+import type { DigestMode } from "./digest-mode";
 
 export type GameDetail = {
   game: ScheduleGame;
@@ -32,6 +33,7 @@ export type UpcomingGame = {
 export type DailyData = {
   date: string;
   prettyDate: string;
+  mode: DigestMode;
   games: GameDetail[];
   standings: DivisionStandings[];
   wildCard: WildCardLeagueStandings[];
@@ -179,6 +181,36 @@ const lastName = (full: string): string => {
 };
 
 export function renderContent(data: DailyData): string {
+  if (data.mode === "no-games") {
+    return `${renderDateline(data.prettyDate)}
+
+<p class="no-games-note">No games yesterday.</p>
+
+${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+
+${renderTransactions(data.transactions)}`;
+  }
+
+  if (data.mode === "all-star") {
+    return `${renderDateline(data.prettyDate)}
+
+<div class="edition-subtitle">All-Star Game Edition</div>
+
+<div class="section">
+  ${renderAllStarLeague("American League", 103, data)}
+</div>
+
+<div class="section">
+  ${renderAllStarLeague("National League", 104, data)}
+</div>
+
+${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+
+${renderAllStarGame(data.games, data.teamAbbrev)}
+
+${renderTransactions(data.transactions)}`;
+  }
+
   return `${renderDateline(data.prettyDate)}
 
 <div class="section">
@@ -215,7 +247,7 @@ function renderDateline(pretty: string): string {
   return `<div class="dateline">${esc(pretty)}</div>`;
 }
 
-function renderLeague(label: string, leagueId: 103 | 104, data: DailyData): string {
+function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leaderLimit = 5): string {
   const key: "AL" | "NL" = leagueId === 103 ? "AL" : "NL";
   const divs = DIVISIONS[key];
   const standingsHtml = divs.map((d) => {
@@ -224,19 +256,15 @@ function renderLeague(label: string, leagueId: 103 | 104, data: DailyData): stri
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league.id === leagueId);
   const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord) : "";
-  const leadersHtml = renderLeagueLeaders(data.leaders[key], data.teamAbbrev);
-  void leagueId;
-  return `<div class="league-band">
-  <div class="league-name">${esc(label)}</div>
-</div>
-<div class="column-container">
+  const leadersHtml = renderLeagueLeaders(data.leaders[key], data.teamAbbrev, leaderLimit);
+  return `<div class="league-layout">
   <div class="col-standings">
-    <div class="boxscores-title">Standings</div>
+    <div class="boxscores-title">${esc(label)} Standings</div>
     ${standingsHtml}
     ${wildCardHtml}
   </div>
   <div class="col-leaders">
-    <div class="boxscores-title">Leaders</div>
+    <div class="boxscores-title">${esc(label)} Leaders</div>
     ${leadersHtml}
   </div>
 </div>`;
@@ -337,9 +365,106 @@ function renderDivisionTable(label: string, d: DivisionStandings): string {
 </table></div>`;
 }
 
-function renderLeagueLeaders(groups: LeaderGroup[], liveAbbrev: Record<string, string>): string {
+function renderAllStarDivisionTable(label: string, d: DivisionStandings): string {
+  const rec = (
+    splits: Array<{ type: string; wins: number; losses: number }> | undefined,
+    type: string,
+  ): string => {
+    const s = splits?.find((x) => x.type === type);
+    return s ? `${s.wins}-${s.losses}` : "—";
+  };
+  const rows = [...d.teamRecords]
+    .sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank))
+    .map((t) => {
+      const sr = t.records?.splitRecords;
+      return `<tr>
+        <td class="team-col">${esc(nickname(t.team.name))}</td>
+        <td class="w-col">${t.wins}</td>
+        <td class="l-col">${t.losses}</td>
+        <td class="pct-col">${esc(t.leagueRecord.pct).replace(/^0/, "")}</td>
+        <td class="gb-col">${esc(t.gamesBack)}</td>
+        <td class="gb-col">${esc(t.wildCardGamesBack ?? "—")}</td>
+        <td class="rec-col">${rec(sr, "extraInning")}</td>
+        <td class="rec-col">${rec(sr, "oneRun")}</td>
+        <td class="rec-col">${rec(sr, "day")}</td>
+        <td class="rec-col">${rec(sr, "night")}</td>
+        <td class="rec-col">${rec(sr, "grass")}</td>
+        <td class="rec-col">${rec(sr, "turf")}</td>
+        <td class="rec-col">${rec(sr, "east")}</td>
+        <td class="rec-col">${rec(sr, "central")}</td>
+        <td class="rec-col">${rec(sr, "west")}</td>
+        <td class="rec-col">${rec(sr, "interLeague")}</td>
+      </tr>`;
+    }).join("");
+  return `<div class="stats-subheader">${esc(label)}</div>
+<div class="standings-wrap"><table class="standings-table asg-standings-table">
+  <thead>
+    <tr>
+      <th class="team-col">Team</th>
+      <th class="w-col">W</th>
+      <th class="l-col">L</th>
+      <th class="pct-col">Pct</th>
+      <th class="gb-col">GB</th>
+      <th class="gb-col">WCGB</th>
+      <th class="rec-col">XTRA</th>
+      <th class="rec-col">1 RUN</th>
+      <th class="rec-col">DAY</th>
+      <th class="rec-col">NIGHT</th>
+      <th class="rec-col">GRASS</th>
+      <th class="rec-col">TURF</th>
+      <th class="rec-col">EAST</th>
+      <th class="rec-col">CENTRAL</th>
+      <th class="rec-col">WEST</th>
+      <th class="rec-col">AL/NL</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table></div>`;
+}
+
+function renderAllStarLeaders(groups: LeaderGroup[], liveAbbrev: Record<string, string>): string {
   const cards = groups.map((g) => {
-    const rows = g.rows.map((L) => `
+    const rows = g.rows.slice(0, 15).map((L) => `
+      <tr>
+        <td class="player-col">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
+        <td>${esc(L.value)}</td>
+      </tr>`).join("");
+    return `<div class="leaders-section">
+<div class="stats-subheader">${esc(g.label)}</div>
+<table class="leaders-table">
+  <thead><tr><th class="player-col">Player</th><th>${esc(g.valueLabel)}</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+</div>`;
+  }).join("");
+  return `<div class="asg-leaders-grid">${cards}</div>`;
+}
+
+function renderAllStarLeague(label: string, leagueId: 103 | 104, data: DailyData): string {
+  const key: "AL" | "NL" = leagueId === 103 ? "AL" : "NL";
+  const divs = DIVISIONS[key];
+  const standingsHtml = divs.map((d) => {
+    const rec = data.standings.find((r) => r.division.id === d.id);
+    return rec ? renderAllStarDivisionTable(d.name, rec) : "";
+  }).join("");
+  const wcRecord = data.wildCard.find((r) => r.league.id === leagueId);
+  const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord) : "";
+  const leadersHtml = renderAllStarLeaders(data.leaders[key], data.teamAbbrev);
+  return `<div class="league-band">
+  <div class="league-name">${esc(label)}</div>
+</div>
+<div class="asg-league-block">
+  <div class="boxscores-title">Standings</div>
+  ${standingsHtml}
+  ${wildCardHtml}
+  <div class="boxscores-title">Leaders</div>
+  ${leadersHtml}
+</div>`;
+}
+
+function renderLeagueLeaders(groups: LeaderGroup[], liveAbbrev: Record<string, string>, limit = 5): string {
+  const cards = groups.map((g) => {
+    const rows = g.rows.slice(0, limit).map((L) => `
       <tr>
         <td class="player-col">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
         <td>${esc(L.value)}</td>
@@ -406,6 +531,16 @@ function renderGames(games: GameDetail[], liveAbbrev: Record<string, string>): s
   const completed = games.filter((g) => g.game.status.codedGameState === "F" && g.box);
   return `<div class="boxscores-container">
 ${completed.map((g) => renderGame(g as Required<GameDetail>, liveAbbrev)).join("")}
+</div>`;
+}
+
+function renderAllStarGame(games: GameDetail[], liveAbbrev: Record<string, string>): string {
+  const asg = games.find((g) => g.game.gameType === "A");
+  if (!asg || !asg.box) return "";
+  return `<div class="boxscores-title">All-Star Game</div>
+<p class="all-star-note">Stats don't count toward season totals.</p>
+<div class="boxscores-container">
+${renderGame(asg as Required<GameDetail>, liveAbbrev)}
 </div>`;
 }
 

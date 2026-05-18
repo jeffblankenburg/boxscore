@@ -24,6 +24,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const date = url.searchParams.get("date") ?? yesterdayInET();
   const trigger = url.searchParams.get("trigger") === "manual" ? "manual" : "cron";
+  const refetch = url.searchParams.get("refetch") === "true";
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
   let runId: string | null = null;
   try {
     runId = await startCronRun({ route: "generate", sport: "mlb", date, trigger });
-    const data = await loadDailyData(date);
+    const data = await loadDailyData(date, { refetch });
     const html = renderContent(data);
     const email_html = renderEmailContent(data);
     await upsertDigest({
@@ -40,6 +41,7 @@ export async function GET(req: Request) {
 
     const result = {
       sport: "mlb", date,
+      mode: data.mode,
       game_count: data.games.length,
       html_bytes: html.length,
       email_bytes: email_html.length,

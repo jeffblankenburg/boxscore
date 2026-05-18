@@ -71,21 +71,17 @@ a { color: inherit; }
   border-top: 3px double var(--border-strong);
   border-bottom: 1px solid var(--border-strong);
   padding: 6px 0; margin: 0 0 18px;
-  text-align: center; font-size: 28px; font-weight: 800;
+  text-align: center; font-weight: 800;
   font-style: italic; letter-spacing: -0.005em;
+  /* Fluid sizing so the longest possible date ("Wednesday, September 24, 2025"
+     ≈ 29 chars) never wraps. ~4vw fits the date across the full width range
+     from ~375px (clamped to 16px min) up through desktop (clamped to 28px max). */
+  font-size: clamp(18px, 4.2vw, 28px);
 }
-
-.league-band {
-  border-bottom: 2px solid var(--border-strong);
-  padding: 6px 0 8px; margin: 12px 0 14px;
-}
-.league-band .league-name { font-size: 24px; font-weight: 800; letter-spacing: 0.01em; }
 
 .section { margin-bottom: 20px; }
-.column-container { display: flex; gap: 15px; }
-.column { flex: 1; }
-.col-standings { width: 50%; }
-.col-leaders { width: 50%; }
+.league-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.col-standings, .col-leaders { width: 100%; margin-bottom: 14px; min-width: 0; }
 
 .boxscores-title {
   text-align: center; font-size: 22px; font-weight: 700;
@@ -104,8 +100,8 @@ th, td { text-align: right; overflow: hidden; line-height: 1.15; padding: 0 2px;
 th:first-child, td:first-child { text-align: left; }
 th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 
-.standings-wrap { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
-.standings-table { margin-bottom: 8px; table-layout: fixed; min-width: 380px; }
+.standings-wrap { max-width: 100%; }
+.standings-table { margin-bottom: 8px; table-layout: fixed; }
 .standings-table th { border-top: none; border-bottom: 1px solid var(--border-strong); }
 .standings-table .team-col { width: 22%; }
 .standings-table .w-col,
@@ -123,6 +119,24 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .leaders-table .player-col { width: 60%; }
 .leaders-cols { column-count: 2; column-gap: 18px; }
 .leaders-cols .leaders-section { break-inside: avoid; page-break-inside: avoid; }
+
+/* All-Star Edition: standings full-width with extra columns, leaders below
+   in a 4-column grid (2 rows = 8 categories per league). */
+.edition-subtitle {
+  font-family: Georgia, serif; font-style: italic; font-weight: 800;
+  font-size: 22px; text-align: center; letter-spacing: -0.005em;
+  color: var(--text-primary);
+  margin: -14px 0 14px;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--border-strong);
+}
+.asg-league-block { margin: 8px 0 16px; }
+.asg-standings-table { font-size: 12px; }
+.asg-standings-table th, .asg-standings-table td { padding: 2px 4px; }
+.asg-leaders-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 18px;
+}
+.asg-leaders-grid .leaders-section { break-inside: avoid; }
 
 .games-section { padding: 10px 0; border-top: 2px solid var(--border-strong); }
 .games-section-title {
@@ -184,6 +198,9 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .batting-table .r-col, .pitching-table .r-col { width: 6%; }
 .batting-table .avg-col, .pitching-table .era-col { width: 10%; }
 .batting-table .player-col.is-sub { padding-left: 10px; }
+.no-games-note { font-size: 14px; font-style: italic; color: var(--text-muted); text-align: center; margin: 6px 0 12px; }
+
+.all-star-note { font-size: 12px; font-style: italic; color: var(--text-muted); text-align: center; margin: 4px 0 8px; }
 .batting-table tbody tr:last-child { font-weight: 700; }
 .pitching-table .ip-col { width: 7%; }
 .pitcher-note { color: var(--text-muted); font-weight: 400; font-size: 0.92em; margin-left: 2px; }
@@ -412,6 +429,49 @@ footer.site-footer a { color: var(--text-secondary); }
 .admin-clicks-table code { background: none; padding: 0; font-size: 12px; }
 .admin-clicks-subhead { font-size: 13px; font-weight: 700; margin: 18px 0 4px;
                         font-family: Georgia, serif; }
+
+.preview-shell { display: flex; gap: 24px; margin-top: 12px; align-items: flex-start; }
+.preview-sidebar { width: 160px; flex-shrink: 0; }
+.preview-sidebar-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+                         font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+.preview-sidebar ul { list-style: none; padding: 0; margin: 0; }
+.preview-sidebar li { padding: 4px 0; }
+.preview-sidebar a { display: block; padding: 4px 8px; border-radius: 4px;
+                     text-decoration: none; color: var(--text-secondary);
+                     font-family: ui-monospace, monospace; font-size: 13px; }
+.preview-sidebar a:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
+.preview-sidebar a.active { background: #000; color: #fff; font-weight: 700; }
+
+.preview-main { flex: 1; min-width: 0; }
+.preview-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
+               flex-wrap: wrap; }
+.preview-toggle { display: inline-flex; border: 1px solid var(--border-strong);
+                  border-radius: 999px; overflow: hidden; }
+.preview-toggle a { padding: 4px 14px; font-size: 13px; font-weight: 700;
+                    text-decoration: none; color: var(--text-secondary); }
+.preview-toggle a.active { background: #000; color: #fff; }
+.preview-meta { font-size: 12px; color: var(--text-muted); font-family: ui-monospace, monospace; }
+.preview-meta code { background: rgba(0,0,0,0.04); padding: 1px 4px; border-radius: 3px; }
+.preview-warn { color: #a40000; margin-left: 6px; }
+
+.preview-web-frame, .preview-email-frame {
+  width: 100%; height: 85vh; border: 1px solid var(--border-strong); background: #fff;
+}
+
+.preview-id { display: inline-flex; align-items: center; gap: 6px;
+              padding: 3px 8px; border: 1px solid var(--border-strong);
+              border-radius: 4px; background: rgba(0,0,0,0.02);
+              cursor: pointer; font-size: 12px; font-family: ui-monospace, monospace; }
+.preview-id:hover { background: rgba(0,0,0,0.06); }
+.preview-id code { background: transparent; padding: 0; }
+.preview-id-icon { font-size: 12px; opacity: 0.6; }
+
+.preview-popout { display: inline-flex; align-items: center; padding: 3px 8px;
+                  border: 1px solid var(--border-strong); border-radius: 4px;
+                  background: rgba(0,0,0,0.02); cursor: pointer; font-size: 12px;
+                  font-family: ui-monospace, monospace; text-decoration: none;
+                  color: var(--text-secondary); }
+.preview-popout:hover { background: rgba(0,0,0,0.06); color: var(--text-primary); }
 .admin-cron-error { color: #a40000; }
 .status-ok { display: inline-block; padding: 1px 6px; border-radius: 3px;
              background: #2a7a2a; color: #fff; font-weight: 700; font-size: 11px; }
@@ -434,6 +494,11 @@ footer.site-footer a { color: var(--text-secondary); }
                                 margin-top: 6px; word-break: break-all; }
 
 .admin.admin-wide { max-width: 1100px; }
+/* Preview page needs to breathe — the iframe inside has to be wider than the
+   site's natural 900px breakpoint to exercise the side-by-side layout, plus
+   we want room for "Laptop" (1024) and "Full" presets without the admin
+   chrome capping them. */
+.admin.admin-preview { max-width: none; padding: 0 12px; }
 .twitter-post-list { list-style: none; padding: 0; margin: 16px 0 0;
                      display: flex; flex-direction: column; gap: 20px; }
 .twitter-post-card { display: grid;
@@ -703,18 +768,20 @@ body:has(.paper-mode) .paper-toggle {
 
 @media (max-width: 900px) {
   .boxscores-container { column-count: 2; }
-  .column-container { flex-direction: column; }
-  .col-standings, .col-leaders { width: 100%; }
   .games-grid { grid-template-columns: 1fr 1fr; }
-  .dateline { font-size: 22px; }
-  .league-band .league-name { font-size: 20px; }
+  .league-layout { grid-template-columns: 1fr; gap: 0; }
+  .asg-standings-table { font-size: 11px; }
+  .asg-standings-table th, .asg-standings-table td { padding: 2px 2px; }
 }
 @media (max-width: 600px) {
   .boxscores-container { column-count: 1; }
   .games-grid { grid-template-columns: 1fr; }
   .leaders-cols { column-count: 1; }
-  .dateline { font-size: 18px; }
-  .league-band .league-name { font-size: 18px; }
+  .asg-leaders-grid { grid-template-columns: repeat(2, 1fr); }
+  .standings-table { font-size: 11px; }
+  .standings-table th, .standings-table td { padding: 0 1px; }
+  .asg-standings-table { font-size: 9px; }
+  .asg-standings-table th, .asg-standings-table td { padding: 1px 1px; }
   .site-header {
     display: flex; flex-wrap: wrap;
     justify-content: space-between; gap: 8px;
