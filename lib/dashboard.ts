@@ -1,5 +1,7 @@
 import { supabaseAdmin } from "./supabase";
 import { yesterdayInET } from "./dates";
+import { getVisibleSports } from "./sports";
+import { featuresFor, type CronRoute as SportCronRoute } from "./sport-features";
 
 // Supabase's JS client caps un-paginated `select` at 1000 rows. The `sends`
 // and `subscribers` tables both grow past that, so any aggregation that needs
@@ -413,6 +415,269 @@ export async function getCronHeatMap(days: number = 14): Promise<CronHeatMap> {
   }
 
   return { days: dayList, cells, runIds };
+}
+
+// ---- Deliverability ---------------------------------------------------
+//
+// Send-level KPIs about what Resend actually did with the messages we
+// handed off. We already store a row per send (sends) and webhook events
+// per resend_id (email_events). This rolls them together and classifies
+// each send into one terminal state:
+//
+//   delivered   — at least one email.delivered event landed
+//   bounced     — email.bounced and no delivered (hard/soft bounce both count)
+//   delayed     — email.delivery_delayed seen, no delivered/bounced yet
+//   pending     — Resend accepted the send but no terminal event yet
+//   failed      — sends.error is set (Resend rejected before sending)
+//
+// Complained is tracked separately because it can overlap with delivered
+// (subscriber receives the email *then* marks it as spam). Counts can sum
+// to greater than the send total only on the complaints row.
+
+export type DeliverabilityStats = {
+  sent: number;
+  delivered: number;
+  bounced: number;
+  delayed: number;
+  complained: number;
+  pending: number;
+  failed: number;
+  deliveredRate: number;
+  bouncedRate: number;
+  delayedRate: number;
+  complainedRate: number;
+  failedRate: number;
+};
+
+export async function getDeliverabilityStats(w: Window): Promise<DeliverabilityStats> {
+  const db = supabaseAdmin();
+  const windowStartIso = new Date(Date.now() - windowHours(w) * 3600 * 1000).toISOString();
+
+  // Every send in the window, including failed ones. resend_id is null when
+  // Resend rejected before assigning an id; we count those as "failed" via
+  // the error column.
+  type SendRow = { resend_id: string | null; error: string | null };
+  const sends = await fetchAll<SendRow>(
+    () => db.from("sends")
+      .select("resend_id, error")
+      .gte("sent_at", windowStartIso) as unknown as QueryBuilder<SendRow>,
+    "getDeliverabilityStats sends",
+  );
+
+  const totalSent = sends.length;
+  if (totalSent === 0) {
+    return {
+      sent: 0, delivered: 0, bounced: 0, delayed: 0, complained: 0, pending: 0, failed: 0,
+      deliveredRate: 0, bouncedRate: 0, delayedRate: 0, complainedRate: 0, failedRate: 0,
+    };
+  }
+
+  let failed = 0;
+  const liveResendIds = new Set<string>();
+  for (const s of sends) {
+    if (s.error) {
+      failed++;
+      continue;
+    }
+    if (s.resend_id) liveResendIds.add(s.resend_id);
+  }
+
+  // Pull terminal events for live ids. Bound by window so we don't drag in
+  // years of history; opens-only events aren't part of this classification.
+  type Event = { resend_id: string; event_type: string };
+  const RELEVANT_TYPES = [
+    "email.delivered",
+    "email.bounced",
+    "email.delivery_delayed",
+    "email.complained",
+  ];
+  let events: Event[] = [];
+  if (liveResendIds.size > 0) {
+    events = await fetchAll<Event>(
+      () => db.from("email_events")
+        .select("resend_id, event_type")
+        .gte("event_at", windowStartIso)
+        .in("event_type", RELEVANT_TYPES) as unknown as QueryBuilder<Event>,
+      "getDeliverabilityStats events",
+    );
+  }
+
+  const byId: Record<string, Set<string>> = {};
+  for (const ev of events) {
+    if (!liveResendIds.has(ev.resend_id)) continue;
+    (byId[ev.resend_id] ??= new Set()).add(ev.event_type);
+  }
+
+  let delivered = 0, bounced = 0, delayed = 0, pending = 0, complained = 0;
+  for (const id of liveResendIds) {
+    const evts = byId[id] ?? new Set<string>();
+    if (evts.has("email.delivered")) delivered++;
+    else if (evts.has("email.bounced")) bounced++;
+    else if (evts.has("email.delivery_delayed")) delayed++;
+    else pending++;
+    if (evts.has("email.complained")) complained++;
+  }
+
+  return {
+    sent: totalSent,
+    delivered, bounced, delayed, pending, complained, failed,
+    deliveredRate: delivered / totalSent,
+    bouncedRate: bounced / totalSent,
+    delayedRate: delayed / totalSent,
+    complainedRate: complained / totalSent,
+    failedRate: failed / totalSent,
+  };
+}
+
+// ---- Universal-dashboard watchwall + sport-day grid --------------------
+//
+// The "is anything broken right now?" hero. Returns one row per visible
+// sport, with one cell per route that sport is *expected* to run today
+// (from lib/sport-features). Cell status:
+//   pass     — most-recent cron_run for (sport, route, yesterdayET) was ok
+//   fail     — most-recent run failed
+//   running  — most-recent run hasn't finished yet
+//   missing  — sport expects this route today but no run yet (red flag)
+
+export type WatchwallCellStatus = "pass" | "fail" | "running" | "missing";
+
+export type WatchwallCell = {
+  route: SportCronRoute;
+  status: WatchwallCellStatus;
+  startedAt: string | null;
+  error: string | null;
+  runId: string | null;
+};
+
+export type WatchwallRow = {
+  sport: string;
+  sportName: string;
+  date: string;
+  cells: WatchwallCell[];
+};
+
+export async function getDashboardWatchwall(): Promise<WatchwallRow[]> {
+  const sports = await getVisibleSports({ includeAdminOnly: true });
+  const date = yesterdayInET();
+
+  // One query, group in JS. Ascending order so later rows overwrite earlier,
+  // leaving the most recent run per (sport, route) in the map at the end.
+  type Row = {
+    id: string; route: string; sport: string;
+    status: string; error: string | null; started_at: string;
+  };
+  const { data, error } = await supabaseAdmin()
+    .from("cron_runs")
+    .select("id, route, sport, status, error, started_at")
+    .eq("date", date)
+    .order("started_at", { ascending: true });
+  if (error) throw new Error(`getDashboardWatchwall: ${error.message}`);
+
+  const latest: Record<string, Record<string, Row>> = {};
+  for (const r of (data ?? []) as Row[]) {
+    (latest[r.sport] ??= {})[r.route] = r;
+  }
+
+  return sports.map((sport) => {
+    const features = featuresFor(sport.id);
+    const cells: WatchwallCell[] = features.expectedRoutes.map((route) => {
+      const r = latest[sport.id]?.[route];
+      return {
+        route,
+        status: !r ? "missing"
+          : r.status === "ok" ? "pass"
+          : r.status === "failed" ? "fail"
+          : "running",
+        startedAt: r?.started_at ?? null,
+        error: r?.error ?? null,
+        runId: r?.id ?? null,
+      };
+    });
+    return { sport: sport.id, sportName: sport.name, date, cells };
+  });
+}
+
+// GitHub-style contribution grid — one row per visible sport, columns are
+// the last N days. Each cell aggregates across that sport's expected routes
+// for that day:
+//   pass     — every expected route ran ok
+//   partial  — some expected routes ran ok, at least one missing (no fails)
+//   fail     — at least one expected route failed
+//   missing  — no expected route ran at all (this should rarely be ok)
+
+export type CronGridCellStatus = "pass" | "partial" | "fail" | "missing";
+
+export type CronGridRow = {
+  sport: string;
+  sportName: string;
+  cells: CronGridCellStatus[];
+};
+
+export type CronGridBySport = {
+  days: string[];    // ISO dates, oldest → newest
+  rows: CronGridRow[];
+};
+
+export async function getCronGridBySportDay(days: number = 14): Promise<CronGridBySport> {
+  const sports = await getVisibleSports({ includeAdminOnly: true });
+
+  // Build ET-aligned day list ending at yesterday-in-ET. Today isn't included
+  // because the cron_runs.date stores the digest date (yesterday at run time);
+  // showing "today" would always be missing because crons haven't run for it.
+  const dayList: string[] = [];
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const todayMs = Date.now();
+  for (let i = days; i >= 1; i--) {
+    const d = new Date(todayMs - i * 24 * 3600 * 1000);
+    const parts = fmt.formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+    dayList.push(`${get("year")}-${get("month")}-${get("day")}`);
+  }
+
+  // One query for the whole window. We use `started_at >= sinceIso` rather
+  // than filtering on `date` so a run scheduled at the boundary still gets
+  // picked up, then we bucket by `date` in JS.
+  const sinceIso = new Date(todayMs - (days + 1) * 24 * 3600 * 1000).toISOString();
+  type Row = { route: string; sport: string; date: string | null; status: string; started_at: string };
+  const { data, error } = await supabaseAdmin()
+    .from("cron_runs")
+    .select("route, sport, date, status, started_at")
+    .gte("started_at", sinceIso)
+    .order("started_at", { ascending: true });
+  if (error) throw new Error(`getCronGridBySportDay: ${error.message}`);
+
+  // sport → date → route → status (latest wins via ascending order).
+  const map: Record<string, Record<string, Record<string, string>>> = {};
+  for (const r of (data ?? []) as Row[]) {
+    const dayKey = r.date ?? r.started_at.slice(0, 10);
+    ((map[r.sport] ??= {})[dayKey] ??= {})[r.route] = r.status;
+  }
+
+  const rows: CronGridRow[] = sports.map((sport) => {
+    const features = featuresFor(sport.id);
+    const expected = features.expectedRoutes;
+    const cells: CronGridCellStatus[] = dayList.map((day) => {
+      const dayRuns = map[sport.id]?.[day] ?? {};
+      let ok = 0, failed = 0, present = 0;
+      for (const route of expected) {
+        const s = dayRuns[route];
+        if (s == null) continue;
+        present++;
+        if (s === "ok") ok++;
+        else if (s === "failed") failed++;
+      }
+      if (failed > 0) return "fail";
+      if (present === 0) return "missing";
+      if (present < expected.length) return "partial";
+      return "pass";
+    });
+    return { sport: sport.id, sportName: sport.name, cells };
+  });
+
+  return { days: dayList, rows };
 }
 
 // ---- Content snapshot --------------------------------------------------

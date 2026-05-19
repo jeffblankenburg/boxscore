@@ -64,9 +64,10 @@ function SiteFooter() {
         <a href="/">{BRAND.name}</a> · {BRAND.tagline}
       </span>
       <span className="site-footer-legal">
-        <a href="/r/support?src=web-footer" target="_blank" rel="noopener noreferrer">Tip jar</a>
+        <a href="/about">About</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
+        <a href="/r/support?src=web-footer" target="_blank" rel="noopener noreferrer">Tip Jar</a>
       </span>
       <Suspense fallback={null}>
         <PaperModeToggle />

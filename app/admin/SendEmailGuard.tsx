@@ -18,9 +18,13 @@ import { triggerCron } from "./actions";
 export function SendEmailGuard({
   defaultDate,
   activeSubscribers,
+  sport = "mlb",
+  returnTo = "/admin",
 }: {
   defaultDate: string;
   activeSubscribers: number;
+  sport?: string;
+  returnTo?: string;
 }) {
   const [stage, setStage] = useState<"idle" | "confirm" | "typed">("idle");
   const [date, setDate] = useState(defaultDate);
@@ -36,6 +40,8 @@ export function SendEmailGuard({
     const fd = new FormData();
     fd.set("route", "send-email");
     fd.set("date", date);
+    fd.set("sport", sport);
+    fd.set("returnTo", returnTo);
     startTransition(async () => {
       await triggerCron(fd);
     });

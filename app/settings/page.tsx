@@ -1,15 +1,18 @@
-// /settings — minimal stub for the auth foundation.
+// /settings — sport opt-in toggles, sign-in flow, sign-out.
 //
-// Signed in:    shows the address, plus a "Sign out" button.
+// Signed in:    shows the address, sport toggles, and a "Sign out" button.
 // Signed out:   shows an email-entry form that POSTs a magic-link request.
 //
-// Real settings UI (sport toggles, team picker, billing) lives in follow-up
-// work; this page just proves auth works end-to-end.
+// Admin users (email matches ADMIN_EMAIL) see admin-only sports too, which
+// is how Phase 5 dogfood works: admin opts themselves into NBA/WNBA through
+// the real settings flow before those sports are publicized.
 
 import { cookies } from "next/headers";
 import { validateSession, SUBSCRIBER_SESSION_COOKIE } from "@/lib/subscriber-auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requestSignInLink } from "./actions";
+import { getVisibleSports } from "@/lib/sports";
+import { getLeagueSubscriptions } from "@/lib/email-subscriptions";
+import { requestSignInLink, setSportSubscription } from "./actions";
 
 export const metadata = { title: "Settings — boxscore", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -32,6 +35,12 @@ export default async function SettingsPage({
       .maybeSingle<{ email: string; status: string }>();
     const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
     const isAdmin = !!sub && !!adminEmail && sub.email.toLowerCase() === adminEmail;
+
+    const [sports, subscriptions] = await Promise.all([
+      getVisibleSports({ includeAdminOnly: isAdmin }),
+      getLeagueSubscriptions(session.subscriber_id),
+    ]);
+
     return (
       <section className="subscribe-card">
         <h1 className="subscribe-h1">Settings</h1>
@@ -43,10 +52,44 @@ export default async function SettingsPage({
             <a href="/admin">Open admin dashboard →</a>
           </p>
         )}
+
+        <h2 className="settings-section-h">Newsletters</h2>
         <p className="subscribe-fine">
-          The full settings UI (sport picker, team customization, billing) is
-          on the way. For now this just proves you're signed in.
+          Turn each daily digest on or off. Changes take effect for the next
+          send.
         </p>
+        <ul className="settings-sport-list">
+          {sports.map((sport) => {
+            const active = subscriptions.get(sport.id) === true;
+            return (
+              <li key={sport.id} className="settings-sport-row">
+                <span className="settings-sport-name">
+                  {sport.name}
+                  {sport.visibility === "admin_only" && (
+                    <span className="settings-sport-badge"> (admin preview)</span>
+                  )}
+                </span>
+                <form action={setSportSubscription}>
+                  <input type="hidden" name="sport" value={sport.id} />
+                  <input type="hidden" name="next" value={active ? "off" : "on"} />
+                  <button
+                    type="submit"
+                    className={active ? "settings-toggle-off" : "settings-toggle-on"}
+                  >
+                    {active ? "Unsubscribe" : "Subscribe"}
+                  </button>
+                </form>
+              </li>
+            );
+          })}
+        </ul>
+        {error === "forbidden" && (
+          <p className="subscribe-error">That sport isn't available yet.</p>
+        )}
+        {error === "unknown_sport" && (
+          <p className="subscribe-error">Unknown sport.</p>
+        )}
+
         <form action="/api/auth/logout" method="post" className="subscribe-form">
           <button type="submit" className="subscribe-button">
             Sign out

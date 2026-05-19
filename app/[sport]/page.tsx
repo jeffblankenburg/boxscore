@@ -1,14 +1,16 @@
 import { notFound } from "next/navigation";
 import { getDigest } from "@/lib/digests";
 import { prettyDate, yesterdayInET } from "@/lib/dates";
+import { getSportById, isSportVisible } from "@/lib/sports";
 import { PaperMasthead } from "@/app/PaperMasthead";
 
 // Bookmarkable league page. URL stays as `/mlb` while rendering the latest
 // finalized day's digest. The dated route `/mlb/[date]` continues to serve
 // archived dates with stable URLs.
+//
+// Sport visibility is read from the sports table; admin_only sports 404
+// here regardless of admin status (admins preview via /admin/preview/[sport]).
 export const dynamic = "force-dynamic";
-
-const VALID_SPORTS = new Set(["mlb"]);
 
 export async function generateMetadata({
   params,
@@ -16,11 +18,12 @@ export async function generateMetadata({
   params: Promise<{ sport: string }>;
 }) {
   const { sport } = await params;
-  if (!VALID_SPORTS.has(sport)) return {};
+  const row = await getSportById(sport);
+  if (!row || row.visibility !== "public") return {};
   const date = yesterdayInET();
   return {
-    title: `${sport.toUpperCase()} — ${prettyDate(date)} | boxscore`,
-    description: `Daily ${sport.toUpperCase()} digest for ${prettyDate(date)}.`,
+    title: `${row.name} — ${prettyDate(date)} | boxscore`,
+    description: `Daily ${row.name} digest for ${prettyDate(date)}.`,
   };
 }
 
@@ -32,7 +35,7 @@ export default async function SportLatest({
   searchParams: Promise<{ paper?: string }>;
 }) {
   const { sport } = await params;
-  if (!VALID_SPORTS.has(sport)) notFound();
+  if (!(await isSportVisible(sport))) notFound();
 
   const date = yesterdayInET();
   const digest = await getDigest(sport, date);

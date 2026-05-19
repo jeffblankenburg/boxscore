@@ -121,6 +121,39 @@ export async function getActiveSubscribers(): Promise<Subscriber[]> {
 }
 
 /**
+ * Active subscribers who have opted in to a sport's league digest. Used by
+ * the per-sport send cron — replaces the old "everyone status='active'" fan-
+ * out so adding a new sport doesn't immediately mail every subscriber.
+ *
+ * Filters on both sides: subscribers.status='active' AND the league row in
+ * email_subscriptions exists with active=true. The 0013 backfill ensured
+ * every MLB-era subscriber has the row, so MLB behavior is unchanged.
+ */
+export async function getActiveSubscribersForSport(sport: string): Promise<Subscriber[]> {
+  // Two-step rather than a Supabase nested select: pull the opted-in IDs
+  // for this sport, then filter the active subscriber list. Matches the
+  // pattern used by getSentSubscriberIds + the send-cron filter loop.
+  const optedIn = new Set<string>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin()
+      .from("email_subscriptions")
+      .select("subscriber_id")
+      .eq("sport", sport)
+      .eq("scope", "league")
+      .eq("active", true)
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`getActiveSubscribersForSport ids: ${error.message}`);
+    const page = (data ?? []) as Array<{ subscriber_id: string }>;
+    for (const row of page) optedIn.add(row.subscriber_id);
+    if (page.length < pageSize) break;
+  }
+  if (optedIn.size === 0) return [];
+  const all = await getActiveSubscribers();
+  return all.filter((s) => optedIn.has(s.id));
+}
+
+/**
  * Flips active → unsubscribed. Idempotent — works regardless of current state
  * so the unsubscribe URL works forever. Default reason is "user" for the
  * customer-facing unsubscribe URL; webhooks pass "bounce"/"complaint".

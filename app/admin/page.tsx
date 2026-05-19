@@ -1,31 +1,38 @@
 import { yesterdayInET, prettyDate } from "@/lib/dates";
 import { recentCronRuns, type CronRun } from "@/lib/cron-runs";
-import { SubmitButton } from "./SubmitButton";
 import { requireAdmin } from "./require-admin";
 import { AdminNav } from "./AdminNav";
-import { SendEmailGuard } from "./SendEmailGuard";
 import {
   parseWindow,
   WINDOW_OPTIONS,
-  windowDays,
   getKpis,
   getSubscriberSeries,
   getSendSeries,
-  getCronHeatMap,
+  getDashboardWatchwall,
+  getCronGridBySportDay,
   getContentSnapshot,
+  getDeliverabilityStats,
   type Window,
 } from "@/lib/dashboard";
 import {
   SubscriberGrowthChart,
   SendHealthChart,
-  CronHeatMapView,
   Sparkline,
+  Watchwall,
+  CronGridBySportView,
 } from "./charts";
+import { EmailSearch } from "./EmailSearch";
+
+// Universal dashboard. Read-only situational awareness across every sport,
+// every format, every day. Per-sport tools (cron triggers, send-to-me,
+// preview, share images) live on /admin/[sport]; this page is exclusively
+// stats and the "is anything broken right now?" hero.
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · boxscore", robots: { index: false } };
 
 const GMAIL_CLIP_BYTES = 102 * 1024;
+const CRON_GRID_DAYS = 14;
 
 export default async function AdminDashboard({
   searchParams,
@@ -37,13 +44,15 @@ export default async function AdminDashboard({
   const w = parseWindow(windowParam);
   const date = yesterdayInET();
 
-  const [kpis, subSeries, sendSeries, heatMap, content, runs] = await Promise.all([
+  const [kpis, subSeries, sendSeries, watchwall, cronGrid, content, runs, deliverability] = await Promise.all([
     getKpis(w),
     getSubscriberSeries(w),
     getSendSeries(w),
-    getCronHeatMap(windowDays(w)),
+    getDashboardWatchwall(),
+    getCronGridBySportDay(CRON_GRID_DAYS),
     getContentSnapshot(w),
     recentCronRuns(20),
+    getDeliverabilityStats(w),
   ]);
 
   return (
@@ -54,9 +63,29 @@ export default async function AdminDashboard({
       {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}
       {error && <p className="admin-error"><strong>Failed:</strong> {error}</p>}
 
+      {/* 1. Watchwall — broken-detection hero. Shows current cron status for
+          every (sport, expected route) for yesterday's digest date. Anything
+          red or yellow is something to look at right now. */}
+      <section>
+        <h2>Is anything broken right now?</h2>
+        <p className="admin-meta">
+          Most recent run of each cron route per sport, for yesterday&apos;s
+          digest date. Anything not green is the first thing to triage.
+        </p>
+        <Watchwall rows={watchwall} />
+      </section>
+
+      {/* 2. Email lookup — paste a recipient address, see every send to it.
+          Lives near the top because it's the most common "I need to look
+          something up right now" admin action. */}
+      <section>
+        <h2>Look up an email</h2>
+        <EmailSearch />
+      </section>
+
       <WindowSelector current={w} />
 
-      {/* 1. Hero KPI strip */}
+      {/* 2. KPI strip */}
       <section className="admin-kpis">
         <KpiCard
           label="Active subscribers"
@@ -117,25 +146,80 @@ export default async function AdminDashboard({
         />
       </section>
 
-      {/* 2. Subscriber growth */}
+      {/* 3. Deliverability — what Resend actually did with the sends. Each
+          send rolls up to delivered / bounced / delayed / pending / failed
+          via the email_events join. Complained is a separate count that can
+          overlap with delivered. */}
+      <section>
+        <h2>Deliverability ({w})</h2>
+        <p className="admin-meta">
+          Outcome of the {deliverability.sent.toLocaleString()} send
+          {deliverability.sent === 1 ? "" : "s"} attempted in this window.
+        </p>
+        <div className="admin-kpis">
+          <KpiCard
+            label="Delivered"
+            value={deliverability.sent === 0 ? "—" : `${(deliverability.deliveredRate * 100).toFixed(1)}%`}
+            sub={`${deliverability.delivered.toLocaleString()} / ${deliverability.sent.toLocaleString()}`}
+            deltaTone={deliverability.sent === 0 ? "neutral"
+              : deliverability.deliveredRate >= 0.98 ? "good"
+              : deliverability.deliveredRate >= 0.95 ? "neutral"
+              : "bad"}
+          />
+          <KpiCard
+            label="Bounced"
+            value={deliverability.sent === 0 ? "—" : `${(deliverability.bouncedRate * 100).toFixed(2)}%`}
+            sub={`${deliverability.bounced.toLocaleString()} bounce${deliverability.bounced === 1 ? "" : "s"}`}
+            deltaTone={deliverability.bouncedRate > 0.02 ? "bad" : deliverability.bounced === 0 ? "good" : "neutral"}
+          />
+          <KpiCard
+            label="Delayed"
+            value={deliverability.sent === 0 ? "—" : `${(deliverability.delayedRate * 100).toFixed(2)}%`}
+            sub={`${deliverability.delayed.toLocaleString()} pending retry`}
+            deltaTone={deliverability.delayed === 0 ? "good" : "neutral"}
+          />
+          <KpiCard
+            label="Complained"
+            value={deliverability.sent === 0 ? "—" : `${(deliverability.complainedRate * 100).toFixed(2)}%`}
+            sub={`${deliverability.complained.toLocaleString()} spam mark${deliverability.complained === 1 ? "" : "s"}`}
+            deltaTone={deliverability.complainedRate > 0.001 ? "bad" : "good"}
+          />
+          <KpiCard
+            label="Failed"
+            value={deliverability.sent === 0 ? "—" : `${(deliverability.failedRate * 100).toFixed(2)}%`}
+            sub={`${deliverability.failed.toLocaleString()} Resend rejected`}
+            deltaTone={deliverability.failed === 0 ? "good" : "bad"}
+          />
+          <KpiCard
+            label="Pending"
+            value={deliverability.sent === 0 ? "—" : `${((deliverability.pending / deliverability.sent) * 100).toFixed(2)}%`}
+            sub={`${deliverability.pending.toLocaleString()} awaiting event`}
+            deltaTone="neutral"
+          />
+        </div>
+      </section>
+
+      {/* 4. Subscriber growth */}
       <section>
         <h2>Subscriber growth ({w})</h2>
         <SubscriberGrowthChart series={subSeries} window={w} />
       </section>
 
-      {/* 3. Send health */}
+      {/* 4. Cron contribution grid — sport × day, last 14d. Catches "WNBA
+          quietly stopped firing 3 days ago" at a glance. */}
+      <section>
+        <h2>Cron health by league · last {CRON_GRID_DAYS} days</h2>
+        <CronGridBySportView grid={cronGrid} />
+      </section>
+
+      {/* 5. Send health */}
       <section>
         <h2>Send health ({w})</h2>
         <SendHealthChart series={sendSeries} window={w} />
       </section>
 
-      {/* 4. Cron heat-map */}
-      <section>
-        <h2>Cron health ({w})</h2>
-        <CronHeatMapView data={heatMap} />
-      </section>
-
-      {/* 5. Content snapshot */}
+      {/* 6. Content snapshot — MLB-only for now; generalize when basketball
+          renderer lands (Phase 3). */}
       <section>
         <h2>Content snapshot</h2>
         {content.yesterday ? (
@@ -164,32 +248,7 @@ export default async function AdminDashboard({
         />
       </section>
 
-      {/* 6. Quick links (kept for now; will move) */}
-      <section>
-        <h2>Quick links</h2>
-        <ul className="admin-stats">
-          <li><a href={`/mlb/${date}`} target="_blank" rel="noreferrer">View /mlb/{date}</a></li>
-          <li><a href={`/admin/email/${date}`} target="_blank" rel="noreferrer">Preview today&apos;s email</a></li>
-          <li><a href="/admin/images">Share images</a></li>
-          <li><a href="/admin/twitter">Twitter compose</a></li>
-        </ul>
-      </section>
-
-      {/* 7. Actions — pushed to the bottom (eventually move to /admin/cron) */}
-      <section>
-        <h2>Run a cron</h2>
-        <p className="admin-meta">
-          Manually fire any cron route. Date defaults to yesterday in ET; results land in
-          the cron-runs table below.
-        </p>
-        <TriggerForm route="generate" date={date} label="Generate digest" />
-        <SendEmailGuard defaultDate={date} activeSubscribers={kpis.activeSubscribers} />
-        <TriggerForm route="post-bluesky" date={date} label="Post to BlueSky" allowReset />
-        <TriggerForm route="post-twitter" date={date} label="Post to Twitter" allowReset />
-        <RegenerateAllForm />
-        <SendEmailForm date={date} />
-      </section>
-
+      {/* 7. Recent cron runs across every sport. */}
       <section>
         <h2>Recent cron runs</h2>
         <CronRunsTable runs={runs} />
@@ -246,69 +305,6 @@ function toneFor(n: number): "good" | "bad" | "neutral" {
   return "neutral";
 }
 
-function RegenerateAllForm() {
-  return (
-    <form
-      action={async () => {
-        "use server";
-        const { regenerateAllDigests } = await import("./actions");
-        await regenerateAllDigests();
-      }}
-      className="admin-trigger-form"
-    >
-      <span className="admin-trigger-label">Regenerate ALL digests (re-renders every date in DB)</span>
-      <SubmitButton idleLabel="Regenerate all" pendingLabel="Regenerating… (may take ~1 min)" />
-    </form>
-  );
-}
-
-function SendEmailForm({ date }: { date: string }) {
-  return (
-    <form action={async () => {
-      "use server";
-      const { sendAdminPreview } = await import("./actions");
-      await sendAdminPreview(date);
-    }} className="admin-trigger-form">
-      <span className="admin-trigger-label">Send today&apos;s email to me ({date})</span>
-      <SubmitButton idleLabel="Send to me" pendingLabel="Sending…" />
-    </form>
-  );
-}
-
-function TriggerForm({
-  route, date, label, allowReset = false,
-}: {
-  route: string; date: string; label: string; allowReset?: boolean;
-}) {
-  return (
-    <form
-      action={async (formData: FormData) => {
-        "use server";
-        const { triggerCron } = await import("./actions");
-        await triggerCron(formData);
-      }}
-      className="admin-trigger-form"
-    >
-      <input type="hidden" name="route" value={route} />
-      <label>
-        <span className="admin-trigger-label">{label}</span>
-        <input
-          className="admin-input"
-          type="date"
-          name="date"
-          defaultValue={date}
-        />
-      </label>
-      {allowReset && (
-        <label className="admin-trigger-checkbox">
-          <input type="checkbox" name="reset" value="1" /> reset
-        </label>
-      )}
-      <SubmitButton idleLabel={`Run ${route}`} pendingLabel="Running…" />
-    </form>
-  );
-}
-
 function CronRunsTable({ runs }: { runs: CronRun[] }) {
   if (runs.length === 0) {
     return <p className="admin-meta">No runs yet.</p>;
@@ -318,6 +314,7 @@ function CronRunsTable({ runs }: { runs: CronRun[] }) {
       <thead>
         <tr>
           <th>Route</th>
+          <th>Sport</th>
           <th>Date</th>
           <th>Trigger</th>
           <th>Status</th>
@@ -339,6 +336,7 @@ function CronRunsTable({ runs }: { runs: CronRun[] }) {
           return (
             <tr key={r.id}>
               <td><code>{r.route}</code></td>
+              <td><code>{r.sport ?? "—"}</code></td>
               <td>{r.date ?? "—"}</td>
               <td>{r.trigger}</td>
               <td><span className={`status-${r.status}`}>{statusLabel(r.status)}</span></td>
@@ -364,6 +362,7 @@ function summarizeResult(result: unknown): string {
   const r = result as Record<string, unknown>;
   const parts: string[] = [];
   if (typeof r.game_count === "number") parts.push(`${r.game_count} games`);
+  if (typeof r.final_count === "number") parts.push(`${r.final_count} final`);
   if (typeof r.sent === "number") parts.push(`${r.sent} sent`);
   if (typeof r.skipped === "number" && (r.skipped as number) > 0) parts.push(`${r.skipped} skipped`);
   if (typeof r.failed === "number" && (r.failed as number) > 0) parts.push(`${r.failed} failed`);

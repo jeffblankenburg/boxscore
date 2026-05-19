@@ -329,6 +329,33 @@ footer.site-footer a { color: var(--text-secondary); }
   background: rgba(0,0,0,0.04); padding: 1px 4px; border-radius: 3px;
 }
 
+.settings-section-h {
+  font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em;
+  font-weight: 700; color: var(--text-muted); margin: 28px 0 8px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--border-strong);
+}
+.settings-sport-list { list-style: none; padding: 0; margin: 8px 0 0; }
+.settings-sport-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px dotted var(--border-light);
+  gap: 12px;
+}
+.settings-sport-row:last-child { border-bottom: none; }
+.settings-sport-name { font-size: 15px; font-weight: 600; }
+.settings-sport-badge {
+  font-size: 12px; font-weight: 400; font-style: italic;
+  color: var(--text-muted); letter-spacing: 0.02em;
+}
+.settings-toggle-on, .settings-toggle-off {
+  font: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 6px 14px; border-radius: 999px; cursor: pointer;
+}
+.settings-toggle-on { background: #000; color: #fff; border: 1px solid #000; }
+.settings-toggle-on:hover { background: #333; }
+.settings-toggle-off { background: #fff; color: var(--text-primary);
+  border: 1px solid var(--border-strong); }
+.settings-toggle-off:hover { background: rgba(0,0,0,0.04); }
+
 .admin { max-width: 920px; margin: 32px auto; padding: 0 20px;
          font-family: Georgia, 'Times New Roman', serif; color: var(--text-primary); }
 .admin-wide { max-width: 1200px; }
@@ -340,6 +367,167 @@ footer.site-footer a { color: var(--text-secondary); }
                text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
 .admin-nav a:first-child { padding-left: 0; }
 .admin-nav a:last-child { border-right: none; }
+
+/* League switcher — strip of league badges under the main admin nav. */
+.league-switcher {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 0 0 20px; padding: 0 0 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+.league-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 16px 6px 12px; font-size: 13px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; text-decoration: none;
+  color: var(--text-primary); background: #fff;
+  border: 1px solid var(--border-strong); border-left-width: 4px;
+  border-radius: 3px; transition: all 0.12s;
+}
+.league-badge-emoji {
+  font-size: 14px; line-height: 1; letter-spacing: 0;
+}
+
+/* Watchwall — sport × route grid. The "is anything broken right now?" hero. */
+.watchwall {
+  width: 100%; border-collapse: collapse; margin: 12px 0;
+  font-family: ui-monospace, monospace; font-size: 13px;
+}
+.watchwall th, .watchwall td {
+  padding: 10px 12px; border: 1px solid var(--border-light);
+  text-align: center; vertical-align: middle;
+}
+.watchwall-corner {
+  background: rgba(0,0,0,0.03); font-weight: 700;
+  text-align: left; font-family: Georgia, serif;
+}
+.watchwall-head {
+  background: rgba(0,0,0,0.03); font-weight: 700;
+  letter-spacing: 0.06em; text-transform: lowercase;
+}
+.watchwall-sport {
+  background: rgba(0,0,0,0.03); font-weight: 700;
+  text-align: left; font-family: Georgia, serif;
+}
+.watchwall-cell {
+  display: table-cell; min-width: 90px;
+}
+.watchwall-mark { display: block; font-size: 16px; font-weight: 700; line-height: 1.1; }
+.watchwall-time { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.watchwall-pass    { background: #e6f7e6; }
+.watchwall-pass    .watchwall-mark { color: #1f5a1f; }
+.watchwall-fail    { background: #ffe6e6; }
+.watchwall-fail    .watchwall-mark { color: #a40000; }
+.watchwall-running { background: #fff2cc; }
+.watchwall-running .watchwall-mark { color: #7a5a00; }
+.watchwall-missing { background: #f3efe5; }
+.watchwall-missing .watchwall-mark { color: var(--text-muted); }
+.watchwall-na      { background: repeating-linear-gradient(
+  45deg, transparent, transparent 4px, rgba(0,0,0,0.04) 4px, rgba(0,0,0,0.04) 8px
+); }
+
+/* Cron contribution grid — sport × day matrix, GitHub-style. */
+.cron-grid-wrap { margin: 12px 0; }
+.cron-grid {
+  display: flex; flex-direction: column; gap: 4px;
+  font-family: ui-monospace, monospace; font-size: 11px;
+}
+.cron-grid-axis { display: flex; align-items: end; }
+.cron-grid-axis-pad { display: inline-block; width: 80px; }
+.cron-grid-axis-label {
+  display: inline-block; min-width: 22px; max-width: 22px;
+  margin-right: 2px; color: var(--text-muted); text-align: center;
+  font-size: 10px; letter-spacing: 0.02em;
+}
+.cron-grid-row { display: flex; align-items: center; }
+.cron-grid-label {
+  display: inline-block; width: 80px;
+  font-family: Georgia, serif; font-weight: 700; font-size: 13px;
+}
+.cron-grid-cell {
+  display: inline-block; width: 22px; height: 22px;
+  margin-right: 2px; border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.cron-grid-pass    { background: #2a7a2a; }
+.cron-grid-partial { background: #d4a017; }
+.cron-grid-fail    { background: #a40000; }
+.cron-grid-missing { background: #ebe7dd; }
+.cron-grid-legend {
+  display: flex; gap: 12px; align-items: center;
+  margin-top: 10px; font-size: 12px; color: var(--text-muted);
+}
+.cron-grid-legend .cron-grid-cell { width: 14px; height: 14px; margin-right: 4px; }
+
+/* Email search — recipient-email lookup on /admin. */
+.email-search { margin: 8px 0 0; }
+.email-search-input {
+  width: 100%; max-width: 520px;
+  font: inherit; font-size: 15px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong); background: #fff;
+  border-radius: 4px;
+}
+.email-search-input:focus {
+  outline: 2px solid var(--border-strong); outline-offset: 1px;
+}
+.email-search-results {
+  width: 100%; border-collapse: collapse; margin-top: 12px;
+  font-size: 14px;
+}
+.email-search-results th, .email-search-results td {
+  text-align: left; padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+.email-search-results th {
+  font-weight: 700; font-family: Georgia, serif;
+  background: rgba(0,0,0,0.03);
+}
+.email-search-to { font-family: ui-monospace, monospace; font-size: 13px; }
+.email-search-to code {
+  background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 3px;
+}
+
+/* Send status pill — Resend-style colored badge per outcome. */
+.send-status {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+  font-family: ui-monospace, monospace;
+}
+.send-status-delivered  { background: #e6f7e6; color: #1f5a1f; }
+.send-status-bounced    { background: #ffe6e6; color: #a40000; }
+.send-status-delayed    { background: #fff2cc; color: #7a5a00; }
+.send-status-complained { background: #ffe6e6; color: #a40000; }
+.send-status-pending    { background: #f3efe5; color: var(--text-muted); }
+.send-status-failed     { background: #ffe6e6; color: #a40000; }
+
+/* Cron pulse — today's status of each scheduled route for a league. */
+.cron-pulse { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+.cron-pulse-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 12px; font-size: 12px; border: 1px solid var(--border-strong);
+  border-radius: 999px; font-family: ui-monospace, monospace;
+}
+.cron-pulse-route { font-weight: 700; letter-spacing: 0.04em; }
+.cron-pulse-status { font-weight: 700; }
+.cron-pulse-time { color: var(--text-muted); font-size: 11px; }
+.cron-pulse-ok      { background: #e6f7e6; border-color: #2a7a2a; }
+.cron-pulse-ok      .cron-pulse-status { color: #1f5a1f; }
+.cron-pulse-fail    { background: #ffe6e6; border-color: #a40000; }
+.cron-pulse-fail    .cron-pulse-status { color: #a40000; }
+.cron-pulse-running { background: #fff2cc; border-color: #7a5a00; }
+.cron-pulse-running .cron-pulse-status { color: #7a5a00; }
+.cron-pulse-missing { background: #f3efe5; }
+.cron-pulse-missing .cron-pulse-status { color: var(--text-muted); }
+.league-badge:hover { background: rgba(0,0,0,0.04); }
+.league-badge.active {
+  background: var(--text-primary); color: #fff;
+  border-color: var(--text-primary); border-left-color: var(--text-primary);
+}
+/* Accent stripes pulled from the leagues' broad palette association — no
+   trademark logos, just an instant visual differentiator on the left edge. */
+.league-badge-mlb  { border-left-color: #002d72; }
+.league-badge-nba  { border-left-color: #c8102e; }
+.league-badge-wnba { border-left-color: #ff671f; }
 .admin-nav a:hover { color: var(--text-primary); background: rgba(0,0,0,0.03); }
 .admin-team-picker { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 0 14px;
                      font-family: ui-monospace, monospace; font-size: 12px; }
@@ -405,6 +593,21 @@ footer.site-footer a { color: var(--text-secondary); }
 .admin-trigger-label { font-weight: 700; color: var(--text-primary); font-size: 13px; }
 .admin-trigger-checkbox { flex-direction: row !important; align-items: center;
                           gap: 4px; font-size: 13px; }
+
+.admin-sports { width: 100%; border-collapse: collapse; font-size: 14px;
+                margin-top: 16px; }
+.admin-sports th, .admin-sports td {
+  text-align: left; padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+.admin-sports th { font-weight: 700; background: rgba(0,0,0,0.03); }
+.admin-sports code { font-family: ui-monospace, monospace; font-size: 13px;
+                     background: rgba(0,0,0,0.04); padding: 1px 4px; border-radius: 3px; }
+.sport-vis { font-family: ui-monospace, monospace; font-size: 12px;
+             padding: 2px 8px; border-radius: 3px; letter-spacing: 0.04em; }
+.sport-vis-public { background: #e6f7e6; color: #1f5a1f; }
+.sport-vis-admin_only { background: #fff2cc; color: #7a5a00; }
 
 .admin-cron-runs { width: 100%; border-collapse: collapse; font-size: 12px;
                    margin-top: 8px; font-family: ui-monospace, monospace; }

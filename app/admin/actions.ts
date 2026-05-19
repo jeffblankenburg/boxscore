@@ -9,8 +9,14 @@ import { prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
 import { siteOrigin } from "@/lib/site";
+import { supabaseAdmin } from "@/lib/supabase";
+import { requireAdmin } from "./require-admin";
 
-export async function sendAdminPreview(date: string): Promise<void> {
+export async function sendAdminPreview(
+  date: string,
+  sport: string = "mlb",
+  returnTo: string = "/admin",
+): Promise<void> {
   // Redirect must happen outside try/catch — Next.js implements redirects via
   // a thrown signal that would otherwise get swallowed.
   let target: string;
@@ -19,17 +25,17 @@ export async function sendAdminPreview(date: string): Promise<void> {
     const adminEmail = process.env.ADMIN_EMAIL;
     if (!adminEmail) throw new Error("ADMIN_EMAIL not set");
 
-    const digest = await getDigest("mlb", date);
+    const digest = await getDigest(sport, date);
     if (!digest || !digest.email_html) {
-      throw new Error(`No email_html for ${date}`);
+      throw new Error(`No email_html for ${sport}/${date}`);
     }
 
     const origin = await siteOrigin();
     const { subject, html, text } = dailyEmail({
-      sport: "mlb",
+      sport,
       digestDate: date,
       digestPrettyDate: prettyDate(date),
-      digestUrl: `${origin}/mlb/${date}`,
+      digestUrl: `${origin}/${sport}/${date}`,
       unsubscribeUrl: `${origin}/u/admin-preview`,
       digestEmailHtml: digest.email_html,
     });
@@ -41,11 +47,11 @@ export async function sendAdminPreview(date: string): Promise<void> {
       text,
     });
 
-    target = `/admin?ok=${encodeURIComponent(`Sent ${prettyDate(date)} digest to ${adminEmail}.`)}`;
+    target = `${returnTo}?ok=${encodeURIComponent(`Sent ${sport}/${prettyDate(date)} digest to ${adminEmail}.`)}`;
   } catch (err) {
     const msg = (err as Error).message;
-    console.error(`[send-admin-preview] FAILED: ${msg}`);
-    target = `/admin?error=${encodeURIComponent(msg)}`;
+    console.error(`[send-admin-preview] ${sport}/${date} FAILED: ${msg}`);
+    target = `${returnTo}?error=${encodeURIComponent(msg)}`;
   }
   redirect(target);
 }
@@ -54,21 +60,33 @@ export async function sendAdminPreview(date: string): Promise<void> {
 // with the CRON_SECRET auth header so the route logs to cron_runs the same
 // way a scheduled run would (with trigger="manual"). Awaits the result so the
 // admin gets a redirect with success/error flash.
+//
+// Sport defaults to "mlb" for back-compat with any caller that doesn't pass
+// it explicitly. Per-league admin pages (/admin/[sport]) set both `sport`
+// and `returnTo` via hidden form fields so the run is attributed correctly
+// and the flash lands back on the originating page.
 export async function triggerCron(formData: FormData): Promise<void> {
   const route = String(formData.get("route") ?? "");
   const rawDate = formData.get("date");
   const date = typeof rawDate === "string" && rawDate ? rawDate : yesterdayInET();
   const reset = formData.get("reset") === "1";
+  const sport = String(formData.get("sport") ?? "mlb");
+  const returnToRaw = formData.get("returnTo");
+  const returnTo =
+    typeof returnToRaw === "string" && returnToRaw.startsWith("/") ? returnToRaw : "/admin";
 
   let target: string;
   try {
     if (!["generate", "send-email", "post-bluesky", "post-twitter"].includes(route)) {
       throw new Error(`Unknown cron route: ${route}`);
     }
+    if (!["mlb", "nba", "wnba"].includes(sport)) {
+      throw new Error(`Unknown sport: ${sport}`);
+    }
     if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
 
     const origin = await siteOrigin();
-    const params = new URLSearchParams({ trigger: "manual", date, sport: "mlb" });
+    const params = new URLSearchParams({ trigger: "manual", date, sport });
     if (reset) params.set("reset", "1");
     const url = `${origin}/api/cron/${route}?${params}`;
 
@@ -81,11 +99,11 @@ export async function triggerCron(formData: FormData): Promise<void> {
     if (!res.ok || body.error) {
       throw new Error(body.error ?? `HTTP ${res.status}`);
     }
-    target = `/admin?ok=${encodeURIComponent(`${route} for ${date} → ${JSON.stringify(body)}`)}`;
+    target = `${returnTo}?ok=${encodeURIComponent(`${route} ${sport}/${date} → ${JSON.stringify(body)}`)}`;
   } catch (err) {
     const msg = (err as Error).message;
-    console.error(`[trigger-cron] ${route} ${date}: ${msg}`);
-    target = `/admin?error=${encodeURIComponent(`${route}: ${msg}`)}`;
+    console.error(`[trigger-cron] ${route} ${sport} ${date}: ${msg}`);
+    target = `${returnTo}?error=${encodeURIComponent(`${route}: ${msg}`)}`;
   }
   redirect(target);
 }
@@ -175,4 +193,104 @@ export async function regenerateShareImages(formData: FormData): Promise<void> {
     target = `/admin/images?error=${encodeURIComponent(msg)}`;
   }
   redirect(target);
+}
+
+// Recipient-email lookup for the /admin search box. Returns the most recent
+// production sends for any subscriber whose email matches the query. Each row
+// rolls up: status (delivered/bounced/delayed/complained/pending/failed),
+// subject (reconstructed from sport + digest date), and sent-at timestamp.
+//
+// Admin previews aren't recorded in `sends`, so they never appear here. The
+// search is case-insensitive substring; pasting a full email returns the
+// usual 0–1 matches, partial input returns up to 50 ordered by recency.
+
+export type SendStatus =
+  | "delivered" | "bounced" | "delayed" | "complained" | "pending" | "failed";
+
+export type SendSearchRow = {
+  id: string;
+  to: string;
+  subject: string;
+  status: SendStatus;
+  sentAt: string;
+};
+
+export async function searchSends(query: string): Promise<SendSearchRow[]> {
+  await requireAdmin();
+  const q = query.trim();
+  // Substring search at <3 chars would page through too much of the table;
+  // the input enforces this client-side but verify here too.
+  if (q.length < 3) return [];
+
+  const db = supabaseAdmin();
+
+  // 1. Subscribers matching the substring. Order by created_at desc so older
+  // dormant accounts don't crowd out a recently active match.
+  const { data: subs, error: subsErr } = await db
+    .from("subscribers")
+    .select("id, email")
+    .ilike("email", `%${q}%`)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (subsErr) throw new Error(`searchSends subs: ${subsErr.message}`);
+  const subRows = (subs ?? []) as Array<{ id: string; email: string }>;
+  if (subRows.length === 0) return [];
+  const emailById = new Map(subRows.map((s) => [s.id, s.email]));
+
+  // 2. Their sends, most recent first.
+  type SendRow = {
+    id: string;
+    subscriber_id: string;
+    digest_sport: string;
+    digest_date: string;
+    sent_at: string;
+    resend_id: string | null;
+    error: string | null;
+  };
+  const { data: sends, error: sendsErr } = await db
+    .from("sends")
+    .select("id, subscriber_id, digest_sport, digest_date, sent_at, resend_id, error")
+    .in("subscriber_id", subRows.map((s) => s.id))
+    .order("sent_at", { ascending: false })
+    .limit(50);
+  if (sendsErr) throw new Error(`searchSends sends: ${sendsErr.message}`);
+  const sendRows = (sends ?? []) as SendRow[];
+  if (sendRows.length === 0) return [];
+
+  // 3. Terminal/engagement events keyed by resend_id, so we can derive the
+  // displayed status without a per-row query.
+  const resendIds = sendRows.map((s) => s.resend_id).filter((r): r is string => Boolean(r));
+  const eventsByResendId: Record<string, Set<string>> = {};
+  if (resendIds.length > 0) {
+    const { data: events, error: evErr } = await db
+      .from("email_events")
+      .select("resend_id, event_type")
+      .in("resend_id", resendIds);
+    if (evErr) throw new Error(`searchSends events: ${evErr.message}`);
+    for (const ev of (events ?? []) as Array<{ resend_id: string; event_type: string }>) {
+      (eventsByResendId[ev.resend_id] ??= new Set()).add(ev.event_type);
+    }
+  }
+
+  return sendRows.map<SendSearchRow>((s) => {
+    const evts = s.resend_id ? eventsByResendId[s.resend_id] ?? new Set<string>() : new Set<string>();
+    // Precedence puts hard signals before soft ones. complained beats
+    // delivered (a complaint after delivery still indicates a problem);
+    // failed (API-level rejection) beats everything since the email never
+    // left Resend.
+    const status: SendStatus = s.error ? "failed"
+      : evts.has("email.complained") ? "complained"
+      : evts.has("email.bounced") ? "bounced"
+      : evts.has("email.delivered") ? "delivered"
+      : evts.has("email.delivery_delayed") ? "delayed"
+      : "pending";
+
+    return {
+      id: s.id,
+      to: emailById.get(s.subscriber_id) ?? "(unknown)",
+      subject: `boxscore - ${s.digest_sport.toUpperCase()} - ${prettyDate(s.digest_date)}`,
+      status,
+      sentAt: s.sent_at,
+    };
+  });
 }

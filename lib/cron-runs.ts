@@ -152,3 +152,19 @@ export async function recentCronRuns(limit: number = 20): Promise<CronRun[]> {
   if (error) throw new Error(`recentCronRuns: ${error.message}`);
   return (data ?? []) as CronRun[];
 }
+
+// Variant for per-sport admin pages. The main dashboard uses recentCronRuns
+// to show every run regardless of sport; sport-specific pages filter.
+export async function recentCronRunsForSports(
+  sports: string[],
+  limit: number = 20,
+): Promise<CronRun[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("cron_runs")
+    .select("id, route, sport, date, status, trigger, error, result, started_at, finished_at")
+    .in("sport", sports)
+    .order("started_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`recentCronRunsForSports: ${error.message}`);
+  return (data ?? []) as CronRun[];
+}

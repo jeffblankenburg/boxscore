@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDigest } from "@/lib/digests";
-import { getActiveSubscribers } from "@/lib/subscribers";
+import { getActiveSubscribersForSport } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
 import { dailyEmail } from "@/lib/emails/templates";
@@ -54,7 +54,10 @@ export async function GET(req: Request) {
     const digestUrl = `${origin}/${sport}/${date}`;
     const digestPrettyDate = prettyDate(date);
 
-    const subscribers = await getActiveSubscribers();
+    // Only subscribers who have opted in to this sport's league digest.
+    // The 0013 backfill made every pre-existing MLB subscriber opted-in,
+    // so for MLB the result set is identical to the old getActiveSubscribers.
+    const subscribers = await getActiveSubscribersForSport(sport);
     // One bulk fetch instead of one round-trip per subscriber. At thousands
     // of subscribers the serial-check pattern can use as much wall-clock as
     // the actual sending did.

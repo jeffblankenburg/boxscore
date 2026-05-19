@@ -13,9 +13,9 @@ export default async function SubscribePage({
   const { error } = await searchParams;
   return (
     <section className="subscribe-card">
-      <h1 className="subscribe-h1">Subscribe</h1>
+      <h1 className="subscribe-h1">Subscribe to the MLB digest</h1>
       <p className="subscribe-lede">
-        Like the sports pages we used to read every day. Black & white.  Standings, full box scores, league leaders — sent to your inbox every morning at <b>5am ET</b>.
+        Like the sports pages we used to read every day. Black & white. Standings, full box scores, league leaders — sent to your inbox every morning at <b>5am ET</b>.
       </p>
       <form action={subscribe} className="subscribe-form" noValidate>
         <input

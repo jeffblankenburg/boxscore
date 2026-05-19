@@ -9,7 +9,10 @@ import {
   type CronHeatMap,
   type CronRoute,
   CRON_ROUTES,
+  type WatchwallRow,
+  type CronGridBySport,
 } from "@/lib/dashboard";
+import { ALL_CRON_ROUTES } from "@/lib/sport-features";
 
 // ---- Subscriber growth: line + green/red bars overlay -----------------
 
@@ -315,6 +318,120 @@ export function Sparkline({
           >{d.slice(5)}</text>
         ))}
       </svg>
+    </div>
+  );
+}
+
+// ---- Watchwall: sport × route current health ----------------------------
+
+const WALL_STATUS_LABEL: Record<string, string> = {
+  pass: "\u2713",     // ✓
+  fail: "\u2717",     // ✗
+  running: "\u2026",  // …
+  missing: "\u2014",  // —
+  na: "",
+};
+
+export function Watchwall({ rows }: { rows: WatchwallRow[] }) {
+  if (rows.length === 0) {
+    return <p className="admin-meta">No sports configured.</p>;
+  }
+  // Column order is canonical ALL_CRON_ROUTES so every row aligns even when
+  // sports expect different subsets. Sports that don't expect a route get a
+  // blank "n/a" cell so the eye doesn't read it as a failure.
+  return (
+    <table className="watchwall">
+      <thead>
+        <tr>
+          <th className="watchwall-corner">League</th>
+          {ALL_CRON_ROUTES.map((route) => (
+            <th key={route} className="watchwall-head">{route}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => {
+          const cellByRoute = new Map(row.cells.map((c) => [c.route, c]));
+          return (
+            <tr key={row.sport}>
+              <th className="watchwall-sport">{row.sportName}</th>
+              {ALL_CRON_ROUTES.map((route) => {
+                const cell = cellByRoute.get(route);
+                if (!cell) {
+                  return (
+                    <td key={route} className="watchwall-cell watchwall-na" aria-label="not expected" />
+                  );
+                }
+                const time = cell.startedAt
+                  ? new Date(cell.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                  : "not run";
+                const title = cell.error ?? `${cell.status} · ${time}`;
+                return (
+                  <td
+                    key={route}
+                    className={`watchwall-cell watchwall-${cell.status}`}
+                    title={title}
+                  >
+                    <span className="watchwall-mark">{WALL_STATUS_LABEL[cell.status]}</span>
+                    <span className="watchwall-time">{time}</span>
+                  </td>
+                );
+              })}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// ---- Cron contribution grid: sport × day --------------------------------
+
+function shortDayLabel(iso: string): string {
+  // YYYY-MM-DD → "M/D" in ET. The grid is dense so labels stay terse.
+  const [y, m, d] = iso.split("-");
+  void y;
+  return `${Number(m)}/${Number(d)}`;
+}
+
+export function CronGridBySportView({ grid }: { grid: CronGridBySport }) {
+  if (grid.rows.length === 0) {
+    return <p className="admin-meta">No sports configured.</p>;
+  }
+  const dayCount = grid.days.length;
+  // Show every 3rd day label so the axis doesn't get cluttered at 14 days.
+  const labelEvery = dayCount <= 14 ? 2 : Math.ceil(dayCount / 8);
+
+  return (
+    <div className="cron-grid-wrap">
+      <div className="cron-grid">
+        <div className="cron-grid-axis" aria-hidden="true">
+          <span className="cron-grid-axis-pad" />
+          {grid.days.map((day, i) => (
+            <span key={day} className="cron-grid-axis-label">
+              {i % labelEvery === 0 ? shortDayLabel(day) : ""}
+            </span>
+          ))}
+        </div>
+        {grid.rows.map((row) => (
+          <div key={row.sport} className="cron-grid-row">
+            <span className="cron-grid-label">{row.sportName}</span>
+            {row.cells.map((status, i) => (
+              <span
+                key={i}
+                className={`cron-grid-cell cron-grid-${status}`}
+                title={`${grid.days[i]}: ${status}`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="cron-grid-legend">
+        <span className="cron-grid-cell cron-grid-pass" /> ok
+        <span className="cron-grid-cell cron-grid-partial" /> partial
+        <span className="cron-grid-cell cron-grid-fail" /> failed
+        <span className="cron-grid-cell cron-grid-missing" /> none
+      </div>
     </div>
   );
 }
