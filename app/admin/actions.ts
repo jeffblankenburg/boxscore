@@ -17,13 +17,17 @@ export async function sendAdminPreview(
   sport: string = "mlb",
   returnTo: string = "/admin",
 ): Promise<void> {
+  // requireAdmin() returns the currently-signed-in admin's email — that's
+  // who gets the preview, replacing the previous ADMIN_EMAIL env-var lookup.
+  // It's called outside the try/catch because its redirect-on-no-session
+  // shouldn't be swallowed as a generic error.
+  const adminEmail = await requireAdmin();
+
   // Redirect must happen outside try/catch — Next.js implements redirects via
   // a thrown signal that would otherwise get swallowed.
   let target: string;
   try {
     if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (!adminEmail) throw new Error("ADMIN_EMAIL not set");
 
     const digest = await getDigest(sport, date);
     if (!digest || !digest.email_html) {

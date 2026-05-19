@@ -13,6 +13,9 @@
 
 const SCOREBOARD_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball";
 const STANDINGS_BASE = "https://site.web.api.espn.com/apis/v2/sports/basketball";
+// The per-athlete statistics endpoint lives on a different path (common/v3).
+// Standings happen to also exist under v2 but byathlete only works here.
+const LEADERS_BASE = "https://site.web.api.espn.com/apis/common/v3/sports/basketball";
 
 export type BasketballLeagueSlug = "nba" | "wnba";
 
@@ -41,9 +44,24 @@ export type BasketballScoreboardEvent = {
   status: BasketballGameStatus;
   statusDetail: string;     // "Final", "End of 3rd Quarter", "7:00 PM ET"
   period: number;           // current period (4 = end of regulation)
+  seasonType: number;       // ESPN: 1=preseason, 2=regular, 3=postseason, 4=in-season tournament
   away: BasketballSideSummary;
   home: BasketballSideSummary;
   venue?: string;
+  // Postseason-only context. ESPN attaches series info to playoff events;
+  // we surface it on the renderer's "Playoff series" section in place of
+  // standings. Undefined for regular-season games.
+  roundName?: string;       // "West Finals", "Conference Semifinals", parsed from notes[0].headline
+  series?: BasketballSeriesContext;
+};
+
+export type BasketballSeriesContext = {
+  title: string;            // "Playoff Series"
+  summary: string;          // "SA leads series 1-0"
+  completed: boolean;
+  totalGames: number;       // 7 for NBA best-of-7
+  awayWins: number;
+  homeWins: number;
 };
 
 export type BasketballSideSummary = {
@@ -93,6 +111,36 @@ export type BasketballConferenceStandings = {
   entries: BasketballStandingsEntry[];
 };
 
+// League leaders — top-N players per counting-stat category. Computed
+// client-side by sorting the merged athlete-stats payload.
+export type LeaderCategoryKey = "PTS" | "REB" | "AST" | "STL" | "BLK";
+
+export type LeaderEntry = {
+  rank: number;
+  athleteName: string;     // "Luka Doncic"
+  teamAbbr: string;        // "LAL"
+  value: number;           // 33.5
+};
+
+export type LeaderCategory = {
+  key: LeaderCategoryKey;
+  label: string;           // "Points"
+  abbrev: string;          // "PPG"
+  entries: LeaderEntry[];  // top N, sorted desc
+};
+
+export type BasketballLeaders = {
+  categories: LeaderCategory[];
+};
+
+// Transactions feed. Player/coach name lives inside `description`; surfaced
+// to the renderer as-is.
+export type BasketballTransaction = {
+  date: string;            // ISO 8601
+  description: string;
+  teamAbbr?: string;
+};
+
 export type BasketballStandings = {
   conferences: BasketballConferenceStandings[];
 };
@@ -124,6 +172,48 @@ export async function fetchScoreboardRaw(
   return getJson(`${SCOREBOARD_BASE}/${league}/scoreboard?dates=${espnDate}`);
 }
 
+// ESPN's scoreboard accepts a date range as `dates=YYYYMMDD-YYYYMMDD`. One
+// call returns every event whose date falls inside the inclusive range,
+// each with its full series + roundName context. The bracket renderer uses
+// this to surface playoff series that haven't started yet (e.g., next-round
+// series whose game 1 is several days away).
+export async function fetchScoreboardRangeRaw(
+  league: BasketballLeagueSlug,
+  startDate: string,
+  endDate: string,
+): Promise<unknown> {
+  const start = startDate.replace(/-/g, "");
+  const end = endDate.replace(/-/g, "");
+  return getJson(`${SCOREBOARD_BASE}/${league}/scoreboard?dates=${start}-${end}`);
+}
+
+// Per-athlete season stats. One call returns every athlete's general,
+// offensive, and defensive buckets together. The response schema lists each
+// stat by name at the top level (`categories[].names`) and stores the per-
+// athlete numbers as positional `values` arrays — parseLeaders re-aligns
+// them.
+export async function fetchAthleteStatsRaw(
+  league: BasketballLeagueSlug,
+  season: number,
+  seasonType: number,
+  limit: number = 100,
+): Promise<unknown> {
+  return getJson(
+    `${LEADERS_BASE}/${league}/statistics/byathlete` +
+    `?lang=en&region=us&season=${season}&seasontype=${seasonType}&limit=${limit}`,
+  );
+}
+
+// League-wide transaction feed. One row per transaction (signings, waivers,
+// trades, coaching moves). ESPN puts the player/coach name inside the
+// human-readable `description` text rather than a separate field — the
+// renderer surfaces description as-is, like baseball does.
+export async function fetchTransactionsRaw(
+  league: BasketballLeagueSlug,
+): Promise<unknown> {
+  return getJson(`${SCOREBOARD_BASE}/${league}/transactions`);
+}
+
 export function parseScoreboard(raw: unknown): BasketballScoreboardEvent[] {
   const data = raw as { events?: Array<Record<string, unknown>> };
   const events = data.events ?? [];
@@ -134,6 +224,9 @@ export function parseScoreboard(raw: unknown): BasketballScoreboardEvent[] {
     const statusType = (status.type as Record<string, unknown>) ?? {};
     const venue = (comp.venue as { fullName?: string } | undefined)?.fullName;
 
+    const season = (ev.season as Record<string, unknown>) ?? {};
+    const away = extractSide(competitors, "away");
+    const home = extractSide(competitors, "home");
     return {
       id: String(ev.id),
       date: String(ev.date),
@@ -141,9 +234,12 @@ export function parseScoreboard(raw: unknown): BasketballScoreboardEvent[] {
       status: classifyStatus(String(statusType.id ?? "")),
       statusDetail: String(statusType.detail ?? statusType.description ?? ""),
       period: Number(status.period ?? 0),
-      away: extractSide(competitors, "away"),
-      home: extractSide(competitors, "home"),
+      seasonType: Number(season.type ?? 0),
+      away,
+      home,
       venue,
+      roundName: extractRoundName(ev),
+      series: extractSeries(comp, away.team.id, home.team.id),
     };
   });
 }
@@ -156,6 +252,45 @@ function classifyStatus(typeId: string): BasketballGameStatus {
     case "5": case "6": return "postponed";
     default:  return "other";
   }
+}
+
+// "West Finals - Game 1" → "West Finals". Falls back to the raw headline
+// when there's no "- Game N" suffix. Undefined when no notes are present
+// (regular-season games typically have none).
+function extractRoundName(ev: Record<string, unknown>): string | undefined {
+  const notes = ev.notes as Array<Record<string, unknown>> | undefined;
+  const headline = notes?.[0]?.headline;
+  if (typeof headline !== "string" || headline.length === 0) return undefined;
+  const idx = headline.indexOf(" - Game ");
+  return idx > 0 ? headline.slice(0, idx) : headline;
+}
+
+// ESPN's series object pairs `competitors[].wins` with the team id; align
+// with the parsed away/home team ids so the renderer doesn't have to lookup.
+function extractSeries(
+  comp: Record<string, unknown>,
+  awayId: string,
+  homeId: string,
+): BasketballSeriesContext | undefined {
+  const s = comp.series as Record<string, unknown> | undefined;
+  if (!s) return undefined;
+  const sCompetitors = (s.competitors as Array<Record<string, unknown>>) ?? [];
+  let awayWins = 0;
+  let homeWins = 0;
+  for (const c of sCompetitors) {
+    const cid = String(c.id);
+    const wins = Number(c.wins ?? 0);
+    if (cid === awayId) awayWins = wins;
+    else if (cid === homeId) homeWins = wins;
+  }
+  return {
+    title: String(s.title ?? ""),
+    summary: String(s.summary ?? ""),
+    completed: s.completed === true,
+    totalGames: Number(s.totalCompetitions ?? 7),
+    awayWins,
+    homeWins,
+  };
 }
 
 function extractSide(
@@ -317,4 +452,121 @@ function extractStandingsEntry(entry: Record<string, unknown>): BasketballStandi
     },
     stats,
   };
+}
+
+// ---- Leaders --------------------------------------------------------------
+//
+// ESPN's byathlete endpoint scopes stats by category bucket — one fetch
+// per category, with per-game averages on each athlete record. We fetch
+// offensive (PTS, AST) and defensive (REB, STL, BLK) buckets and merge by
+// athlete id so each player carries every stat we need.
+
+type AthleteRecord = {
+  id: string;
+  name: string;
+  teamAbbr: string;
+  stats: Record<string, number>;
+};
+
+// The byathlete response uses two parallel arrays per category bucket:
+//   top-level: categories[].names = ["avgPoints", "avgAssists", ...]
+//   per-athlete: categories[].values = [33.5, 8.3, ...]
+// Index N in the per-athlete values corresponds to names[N]. Rebounds live
+// in the "general" bucket, points/assists in "offensive", steals/blocks in
+// "defensive" — so we have to walk all three to populate every stat we need.
+function extractAthletes(raw: unknown): AthleteRecord[] {
+  const data = raw as {
+    categories?: Array<{ name?: string; names?: string[] }>;
+    athletes?: Array<Record<string, unknown>>;
+  };
+
+  // Build schema: category name → ordered list of stat keys
+  const namesByCategory = new Map<string, string[]>();
+  for (const c of data.categories ?? []) {
+    if (typeof c.name === "string" && Array.isArray(c.names)) {
+      namesByCategory.set(c.name, c.names);
+    }
+  }
+
+  const out: AthleteRecord[] = [];
+  for (const a of data.athletes ?? []) {
+    const athlete = a.athlete as Record<string, unknown> | undefined;
+    if (!athlete) continue;
+    const stats: Record<string, number> = {};
+    const catArr = (a.categories as Array<Record<string, unknown>>) ?? [];
+    for (const c of catArr) {
+      const catName = typeof c.name === "string" ? c.name : "";
+      const names = namesByCategory.get(catName);
+      const values = c.values as unknown[] | undefined;
+      if (!names || !Array.isArray(values)) continue;
+      const max = Math.min(names.length, values.length);
+      for (let i = 0; i < max; i++) {
+        const k = names[i];
+        const v = values[i];
+        if (k && typeof v === "number") stats[k] = v;
+      }
+    }
+    out.push({
+      id: String(athlete.id ?? ""),
+      name: String(
+        athlete.displayName ??
+          `${athlete.firstName ?? ""} ${athlete.lastName ?? ""}`.trim(),
+      ),
+      teamAbbr: String(athlete.teamShortName ?? ""),
+      stats,
+    });
+  }
+  return out;
+}
+
+export function parseLeaders(raw: unknown): BasketballLeaders {
+  const athletes = extractAthletes(raw);
+
+  const make = (
+    key: LeaderCategoryKey,
+    label: string,
+    abbrev: string,
+    statField: string,
+  ): LeaderCategory => {
+    const sorted = [...athletes]
+      .filter((a) => typeof a.stats[statField] === "number")
+      .sort((a, b) => (b.stats[statField] ?? 0) - (a.stats[statField] ?? 0))
+      .slice(0, 5);
+    return {
+      key,
+      label,
+      abbrev,
+      entries: sorted.map((a, i) => ({
+        rank: i + 1,
+        athleteName: a.name,
+        teamAbbr: a.teamAbbr,
+        value: a.stats[statField] ?? 0,
+      })),
+    };
+  };
+
+  return {
+    categories: [
+      make("PTS", "Points", "PPG", "avgPoints"),
+      make("REB", "Rebounds", "RPG", "avgRebounds"),
+      make("AST", "Assists", "APG", "avgAssists"),
+      make("STL", "Steals", "SPG", "avgSteals"),
+      make("BLK", "Blocks", "BPG", "avgBlocks"),
+    ],
+  };
+}
+
+// ---- Transactions ---------------------------------------------------------
+
+export function parseTransactions(raw: unknown): BasketballTransaction[] {
+  const data = raw as { transactions?: Array<Record<string, unknown>> };
+  const list = data.transactions ?? [];
+  return list.map((t) => {
+    const team = t.team as { abbreviation?: string } | undefined;
+    return {
+      date: String(t.date ?? ""),
+      description: String(t.description ?? ""),
+      teamAbbr: team?.abbreviation ? String(team.abbreviation) : undefined,
+    };
+  });
 }

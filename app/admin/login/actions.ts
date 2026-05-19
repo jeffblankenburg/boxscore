@@ -1,12 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { issueCode } from "@/lib/admin-auth";
+import { isAdminEmail, issueCode } from "@/lib/admin-auth";
 import { sendEmail } from "@/lib/email";
 
 // Login flow step 1: user submits email, we mint a code and email it.
 // Always redirects to /admin/verify so an outside observer can't tell which
-// emails are valid admin addresses (single-user app, but cheap to do right).
+// emails are valid admin addresses (the gate is silent — same response for
+// admin and non-admin attempts).
 export async function requestCode(formData: FormData): Promise<void> {
   const raw = formData.get("email");
   const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
@@ -15,12 +16,10 @@ export async function requestCode(formData: FormData): Promise<void> {
     redirect(`/admin/login?error=${encodeURIComponent("Enter a valid email.")}`);
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
-  if (!adminEmail) {
-    redirect(`/admin/login?error=${encodeURIComponent("ADMIN_EMAIL not set on the server.")}`);
-  }
-
-  if (email === adminEmail) {
+  // Admin identity now lives on subscribers.is_admin. If the email matches
+  // an admin row, mint and email a code. Otherwise we silently fall through
+  // to the same redirect so we don't leak which addresses are admins.
+  if (await isAdminEmail(email)) {
     try {
       const { plaintext } = await issueCode(email);
       await sendEmail({

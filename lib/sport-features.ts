@@ -25,8 +25,8 @@ export type SportFeatures = {
 
 export const SPORT_FEATURES: Record<string, SportFeatures> = {
   mlb:  { hasPreview: true,  hasShareImages: true,  hasTeamDigests: true,  hasRegenAll: true,  expectedRoutes: ALL_CRON_ROUTES },
-  nba:  { hasPreview: false, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate"] },
-  wnba: { hasPreview: false, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate"] },
+  nba:  { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate"] },
+  wnba: { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate"] },
 };
 
 export function featuresFor(sport: string): SportFeatures {

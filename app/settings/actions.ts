@@ -35,9 +35,9 @@ export async function requestSignInLink(formData: FormData) {
  *   sport: the sport id (e.g. "mlb", "nba")
  *   next:  "on" | "off"
  *
- * Refuses to toggle on an admin_only sport unless the caller's email matches
- * ADMIN_EMAIL — keeps a non-admin user from sneaking into the dogfood list
- * by manually crafting a POST.
+ * Refuses to toggle on an admin_only sport unless the caller's subscribers
+ * row has is_admin=true — keeps a non-admin user from sneaking into the
+ * dogfood list by crafting a POST.
  */
 export async function setSportSubscription(formData: FormData) {
   const sportId = formData.get("sport");
@@ -55,15 +55,14 @@ export async function setSportSubscription(formData: FormData) {
   if (!sport) redirect("/settings?error=unknown_sport");
 
   if (sport.visibility === "admin_only") {
-    // Confirm the caller is the admin before allowing dogfood opt-in.
+    // Confirm the caller is an admin (DB-backed) before allowing the
+    // admin-only opt-in.
     const { data: sub } = await supabaseAdmin()
       .from("subscribers")
-      .select("email")
+      .select("is_admin")
       .eq("id", session.subscriber_id)
-      .maybeSingle<{ email: string }>();
-    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
-    const isAdmin = !!sub && !!adminEmail && sub.email.toLowerCase() === adminEmail;
-    if (!isAdmin) redirect("/settings?error=forbidden");
+      .maybeSingle<{ is_admin: boolean }>();
+    if (sub?.is_admin !== true) redirect("/settings?error=forbidden");
   }
 
   await setLeagueSubscription(session.subscriber_id, sport.id, next === "on");

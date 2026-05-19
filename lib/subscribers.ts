@@ -17,10 +17,11 @@ export type Subscriber = {
   unsubscribe_reason: UnsubscribeReason | null;
   confirm_token: string;
   unsubscribe_token: string;
+  is_admin: boolean;
 };
 
 const COLS =
-  "id, email, status, created_at, confirmed_at, unsubscribed_at, unsubscribe_reason, confirm_token, unsubscribe_token";
+  "id, email, status, created_at, confirmed_at, unsubscribed_at, unsubscribe_reason, confirm_token, unsubscribe_token, is_admin";
 
 /**
  * Idempotent: starting a subscription for an email that already exists in any

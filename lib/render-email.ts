@@ -23,6 +23,11 @@ import type {
 } from "./mlb";
 import type { DailyData, GameDetail, LeaderGroup, UpcomingGame } from "./render";
 import type { Transaction } from "./mlb";
+// EMAIL_STYLES is concatenated with the basketball renderer's class rules so
+// the same stylesheet is injected into every digest email regardless of
+// sport. Both stylesheets use disjoint class prefixes (es-* for MLB, bb-*
+// for basketball) so no collisions; the cost of the extra ~2 KB is trivial.
+import { BASKETBALL_EMAIL_STYLES } from "./render-basketball";
 
 // ─── styles ───────────────────────────────────────────────────────────────
 
@@ -126,7 +131,7 @@ export const EMAIL_STYLES = `
   .es-tx-type { display: block; font-size: 10px; font-weight: 700;
                 text-transform: uppercase; letter-spacing: 0.03em;
                 color: #6a6354; margin-bottom: 1px; }
-`;
+` + BASKETBALL_EMAIL_STYLES;
 
 // ─── data ────────────────────────────────────────────────────────────────
 

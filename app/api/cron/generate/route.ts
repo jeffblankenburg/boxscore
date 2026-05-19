@@ -5,6 +5,10 @@ import { renderEmailContent } from "@/lib/render-email";
 import { upsertDigest } from "@/lib/digests";
 import { loadNbaData } from "@/lib/nba";
 import { loadWnbaData } from "@/lib/wnba";
+import {
+  renderBasketballContent,
+  renderBasketballEmailContent,
+} from "@/lib/render-basketball";
 import { yesterdayInET, isValidIsoDate } from "@/lib/dates";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
@@ -60,12 +64,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
 
-    // Basketball (nba | wnba): cache raw payload only. Renderer + digest
-    // write land in Phase 3; until then a "generate" run for basketball
-    // means "warm the raw cache" so the eventual renderer has data ready.
+    // Basketball (nba | wnba): load → render → upsert. Same shape as MLB
+    // above; the only difference is the data loader and the renderer used.
     const bb = sport === "nba"
       ? await loadNbaData(date, { refetch })
       : await loadWnbaData(date, { refetch });
+    const html = renderBasketballContent(bb);
+    const email_html = renderBasketballEmailContent(bb);
+    await upsertDigest({
+      sport, date, html, email_html, game_count: bb.games.length,
+    });
     const finals = bb.games.filter((g) => g.event.status === "final").length;
     const result = {
       sport, date,
@@ -73,6 +81,8 @@ export async function GET(req: Request) {
       final_count: finals,
       conference_count: bb.standings.conferences.length,
       season: bb.season,
+      html_bytes: html.length,
+      email_bytes: email_html.length,
     };
     await finishCronRun(runId, { status: "ok", result });
     return NextResponse.json({ ok: true, ...result });

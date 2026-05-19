@@ -3,9 +3,9 @@
 // Signed in:    shows the address, sport toggles, and a "Sign out" button.
 // Signed out:   shows an email-entry form that POSTs a magic-link request.
 //
-// Admin users (email matches ADMIN_EMAIL) see admin-only sports too, which
-// is how Phase 5 dogfood works: admin opts themselves into NBA/WNBA through
-// the real settings flow before those sports are publicized.
+// Admin users (subscribers.is_admin = true) see admin-only sports too,
+// which is how dogfood works: an admin opts themselves into NBA/WNBA
+// through the real settings flow before those sports are publicized.
 
 import { cookies } from "next/headers";
 import { validateSession, SUBSCRIBER_SESSION_COOKIE } from "@/lib/subscriber-auth";
@@ -30,11 +30,10 @@ export default async function SettingsPage({
   if (session) {
     const { data: sub } = await supabaseAdmin()
       .from("subscribers")
-      .select("email, status")
+      .select("email, status, is_admin")
       .eq("id", session.subscriber_id)
-      .maybeSingle<{ email: string; status: string }>();
-    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
-    const isAdmin = !!sub && !!adminEmail && sub.email.toLowerCase() === adminEmail;
+      .maybeSingle<{ email: string; status: string; is_admin: boolean }>();
+    const isAdmin = sub?.is_admin === true;
 
     const [sports, subscriptions] = await Promise.all([
       getVisibleSports({ includeAdminOnly: isAdmin }),

@@ -166,8 +166,8 @@ export default async function LeagueDashboard({
           <h2>Send today&apos;s email to me</h2>
           <p className="admin-meta">
             Renders + emails the {sportRow.name} digest for the chosen date to
-            <code> ADMIN_EMAIL</code>. Useful for eyeballing a render before
-            firing the real send.
+            the signed-in admin&apos;s address. Useful for eyeballing a render
+            before firing the real send.
           </p>
           <SendToMeForm date={date} sport={sport} returnTo={returnTo} />
         </section>

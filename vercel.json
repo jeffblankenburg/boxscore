@@ -5,6 +5,14 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/generate?sport=nba",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/generate?sport=wnba",
+      "schedule": "0 9 * * *"
+    },
+    {
       "path": "/api/cron/send-email?sport=mlb",
       "schedule": "15 9 * * *"
     },

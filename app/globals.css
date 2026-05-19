@@ -500,6 +500,174 @@ footer.site-footer a { color: var(--text-secondary); }
 .send-status-pending    { background: #f3efe5; color: var(--text-muted); }
 .send-status-failed     { background: #ffe6e6; color: #a40000; }
 
+/* Basketball digest — NBA + WNBA share the same renderer (lib/render-basketball.ts)
+   and the same classes. Mirrored in BASKETBALL_EMAIL_STYLES for the email
+   variant; keep these two stylesheets in sync. Design tokens match MLB's
+   .es-* family: Source Sans 3 sans-serif throughout, #6a6354 muted, #c4baa5
+   strong rule, #e8e2d4 dotted rule. */
+
+/* Defensive reset: globals.css line 101 sets `th { border-top: 1px solid }`
+   for the MLB tables. Basketball tables also use <th> (header rows + team
+   labels in the line score), and that sitewide rule leaks in unless we
+   explicitly null it on every basketball table cell. The email stylesheet
+   doesn't need this because it doesn't inherit the global th rule. */
+.bb-linescore th, .bb-linescore td,
+.bb-player-table th, .bb-player-table td,
+.bb-standings-table th, .bb-standings-table td,
+.bb-leader-table th, .bb-leader-table td { border-top: none; }
+
+.bb-section { margin: 18px 0 24px; }
+.bb-section-title {
+  font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
+  margin: 22px 0 6px; padding-bottom: 4px;
+  border-bottom: 2px solid #161410;
+}
+.bb-dateline {
+  border-top: 3px double #161410; border-bottom: 1px solid #161410;
+  padding: 8px 0; margin: 0 0 14px; text-align: center;
+  font-style: italic; font-weight: 800; letter-spacing: -0.005em;
+  font-size: 22px;
+  font-size: clamp(16px, 4.2vw, 24px);
+}
+.bb-empty { font-size: 13px; color: #6a6354; font-style: italic;
+            margin: 6px 0; text-align: center; }
+
+.bb-game { margin: 18px 0 6px; padding-top: 6px; border-top: 1px solid #c4baa5; }
+.bb-game-context { font-size: 11px; font-style: italic; color: #6a6354;
+                   letter-spacing: 0.04em; margin-bottom: 2px; }
+.bb-game-header { display: flex; justify-content: space-between;
+                  align-items: baseline; margin: 0 0 4px;
+                  padding-bottom: 3px; border-bottom: 1px solid #161410; }
+.bb-game-matchup { font-size: 16px; font-weight: 700; }
+.bb-game-status  { font-size: 11px; color: #6a6354; font-style: italic; }
+
+.bb-bracket-round { margin: 10px 0 14px; }
+.bb-bracket-round-title {
+  font-size: 13px; font-weight: 700;
+  margin: 10px 0 2px; padding-bottom: 2px;
+  border-bottom: 1px solid #161410;
+}
+.bb-bracket-series { padding: 4px 0; border-bottom: 1px dotted #e8e2d4; }
+.bb-bracket-series:last-child { border-bottom: none; }
+.bb-bracket-matchup { font-size: 14px; font-weight: 700; }
+.bb-bracket-vs { font-weight: 400; color: #6a6354;
+                 font-style: italic; padding: 0 4px; }
+.bb-bracket-summary { font-size: 12px; color: #6a6354; margin-top: 2px; }
+
+/* League leaders — five stacked mini-tables (PTS, REB, AST, STL, BLK). */
+.bb-leader-table { width: 100%; border-collapse: collapse;
+                   font-size: 12px; margin: 6px 0 14px; }
+.bb-ldr-caption {
+  margin: 10px 0 2px; padding: 0 0 2px;
+  font-size: 13px; font-weight: 700;
+  border-bottom: 1px solid #161410;
+}
+.bb-ldr-abbrev { font-size: 10px; color: #6a6354;
+                 margin-left: 6px; letter-spacing: 0.04em;
+                 font-weight: 400; text-transform: uppercase; }
+.bb-leader-table th, .bb-leader-table td {
+  padding: 2px 4px; white-space: nowrap;
+}
+.bb-ldr-rank  { width: 24px; text-align: right; color: #6a6354; }
+.bb-ldr-name  { text-align: left; font-size: 12px; }
+.bb-ldr-team  { width: 36px; text-align: right; color: #6a6354;
+                font-size: 11px; }
+.bb-ldr-value { width: 48px; text-align: right; font-weight: 700; }
+
+/* Transactions — list of team + description on the digest's date. */
+.bb-tx-list { list-style: none; padding: 0; margin: 8px 0 0; }
+.bb-tx-row { display: flex; gap: 10px; padding: 4px 0;
+             border-bottom: 1px dotted #e8e2d4;
+             font-size: 12px; line-height: 1.4; }
+.bb-tx-row:last-child { border-bottom: none; }
+.bb-tx-team { flex-shrink: 0; min-width: 40px;
+              font-size: 11px; font-weight: 700;
+              letter-spacing: 0.04em; color: #2a2620;
+              padding-top: 1px; }
+.bb-tx-desc { font-size: 12px; }
+
+.bb-upcoming-day { margin: 8px 0 12px; }
+.bb-upcoming-day-title {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin: 0 0 4px; padding-bottom: 2px;
+  border-bottom: 1px solid #161410; color: #6a6354;
+}
+.bb-upcoming { list-style: none; padding: 0; margin: 0; }
+.bb-upcoming-row { display: flex; justify-content: space-between;
+                   align-items: baseline; gap: 8px;
+                   padding: 4px 0; border-bottom: 1px dotted #e8e2d4;
+                   font-size: 12px; }
+.bb-upcoming-row:last-child { border-bottom: none; }
+.bb-upcoming-matchup { font-weight: 700; }
+.bb-upcoming-time { color: #6a6354; font-style: italic; }
+
+.bb-linescore { width: 100%; border-collapse: collapse; margin: 0 0 6px;
+                font-size: 12px; table-layout: fixed; }
+.bb-linescore th, .bb-linescore td {
+  padding: 2px 4px; text-align: right; white-space: nowrap;
+}
+/* Header-row period labels only — scoping to `thead th` keeps the team-row
+   <th> labels (SA / OKC) from inheriting a half-width bottom border. */
+.bb-linescore thead th {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid #161410;
+}
+.bb-ls-team      { text-align: left !important; font-weight: 700;
+                   width: 18%; font-size: 12px; }
+.bb-ls-team-head { text-align: left !important; }
+.bb-ls-total     { font-weight: 700; }
+.bb-ls-cell      { min-width: 22px; }
+
+.bb-box { display: block; margin: 4px 0 0; }
+.bb-player-table { width: 100%; border-collapse: collapse;
+                   font-size: 12px; margin: 6px 0 10px;
+                   table-layout: fixed; }
+.bb-team-caption {
+  margin: 10px 0 2px; padding: 0 0 2px;
+  font-size: 13px; font-weight: 700;
+  border-bottom: 1px solid #161410;
+}
+.bb-player-table th, .bb-player-table td {
+  padding: 2px 3px; text-align: right; white-space: nowrap;
+}
+.bb-player-table th {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid #161410;
+}
+.bb-pl-name   { text-align: left !important; font-size: 12px;
+                width: 38%; white-space: normal; word-break: break-word; }
+.bb-pl-pos    { font-size: 10px; color: #6a6354; margin-left: 3px;
+                text-transform: lowercase; letter-spacing: 0.04em;
+                white-space: nowrap; font-weight: 400; }
+.bb-pl-stat   { min-width: 22px; }
+/* Totals row: weight + top border on every cell so the rule spans the
+   full table. The single-cell .bb-pl-totals class only painted under the
+   "Totals" label, which left a stub line under the player table. */
+.bb-player-table tfoot td { font-weight: 700; border-top: 1px solid #161410; }
+
+.bb-standings-grid { display: block; }
+.bb-standings-table { width: 100%; border-collapse: collapse;
+                      font-size: 12px; margin: 6px 0 14px; }
+.bb-conf-caption {
+  margin: 10px 0 2px; padding: 0 0 2px;
+  font-size: 13px; font-weight: 700;
+  border-bottom: 1px solid #161410;
+}
+.bb-standings-table th, .bb-standings-table td {
+  padding: 2px 4px; text-align: right; white-space: nowrap;
+}
+.bb-standings-table th {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid #161410;
+}
+.bb-st-rank { width: 24px; text-align: right !important; color: #6a6354; }
+.bb-st-team { text-align: left !important; font-size: 12px; }
+.bb-st-stat { min-width: 36px; }
+
 /* Cron pulse — today's status of each scheduled route for a league. */
 .cron-pulse { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
 .cron-pulse-pill {
@@ -675,6 +843,20 @@ footer.site-footer a { color: var(--text-secondary); }
                   font-family: ui-monospace, monospace; text-decoration: none;
                   color: var(--text-secondary); }
 .preview-popout:hover { background: rgba(0,0,0,0.06); color: var(--text-primary); }
+
+/* "Regen" button sits inline with the preview-bar actions; size it to match
+   .preview-popout (small, bordered) instead of the default .admin-btn pill. */
+.preview-regen-form { display: inline-flex; margin: 0; }
+.preview-regen-form .admin-btn {
+  padding: 3px 8px; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.02em; background: rgba(0,0,0,0.02); color: var(--text-secondary);
+  border: 1px solid var(--border-strong); border-radius: 4px;
+}
+.preview-regen-form .admin-btn:hover { background: rgba(0,0,0,0.06); color: var(--text-primary); }
+.preview-regen-form .admin-btn:disabled,
+.preview-regen-form .admin-btn[aria-busy="true"] {
+  background: rgba(0,0,0,0.04); color: var(--text-muted); cursor: progress; opacity: 1;
+}
 .admin-cron-error { color: #a40000; }
 .status-ok { display: inline-block; padding: 1px 6px; border-radius: 3px;
              background: #2a7a2a; color: #fff; font-weight: 700; font-size: 11px; }

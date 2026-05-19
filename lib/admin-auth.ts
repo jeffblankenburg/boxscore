@@ -1,9 +1,50 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { supabaseAdmin } from "./supabase";
 
-// Single-user admin auth. Email must equal ADMIN_EMAIL; a 6-digit code is
-// emailed via Resend; user enters it; on success we issue a session token
-// stored httpOnly. Codes hashed at rest; session tokens are random UUIDs.
+// Multi-admin auth. Admin status lives on subscribers.is_admin (boolean);
+// /admin/login looks up the email there and issues a 6-digit code if the
+// row exists with is_admin=true. Codes are hashed at rest; session tokens
+// are random UUIDs stored httpOnly. The session's email is the only
+// "who's the admin" identifier the rest of the app needs.
+
+/**
+ * True if there's a subscribers row with this email and is_admin=true.
+ * Used by /admin/login as the gate before a 2FA code is issued. Email
+ * comparison is case-insensitive; the underlying column is text and
+ * subscribers are normalized to lowercase on insert.
+ */
+export async function isAdminEmail(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .select("is_admin")
+    .eq("email", normalized)
+    .eq("is_admin", true)
+    .maybeSingle<{ is_admin: boolean }>();
+  if (error) {
+    console.error(`isAdminEmail(${normalized}): ${error.message}`);
+    return false;
+  }
+  return data?.is_admin === true;
+}
+
+/**
+ * Every admin's email. Used for unattended fan-outs (cron failure alerts)
+ * where no session is available to derive a single admin. Returns lowercase
+ * emails. Empty array if no admins are configured.
+ */
+export async function getAdminEmails(): Promise<string[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .select("email")
+    .eq("is_admin", true);
+  if (error) {
+    console.error(`getAdminEmails: ${error.message}`);
+    return [];
+  }
+  return (data ?? []).map((r) => (r as { email: string }).email);
+}
 
 const CODE_TTL_MIN = 10;
 const SESSION_TTL_DAYS = 30;

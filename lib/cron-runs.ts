@@ -98,12 +98,13 @@ export async function finishCronRun(
   }
 }
 
-// Send an email to ADMIN_EMAIL when a cron run finishes in 'failed' state.
-// Silent no-op if ADMIN_EMAIL is unset. Resend errors propagate to the caller
-// (finishCronRun catches them).
+// Fan out a failure email to every admin (every subscribers row with
+// is_admin=true). Silent no-op if no admins are configured. Resend errors
+// propagate to the caller (finishCronRun catches them).
 async function notifyCronFailure(run: CronRun): Promise<void> {
-  const to = process.env.ADMIN_EMAIL;
-  if (!to) return;
+  const { getAdminEmails } = await import("./admin-auth");
+  const recipients = await getAdminEmails();
+  if (recipients.length === 0) return;
   const { sendEmail } = await import("./email");
   const siteUrl = process.env.SITE_URL ?? "https://boxscore.email";
   const adminUrl = `${siteUrl}/admin`;
@@ -133,7 +134,12 @@ async function notifyCronFailure(run: CronRun): Promise<void> {
     ``,
     `Admin: ${adminUrl}`,
   ].join("\n");
-  await sendEmail({ to, subject, html, text });
+  // One email per admin so each recipient gets their own message rather
+  // than seeing every co-admin's address. sequential is fine — recipient
+  // count is small.
+  for (const to of recipients) {
+    await sendEmail({ to, subject, html, text });
+  }
 }
 
 function escapeHtml(s: string): string {
