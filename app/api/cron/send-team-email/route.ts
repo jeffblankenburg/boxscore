@@ -148,6 +148,7 @@ export async function GET(req: Request) {
             const oneClickUrl = `${origin}/api/u/${sub.unsubscribe_token}`;
             const { subject, html, text } = teamDailyEmail({
               teamName: team.name,
+              digestDate: date,
               digestPrettyDate,
               digestUrl,
               unsubscribeUrl,

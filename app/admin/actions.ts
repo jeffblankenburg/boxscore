@@ -93,6 +93,7 @@ export async function sendTeamAdminPreview(
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
     const { subject, html, text } = teamDailyEmail({
       teamName: team.name,
+      digestDate: date,
       digestPrettyDate: prettyDate(date),
       digestUrl: `${origin}/${sport}/${team.slug}/${date}`,
       unsubscribeUrl: `${origin}/u/admin-preview`,

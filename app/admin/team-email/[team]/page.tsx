@@ -41,6 +41,7 @@ export default async function AdminTeamEmailPreview({
   const announcementBanner = (await getAnnouncement("mlb", date)) ?? undefined;
   const { html, subject } = teamDailyEmail({
     teamName: team.name,
+    digestDate: date,
     digestPrettyDate: prettyDate(date),
     digestUrl: `${origin}/mlb/${team.slug}/${date}`,
     unsubscribeUrl: `${origin}/u/admin-preview`,

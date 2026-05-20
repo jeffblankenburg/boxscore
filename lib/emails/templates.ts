@@ -188,14 +188,18 @@ export function dailyEmail(opts: {
  */
 export function teamDailyEmail(opts: {
   teamName: string;
-  digestPrettyDate: string;
+  digestDate: string;          // ISO "YYYY-MM-DD" of the digest
+  digestPrettyDate: string;    // long form, used in preview text
   digestUrl: string;
   unsubscribeUrl: string;
   manageUrl: string;
   digestEmailHtml: string;
   announcementBanner?: string;
 }): { subject: string; html: string; text: string } {
-  const subject = `boxscore: ${opts.teamName} · ${opts.digestPrettyDate}`;
+  // Match the league subject shape: "boxscore - {label} - {short date}".
+  // Replaces the prior "boxscore: {team} · {long date}" so subscribers who
+  // get both a league and a team digest see a uniform thread style.
+  const subject = `boxscore - ${opts.teamName} - ${shortPrettyDate(opts.digestDate)}`;
   const html = wrapWithDigest({
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
@@ -204,7 +208,7 @@ export function teamDailyEmail(opts: {
     announcementBanner: opts.announcementBanner,
     previewText: `${opts.digestPrettyDate} · ${opts.teamName} digest from boxscore.`,
   });
-  const text = `boxscore — ${opts.teamName} — ${opts.digestPrettyDate}\n\nManage subscriptions: ${opts.manageUrl}\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `${subject}\n\nManage subscriptions: ${opts.manageUrl}\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
