@@ -257,8 +257,9 @@ ${preview}
                 <img src="https://boxscore.email/icon.png" alt="" width="24" height="24" style="vertical-align:bottom; margin-right:6px; border-radius:4px;">boxscore
               </a>
             </td>
-            <td align="right" style="vertical-align:bottom;">
-              <a href="${opts.manageUrl}" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; font-weight:700; background:#fff; color:${INK}; padding:5px 12px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Manage subscriptions</a>
+            <td align="right" style="vertical-align:bottom; white-space:nowrap;">
+              <a href="https://boxscore.email/r/support?src=email-header" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; font-weight:700; background:#fff; color:${INK}; padding:3px 10px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em; margin-right:4px;">Tip Jar</a>
+              <a href="${opts.manageUrl}" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; font-weight:700; background:#fff; color:${INK}; padding:3px 10px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Manage Subscriptions</a>
             </td>
           </tr>
         </table>

@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "../require-admin";
 import { AdminNav } from "../AdminNav";
 import { SubmitButton } from "../SubmitButton";
-import { SendEmailGuard } from "../SendEmailGuard";
-import { triggerCron, sendAdminPreview, sendTeamAdminPreview, setAnnouncement, removeAnnouncement } from "../actions";
+import { sendAdminPreview, sendTeamAdminPreview, setAnnouncement, removeAnnouncement } from "../actions";
 import { RegenerateAllRunner } from "./RegenerateAllRunner";
+import { CronPanel } from "./CronPanel";
 import { CopyButton } from "./CopyButton";
 import {
   getSpecificAnnouncement,
@@ -48,7 +48,7 @@ export default async function LeagueDashboard({
   const date = yesterdayInET();
   const returnTo = `/admin/${sport}`;
 
-  const [activeSubs, teamSendCount, generateRun, lastSend, cronPulse, recentRuns, regenDates, sportAnnouncement, globalAnnouncement, announcementList] = await Promise.all([
+  const [activeSubs, teamSendCount, generateRun, lastSend, cronPulse, recentRuns, regenDates, sportAnnouncement, globalAnnouncement, announcementList, teamConsoleRows] = await Promise.all([
     getActiveSubscribersForSport(sport).then((rows) => rows.length),
     features.hasTeamDigests ? countActiveTeamSubscriptions(sport) : Promise.resolve(0),
     getMostRecentCronRunForDate(sport, "generate", date),
@@ -59,6 +59,7 @@ export default async function LeagueDashboard({
     getSpecificAnnouncement(sport, date),
     getSpecificAnnouncement(GLOBAL_ANNOUNCEMENT_SPORT, date),
     listAnnouncements(sport),
+    features.hasTeamDigests ? loadTeamConsoleRows(sport, date) : Promise.resolve([]),
   ]);
 
   const generateResult = (generateRun?.result ?? null) as
@@ -74,7 +75,7 @@ export default async function LeagueDashboard({
 
   return (
     <main className="admin admin-wide">
-      <AdminNav activeSport={sport} />
+      <AdminNav activeSport={sport} active="dashboard" />
       <h1>{sportRow.name}</h1>
 
       {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}
@@ -136,57 +137,30 @@ export default async function LeagueDashboard({
           Manually fire any cron route. Date defaults to yesterday in ET;
           results land in the recent-runs table below.
         </p>
-        {features.expectedRoutes.includes("generate") && (
-          <TriggerForm
-            route="generate"
-            date={date}
-            sport={sport}
-            returnTo={returnTo}
-            label="Generate digest"
-          />
-        )}
-        {features.expectedRoutes.includes("send-email") && (
-          <SendEmailGuard
-            defaultDate={date}
-            activeSubscribers={activeSubs}
-            sport={sport}
-            returnTo={returnTo}
-          />
-        )}
-        {features.expectedRoutes.includes("send-team-email") && (
-          <SendEmailGuard
-            defaultDate={date}
-            activeSubscribers={teamSendCount}
-            sport={sport}
-            returnTo={returnTo}
-            route="send-team-email"
-            label="Send team digests to subscribers"
-            buttonLabel="Run send-team-email"
-            audienceNoun="team-digest send"
-          />
-        )}
-        {features.expectedRoutes.includes("post-bluesky") && (
-          <TriggerForm
-            route="post-bluesky"
-            date={date}
-            sport={sport}
-            returnTo={returnTo}
-            label="Post to BlueSky"
-            allowReset
-          />
-        )}
-        {features.expectedRoutes.includes("post-twitter") && (
-          <TriggerForm
-            route="post-twitter"
-            date={date}
-            sport={sport}
-            returnTo={returnTo}
-            label="Post to Twitter"
-            allowReset
-          />
-        )}
+        <CronPanel
+          sport={sport}
+          returnTo={returnTo}
+          defaultDate={date}
+          expectedRoutes={features.expectedRoutes}
+          activeSubs={activeSubs}
+          teamSendCount={teamSendCount}
+        />
         {features.hasRegenAll && <RegenerateAllRunner sport={sport} dates={regenDates} />}
       </section>
+
+      {features.hasTeamDigests && (
+        <section>
+          <h2>Team digest console</h2>
+          <p className="admin-meta">
+            Per-team rollup for <code>{date}</code>. Subs = opted-in
+            subscribers. Yesterday = whether the team played + a final box
+            score was cached. Send = sent/failed counts from the team-send
+            cron for this date. Preview opens the team's web digest in a
+            new tab.
+          </p>
+          <TeamConsole rows={teamConsoleRows} sport={sport} date={date} />
+        </section>
+      )}
 
       <section>
         <h2>Email announcement banner</h2>
@@ -315,6 +289,97 @@ async function getMostRecentSendForSport(sport: string): Promise<CronRun | null>
   return data;
 }
 
+type TeamConsoleRow = {
+  slug: string;
+  name: string;
+  abbreviation: string;
+  primary: string | null;
+  subscribers: number;
+  hasGameYesterday: boolean | null; // null = no team_digests row at all
+  digestGenerated: boolean;
+  send: { sent: number; failed: number } | null;
+};
+
+// Per-team rollup for the team console section: subscriber count, did the
+// team play yesterday, did generate succeed (was a team_digests row
+// written), and how did the team-send go. Four small queries, joined in
+// memory; cheap at 30 teams.
+//
+// Subscriber count semantics: ONLY counts opted-in rows whose subscriber
+// account is also subscribers.status='active'. The send cron filters the
+// same way, so this number matches what an actual send would deliver to.
+// (Earlier this counted raw email_subscriptions rows, which over-counted
+// by including subscribers who later unsubscribed but never toggled the
+// team off — their row stays active=true, but the cron correctly skips
+// them.)
+async function loadTeamConsoleRows(
+  sport: string,
+  date: string,
+): Promise<TeamConsoleRow[]> {
+  const db = supabaseAdmin();
+  const teams = teamsBySport(sport as Sport);
+
+  const { getActiveSubscriberIdSet } = await import("@/lib/subscribers");
+  const [
+    { data: subRows, error: subErr },
+    activeIds,
+    { data: digestRows, error: digestErr },
+    { data: sendRows, error: sendErr },
+  ] = await Promise.all([
+    db.from("email_subscriptions")
+      .select("team_id, subscriber_id")
+      .eq("sport", sport)
+      .eq("scope", "team")
+      .eq("active", true),
+    // Paginated — un-paginated active-subscriber selects silently cap at
+    // 1000 rows. Same trap that hid the team-send cron bug.
+    getActiveSubscriberIdSet(),
+    db.from("team_digests")
+      .select("team_slug, has_game")
+      .eq("sport", sport)
+      .eq("date", date),
+    db.from("sends")
+      .select("team_id, error")
+      .eq("digest_sport", sport)
+      .eq("digest_date", date)
+      .not("team_id", "is", null),
+  ]);
+  if (subErr) throw new Error(`team-console subs: ${subErr.message}`);
+  if (digestErr) throw new Error(`team-console digests: ${digestErr.message}`);
+  if (sendErr) throw new Error(`team-console sends: ${sendErr.message}`);
+  const subsByTeam = new Map<string, number>();
+  for (const r of (subRows ?? []) as Array<{ team_id: string | null; subscriber_id: string }>) {
+    if (!r.team_id) continue;
+    if (!activeIds.has(r.subscriber_id)) continue;
+    subsByTeam.set(r.team_id, (subsByTeam.get(r.team_id) ?? 0) + 1);
+  }
+  const digestByTeam = new Map<string, boolean>();
+  for (const r of (digestRows ?? []) as Array<{ team_slug: string; has_game: boolean }>) {
+    digestByTeam.set(r.team_slug, r.has_game);
+  }
+  const sendsByTeam = new Map<string, { sent: number; failed: number }>();
+  for (const r of (sendRows ?? []) as Array<{ team_id: string | null; error: string | null }>) {
+    if (!r.team_id) continue;
+    const cur = sendsByTeam.get(r.team_id) ?? { sent: 0, failed: 0 };
+    if (r.error) cur.failed++;
+    else cur.sent++;
+    sendsByTeam.set(r.team_id, cur);
+  }
+
+  return teams
+    .map((team) => ({
+      slug: team.slug,
+      name: team.name,
+      abbreviation: team.abbreviation,
+      primary: team.primary ?? null,
+      subscribers: subsByTeam.get(team.slug) ?? 0,
+      hasGameYesterday: digestByTeam.has(team.slug) ? digestByTeam.get(team.slug)! : null,
+      digestGenerated: digestByTeam.has(team.slug),
+      send: sendsByTeam.get(team.slug) ?? null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 async function listCachedDigestDates(sport: string): Promise<string[]> {
   const { data, error } = await supabaseAdmin()
     .from("daily_digests")
@@ -408,45 +473,6 @@ function CronPulseStrip({
   );
 }
 
-function TriggerForm({
-  route,
-  date,
-  sport,
-  returnTo,
-  label,
-  allowReset = false,
-}: {
-  route: string;
-  date: string;
-  sport: string;
-  returnTo: string;
-  label: string;
-  allowReset?: boolean;
-}) {
-  return (
-    <form action={triggerCron} className="admin-trigger-form">
-      <input type="hidden" name="route" value={route} />
-      <input type="hidden" name="sport" value={sport} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <label>
-        <span className="admin-trigger-label">{label}</span>
-        <input
-          className="admin-input"
-          type="date"
-          name="date"
-          defaultValue={date}
-        />
-      </label>
-      {allowReset && (
-        <label className="admin-trigger-checkbox">
-          <input type="checkbox" name="reset" value="1" /> reset
-        </label>
-      )}
-      <SubmitButton idleLabel={`Run ${route}`} pendingLabel="Running\u2026" />
-    </form>
-  );
-}
-
 function SendToMeForm({
   date,
   sport,
@@ -524,6 +550,81 @@ function SendTeamToMeForm({
       </label>
       <SubmitButton idleLabel="Send team to me" pendingLabel="Sending\u2026" />
     </form>
+  );
+}
+
+function TeamConsole({
+  rows,
+  sport,
+  date,
+}: {
+  rows: TeamConsoleRow[];
+  sport: string;
+  date: string;
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="admin-meta">No team registry entries for this sport.</p>
+    );
+  }
+  return (
+    <table className="admin-team-console">
+      <thead>
+        <tr>
+          <th className="admin-team-col-name">Team</th>
+          <th className="admin-team-col-num">Subs</th>
+          <th className="admin-team-col-state">Yesterday</th>
+          <th className="admin-team-col-state">Last gen</th>
+          <th className="admin-team-col-state">Send (ok/fail)</th>
+          <th className="admin-team-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const sendCell = r.send
+            ? <span className={r.send.failed > 0 ? "admin-team-bad" : "admin-team-ok"}>
+                {r.send.sent}/{r.send.failed}
+              </span>
+            : <span className="admin-team-empty">—</span>;
+          const yesterdayCell = r.hasGameYesterday === null
+            ? <span className="admin-team-empty">—</span>
+            : r.hasGameYesterday
+              ? <span className="admin-team-ok">✓ played</span>
+              : <span className="admin-team-empty">no game</span>;
+          const genCell = r.digestGenerated
+            ? <span className="admin-team-ok">OK</span>
+            : <span className="admin-team-bad">missing</span>;
+          return (
+            <tr key={r.slug}>
+              <td className="admin-team-col-name">
+                {r.primary && (
+                  <span
+                    className="admin-team-swatch"
+                    style={{ background: r.primary }}
+                    aria-hidden="true"
+                  />
+                )}
+                {r.name}
+              </td>
+              <td className="admin-team-col-num">{r.subscribers.toLocaleString()}</td>
+              <td className="admin-team-col-state">{yesterdayCell}</td>
+              <td className="admin-team-col-state">{genCell}</td>
+              <td className="admin-team-col-state">{sendCell}</td>
+              <td className="admin-team-col-actions">
+                <a
+                  href={`/${sport}/${r.slug}/${date}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="admin-team-link"
+                >
+                  Preview →
+                </a>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 

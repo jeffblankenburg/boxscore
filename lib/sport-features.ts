@@ -10,6 +10,7 @@ export const ALL_CRON_ROUTES = [
   "send-team-email",
   "post-twitter",
   "post-bluesky",
+  "post-facebook",
 ] as const;
 export type CronRoute = (typeof ALL_CRON_ROUTES)[number];
 
@@ -26,11 +27,12 @@ export type SportFeatures = {
 
 export const SPORT_FEATURES: Record<string, SportFeatures> = {
   mlb:  { hasPreview: true,  hasShareImages: true,  hasTeamDigests: true,  hasRegenAll: true,  expectedRoutes: ALL_CRON_ROUTES },
-  // NBA/WNBA have no send-team-email yet (no per-team renderer), so the team
-  // route is intentionally left out of expectedRoutes — the watchwall will
-  // not flag it as missing.
-  nba:  { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate"] },
-  wnba: { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate"] },
+  // NBA/WNBA: league send wired but no team digests or social posts yet.
+  // The watchwall will flag generate/send-email as missing if they don't
+  // run; the team/post routes stay intentionally absent so they don't
+  // show up as red rows for routes that aren't supposed to exist yet.
+  nba:  { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"] },
+  wnba: { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"] },
 };
 
 export function featuresFor(sport: string): SportFeatures {

@@ -139,7 +139,7 @@ export async function triggerCron(formData: FormData): Promise<void> {
 
   let target: string;
   try {
-    if (!["generate", "send-email", "send-team-email", "post-bluesky", "post-twitter"].includes(route)) {
+    if (!["generate", "send-email", "send-team-email", "post-bluesky", "post-twitter", "post-facebook"].includes(route)) {
       throw new Error(`Unknown cron route: ${route}`);
     }
     if (!["mlb", "nba", "wnba"].includes(sport)) {

@@ -11,7 +11,7 @@ export default async function AdminClicksView() {
 
   return (
     <main className="admin">
-      <AdminNav />
+      <AdminNav active="clicks" />
       <h1>Click tracking</h1>
 
       <section>

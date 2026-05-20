@@ -118,6 +118,32 @@ export async function confirmSubscriberIfPending(id: string): Promise<Subscriber
   return data;
 }
 
+/**
+ * Just the IDs of all active subscribers, paginated. Lightweight version
+ * of getActiveSubscribers when callers only need the ID set (e.g. to
+ * intersect with another opt-in list for a count). Without pagination,
+ * Supabase silently caps each select at 1000 rows, which had been
+ * causing the team-send/coverage/console queries to under-report by
+ * ~80% on accounts with more than 1000 active subscribers.
+ */
+export async function getActiveSubscriberIdSet(): Promise<Set<string>> {
+  const out = new Set<string>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin()
+      .from("subscribers")
+      .select("id")
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`getActiveSubscriberIdSet: ${error.message}`);
+    const page = (data ?? []) as Array<{ id: string }>;
+    for (const row of page) out.add(row.id);
+    if (page.length < pageSize) break;
+  }
+  return out;
+}
+
 export async function getActiveSubscribers(): Promise<Subscriber[]> {
   // Supabase silently caps SELECT at 1000 rows; paginate so we get everyone.
   const out: Subscriber[] = [];
@@ -132,6 +158,43 @@ export async function getActiveSubscribers(): Promise<Subscriber[]> {
     if (error) throw new Error(`getActiveSubscribers: ${error.message}`);
     const page = (data ?? []) as Subscriber[];
     out.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return out;
+}
+
+/**
+ * Just the opted-in subscriber IDs for a single team (no status filter, no
+ * subscriber rows). Used by the team-send cron when it has already
+ * pre-fetched all active subscribers; combining this set with that
+ * pre-fetched list avoids calling getActiveSubscribers() once per team.
+ *
+ * Why this exists: getActiveSubscribersForTeam (below) called
+ * getActiveSubscribers internally, which paginated ~5 pages from the
+ * subscribers table. The team cron runs 29 of those back-to-back. Under
+ * load, the pagination was silently truncating somewhere on the team
+ * cron path (league cron, which only paginates once, was unaffected) and
+ * dropping ~80% of expected sends. Pre-fetching active subscribers once
+ * at the top of the cron and reusing them sidesteps the issue.
+ */
+export async function getTeamOptInSubscriberIds(
+  sport: string,
+  teamId: string,
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin()
+      .from("email_subscriptions")
+      .select("subscriber_id")
+      .eq("sport", sport)
+      .eq("scope", "team")
+      .eq("team_id", teamId)
+      .eq("active", true)
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`getTeamOptInSubscriberIds: ${error.message}`);
+    const page = (data ?? []) as Array<{ subscriber_id: string }>;
+    for (const row of page) out.add(row.subscriber_id);
     if (page.length < pageSize) break;
   }
   return out;

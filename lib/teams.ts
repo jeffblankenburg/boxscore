@@ -17,39 +17,44 @@ export type Team = {
   nickname: string;    // "Guardians"
   abbreviation: string; // "CLE"
   mlbApiId?: number;   // present for MLB teams
+  // ADMIN-ONLY: each team's recognizable primary color, used to tint
+  // tabs/rows in admin tools so scanning by color works ("the orange
+  // one"). Never surfaces on the public newspaper-style site/emails;
+  // those stay strictly black and white.
+  primary?: string;    // hex, e.g. "#0C2340"
 };
 
 export const TEAMS: readonly Team[] = [
-  { sport: "mlb", slug: "ari", name: "Arizona Diamondbacks", city: "Arizona", nickname: "Diamondbacks", abbreviation: "ARI", mlbApiId: 109 },
-  { sport: "mlb", slug: "atl", name: "Atlanta Braves", city: "Atlanta", nickname: "Braves", abbreviation: "ATL", mlbApiId: 144 },
-  { sport: "mlb", slug: "bal", name: "Baltimore Orioles", city: "Baltimore", nickname: "Orioles", abbreviation: "BAL", mlbApiId: 110 },
-  { sport: "mlb", slug: "bos", name: "Boston Red Sox", city: "Boston", nickname: "Red Sox", abbreviation: "BOS", mlbApiId: 111 },
-  { sport: "mlb", slug: "chc", name: "Chicago Cubs", city: "Chicago", nickname: "Cubs", abbreviation: "CHC", mlbApiId: 112 },
-  { sport: "mlb", slug: "cws", name: "Chicago White Sox", city: "Chicago", nickname: "White Sox", abbreviation: "CWS", mlbApiId: 145 },
-  { sport: "mlb", slug: "cin", name: "Cincinnati Reds", city: "Cincinnati", nickname: "Reds", abbreviation: "CIN", mlbApiId: 113 },
-  { sport: "mlb", slug: "cle", name: "Cleveland Guardians", city: "Cleveland", nickname: "Guardians", abbreviation: "CLE", mlbApiId: 114 },
-  { sport: "mlb", slug: "col", name: "Colorado Rockies", city: "Colorado", nickname: "Rockies", abbreviation: "COL", mlbApiId: 115 },
-  { sport: "mlb", slug: "det", name: "Detroit Tigers", city: "Detroit", nickname: "Tigers", abbreviation: "DET", mlbApiId: 116 },
-  { sport: "mlb", slug: "hou", name: "Houston Astros", city: "Houston", nickname: "Astros", abbreviation: "HOU", mlbApiId: 117 },
-  { sport: "mlb", slug: "kc",  name: "Kansas City Royals", city: "Kansas City", nickname: "Royals", abbreviation: "KC", mlbApiId: 118 },
-  { sport: "mlb", slug: "laa", name: "Los Angeles Angels", city: "Los Angeles", nickname: "Angels", abbreviation: "LAA", mlbApiId: 108 },
-  { sport: "mlb", slug: "lad", name: "Los Angeles Dodgers", city: "Los Angeles", nickname: "Dodgers", abbreviation: "LAD", mlbApiId: 119 },
-  { sport: "mlb", slug: "mia", name: "Miami Marlins", city: "Miami", nickname: "Marlins", abbreviation: "MIA", mlbApiId: 146 },
-  { sport: "mlb", slug: "mil", name: "Milwaukee Brewers", city: "Milwaukee", nickname: "Brewers", abbreviation: "MIL", mlbApiId: 158 },
-  { sport: "mlb", slug: "min", name: "Minnesota Twins", city: "Minnesota", nickname: "Twins", abbreviation: "MIN", mlbApiId: 142 },
-  { sport: "mlb", slug: "nym", name: "New York Mets", city: "New York", nickname: "Mets", abbreviation: "NYM", mlbApiId: 121 },
-  { sport: "mlb", slug: "nyy", name: "New York Yankees", city: "New York", nickname: "Yankees", abbreviation: "NYY", mlbApiId: 147 },
-  { sport: "mlb", slug: "ath", name: "Athletics", city: "Athletics", nickname: "Athletics", abbreviation: "ATH", mlbApiId: 133 },
-  { sport: "mlb", slug: "phi", name: "Philadelphia Phillies", city: "Philadelphia", nickname: "Phillies", abbreviation: "PHI", mlbApiId: 143 },
-  { sport: "mlb", slug: "pit", name: "Pittsburgh Pirates", city: "Pittsburgh", nickname: "Pirates", abbreviation: "PIT", mlbApiId: 134 },
-  { sport: "mlb", slug: "sd",  name: "San Diego Padres", city: "San Diego", nickname: "Padres", abbreviation: "SD", mlbApiId: 135 },
-  { sport: "mlb", slug: "sf",  name: "San Francisco Giants", city: "San Francisco", nickname: "Giants", abbreviation: "SF", mlbApiId: 137 },
-  { sport: "mlb", slug: "sea", name: "Seattle Mariners", city: "Seattle", nickname: "Mariners", abbreviation: "SEA", mlbApiId: 136 },
-  { sport: "mlb", slug: "stl", name: "St. Louis Cardinals", city: "St. Louis", nickname: "Cardinals", abbreviation: "STL", mlbApiId: 138 },
-  { sport: "mlb", slug: "tb",  name: "Tampa Bay Rays", city: "Tampa Bay", nickname: "Rays", abbreviation: "TB", mlbApiId: 139 },
-  { sport: "mlb", slug: "tex", name: "Texas Rangers", city: "Texas", nickname: "Rangers", abbreviation: "TEX", mlbApiId: 140 },
-  { sport: "mlb", slug: "tor", name: "Toronto Blue Jays", city: "Toronto", nickname: "Blue Jays", abbreviation: "TOR", mlbApiId: 141 },
-  { sport: "mlb", slug: "wsh", name: "Washington Nationals", city: "Washington", nickname: "Nationals", abbreviation: "WSH", mlbApiId: 120 },
+  { sport: "mlb", slug: "ari", name: "Arizona Diamondbacks", city: "Arizona", nickname: "Diamondbacks", abbreviation: "ARI", mlbApiId: 109, primary: "#A71930" },
+  { sport: "mlb", slug: "atl", name: "Atlanta Braves", city: "Atlanta", nickname: "Braves", abbreviation: "ATL", mlbApiId: 144, primary: "#CE1141" },
+  { sport: "mlb", slug: "bal", name: "Baltimore Orioles", city: "Baltimore", nickname: "Orioles", abbreviation: "BAL", mlbApiId: 110, primary: "#DF4601" },
+  { sport: "mlb", slug: "bos", name: "Boston Red Sox", city: "Boston", nickname: "Red Sox", abbreviation: "BOS", mlbApiId: 111, primary: "#BD3039" },
+  { sport: "mlb", slug: "chc", name: "Chicago Cubs", city: "Chicago", nickname: "Cubs", abbreviation: "CHC", mlbApiId: 112, primary: "#0E3386" },
+  { sport: "mlb", slug: "cws", name: "Chicago White Sox", city: "Chicago", nickname: "White Sox", abbreviation: "CWS", mlbApiId: 145, primary: "#27251F" },
+  { sport: "mlb", slug: "cin", name: "Cincinnati Reds", city: "Cincinnati", nickname: "Reds", abbreviation: "CIN", mlbApiId: 113, primary: "#C6011F" },
+  { sport: "mlb", slug: "cle", name: "Cleveland Guardians", city: "Cleveland", nickname: "Guardians", abbreviation: "CLE", mlbApiId: 114, primary: "#00385D" },
+  { sport: "mlb", slug: "col", name: "Colorado Rockies", city: "Colorado", nickname: "Rockies", abbreviation: "COL", mlbApiId: 115, primary: "#33006F" },
+  { sport: "mlb", slug: "det", name: "Detroit Tigers", city: "Detroit", nickname: "Tigers", abbreviation: "DET", mlbApiId: 116, primary: "#0C2340" },
+  { sport: "mlb", slug: "hou", name: "Houston Astros", city: "Houston", nickname: "Astros", abbreviation: "HOU", mlbApiId: 117, primary: "#002D62" },
+  { sport: "mlb", slug: "kc",  name: "Kansas City Royals", city: "Kansas City", nickname: "Royals", abbreviation: "KC", mlbApiId: 118, primary: "#004687" },
+  { sport: "mlb", slug: "laa", name: "Los Angeles Angels", city: "Los Angeles", nickname: "Angels", abbreviation: "LAA", mlbApiId: 108, primary: "#BA0021" },
+  { sport: "mlb", slug: "lad", name: "Los Angeles Dodgers", city: "Los Angeles", nickname: "Dodgers", abbreviation: "LAD", mlbApiId: 119, primary: "#005A9C" },
+  { sport: "mlb", slug: "mia", name: "Miami Marlins", city: "Miami", nickname: "Marlins", abbreviation: "MIA", mlbApiId: 146, primary: "#00A3E0" },
+  { sport: "mlb", slug: "mil", name: "Milwaukee Brewers", city: "Milwaukee", nickname: "Brewers", abbreviation: "MIL", mlbApiId: 158, primary: "#0A2351" },
+  { sport: "mlb", slug: "min", name: "Minnesota Twins", city: "Minnesota", nickname: "Twins", abbreviation: "MIN", mlbApiId: 142, primary: "#002B5C" },
+  { sport: "mlb", slug: "nym", name: "New York Mets", city: "New York", nickname: "Mets", abbreviation: "NYM", mlbApiId: 121, primary: "#002D72" },
+  { sport: "mlb", slug: "nyy", name: "New York Yankees", city: "New York", nickname: "Yankees", abbreviation: "NYY", mlbApiId: 147, primary: "#0C2340" },
+  { sport: "mlb", slug: "ath", name: "Athletics", city: "Athletics", nickname: "Athletics", abbreviation: "ATH", mlbApiId: 133, primary: "#003831" },
+  { sport: "mlb", slug: "phi", name: "Philadelphia Phillies", city: "Philadelphia", nickname: "Phillies", abbreviation: "PHI", mlbApiId: 143, primary: "#E81828" },
+  { sport: "mlb", slug: "pit", name: "Pittsburgh Pirates", city: "Pittsburgh", nickname: "Pirates", abbreviation: "PIT", mlbApiId: 134, primary: "#FDB827" },
+  { sport: "mlb", slug: "sd",  name: "San Diego Padres", city: "San Diego", nickname: "Padres", abbreviation: "SD", mlbApiId: 135, primary: "#2F241D" },
+  { sport: "mlb", slug: "sf",  name: "San Francisco Giants", city: "San Francisco", nickname: "Giants", abbreviation: "SF", mlbApiId: 137, primary: "#FD5A1E" },
+  { sport: "mlb", slug: "sea", name: "Seattle Mariners", city: "Seattle", nickname: "Mariners", abbreviation: "SEA", mlbApiId: 136, primary: "#0C2C56" },
+  { sport: "mlb", slug: "stl", name: "St. Louis Cardinals", city: "St. Louis", nickname: "Cardinals", abbreviation: "STL", mlbApiId: 138, primary: "#C41E3A" },
+  { sport: "mlb", slug: "tb",  name: "Tampa Bay Rays", city: "Tampa Bay", nickname: "Rays", abbreviation: "TB", mlbApiId: 139, primary: "#092C5C" },
+  { sport: "mlb", slug: "tex", name: "Texas Rangers", city: "Texas", nickname: "Rangers", abbreviation: "TEX", mlbApiId: 140, primary: "#003278" },
+  { sport: "mlb", slug: "tor", name: "Toronto Blue Jays", city: "Toronto", nickname: "Blue Jays", abbreviation: "TOR", mlbApiId: 141, primary: "#134A8E" },
+  { sport: "mlb", slug: "wsh", name: "Washington Nationals", city: "Washington", nickname: "Nationals", abbreviation: "WSH", mlbApiId: 120, primary: "#AB0003" },
 
   // NBA roster — placeholder entries to populate the /subscribe team-picker
   // tabs while only MLB has a per-team digest pipeline. Once the NBA team

@@ -25,6 +25,14 @@
       "schedule": "25 9 * * *"
     },
     {
+      "path": "/api/cron/send-email?sport=nba",
+      "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-email?sport=wnba",
+      "schedule": "40 9 * * *"
+    },
+    {
       "path": "/api/cron/send-team-email?sport=mlb",
       "schedule": "45 9 * * *"
     }

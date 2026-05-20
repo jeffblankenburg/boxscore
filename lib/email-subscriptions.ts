@@ -148,21 +148,31 @@ export async function applyInitialSubscriptions(
 }
 
 /**
- * Total active team-digest opt-ins for a sport. Equals the number of emails
- * a single team-send cron run would fan out (one row per subscriber-per-team
- * pair). Used by the admin trigger guard so the "send to N" copy matches
- * what will actually go out — distinct from league subscribers and usually
- * larger because subscribers can opt into multiple teams.
+ * Total active team-digest opt-ins for a sport — counts only opt-ins
+ * whose subscriber account is ALSO subscribers.status='active'. Mirrors
+ * what the send cron will actually fan out to; an earlier version of
+ * this helper counted raw email_subscriptions rows and over-reported
+ * because unsubscribed subscribers' opt-in rows stay active=true (the
+ * cron filters them at send time, but the count didn't).
  */
 export async function countActiveTeamSubscriptions(sport: string): Promise<number> {
-  const { count, error } = await supabaseAdmin()
-    .from("email_subscriptions")
-    .select("subscriber_id", { count: "exact", head: true })
-    .eq("sport", sport)
-    .eq("scope", "team")
-    .eq("active", true);
-  if (error) throw new Error(`countActiveTeamSubscriptions: ${error.message}`);
-  return count ?? 0;
+  const db = supabaseAdmin();
+  const [{ data: optedIn, error: optErr }, activeIds] = await Promise.all([
+    db.from("email_subscriptions")
+      .select("subscriber_id")
+      .eq("sport", sport)
+      .eq("scope", "team")
+      .eq("active", true),
+    // Paginated — without this the active-subscribers select silently
+    // caps at 1000 and the count comes back ~80% too low.
+    (await import("./subscribers")).getActiveSubscriberIdSet(),
+  ]);
+  if (optErr) throw new Error(`countActiveTeamSubscriptions opted: ${optErr.message}`);
+  let count = 0;
+  for (const r of (optedIn ?? []) as Array<{ subscriber_id: string }>) {
+    if (activeIds.has(r.subscriber_id)) count++;
+  }
+  return count;
 }
 
 /**

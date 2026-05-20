@@ -18,7 +18,7 @@ export default async function AdminSportsPage({
 
   return (
     <main className="admin">
-      <AdminNav />
+      <AdminNav active="sports" />
       <h1>Sports</h1>
 
       {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}

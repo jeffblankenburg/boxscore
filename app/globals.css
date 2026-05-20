@@ -520,6 +520,10 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
                text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
 .admin-nav a:first-child { padding-left: 0; }
 .admin-nav a:last-child { border-right: none; }
+.admin-nav a.active { color: var(--text-primary);
+                       text-decoration: underline;
+                       text-decoration-thickness: 2px;
+                       text-underline-offset: 6px; }
 
 /* League switcher — strip of league badges under the main admin nav. */
 .league-switcher {
@@ -915,6 +919,88 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .admin-trigger-checkbox { flex-direction: row !important; align-items: center;
                           gap: 4px; font-size: 13px; }
 
+/* Consolidated cron panel — one shared date input over a vertical stack
+   of action buttons. Replaces the older approach of one form per cron,
+   each carrying its own date field; cleaner UX since the operator only
+   touches the date once. */
+.admin-cron-panel { margin: 8px 0; display: flex; flex-direction: column;
+                     gap: 10px; max-width: 520px; }
+.admin-cron-date { display: flex; flex-direction: column; gap: 2px;
+                    font-size: 12px; color: var(--text-muted); }
+.admin-cron-date .admin-input { max-width: 200px; }
+.admin-cron-actions { display: flex; flex-direction: column; gap: 6px;
+                       align-items: flex-start; }
+.admin-cron-action { display: flex; align-items: center; gap: 12px;
+                      margin: 0; }
+/* Single-row layout for the dropdown variant of the panel: date + cron
+   picker + reset checkbox + Run button, all aligned bottom so the labels
+   stack above the controls evenly. */
+.admin-cron-row { display: flex; align-items: end; gap: 12px;
+                   flex-wrap: wrap; }
+.admin-cron-field { display: flex; flex-direction: column; gap: 2px;
+                     font-size: 12px; color: var(--text-muted); }
+.admin-cron-field-wide .admin-input { min-width: 240px; }
+.admin-cron-reset { display: inline-flex; align-items: center; gap: 4px;
+                     font-size: 12px; color: var(--text-muted);
+                     cursor: pointer; }
+
+/* Send coverage on the universal dashboard — eligible vs actually-sent
+   per sport, per route. Red coverage cell when the gap exceeds the
+   threshold; the "missed" suffix only appears for warn rows so green
+   cells stay tight. */
+.admin-send-coverage { width: 100%; border-collapse: collapse;
+                        font-size: 13px; margin-top: 8px; }
+.admin-send-coverage th, .admin-send-coverage td {
+  text-align: left; padding: 6px 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+.admin-send-coverage th { font-weight: 700; font-size: 11px;
+                           color: var(--text-muted);
+                           text-transform: uppercase;
+                           letter-spacing: 0.04em;
+                           border-bottom-color: var(--border-strong); }
+.admin-send-coverage-sport { font-weight: 600; }
+.admin-send-coverage-ok { color: var(--text-primary); }
+.admin-send-coverage-warn { color: #b03a2e; font-weight: 600; }
+.admin-send-coverage-pct { font-variant-numeric: tabular-nums;
+                            color: var(--text-muted); }
+.admin-send-coverage-warn .admin-send-coverage-pct { color: inherit; }
+.admin-send-coverage-gap { font-weight: 600; }
+
+/* Team digest console table. Sorted by team name (operator looks up by
+   name, not popularity). Compact rows + auto-layout columns. */
+.admin-team-console { width: 100%; border-collapse: collapse;
+                       font-size: 13px; table-layout: auto;
+                       margin-top: 8px; }
+.admin-team-console th, .admin-team-console td {
+  text-align: left; padding: 4px 10px;
+  border-bottom: 1px solid var(--border-light);
+  white-space: nowrap; vertical-align: middle;
+}
+.admin-team-console th { font-weight: 700; font-size: 11px;
+                          color: var(--text-muted);
+                          text-transform: uppercase;
+                          letter-spacing: 0.04em;
+                          border-bottom-color: var(--border-strong); }
+.admin-team-col-name { font-weight: 600; }
+/* Small color swatch next to the team name in the team console. Helps
+   the operator find "the orange one" at a glance. Admin-only. */
+.admin-team-swatch {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 2px; margin-right: 8px;
+  vertical-align: -1px;
+}
+.admin-team-col-num { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-team-col-state { font-size: 12px; }
+.admin-team-col-actions { text-align: right; padding-right: 0; }
+.admin-team-ok { color: var(--text-primary); }
+.admin-team-bad { color: #b03a2e; font-weight: 600; }
+.admin-team-empty { color: var(--text-muted); }
+.admin-team-link { font-size: 12px; color: var(--text-muted);
+                    text-decoration: none; padding: 2px 4px; }
+.admin-team-link:hover { color: var(--text-primary);
+                          text-decoration: underline; }
+
 /* Email announcement form — vertical stack with a full-width textarea
    for HTML editing. Distinct from .admin-trigger-form because trigger
    forms are horizontal flex rows (a textarea gets squeezed into a tiny
@@ -1022,6 +1108,36 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .admin-clicks-subhead { font-size: 13px; font-weight: 700; margin: 18px 0 4px;
                         font-family: Georgia, serif; }
 
+/* Secondary nav strip on /admin/preview: LEAGUE | ARI | ATH | … . Each
+   tab is its own bordered box — packed tight, no horizontal scroll, wraps
+   on narrow screens. Margins above + below the strip are symmetric so it
+   sits visually centered between the LeagueSwitcher line and the page
+   heading. */
+.preview-team-tabs { display: flex; gap: 2px; margin: 4px 0;
+                      flex-wrap: wrap; padding-bottom: 4px;
+                      border-bottom: 1px solid var(--border-light); }
+.preview-team-tabs a {
+  display: inline-block; padding: 2px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; font-weight: 600;
+  color: var(--text-secondary); text-decoration: none;
+  border: 1px solid var(--border-light);
+  border-radius: 2px; background: #fff;
+  white-space: nowrap;
+}
+.preview-team-tabs a:hover { background: rgba(0,0,0,0.05);
+                              color: var(--text-primary);
+                              border-color: var(--border-strong); }
+.preview-team-tabs a.active { background: #000; color: #fff;
+                                border-color: #000; }
+
+/* Date picker in the team preview bar. Sits inline with the other
+   surface/width toggles. */
+.preview-date-form { display: inline-flex; align-items: center; gap: 6px; }
+.preview-date-label { display: inline-flex; align-items: center; gap: 6px;
+                       font-size: 12px; color: var(--text-muted); }
+.preview-date-label .admin-input { font-size: 13px; padding: 3px 6px; }
+
 .preview-shell { display: flex; gap: 24px; margin-top: 12px; align-items: flex-start; }
 .preview-sidebar { width: 160px; flex-shrink: 0; }
 .preview-sidebar-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
@@ -1035,6 +1151,9 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .preview-sidebar a.active { background: #000; color: #fff; font-weight: 700; }
 
 .preview-main { flex: 1; min-width: 0; }
+/* Full-width preview (no sidebar) — used since the variant sidebar moved
+   into a date input + quick-jump dropdown in the toolbar. */
+.preview-main-full { margin-top: 12px; }
 .preview-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
                flex-wrap: wrap; }
 .preview-toggle { display: inline-flex; border: 1px solid var(--border-strong);

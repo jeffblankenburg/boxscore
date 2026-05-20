@@ -20,7 +20,18 @@ const SPORT_EMOJI: Record<string, string> = {
   wnba: "\u{1F3C0}", // 🏀
 };
 
-export async function LeagueSwitcher({ active }: { active?: string }) {
+// `basePath` controls where each badge links — defaults to "/admin" so
+// the badges go to the per-sport dashboard. Pages that live under a
+// different section (e.g. /admin/preview/[sport]) pass "/admin/preview"
+// so clicking NBA from inside the preview area stays in the preview
+// area instead of bouncing to the NBA dashboard.
+export async function LeagueSwitcher({
+  active,
+  basePath = "/admin",
+}: {
+  active?: string;
+  basePath?: string;
+}) {
   const sports = await getVisibleSports({ includeAdminOnly: true });
   if (sports.length === 0) return null;
   return (
@@ -30,7 +41,7 @@ export async function LeagueSwitcher({ active }: { active?: string }) {
         return (
           <a
             key={s.id}
-            href={`/admin/${s.id}`}
+            href={`${basePath}/${s.id}`}
             className={`league-badge league-badge-${s.id}${active === s.id ? " active" : ""}`}
           >
             {emoji && <span className="league-badge-emoji" aria-hidden="true">{emoji}</span>}

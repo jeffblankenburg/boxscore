@@ -70,6 +70,10 @@ function renderBody(data: BasketballData): string {
       renderDateline(data),
       renderResults(data, "Yesterday\u2019s games"),
       renderPlayoffSeries(data),
+      // Today's games surfaces a Game N of an ongoing series scheduled for
+      // tonight — should always be visible above the broader upcoming
+      // list. Upcoming then covers the rest of the bracket window.
+      renderTodaysGames(data),
       renderUpcomingGames(data),
     ];
     return sections.filter((s) => s.length > 0).join("\n");
@@ -430,7 +434,12 @@ function etCalendarDate(iso: string): string {
 }
 
 function renderUpcomingGames(data: BasketballData): string {
+  // Skip today's games — they live in the dedicated "Today's games"
+  // section in both regular and playoff modes. Without this exclusion
+  // playoffs would double-list tonight's Game N (once here, once above).
+  const todayEt = digestDatePlusOne(data.date);
   const upcoming = data.upcomingEvents
+    .filter((e) => etCalendarDate(e.date) !== todayEt)
     .filter((e) => e.status === "scheduled" || e.status === "in_progress")
     .sort((a, b) => a.date.localeCompare(b.date));
   if (upcoming.length === 0) return "";
@@ -532,9 +541,11 @@ function digestDatePlusOne(digestDate: string): string {
 
 function renderTodaysGames(data: BasketballData): string {
   const todayEt = digestDatePlusOne(data.date);
+  // Don't filter by status — historical regens see these events as
+  // 'final' now, but the section is "what was scheduled today" and the
+  // tipoff time is still meaningful (and consistent across regens).
   const games = data.upcomingEvents
     .filter((e) => etCalendarDate(e.date) === todayEt)
-    .filter((e) => e.status === "scheduled" || e.status === "in_progress")
     .sort((a, b) => a.date.localeCompare(b.date));
   if (games.length === 0) return "";
 

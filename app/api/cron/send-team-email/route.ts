@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getActiveTeamIds } from "@/lib/email-subscriptions";
-import { getActiveSubscribersForTeam } from "@/lib/subscribers";
+import { getActiveSubscribers, getTeamOptInSubscriberIds, type Subscriber } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
 import { teamDailyEmail } from "@/lib/emails/templates";
@@ -89,6 +89,15 @@ export async function GET(req: Request) {
     // Announcement is league-wide for the day; fetched once and applied to
     // every team's send below.
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
+    // Pre-fetch active subscribers ONCE and reuse for every team. Was
+    // previously called per-team via getActiveSubscribersForTeam; 29
+    // repeated calls were silently dropping subscribers from the second
+    // page on some calls, capping each team's send to ~21% of eligible.
+    // One fetch + an in-memory map sidesteps the issue entirely.
+    const allActive = await getActiveSubscribers();
+    const subscriberById = new Map<string, Subscriber>(
+      allActive.map((s) => [s.id, s]),
+    );
     let totalSent = 0;
     let totalSkipped = 0;
     let totalFailed = 0;
@@ -127,7 +136,15 @@ export async function GET(req: Request) {
         }
 
         const body = cached.email_html;
-        const subscribers = await getActiveSubscribersForTeam(sport, teamId);
+        // Get this team's opt-in subscriber IDs, then intersect with the
+        // pre-fetched active subscribers map. Avoids the 29x repeated
+        // getActiveSubscribers fetch that was causing the truncation bug.
+        const optedIds = await getTeamOptInSubscriberIds(sport, teamId);
+        const subscribers: Subscriber[] = [];
+        for (const id of optedIds) {
+          const sub = subscriberById.get(id);
+          if (sub) subscribers.push(sub);
+        }
         const alreadySent = await getSentSubscriberIds(sport, date, teamId);
         const toSend = subscribers.filter((s) => !alreadySent.has(s.id));
         const skipped = subscribers.length - toSend.length;

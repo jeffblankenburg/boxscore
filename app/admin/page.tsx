@@ -12,7 +12,9 @@ import {
   getCronGridBySportDay,
   getContentSnapshot,
   getDeliverabilityStats,
+  getSendCoverage,
   type Window,
+  type SendCoverageRow,
 } from "@/lib/dashboard";
 import {
   SubscriberGrowthChart,
@@ -44,7 +46,7 @@ export default async function AdminDashboard({
   const w = parseWindow(windowParam);
   const date = yesterdayInET();
 
-  const [kpis, subSeries, sendSeries, watchwall, cronGrid, content, runs, deliverability] = await Promise.all([
+  const [kpis, subSeries, sendSeries, watchwall, cronGrid, content, runs, deliverability, sendCoverage] = await Promise.all([
     getKpis(w),
     getSubscriberSeries(w),
     getSendSeries(w),
@@ -53,11 +55,12 @@ export default async function AdminDashboard({
     getContentSnapshot(w),
     recentCronRuns(20),
     getDeliverabilityStats(w),
+    getSendCoverage(),
   ]);
 
   return (
     <main className="admin admin-wide">
-      <AdminNav />
+      <AdminNav active="dashboard" />
       <h1>Admin</h1>
 
       {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}
@@ -73,6 +76,20 @@ export default async function AdminDashboard({
           digest date. Anything not green is the first thing to triage.
         </p>
         <Watchwall rows={watchwall} />
+      </section>
+
+      {/* 1b. Send coverage — eligible subscribers vs actually-sent for
+          yesterday. Watchwall says "did the cron run"; this says "did it
+          actually reach everyone it should have". A red bar here is the
+          classic "cron ran fine but silently dropped sends" symptom. */}
+      <section>
+        <h2>Did the sends actually go out?</h2>
+        <p className="admin-meta">
+          Subscribers who were eligible at yesterday&apos;s send vs the
+          rows actually written to <code>sends</code>. A small gap is
+          normal (post-cron confirmations). A large gap is a problem.
+        </p>
+        <SendCoverageTable rows={sendCoverage} />
       </section>
 
       {/* 2. Email lookup — paste a recipient address, see every send to it.
@@ -348,6 +365,56 @@ function CronRunsTable({ runs }: { runs: CronRun[] }) {
         })}
       </tbody>
     </table>
+  );
+}
+
+function SendCoverageTable({ rows }: { rows: SendCoverageRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="admin-meta">
+        No send-capable sports are configured yet.
+      </p>
+    );
+  }
+  return (
+    <table className="admin-send-coverage">
+      <thead>
+        <tr>
+          <th>Sport</th>
+          <th>Date</th>
+          <th>League send</th>
+          <th>Team sends</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.sport}>
+            <td className="admin-send-coverage-sport">{row.sportName}</td>
+            <td><code>{row.date}</code></td>
+            <td><CoverageCell bucket={row.league} /></td>
+            <td><CoverageCell bucket={row.team} /></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function CoverageCell({ bucket }: { bucket: SendCoverageRow["league"] }) {
+  if (!bucket) return <span className="admin-meta">—</span>;
+  const pct = (bucket.coverage * 100).toFixed(bucket.coverage === 1 ? 0 : 1);
+  const gap = bucket.eligible - bucket.sent;
+  const cls = bucket.warn ? "admin-send-coverage-warn" : "admin-send-coverage-ok";
+  return (
+    <span className={cls}>
+      {bucket.sent.toLocaleString()} / {bucket.eligible.toLocaleString()}{" "}
+      <span className="admin-send-coverage-pct">({pct}%)</span>
+      {bucket.warn && (
+        <span className="admin-send-coverage-gap">
+          {" "}— {gap.toLocaleString()} missed
+        </span>
+      )}
+    </span>
   );
 }
 

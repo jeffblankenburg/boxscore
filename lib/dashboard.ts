@@ -2,6 +2,7 @@ import { supabaseAdmin } from "./supabase";
 import { yesterdayInET } from "./dates";
 import { getVisibleSports } from "./sports";
 import { featuresFor, type CronRoute as SportCronRoute } from "./sport-features";
+import { getActiveSubscriberIdSet } from "./subscribers";
 
 // Supabase's JS client caps un-paginated `select` at 1000 rows. The `sends`
 // and `subscribers` tables both grow past that, so any aggregation that needs
@@ -740,4 +741,117 @@ export async function getContentSnapshot(w: Window): Promise<ContentSnapshot> {
       : null,
     emailSizeTrend,
   };
+}
+
+// ---- Send coverage -------------------------------------------------------
+//
+// For each sport that runs sends, compares the count of currently-eligible
+// subscribers (active subscriber + active opt-in row) against the count of
+// rows actually written to `sends` for that (sport, date). A meaningful
+// gap means the cron either hasn't fully fired OR is silently dropping
+// recipients somewhere — both worth surfacing on the universal dashboard
+// next to the watchwall.
+//
+// Some natural daily gap is expected from subscribers who confirm AFTER
+// the cron runs; we flag rows where the gap exceeds a small threshold.
+
+export type SendCoverageBucket = {
+  eligible: number;
+  sent: number;
+  /** sent / eligible as a 0–1 ratio. 1.0 when fully covered, 0 when no sends. */
+  coverage: number;
+  /** True when there's a meaningful unexplained gap — UI surfaces this in red. */
+  warn: boolean;
+};
+
+export type SendCoverageRow = {
+  sport: string;
+  sportName: string;
+  date: string;
+  league: SendCoverageBucket | null;  // null = sport doesn't run a league send
+  team: SendCoverageBucket | null;    // null = sport doesn't have team digests
+};
+
+// Tunable. Anything ≥5% gap (e.g. 100 sent of 110 eligible) is the kind of
+// thing that begs a second look. Smaller gaps are typically just post-cron
+// confirmations.
+const COVERAGE_WARN_THRESHOLD = 0.05;
+
+function makeBucket(eligible: number, sent: number): SendCoverageBucket {
+  const coverage = eligible === 0 ? 1 : sent / eligible;
+  const gap = eligible - sent;
+  // Flag when coverage is meaningfully below 1.0 AND the gap is more than
+  // a handful of subscribers — avoids false alarms on tiny eligible sets
+  // (e.g. 1 eligible / 0 sent isn't actually interesting).
+  const warn = eligible > 5 && gap >= 5 && coverage < 1 - COVERAGE_WARN_THRESHOLD;
+  return { eligible, sent, coverage, warn };
+}
+
+export async function getSendCoverage(): Promise<SendCoverageRow[]> {
+  const date = yesterdayInET();
+  const sports = await getVisibleSports({ includeAdminOnly: true });
+  const db = supabaseAdmin();
+
+  // Paginated active-subscriber IDs — without pagination Supabase silently
+  // caps at 1000 rows and we silently under-count opt-ins by ~80% on
+  // larger accounts. Same root cause as the team-send cron bug.
+  const activeIds = await getActiveSubscriberIdSet();
+
+  const rows: SendCoverageRow[] = [];
+  for (const sport of sports) {
+    const features = featuresFor(sport.id);
+
+    let league: SendCoverageBucket | null = null;
+    if (features.expectedRoutes.includes("send-email")) {
+      const [optIns, sent] = await Promise.all([
+        db.from("email_subscriptions")
+          .select("subscriber_id")
+          .eq("sport", sport.id)
+          .eq("scope", "league")
+          .eq("active", true),
+        db.from("sends")
+          .select("subscriber_id", { count: "exact", head: true })
+          .eq("digest_sport", sport.id)
+          .eq("digest_date", date)
+          .is("team_id", null)
+          .is("error", null),
+      ]);
+      if (optIns.error) throw new Error(`getSendCoverage league opt-ins: ${optIns.error.message}`);
+      if (sent.error) throw new Error(`getSendCoverage league sends: ${sent.error.message}`);
+      let eligible = 0;
+      for (const r of (optIns.data ?? []) as Array<{ subscriber_id: string }>) {
+        if (activeIds.has(r.subscriber_id)) eligible++;
+      }
+      league = makeBucket(eligible, sent.count ?? 0);
+    }
+
+    let team: SendCoverageBucket | null = null;
+    if (features.expectedRoutes.includes("send-team-email")) {
+      const [optIns, sent] = await Promise.all([
+        db.from("email_subscriptions")
+          .select("subscriber_id")
+          .eq("sport", sport.id)
+          .eq("scope", "team")
+          .eq("active", true),
+        db.from("sends")
+          .select("subscriber_id", { count: "exact", head: true })
+          .eq("digest_sport", sport.id)
+          .eq("digest_date", date)
+          .not("team_id", "is", null)
+          .is("error", null),
+      ]);
+      if (optIns.error) throw new Error(`getSendCoverage team opt-ins: ${optIns.error.message}`);
+      if (sent.error) throw new Error(`getSendCoverage team sends: ${sent.error.message}`);
+      let eligible = 0;
+      for (const r of (optIns.data ?? []) as Array<{ subscriber_id: string }>) {
+        if (activeIds.has(r.subscriber_id)) eligible++;
+      }
+      team = makeBucket(eligible, sent.count ?? 0);
+    }
+
+    if (league || team) {
+      rows.push({ sport: sport.id, sportName: sport.name, date, league, team });
+    }
+  }
+  return rows;
 }
