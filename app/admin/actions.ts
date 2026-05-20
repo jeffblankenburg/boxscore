@@ -4,12 +4,14 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getDigest } from "@/lib/digests";
 import { sendEmail } from "@/lib/email";
-import { dailyEmail } from "@/lib/emails/templates";
+import { dailyEmail, teamDailyEmail } from "@/lib/emails/templates";
 import { prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
 import { siteOrigin } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
+import { findTeam, type Sport } from "@/lib/teams";
+import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
 import { requireAdmin } from "./require-admin";
 
 export async function sendAdminPreview(
@@ -35,12 +37,16 @@ export async function sendAdminPreview(
     }
 
     const origin = await siteOrigin();
+    const { getAnnouncement } = await import("@/lib/announcements");
+    const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
     const { subject, html, text } = dailyEmail({
       sport,
       digestDate: date,
       digestPrettyDate: prettyDate(date),
       digestUrl: `${origin}/${sport}/${date}`,
       unsubscribeUrl: `${origin}/u/admin-preview`,
+      manageUrl: `${origin}/settings`,
+      announcementBanner,
       digestEmailHtml: digest.email_html,
     });
 
@@ -55,6 +61,57 @@ export async function sendAdminPreview(
   } catch (err) {
     const msg = (err as Error).message;
     console.error(`[send-admin-preview] ${sport}/${date} FAILED: ${msg}`);
+    target = `${returnTo}?error=${encodeURIComponent(msg)}`;
+  }
+  redirect(target);
+}
+
+// Renders + emails a single team's digest to the signed-in admin. Mirrors
+// sendAdminPreview but routes through loadTeamEmailData/renderTeamEmailContent
+// rather than the cached league digest, so we can dogfood team emails before
+// any team-send cron has fired (and on dates where the team's row would be
+// skipped as "empty" by the send cron — preview still emails it).
+export async function sendTeamAdminPreview(
+  date: string,
+  sport: string = "mlb",
+  teamSlug: string = "",
+  returnTo: string = "/admin",
+): Promise<void> {
+  const adminEmail = await requireAdmin();
+
+  let target: string;
+  try {
+    if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
+    if (sport !== "mlb") throw new Error(`Team preview only wired for MLB`);
+    const team = findTeam(sport as Sport, teamSlug);
+    if (!team) throw new Error(`Unknown team: ${sport}/${teamSlug}`);
+
+    const data = await loadTeamEmailData(team, date);
+    const body = renderTeamEmailContent(data);
+    const origin = await siteOrigin();
+    const { getAnnouncement } = await import("@/lib/announcements");
+    const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
+    const { subject, html, text } = teamDailyEmail({
+      teamName: team.name,
+      digestPrettyDate: prettyDate(date),
+      digestUrl: `${origin}/${sport}/${team.slug}/${date}`,
+      unsubscribeUrl: `${origin}/u/admin-preview`,
+      manageUrl: `${origin}/settings`,
+      announcementBanner,
+      digestEmailHtml: body,
+    });
+
+    await sendEmail({
+      to: adminEmail,
+      subject: `[ADMIN PREVIEW] ${subject}`,
+      html,
+      text,
+    });
+
+    target = `${returnTo}?ok=${encodeURIComponent(`Sent ${team.abbreviation}/${prettyDate(date)} digest to ${adminEmail}.`)}`;
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`[send-team-admin-preview] ${sport}/${teamSlug}/${date} FAILED: ${msg}`);
     target = `${returnTo}?error=${encodeURIComponent(msg)}`;
   }
   redirect(target);
@@ -81,7 +138,7 @@ export async function triggerCron(formData: FormData): Promise<void> {
 
   let target: string;
   try {
-    if (!["generate", "send-email", "post-bluesky", "post-twitter"].includes(route)) {
+    if (!["generate", "send-email", "send-team-email", "post-bluesky", "post-twitter"].includes(route)) {
       throw new Error(`Unknown cron route: ${route}`);
     }
     if (!["mlb", "nba", "wnba"].includes(sport)) {
@@ -112,18 +169,138 @@ export async function triggerCron(formData: FormData): Promise<void> {
   redirect(target);
 }
 
-export async function regenerateAllDigests(): Promise<void> {
+// Save (or clear) an announcement banner. Scope is decided by the
+// `apply_all` form field — when "1" the row is written under sport='*'
+// (global, applies to every sport's send for the date); otherwise it's
+// written under the page's sport. Empty/whitespace HTML clears the row.
+export async function setAnnouncement(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const pageSport = String(formData.get("sport") ?? "mlb");
+  const applyAll = formData.get("apply_all") === "1";
+  const date = String(formData.get("date") ?? "");
+  const html = String(formData.get("html") ?? "");
+  const returnToRaw = formData.get("returnTo");
+  const returnTo =
+    typeof returnToRaw === "string" && returnToRaw.startsWith("/") ? returnToRaw : `/admin/${pageSport}`;
+
+  // The actual sport value we write under. "*" for global; the page's sport
+  // otherwise. /admin/[sport] always passes one of mlb/nba/wnba.
+  const scope = applyAll ? "*" : pageSport;
+  const label = applyAll ? "all sports" : pageSport;
+
   let target: string;
   try {
+    if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
+    if (!applyAll && !["mlb", "nba", "wnba"].includes(pageSport)) {
+      throw new Error(`Unknown sport: ${pageSport}`);
+    }
+    const { upsertAnnouncement, deleteAnnouncement } = await import("@/lib/announcements");
+    const trimmed = html.trim();
+    if (trimmed.length === 0) {
+      await deleteAnnouncement(scope, date);
+      target = `${returnTo}?ok=${encodeURIComponent(`Announcement for ${label}/${date} cleared.`)}`;
+    } else {
+      await upsertAnnouncement({ sport: scope, date, html: trimmed });
+      target = `${returnTo}?ok=${encodeURIComponent(`Announcement saved for ${label}/${date} (${trimmed.length} chars).`)}`;
+    }
+  } catch (err) {
+    target = `${returnTo}?error=${encodeURIComponent(`announcement: ${(err as Error).message}`)}`;
+  }
+  redirect(target);
+}
+
+// Direct delete from the announcements list on /admin/[sport]. Takes the
+// row's (sport, date) — sport may be "*" for a global row — and removes
+// it. Avoids forcing the operator to switch the form's date input and
+// re-save an empty value just to clear an existing row.
+export async function removeAnnouncement(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const scope = String(formData.get("scope") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const pageSport = String(formData.get("pageSport") ?? "mlb");
+  const returnToRaw = formData.get("returnTo");
+  const returnTo =
+    typeof returnToRaw === "string" && returnToRaw.startsWith("/") ? returnToRaw : `/admin/${pageSport}`;
+
+  let target: string;
+  try {
+    if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
+    if (!["mlb", "nba", "wnba", "*"].includes(scope)) {
+      throw new Error(`Unknown scope: ${scope}`);
+    }
+    const { deleteAnnouncement } = await import("@/lib/announcements");
+    await deleteAnnouncement(scope, date);
+    const label = scope === "*" ? "all sports" : scope;
+    target = `${returnTo}?ok=${encodeURIComponent(`Announcement for ${label}/${date} cleared.`)}`;
+  } catch (err) {
+    target = `${returnTo}?error=${encodeURIComponent(`remove-announcement: ${(err as Error).message}`)}`;
+  }
+  redirect(target);
+}
+
+// Single-date regenerate, invoked from the client-side bulk runner. When
+// includeTeams is false (default), passes skip_teams=1 so the iteration is
+// sub-second per date. When true, hits the full generate path — ~20s/date
+// for MLB because each call also rebuilds 30 team_digests rows. The runner
+// surfaces this choice via a checkbox.
+export async function regenerateOneDigest(
+  sport: string,
+  date: string,
+  includeTeams = false,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!["mlb", "nba", "wnba"].includes(sport)) {
+    return { ok: false, error: `Unknown sport: ${sport}` };
+  }
+  if (!isValidIsoDate(date)) {
+    return { ok: false, error: `Invalid date: ${date}` };
+  }
+
+  const origin = await siteOrigin();
+  const headers: HeadersInit = {};
+  const secret = process.env.CRON_SECRET;
+  if (secret) headers.Authorization = `Bearer ${secret}`;
+
+  const params = new URLSearchParams({ date, sport, trigger: "manual" });
+  if (!includeTeams) params.set("skip_teams", "1");
+
+  try {
+    const res = await fetch(`${origin}/api/cron/generate?${params}`, { headers });
+    const body = (await res.json()) as { error?: string };
+    if (!res.ok || body.error) {
+      return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+// Legacy synchronous bulk regenerate — invoked from the /admin/[sport]
+// "Regenerate all" form when there's no client-side runner. The runner is
+// preferred since it gives the operator visible progress; this stays as a
+// fallback for browsers that don't run the client component for any reason.
+export async function regenerateAllDigests(formData: FormData): Promise<void> {
+  const sport = String(formData.get("sport") ?? "mlb");
+  const returnToRaw = formData.get("returnTo");
+  const returnTo =
+    typeof returnToRaw === "string" && returnToRaw.startsWith("/") ? returnToRaw : `/admin/${sport}`;
+
+  let target: string;
+  try {
+    if (!["mlb", "nba", "wnba"].includes(sport)) {
+      throw new Error(`Unknown sport: ${sport}`);
+    }
+
     const { supabaseAdmin } = await import("@/lib/supabase");
     const { data, error } = await supabaseAdmin()
       .from("daily_digests")
       .select("date,sport")
+      .eq("sport", sport)
       .order("date", { ascending: true });
     if (error) throw new Error(`query digests: ${error.message}`);
     const rows = (data ?? []) as Array<{ date: string; sport: string }>;
     if (rows.length === 0) {
-      target = `/admin?ok=${encodeURIComponent("No digests to regenerate.")}`;
+      target = `${returnTo}?ok=${encodeURIComponent(`No ${sport} digests to regenerate.`)}`;
       redirect(target);
     }
 
@@ -140,7 +317,7 @@ export async function regenerateAllDigests(): Promise<void> {
     for (const row of rows) {
       try {
         const res = await fetch(
-          `${origin}/api/cron/generate?date=${row.date}&sport=${row.sport}&trigger=manual`,
+          `${origin}/api/cron/generate?date=${row.date}&sport=${row.sport}&trigger=manual&skip_teams=1`,
           { headers },
         );
         const body = (await res.json()) as { error?: string };
@@ -157,13 +334,13 @@ export async function regenerateAllDigests(): Promise<void> {
     }
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     const msg = fail === 0
-      ? `Regenerated ${ok} digests in ${elapsed}s.`
-      : `Regenerated ${ok} of ${rows.length} in ${elapsed}s. Failures: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? "…" : ""}`;
+      ? `Regenerated ${ok} ${sport} digests in ${elapsed}s.`
+      : `Regenerated ${ok} of ${rows.length} ${sport} digests in ${elapsed}s. Failures: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? "…" : ""}`;
     target = fail === 0
-      ? `/admin?ok=${encodeURIComponent(msg)}`
-      : `/admin?error=${encodeURIComponent(msg)}`;
+      ? `${returnTo}?ok=${encodeURIComponent(msg)}`
+      : `${returnTo}?error=${encodeURIComponent(msg)}`;
   } catch (err) {
-    target = `/admin?error=${encodeURIComponent(`regenerate-all: ${(err as Error).message}`)}`;
+    target = `${returnTo}?error=${encodeURIComponent(`regenerate-all: ${(err as Error).message}`)}`;
   }
   redirect(target);
 }

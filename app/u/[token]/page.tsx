@@ -15,12 +15,41 @@ export const dynamic = "force-dynamic";
 // Mail-client native "Unsubscribe" buttons (List-Unsubscribe-Post one-click,
 // RFC 8058) POST to a separate endpoint at /api/u/[token] — see route.ts there.
 
+// The admin email preview at /admin/team-email/[team] passes this literal
+// as unsubscribeUrl so the rendered template has a real link to click.
+// Real subscriber tokens would be dangerous (clicking would unsub a real
+// person); the admin's own token would be self-foot-shooting. Recognizing
+// the stub here lets admins click through and see exactly what subscribers
+// see — same layout, button intentionally inert.
+const PREVIEW_TOKEN = "admin-preview";
+
 export default async function UnsubscribePage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
+  if (token === PREVIEW_TOKEN) {
+    return (
+      <section className="subscribe-card">
+        <h1 className="subscribe-h1">Unsubscribe?</h1>
+        <p className="subscribe-lede">
+          Click below to stop sending the daily digest to{" "}
+          <code>you@example.com</code>.
+        </p>
+        <form className="subscribe-form">
+          <button type="button" className="subscribe-button" disabled>
+            Confirm unsubscribe
+          </button>
+        </form>
+        <p className="subscribe-fine">
+          <em>Preview mode</em> — admins see this when they click the
+          unsubscribe link in an email preview. Button is intentionally
+          inert; nothing happens.
+        </p>
+      </section>
+    );
+  }
   if (!/^[0-9a-f-]{36}$/i.test(token)) notFound();
 
   const subscriber = await findByUnsubscribeToken(token);

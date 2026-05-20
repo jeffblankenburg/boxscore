@@ -30,12 +30,16 @@ export default async function AdminEmailPreview({
   }
 
   const origin = await siteOrigin();
+  const { getAnnouncement } = await import("@/lib/announcements");
+  const announcementBanner = (await getAnnouncement("mlb", date)) ?? undefined;
   const { html } = dailyEmail({
     sport: "mlb",
     digestDate: date,
     digestPrettyDate: prettyDate(date),
     digestUrl: `${origin}/mlb/${date}`,
     unsubscribeUrl: `${origin}/u/admin-preview`,
+    manageUrl: `${origin}/settings`,
+    announcementBanner,
     digestEmailHtml: digest.email_html,
   });
 

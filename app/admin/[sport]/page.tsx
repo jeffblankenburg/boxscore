@@ -3,13 +3,23 @@ import { requireAdmin } from "../require-admin";
 import { AdminNav } from "../AdminNav";
 import { SubmitButton } from "../SubmitButton";
 import { SendEmailGuard } from "../SendEmailGuard";
-import { triggerCron, sendAdminPreview, regenerateAllDigests } from "../actions";
+import { triggerCron, sendAdminPreview, sendTeamAdminPreview, setAnnouncement, removeAnnouncement } from "../actions";
+import { RegenerateAllRunner } from "./RegenerateAllRunner";
+import { CopyButton } from "./CopyButton";
+import {
+  getSpecificAnnouncement,
+  GLOBAL_ANNOUNCEMENT_SPORT,
+  listAnnouncements,
+  type AnnouncementListItem,
+} from "@/lib/announcements";
 import { getSportById, isSportVisible } from "@/lib/sports";
 import { getActiveSubscribersForSport } from "@/lib/subscribers";
+import { countActiveTeamSubscriptions } from "@/lib/email-subscriptions";
 import { recentCronRunsForSports, type CronRun } from "@/lib/cron-runs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { yesterdayInET, prettyDate } from "@/lib/dates";
 import { featuresFor, type CronRoute } from "@/lib/sport-features";
+import { teamsBySport, type Sport } from "@/lib/teams";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +48,17 @@ export default async function LeagueDashboard({
   const date = yesterdayInET();
   const returnTo = `/admin/${sport}`;
 
-  const [activeSubs, generateRun, lastSend, cronPulse, recentRuns] = await Promise.all([
+  const [activeSubs, teamSendCount, generateRun, lastSend, cronPulse, recentRuns, regenDates, sportAnnouncement, globalAnnouncement, announcementList] = await Promise.all([
     getActiveSubscribersForSport(sport).then((rows) => rows.length),
+    features.hasTeamDigests ? countActiveTeamSubscriptions(sport) : Promise.resolve(0),
     getMostRecentCronRunForDate(sport, "generate", date),
     getMostRecentSendForSport(sport),
     getCronPulseForDate(sport, date, features.expectedRoutes),
     recentCronRunsForSports([sport], 20),
+    features.hasRegenAll ? listCachedDigestDates(sport) : Promise.resolve([]),
+    getSpecificAnnouncement(sport, date),
+    getSpecificAnnouncement(GLOBAL_ANNOUNCEMENT_SPORT, date),
+    listAnnouncements(sport),
   ]);
 
   const generateResult = (generateRun?.result ?? null) as
@@ -138,6 +153,18 @@ export default async function LeagueDashboard({
             returnTo={returnTo}
           />
         )}
+        {features.expectedRoutes.includes("send-team-email") && (
+          <SendEmailGuard
+            defaultDate={date}
+            activeSubscribers={teamSendCount}
+            sport={sport}
+            returnTo={returnTo}
+            route="send-team-email"
+            label="Send team digests to subscribers"
+            buttonLabel="Run send-team-email"
+            audienceNoun="team-digest send"
+          />
+        )}
         {features.expectedRoutes.includes("post-bluesky") && (
           <TriggerForm
             route="post-bluesky"
@@ -158,7 +185,30 @@ export default async function LeagueDashboard({
             allowReset
           />
         )}
-        {features.hasRegenAll && <RegenerateAllForm />}
+        {features.hasRegenAll && <RegenerateAllRunner sport={sport} dates={regenDates} />}
+      </section>
+
+      <section>
+        <h2>Email announcement banner</h2>
+        <p className="admin-meta">
+          One-off note prepended above the digest body in both the league
+          send and every per-team send for the chosen date. Line breaks are
+          preserved. Markdown: <code>**bold**</code>, <code>*italic*</code>,{" "}
+          <code>__underline__</code>, <code>[link](https://…)</code>. Raw
+          HTML also accepted. Empty + Save clears it.
+        </p>
+        <AnnouncementForm
+          sport={sport}
+          date={date}
+          returnTo={returnTo}
+          sportAnnouncement={sportAnnouncement}
+          globalAnnouncement={globalAnnouncement}
+        />
+        <AnnouncementList
+          sport={sport}
+          returnTo={returnTo}
+          items={announcementList}
+        />
       </section>
 
       {features.hasPreview && (
@@ -170,6 +220,23 @@ export default async function LeagueDashboard({
             before firing the real send.
           </p>
           <SendToMeForm date={date} sport={sport} returnTo={returnTo} />
+        </section>
+      )}
+
+      {features.hasTeamDigests && (
+        <section>
+          <h2>Send a team&apos;s email to me</h2>
+          <p className="admin-meta">
+            Renders + emails a single team&apos;s digest to the signed-in
+            admin&apos;s address. Bypasses the empty-day skip used by the
+            send-team-email cron so you can preview off-day templates too.
+          </p>
+          <SendTeamToMeForm
+            date={date}
+            sport={sport}
+            returnTo={returnTo}
+            teams={teamsBySport(sport as Sport)}
+          />
         </section>
       )}
 
@@ -246,6 +313,16 @@ async function getMostRecentSendForSport(sport: string): Promise<CronRun | null>
     .maybeSingle<CronRun>();
   if (error) throw new Error(`getMostRecentSendForSport: ${error.message}`);
   return data;
+}
+
+async function listCachedDigestDates(sport: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("daily_digests")
+    .select("date")
+    .eq("sport", sport)
+    .order("date", { ascending: true });
+  if (error) throw new Error(`listCachedDigestDates: ${error.message}`);
+  return ((data ?? []) as Array<{ date: string }>).map((r) => r.date);
 }
 
 async function getCronPulseForDate(
@@ -403,24 +480,207 @@ function SendToMeForm({
   );
 }
 
-function RegenerateAllForm() {
+function SendTeamToMeForm({
+  date,
+  sport,
+  returnTo,
+  teams,
+}: {
+  date: string;
+  sport: string;
+  returnTo: string;
+  teams: ReturnType<typeof teamsBySport>;
+}) {
   return (
     <form
-      action={async () => {
+      action={async (formData: FormData) => {
         "use server";
-        await regenerateAllDigests();
+        const rawDate = formData.get("date");
+        const rawTeam = formData.get("team");
+        const targetDate = typeof rawDate === "string" && rawDate ? rawDate : date;
+        const targetTeam = typeof rawTeam === "string" ? rawTeam : "";
+        await sendTeamAdminPreview(targetDate, sport, targetTeam, returnTo);
       }}
       className="admin-trigger-form"
     >
-      <span className="admin-trigger-label">
-        Regenerate ALL digests (re-renders every date in DB)
-      </span>
-      <SubmitButton
-        idleLabel="Regenerate all"
-        pendingLabel="Regenerating\u2026 (may take ~1 min)"
-      />
+      <label>
+        <span className="admin-trigger-label">Team</span>
+        <select className="admin-input" name="team" defaultValue={teams[0]?.slug ?? ""}>
+          {teams.map((t) => (
+            <option key={t.slug} value={t.slug}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span className="admin-trigger-label">Date</span>
+        <input
+          className="admin-input"
+          type="date"
+          name="date"
+          defaultValue={date}
+        />
+      </label>
+      <SubmitButton idleLabel="Send team to me" pendingLabel="Sending\u2026" />
     </form>
   );
+}
+
+function AnnouncementForm({
+  sport,
+  date,
+  returnTo,
+  sportAnnouncement,
+  globalAnnouncement,
+}: {
+  sport: string;
+  date: string;
+  returnTo: string;
+  sportAnnouncement: string | null;
+  globalAnnouncement: string | null;
+}) {
+  // Pre-fill the textarea with whichever is currently set; sport-specific
+  // wins (matches the precedence the send crons use). The "all sports"
+  // checkbox starts in whichever mode matches the populated source.
+  const prefill = sportAnnouncement ?? globalAnnouncement ?? "";
+  const prefillIsGlobal = !sportAnnouncement && !!globalAnnouncement;
+
+  return (
+    <form action={setAnnouncement} className="admin-announcement-form">
+      <input type="hidden" name="sport" value={sport} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <div className="admin-announcement-meta">
+        <label>
+          <span className="admin-trigger-label">Date</span>
+          <input
+            className="admin-input"
+            type="date"
+            name="date"
+            defaultValue={date}
+          />
+        </label>
+        <label className="admin-announcement-scope">
+          <input
+            type="checkbox"
+            name="apply_all"
+            value="1"
+            defaultChecked={prefillIsGlobal}
+          />
+          <span>Apply to all sports (global banner)</span>
+        </label>
+      </div>
+      <AnnouncementStatus
+        sport={sport}
+        sportAnnouncement={sportAnnouncement}
+        globalAnnouncement={globalAnnouncement}
+      />
+      <label className="admin-announcement-html">
+        <span className="admin-trigger-label">HTML</span>
+        <textarea
+          name="html"
+          rows={6}
+          className="admin-input admin-announcement-textarea"
+          defaultValue={prefill}
+          placeholder={`New: **per-team daily digests** are live.\nPick your team on [Settings](https://boxscore.email/settings).`}
+        />
+      </label>
+      <div className="admin-announcement-actions">
+        <SubmitButton idleLabel="Save announcement" pendingLabel="Saving\u2026" />
+      </div>
+    </form>
+  );
+}
+
+function AnnouncementStatus({
+  sport,
+  sportAnnouncement,
+  globalAnnouncement,
+}: {
+  sport: string;
+  sportAnnouncement: string | null;
+  globalAnnouncement: string | null;
+}) {
+  if (!sportAnnouncement && !globalAnnouncement) {
+    return (
+      <p className="admin-meta admin-announcement-status">
+        No banner set for this date.
+      </p>
+    );
+  }
+  return (
+    <ul className="admin-meta admin-announcement-status admin-announcement-status-list">
+      {sportAnnouncement && (
+        <li>
+          <strong>{sport.toUpperCase()}-specific</strong> banner set ({sportAnnouncement.length} chars){globalAnnouncement ? " — overrides the global banner" : ""}.
+        </li>
+      )}
+      {globalAnnouncement && (
+        <li>
+          <strong>Global</strong> banner set ({globalAnnouncement.length} chars) — applies to every sport's send when no sport-specific banner exists.
+        </li>
+      )}
+    </ul>
+  );
+}
+
+function AnnouncementList({
+  sport,
+  returnTo,
+  items,
+}: {
+  sport: string;
+  returnTo: string;
+  items: AnnouncementListItem[];
+}) {
+  if (items.length === 0) {
+    return (
+      <p className="admin-meta admin-announcement-list-empty">
+        No saved announcements for {sport.toUpperCase()} or global.
+      </p>
+    );
+  }
+  return (
+    <div className="admin-announcement-list">
+      <h3 className="admin-announcement-list-title">Saved announcements</h3>
+      <ul className="admin-announcement-rows">
+        {items.map((item) => {
+          const scope = item.sport === "*" ? "All sports" : item.sport.toUpperCase();
+          const preview = plainTextForPreview(item.html);
+          return (
+            <li key={`${item.sport}-${item.date}`} className="admin-announcement-row">
+              <div className="admin-announcement-when">
+                <div className="admin-announcement-date">{item.date}</div>
+                <div className="admin-announcement-scope-tag">{scope}</div>
+              </div>
+              <div className="admin-announcement-preview">{preview}</div>
+              <div className="admin-announcement-row-actions">
+                <CopyButton text={item.html} />
+                <form action={removeAnnouncement} style={{ margin: 0 }}>
+                  <input type="hidden" name="scope" value={item.sport} />
+                  <input type="hidden" name="date" value={item.date} />
+                  <input type="hidden" name="pageSport" value={sport} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <button type="submit" className="admin-btn admin-btn-ghost admin-btn-small">
+                    Delete
+                  </button>
+                </form>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function plainTextForPreview(raw: string): string {
+  // Strip HTML tags but PRESERVE author-typed newlines so the preview cell
+  // looks like the announcement actually will (via white-space: pre-wrap
+  // in CSS). Markdown markers stay visible — operator typed them, let
+  // them see what they typed. No truncation; the column wraps naturally
+  // and Copy still grabs the raw original for full editing elsewhere.
+  return raw.replace(/<[^>]+>/g, "").trim();
 }
 
 function CronRunsTable({ runs }: { runs: CronRun[] }) {

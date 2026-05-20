@@ -112,7 +112,7 @@ export const EMAIL_STYLES = `
   .es-info { font-size: 11px; font-style: italic; color: #6a6354; margin: 6px 0 0; padding-top: 4px; border-top: 1px dotted #e8e2d4; }
   .es-info b { font-style: normal; color: #2a2620; }
 
-  .es-scoring-block { margin: 6px 0 0; padding-top: 4px; border-top: 1px solid #161410; }
+  .es-scoring-block { margin: 6px 0 0; padding-top: 4px; }
   .es-scoring p { font-size: 12px; line-height: 1.35; margin: 1px 0; }
   .es-scoring .inn { font-weight: 700; }
   .es-scoring .ev { font-style: italic; }
@@ -561,14 +561,18 @@ function renderPitching(team: BoxTeam, cityName: string): string {
       <td align="right">${pad(pi.earnedRuns)}</td>
       <td align="right">${pad(pi.baseOnBalls)}</td>
       <td align="right">${pad(pi.strikeOuts)}</td>
+      <td align="right">${pad(pi.homeRuns)}</td>
+      <td align="right">${pad(pi.battersFaced)}</td>
       <td align="right">${era}</td>
     </tr>`;
   }).join("");
+  const extras = pitchingExtras(ordered);
   return `<div class="es-team-label">${esc(cityName)} Pitching</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
-        <col width="38%"><col width="8%"><col width="8%"><col width="8%">
-        <col width="8%"><col width="8%"><col width="8%"><col width="14%">
+        <col width="30%"><col width="7%"><col width="7%"><col width="6%">
+        <col width="7%"><col width="7%"><col width="7%"><col width="7%">
+        <col width="8%"><col width="14%">
       </colgroup>
       <thead><tr>
         <th align="left">Pitcher</th>
@@ -577,11 +581,35 @@ function renderPitching(team: BoxTeam, cityName: string): string {
         <th align="right">R</th>
         <th align="right">ER</th>
         <th align="right">BB</th>
-        <th align="right">SO</th>
+        <th align="right">K</th>
+        <th align="right">HR</th>
+        <th align="right">BF</th>
         <th align="right">ERA</th>
       </tr></thead>
       <tbody>${rows}</tbody>
-    </table>`;
+    </table>
+    ${extras ? `<p class="es-info" style="border-bottom:1px dotted #e8e2d4;padding-bottom:4px;">${extras}</p>` : ""}`;
+}
+
+// "Newspaper extras" line under a team's pitching table: strikes-of-pitches
+// per pitcher (e.g., "62-96" = 62 strikes thrown out of 96 total). BF lives
+// in the table itself; this line is just for stats the table doesn't carry.
+function pitchingExtras(players: BoxPlayer[]): string {
+  type Row = { last: string; p: number; s: number };
+  const rows: Row[] = [];
+  for (const p of players) {
+    const pi = p.stats.pitching;
+    const pitches = pi.pitchesThrown ?? pi.numberOfPitches ?? 0;
+    if (pitches === 0) continue;
+    rows.push({
+      last: lastName(p.person.fullName),
+      p: pitches,
+      s: pi.strikes ?? 0,
+    });
+  }
+  if (rows.length === 0) return "";
+  const pcst = rows.map((r) => `${esc(r.last)} (${r.s}-${r.p})`).join(", ");
+  return `<b>ST-PC:</b> ${pcst}.`;
 }
 
 function renderScoring(plays: ScoringPlay[]): string {
@@ -606,7 +634,10 @@ function renderScoringNotes(plays: { inning: number; halfInning: "top" | "bottom
     const score = `${p.awayScore}-${p.homeScore}`;
     return `<p><span class="inn">${inn} ${score}</span> <span class="ev">${esc(p.description)}</span></p>`;
   }).join("");
-  return `<div class="es-scoring-block es-scoring">${items}</div>`;
+  return `<div class="es-scoring-block es-scoring">
+    <div class="es-scoring-h">Scoring Plays</div>
+    ${items}
+  </div>`;
 }
 
 function renderGameInfo(boxInfo: Array<{ label: string; value?: string }>): string {

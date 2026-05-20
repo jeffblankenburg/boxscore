@@ -69,7 +69,8 @@ export type PlayerStats = {
     inningsPitched: string; hits: number; runs: number;
     earnedRuns: number; baseOnBalls: number; strikeOuts: number;
     homeRuns: number; pitchesThrown: number; numberOfPitches: number;
-    strikes: number; era: string; note?: string;
+    strikes: number; battersFaced: number; strikePercentage: string;
+    era: string; note?: string;
   }>;
   fielding: Record<string, unknown>;
 };

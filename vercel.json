@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/post-bluesky?sport=mlb",
       "schedule": "25 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-team-email?sport=mlb",
+      "schedule": "45 9 * * *"
     }
   ],
   "functions": {

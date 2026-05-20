@@ -237,13 +237,26 @@ async function refetchProbablePitcherStats(scheduleRaw: unknown, season: number)
 // or refetch=true was passed, fetch from MLB and write through. For rows that
 // just lack newer fields (transactions, ERA on probables), lazy-patch with
 // the minimum extra fetches.
+//
+// Leaders preservation: the /v1/stats/leaders endpoint has no point-in-time
+// query — it always returns CURRENT season state. So on any refetch of an
+// old date, we keep the originally-cached `leaders` block rather than
+// stomping it with today's leader board. Historical accuracy beats freshness
+// here; the leaders shown on a 2026-03-25 page should be from late March
+// 2026, not whatever's current today.
 export async function loadDailyData(date: string, opts?: { refetch?: boolean }): Promise<DailyData> {
-  let raw = opts?.refetch ? null : await getDailyRaw("mlb", date);
-  if (raw && isOldShape(raw)) raw = null;
-  if (!raw) {
+  const existing = await getDailyRaw("mlb", date);
+  const stale = !existing || isOldShape(existing) || opts?.refetch === true;
+
+  let raw: DailyRaw;
+  if (stale) {
     raw = await fetchDailyRaw(date);
+    if (existing?.leaders && Object.keys(existing.leaders).length > 0) {
+      raw = { ...raw, leaders: existing.leaders };
+    }
     await upsertDailyRaw("mlb", date, raw);
   } else {
+    raw = existing;
     let dirty = false;
     if (!raw.transactions) {
       raw = { ...raw, transactions: await fetchTransactionsRaw(date) };

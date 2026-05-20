@@ -45,6 +45,9 @@ a { color: inherit; }
 .site-header .brand .dot { color: var(--text-muted); }
 .site-header .social { font-size: 13px; justify-self: center; }
 .site-header .header-cta { justify-self: end; display: inline-flex; align-items: center; gap: 6px; }
+/* Gear glyph in the signed-in "⚙ Settings" CTA — pulled up a touch so the
+   symbol baselines with the label visually. */
+.auth-gear { display: inline-block; margin-right: 2px; transform: translateY(-1px); font-size: 0.95em; }
 .site-header .social a {
   color: var(--text-secondary); text-decoration: none;
   margin-right: 6px; padding-right: 6px;
@@ -77,7 +80,29 @@ a { color: inherit; }
      ≈ 29 chars) never wraps. ~4vw fits the date across the full width range
      from ~375px (clamped to 16px min) up through desktop (clamped to 28px max). */
   font-size: clamp(18px, 4.2vw, 28px);
+  position: relative;
 }
+/* Day-nav arrows in the dateline. Near-invisible by default (low opacity,
+   not italic, lighter weight) — present for users who look for them,
+   absent for users who don't. Hover lifts to clearly clickable. */
+.dateline-arrow {
+  position: absolute; top: 50%;
+  transform: translateY(-50%);
+  font-style: normal; font-weight: 400;
+  font-size: 0.72em; line-height: 1;
+  padding: 4px 10px;
+  color: var(--text-primary);
+  opacity: 0.18; text-decoration: none;
+  transition: opacity 120ms ease;
+}
+.dateline-arrow:hover, .dateline-arrow:focus-visible { opacity: 0.85; }
+.dateline-prev { left: 4px; }
+.dateline-next { right: 4px; }
+.dateline-text { display: inline-block; }
+/* Suppress the dateline arrows when the wrapper says there's no further
+   cached date in that direction — keeps users from clicking into a 404. */
+.no-prev-day .dateline-prev,
+.no-next-day .dateline-next { display: none; }
 
 .section { margin-bottom: 20px; }
 .league-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
@@ -87,6 +112,15 @@ a { color: inherit; }
   text-align: center; font-size: 22px; font-weight: 700;
   margin: 10px 0; border-bottom: 2px solid var(--border-strong);
   padding-bottom: 4px;
+}
+/* Team-page header sits right under the dateline. Pull it up with a negative
+   margin so the gap above the text (dateline border → text) matches the gap
+   below (text → its own border-bottom). Same visual weight as boxscores-title
+   otherwise. */
+.team-name-header {
+  text-align: center; font-size: 22px; font-weight: 700;
+  margin: -14px 0 0; padding-bottom: 4px;
+  border-bottom: 2px solid var(--border-strong);
 }
 .stats-subheader {
   font-size: 14px; font-weight: 700; margin: 0 0 2px;
@@ -99,6 +133,11 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: f
 th, td { text-align: right; overflow: hidden; line-height: 1.15; padding: 0 2px; white-space: nowrap; }
 th:first-child, td:first-child { text-align: left; }
 th { border-top: 1px solid var(--border-strong); font-weight: 700; }
+
+/* Team-name links in the league standings inherit color so the table looks
+   unchanged; hover hint is the only visible affordance. */
+.team-link, .team-link:visited { color: inherit; text-decoration: none; }
+.team-link:hover { text-decoration: underline; }
 
 .standings-wrap { max-width: 100%; }
 .standings-table { margin-bottom: 8px; table-layout: fixed; }
@@ -203,7 +242,31 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .all-star-note { font-size: 12px; font-style: italic; color: var(--text-muted); text-align: center; margin: 4px 0 8px; }
 .batting-table tbody tr:last-child { font-weight: 700; }
 .pitching-table .ip-col { width: 7%; }
+/* Pitching table grew to 9 cols (added K, HR, BF); cinch the player+stat cols
+   so the row fits without rewrapping. Batting table is unaffected. */
+.pitching-table .player-col { width: 30%; }
+.pitching-table .stat-col { width: 7%; }
+.pitching-table .era-col { width: 13%; }
 .pitcher-note { color: var(--text-muted); font-weight: 400; font-size: 0.92em; margin-left: 2px; }
+
+/* Team-digest season stat sheet (Hitters/Pitchers tables on /[sport]/[slug]).
+   Columns are flexible — table-layout: auto so 12-column rosters render
+   without us hard-coding widths per stat. */
+.team-stat-table { table-layout: auto; font-size: 13px; margin: 2px 0 8px; }
+.team-stat-table tbody tr:nth-child(even) td { background-color: rgba(0, 0, 0, 0.025); }
+.team-stat-table .player-col { width: auto; text-align: left; }
+.team-stat-table .jersey, .team-stat-table .pos { color: var(--text-muted); font-weight: 400; }
+
+/* Upcoming-games block on the team page — one "row" per game, two lines:
+   matchup metadata, then probable pitchers. */
+.upcoming-list { margin: 4px 0 12px; }
+.upcoming-row { padding: 4px 0; border-bottom: 1px dotted var(--border-light, #ccc); font-size: 13px; }
+.upcoming-row:last-child { border-bottom: none; }
+.upcoming-line { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+.upcoming-when { flex: 0 0 auto; }
+.upcoming-opp { flex: 1 1 auto; padding: 0 8px; }
+.upcoming-time { flex: 0 0 auto; color: var(--text-muted); font-style: italic; }
+.upcoming-matchup { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
 .notes {
   font-size: 12px; line-height: 1.25; padding: 4px 0;
@@ -211,10 +274,11 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 }
 .scoring-block {
   font-size: 12px; line-height: 1.35; padding: 4px 0;
-  border-top: 1px solid var(--border-strong);
 }
 .scoring-block .ev { font-style: italic; }
 .scoring-block .inn { font-weight: 700; }
+.scoring-h { font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+             text-transform: uppercase; margin-bottom: 4px; }
 
 .transactions-section { margin-top: 20px; }
 .transactions-list { list-style: none; padding: 0; margin: 0;
@@ -236,8 +300,16 @@ footer.site-footer {
   border-top: 1px solid var(--border-light);
   font-size: 12px;
   color: var(--text-muted);
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  /* 3-col grid so the middle child sits in the true viewport center, not
+     in the middle of the gap left by flex space-between (which biases the
+     center when the credit and toggle have different widths). */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 12px;
 }
+footer.site-footer > :first-child { justify-self: start; }
+footer.site-footer > .site-footer-legal { justify-self: center; }
+footer.site-footer > :last-child { justify-self: end; }
 footer.site-footer a { color: var(--text-secondary); }
 .site-footer-credit { font-style: italic; }
 .site-footer-legal { display: inline-flex; gap: 12px; font-style: normal; }
@@ -291,6 +363,14 @@ footer.site-footer a { color: var(--text-secondary); }
   letter-spacing: -0.005em; margin: 0 0 12px;
 }
 .subscribe-lede { font-size: 16px; line-height: 1.5; margin: 0 0 16px; }
+/* One-shot welcome banner shown when ?welcome=1 lands a new subscriber on
+   /settings straight from /c/[token]. Visually distinct from the lede so
+   the "you're in + here's what to do" framing reads first. */
+.subscribe-welcome {
+  font-size: 15px; line-height: 1.5; margin: 0 0 14px;
+  padding: 10px 12px;
+  background: #f3eedf; border-left: 3px solid #161410;
+}
 .subscribe-form { display: flex; gap: 8px; margin: 12px 0 6px; flex-wrap: wrap; }
 .subscribe-input {
   flex: 1; min-width: 220px;
@@ -308,6 +388,16 @@ footer.site-footer a { color: var(--text-secondary); }
   cursor: pointer; letter-spacing: 0.02em;
 }
 .subscribe-button:hover { background: #333; }
+/* Secondary variant — white fill, black border. Used for the "Admin
+   Dashboard" button under Sign Out so admins have a clear secondary
+   action without competing with the primary sign-out. */
+a.subscribe-button-outline, .subscribe-button-outline {
+  background: #fff; color: var(--text-primary);
+  text-decoration: none; display: inline-block;
+}
+a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
+  background: rgba(0,0,0,0.04);
+}
 .subscribe-error { color: #a40000; font-size: 13px; margin: 4px 0 0; }
 .subscribe-fine { font-size: 13px; color: var(--text-muted); margin: 18px 0 0; }
 .subscribe-card a { color: var(--text-secondary); }
@@ -329,26 +419,76 @@ footer.site-footer a { color: var(--text-secondary); }
   background: rgba(0,0,0,0.04); padding: 1px 4px; border-radius: 3px;
 }
 
+/* Settings + Subscribe share these classes so the team/sport pickers look
+   identical on both pages. Tightened from the earlier looser layout — at
+   30 MLB teams the rows added up to a tall scroll on /settings and would
+   have been worse on /subscribe. */
 .settings-section-h {
-  font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em;
-  font-weight: 700; color: var(--text-muted); margin: 28px 0 8px;
-  padding-bottom: 4px; border-bottom: 1px solid var(--border-strong);
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em;
+  font-weight: 700; color: var(--text-muted); margin: 16px 0 2px;
+  padding-bottom: 2px; border-bottom: 1px solid var(--border-strong);
 }
-.settings-sport-list { list-style: none; padding: 0; margin: 8px 0 0; }
+.settings-sport-list { list-style: none; padding: 0; margin: 2px 0 0; }
 .settings-sport-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 0; border-bottom: 1px dotted var(--border-light);
-  gap: 12px;
+  padding: 5px 0; border-bottom: 1px dotted var(--border-light);
+  gap: 10px;
 }
 .settings-sport-row:last-child { border-bottom: none; }
-.settings-sport-name { font-size: 15px; font-weight: 600; }
+.settings-sport-name { font-size: 14px; font-weight: 600; }
 .settings-sport-badge {
   font-size: 12px; font-weight: 400; font-style: italic;
   color: var(--text-muted); letter-spacing: 0.02em;
 }
 .settings-toggle-on, .settings-toggle-off {
-  font: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
-  padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 3px 11px; border-radius: 999px; cursor: pointer;
+}
+/* /subscribe variant: each row is a label wrapping a checkbox + name. */
+.settings-pick-label {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; cursor: pointer;
+  font-size: 14px; font-weight: 600;
+}
+.settings-pick-label input[type="checkbox"] {
+  width: 15px; height: 15px; flex: 0 0 auto;
+}
+.subscribe-input-block { width: 100%; box-sizing: border-box; margin: 4px 0; }
+.subscribe-button-block { width: 100%; margin-top: 16px; }
+
+/* CSS-only tab strip for the Team Newsletters section on /subscribe. Three
+   radio inputs (visually hidden) live as siblings of the strip + panels; the
+   :checked + ~ combinator decides which strip label is "active" and which
+   panel is visible. No JavaScript needed; submitting the form ignores the
+   radio because the action only reads `leagues` and `teams`. */
+.team-tabs { margin-top: 4px; }
+.team-tab-input { position: absolute; opacity: 0; pointer-events: none; }
+.team-tab-strip {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border-strong);
+}
+.team-tab-label {
+  padding: 5px 14px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--text-secondary);
+  margin-right: -1px;
+  margin-bottom: -1px;
+}
+.team-tab-label:hover { background: rgba(0,0,0,0.04); }
+.team-tab-panel { display: none; padding-top: 4px; }
+#tab-mlb:checked ~ .team-tab-strip label[for="tab-mlb"],
+#tab-nba:checked ~ .team-tab-strip label[for="tab-nba"],
+#tab-wnba:checked ~ .team-tab-strip label[for="tab-wnba"] {
+  background: var(--text-primary); color: #fff;
+  border-color: var(--text-primary);
+}
+#tab-mlb:checked ~ .team-tab-panel[data-sport="mlb"],
+#tab-nba:checked ~ .team-tab-panel[data-sport="nba"],
+#tab-wnba:checked ~ .team-tab-panel[data-sport="wnba"] {
+  display: block;
 }
 .settings-toggle-on { background: #000; color: #fff; border: 1px solid #000; }
 .settings-toggle-on:hover { background: #333; }
@@ -761,6 +901,74 @@ footer.site-footer a { color: var(--text-secondary); }
 .admin-trigger-label { font-weight: 700; color: var(--text-primary); font-size: 13px; }
 .admin-trigger-checkbox { flex-direction: row !important; align-items: center;
                           gap: 4px; font-size: 13px; }
+
+/* Email announcement form — vertical stack with a full-width textarea
+   for HTML editing. Distinct from .admin-trigger-form because trigger
+   forms are horizontal flex rows (a textarea gets squeezed into a tiny
+   column there). */
+.admin-announcement-form { display: flex; flex-direction: column; gap: 10px;
+                            margin: 8px 0; max-width: 720px; }
+.admin-announcement-meta { display: flex; align-items: end; gap: 16px;
+                            flex-wrap: wrap; }
+.admin-announcement-meta label { display: flex; flex-direction: column;
+                                   gap: 2px; font-size: 12px;
+                                   color: var(--text-muted); }
+.admin-announcement-status { padding-bottom: 4px; font-style: italic; }
+.admin-announcement-status-list { list-style: none; padding: 0; margin: 0; }
+.admin-announcement-status-list li { margin: 2px 0; }
+.admin-announcement-scope { flex-direction: row !important; align-items: center;
+                             gap: 6px; font-size: 13px; padding-bottom: 4px; }
+.admin-announcement-html { display: flex; flex-direction: column; gap: 2px;
+                            font-size: 12px; color: var(--text-muted); }
+.admin-announcement-textarea {
+  width: 100%; box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px; line-height: 1.45; resize: vertical;
+  padding: 8px 10px;
+}
+.admin-announcement-actions { display: flex; justify-content: flex-start; }
+
+/* List of saved announcements below the form. Card-style rows (a flex
+   list, not a table) so we sidestep the sitewide `td { white-space:
+   nowrap }` rule and own every column's whitespace behavior locally. */
+.admin-announcement-list { margin: 22px 0 0; }
+.admin-announcement-list-title { font-size: 13px; font-weight: 700;
+                                  text-transform: uppercase;
+                                  letter-spacing: 0.06em;
+                                  color: var(--text-muted);
+                                  margin: 0 0 8px;
+                                  padding-bottom: 6px;
+                                  border-bottom: 1px solid var(--border-strong); }
+.admin-announcement-list-empty { margin: 22px 0 0; font-style: italic;
+                                   color: var(--text-muted); }
+.admin-announcement-rows { list-style: none; padding: 0; margin: 0;
+                            display: flex; flex-direction: column;
+                            gap: 0; }
+.admin-announcement-row { display: flex; align-items: flex-start;
+                           gap: 18px;
+                           padding: 12px 4px;
+                           border-bottom: 1px dotted var(--border-light); }
+.admin-announcement-row:last-child { border-bottom: none; }
+.admin-announcement-when { flex: 0 0 auto; min-width: 110px;
+                            line-height: 1.2; }
+.admin-announcement-date { font-family: ui-monospace, SFMono-Regular,
+                                          Menlo, monospace;
+                            font-size: 13px; font-weight: 600;
+                            white-space: nowrap; color: var(--text-primary); }
+.admin-announcement-scope-tag { margin-top: 3px;
+                                  font-size: 11px;
+                                  font-style: italic;
+                                  color: var(--text-muted);
+                                  letter-spacing: 0.02em; }
+.admin-announcement-preview { flex: 1 1 auto;
+                               color: var(--text-secondary);
+                               font-size: 13px; line-height: 1.5;
+                               white-space: pre-wrap;
+                               word-break: break-word;
+                               min-width: 0; }
+.admin-announcement-row-actions { flex: 0 0 auto;
+                                    display: inline-flex; gap: 6px;
+                                    align-items: center; }
 
 .admin-sports { width: 100%; border-collapse: collapse; font-size: 14px;
                 margin-top: 16px; }

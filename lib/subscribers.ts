@@ -50,6 +50,22 @@ export async function startSubscription(email: string): Promise<Subscriber> {
   return data;
 }
 
+/**
+ * Lookup by email (normalized). Used by /subscribe to dispatch between the
+ * confirmation flow (new/pending/unsubscribed addresses) and a magic-link
+ * sign-in flow (already-active addresses) without re-pendinging the row.
+ */
+export async function findByEmail(email: string): Promise<Subscriber | null> {
+  const normalized = email.trim().toLowerCase();
+  const { data, error } = await supabaseAdmin()
+    .from("subscribers")
+    .select(COLS)
+    .eq("email", normalized)
+    .maybeSingle<Subscriber>();
+  if (error) throw new Error(`findByEmail: ${error.message}`);
+  return data ?? null;
+}
+
 export async function findByConfirmToken(token: string): Promise<Subscriber | null> {
   const { data, error } = await supabaseAdmin()
     .from("subscribers")
@@ -119,6 +135,37 @@ export async function getActiveSubscribers(): Promise<Subscriber[]> {
     if (page.length < pageSize) break;
   }
   return out;
+}
+
+/**
+ * Active subscribers opted in to a specific team's digest. Same shape as
+ * getActiveSubscribersForSport, but keyed on (sport, scope='team', team_id).
+ * Used by the team-send cron to fan out a single team's digest only to its
+ * own opted-in subscribers.
+ */
+export async function getActiveSubscribersForTeam(
+  sport: string,
+  teamId: string,
+): Promise<Subscriber[]> {
+  const optedIn = new Set<string>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin()
+      .from("email_subscriptions")
+      .select("subscriber_id")
+      .eq("sport", sport)
+      .eq("scope", "team")
+      .eq("team_id", teamId)
+      .eq("active", true)
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`getActiveSubscribersForTeam ids: ${error.message}`);
+    const page = (data ?? []) as Array<{ subscriber_id: string }>;
+    for (const row of page) optedIn.add(row.subscriber_id);
+    if (page.length < pageSize) break;
+  }
+  if (optedIn.size === 0) return [];
+  const all = await getActiveSubscribers();
+  return all.filter((s) => optedIn.has(s.id));
 }
 
 /**

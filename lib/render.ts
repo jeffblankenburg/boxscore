@@ -4,6 +4,8 @@ import type {
   WildCardLeagueStandings, Transaction,
 } from "./mlb";
 import type { DigestMode } from "./digest-mode";
+import { findTeamByMlbApiId } from "./teams";
+import { prevDay, nextDay } from "./dates";
 
 export type GameDetail = {
   game: ScheduleGame;
@@ -155,13 +157,13 @@ function nicknameHtml(teamName: string): string {
 const tla = (name: string, live?: Record<string, string>): string =>
   live?.[name] ?? TLA_OF[name] ?? name;
 
-const esc = (s: string | number | undefined): string =>
+export const esc = (s: string | number | undefined): string =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const pad = (n: number | undefined): string => (n == null ? "—" : String(n));
-const fmtAvg = (s: string | undefined): string =>
+export const pad = (n: number | undefined): string => (n == null ? "—" : String(n));
+export const fmtAvg = (s: string | undefined): string =>
   !s || s === "-.--" ? ".---" : s.replace(/^0/, "");
-const fmtEra = (s: string | undefined): string =>
+export const fmtEra = (s: string | undefined): string =>
   !s || s === "-.--" ? "—" : s;
 
 const fmtDiff = (scored: number | undefined, allowed: number | undefined): string => {
@@ -172,7 +174,7 @@ const fmtDiff = (scored: number | undefined, allowed: number | undefined): strin
   return "0";
 };
 
-const lastName = (full: string): string => {
+export const lastName = (full: string): string => {
   const parts = full.split(/\s+/);
   const suffixes = new Set(["Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV"]);
   let i = parts.length - 1;
@@ -181,8 +183,16 @@ const lastName = (full: string): string => {
 };
 
 export function renderContent(data: DailyData): string {
+  // League digests live at /mlb/{date}. Prev/next links are best-effort —
+  // they may 404 if the cron hasn't generated that day yet, but the page
+  // handles that gracefully.
+  const datelineOpts = {
+    prevUrl: `/mlb/${prevDay(data.date)}`,
+    nextUrl: `/mlb/${nextDay(data.date)}`,
+  };
+
   if (data.mode === "no-games") {
-    return `${renderDateline(data.prettyDate)}
+    return `${renderDateline(data.prettyDate, datelineOpts)}
 
 <p class="no-games-note">No games yesterday.</p>
 
@@ -192,7 +202,7 @@ ${renderTransactions(data.transactions)}`;
   }
 
   if (data.mode === "all-star") {
-    return `${renderDateline(data.prettyDate)}
+    return `${renderDateline(data.prettyDate, datelineOpts)}
 
 <div class="edition-subtitle">All-Star Game Edition</div>
 
@@ -211,7 +221,7 @@ ${renderAllStarGame(data.games, data.teamAbbrev)}
 ${renderTransactions(data.transactions)}`;
   }
 
-  return `${renderDateline(data.prettyDate)}
+  return `${renderDateline(data.prettyDate, datelineOpts)}
 
 <div class="section">
   ${renderLeague("American League", 103, data)}
@@ -231,7 +241,7 @@ ${renderGames(data.games, data.teamAbbrev)}
 ${renderTransactions(data.transactions)}`;
 }
 
-function renderTransactions(txs: Transaction[]): string {
+export function renderTransactions(txs: Transaction[]): string {
   if (txs.length === 0) return "";
   const items = txs
     .map((t) => `<li><span class="tx-type">${esc(t.typeDesc)}</span> ${esc(t.description)}</li>`)
@@ -243,8 +253,21 @@ function renderTransactions(txs: Transaction[]): string {
 }
 
 
-function renderDateline(pretty: string): string {
-  return `<div class="dateline">${esc(pretty)}</div>`;
+export function renderDateline(
+  pretty: string,
+  opts: { prevUrl?: string; nextUrl?: string } = {},
+): string {
+  // Subtle day-nav arrows positioned at each end of the dateline. CSS keeps
+  // them near-invisible (low opacity) until hovered; the chevrons survive
+  // contrast tests for "obviously clickable when you look for them" but
+  // don't compete with the date text for attention.
+  const prev = opts.prevUrl
+    ? `<a class="dateline-arrow dateline-prev" href="${esc(opts.prevUrl)}" aria-label="Previous day" rel="prev">&#x2039;</a>`
+    : "";
+  const next = opts.nextUrl
+    ? `<a class="dateline-arrow dateline-next" href="${esc(opts.nextUrl)}" aria-label="Next day" rel="next">&#x203A;</a>`
+    : "";
+  return `<div class="dateline">${prev}<span class="dateline-text">${esc(pretty)}</span>${next}</div>`;
 }
 
 function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leaderLimit = 5): string {
@@ -252,7 +275,7 @@ function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leade
   const divs = DIVISIONS[key];
   const standingsHtml = divs.map((d) => {
     const rec = data.standings.find((r) => r.division.id === d.id);
-    return rec ? renderDivisionTable(d.name, rec) : "";
+    return rec ? renderDivisionTable(d.name, rec, { date: data.date }) : "";
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league.id === leagueId);
   const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord) : "";
@@ -325,15 +348,31 @@ function renderWildCardTable(wc: WildCardLeagueStandings): string {
 </table></div>`;
 }
 
-function renderDivisionTable(label: string, d: DivisionStandings): string {
+export function renderDivisionTable(
+  label: string,
+  d: DivisionStandings,
+  opts: { date?: string } = {},
+): string {
   const rows = [...d.teamRecords]
     .sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank))
     .map((t) => {
       const home = t.records?.splitRecords?.find((s) => s.type === "home");
       const away = t.records?.splitRecords?.find((s) => s.type === "away");
       const l10 = t.records?.splitRecords?.find((s) => s.type === "lastTen");
+      // Each team name links to its standalone digest page. Click-through
+      // carries the current page's date when present so clicking a team
+      // from /mlb/2025-08-15 lands on /mlb/{slug}/2025-08-15, not the
+      // team's most-recent (which would jump you forward in time).
+      const slug = findTeamByMlbApiId(t.team.id)?.slug;
+      const name = esc(nickname(t.team.name));
+      const teamHref = slug
+        ? `/mlb/${slug}${opts.date ? `/${opts.date}` : ""}`
+        : null;
+      const teamCell = teamHref
+        ? `<a class="team-link" href="${teamHref}">${name}</a>`
+        : name;
       return `<tr>
-        <td class="team-col">${esc(nickname(t.team.name))}</td>
+        <td class="team-col">${teamCell}</td>
         <td class="w-col">${t.wins}</td>
         <td class="l-col">${t.losses}</td>
         <td class="pct-col">${esc(t.leagueRecord.pct).replace(/^0/, "")}</td>
@@ -601,7 +640,7 @@ function ordinal(n: number): string {
   return `${n}th`;
 }
 
-function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Record<string, string>): string {
+export function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbbrev: Record<string, string>): string {
   const a = game.teams.away, h = game.teams.home;
   const aScore = a.score ?? 0, hScore = h.score ?? 0;
   const innings = game.linescore?.innings ?? [];
@@ -749,10 +788,13 @@ function renderPitching(team: BoxTeam, cityName: string): string {
       <td class="stat-col">${pad(pi.earnedRuns)}</td>
       <td class="stat-col">${pad(pi.baseOnBalls)}</td>
       <td class="stat-col">${pad(pi.strikeOuts)}</td>
+      <td class="stat-col">${pad(pi.homeRuns)}</td>
+      <td class="stat-col">${pad(pi.battersFaced)}</td>
       <td class="era-col">${era}</td>
     </tr>`;
   }).join("");
 
+  const extras = pitchingExtras(ordered);
   return `<table class="pitching-table">
     <thead>
       <tr>
@@ -762,12 +804,33 @@ function renderPitching(team: BoxTeam, cityName: string): string {
         <th class="stat-col">R</th>
         <th class="stat-col">ER</th>
         <th class="stat-col">BB</th>
-        <th class="stat-col">SO</th>
+        <th class="stat-col">K</th>
+        <th class="stat-col">HR</th>
+        <th class="stat-col">BF</th>
         <th class="era-col">ERA</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
-  </table>`;
+  </table>
+  ${extras ? `<div class="notes">${extras}</div>` : ""}`;
+}
+
+function pitchingExtras(players: BoxPlayer[]): string {
+  type Row = { last: string; p: number; s: number };
+  const rows: Row[] = [];
+  for (const p of players) {
+    const pi = p.stats.pitching;
+    const pitches = pi.pitchesThrown ?? pi.numberOfPitches ?? 0;
+    if (pitches === 0) continue;
+    rows.push({
+      last: lastName(p.person.fullName),
+      p: pitches,
+      s: pi.strikes ?? 0,
+    });
+  }
+  if (rows.length === 0) return "";
+  const pcst = rows.map((r) => `${esc(r.last)} (${r.s}-${r.p})`).join(", ");
+  return `<b>ST-PC:</b> ${pcst}.`;
 }
 
 function renderScoringNotes(plays: ScoringPlay[]): string {
@@ -778,5 +841,8 @@ function renderScoringNotes(plays: ScoringPlay[]): string {
     const score = `${p.awayScore}-${p.homeScore}`;
     return `<div><span class="inn">${inn} ${score}</span> <span class="ev">${esc(p.description)}</span></div>`;
   }).join("");
-  return `<div class="scoring-block">${items}</div>`;
+  return `<div class="scoring-block">
+    <div class="scoring-h">Scoring Plays</div>
+    ${items}
+  </div>`;
 }

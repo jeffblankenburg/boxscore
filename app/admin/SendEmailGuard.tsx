@@ -20,11 +20,19 @@ export function SendEmailGuard({
   activeSubscribers,
   sport = "mlb",
   returnTo = "/admin",
+  route = "send-email",
+  label = "Send email to subscribers",
+  buttonLabel = "Run send-email",
+  audienceNoun = "active subscriber",
 }: {
   defaultDate: string;
   activeSubscribers: number;
   sport?: string;
   returnTo?: string;
+  route?: "send-email" | "send-team-email";
+  label?: string;
+  buttonLabel?: string;
+  audienceNoun?: string;
 }) {
   const [stage, setStage] = useState<"idle" | "confirm" | "typed">("idle");
   const [date, setDate] = useState(defaultDate);
@@ -38,7 +46,7 @@ export function SendEmailGuard({
 
   const fire = () => {
     const fd = new FormData();
-    fd.set("route", "send-email");
+    fd.set("route", route);
     fd.set("date", date);
     fd.set("sport", sport);
     fd.set("returnTo", returnTo);
@@ -47,10 +55,12 @@ export function SendEmailGuard({
     });
   };
 
+  const audienceLabel = `${activeSubscribers.toLocaleString()} ${audienceNoun}${activeSubscribers === 1 ? "" : "s"}`;
+
   return (
     <div className="admin-trigger-form">
       <label>
-        <span className="admin-trigger-label">Send email to subscribers</span>
+        <span className="admin-trigger-label">{label}</span>
         <input
           className="admin-input"
           type="date"
@@ -65,7 +75,7 @@ export function SendEmailGuard({
         onClick={() => setStage("confirm")}
         disabled={pending}
       >
-        Run send-email
+        {buttonLabel}
       </button>
 
       {stage !== "idle" && (
@@ -78,10 +88,10 @@ export function SendEmailGuard({
           <div className="admin-guard-modal">
             {stage === "confirm" && (
               <>
-                <h2 className="admin-guard-title">Send to {activeSubscribers.toLocaleString()} subscribers?</h2>
+                <h2 className="admin-guard-title">Send to {audienceLabel}?</h2>
                 <p className="admin-guard-body">
                   This will fan out the <code>{date}</code> digest to every
-                  active subscriber. Sends are not reversible.
+                  matching subscriber. Sends are not reversible.
                 </p>
                 <p className="admin-guard-body">
                   Make sure you intend to do this. If yesterday's digest hasn't
@@ -102,8 +112,7 @@ export function SendEmailGuard({
                 <h2 className="admin-guard-title">Type <code>SEND</code> to confirm</h2>
                 <p className="admin-guard-body">
                   Final check. Type <code>SEND</code> below and click the
-                  button to fire the email to all{" "}
-                  {activeSubscribers.toLocaleString()} active subscribers.
+                  button to fire the email to all {audienceLabel}.
                 </p>
                 <input
                   className="admin-input admin-guard-input"

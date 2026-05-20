@@ -131,6 +131,7 @@ export function welcomeEmail(opts: {
   digestPrettyDate: string;
   digestUrl: string;
   unsubscribeUrl: string;
+  manageUrl: string;
   digestEmailHtml: string;
 }): { subject: string; html: string; text: string } {
   const subject = `Welcome — boxscore · ${opts.digestPrettyDate}`;
@@ -141,9 +142,10 @@ export function welcomeEmail(opts: {
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
+    manageUrl: opts.manageUrl,
     previewText: `Welcome — your boxscore digest for ${opts.digestPrettyDate} is below.`,
   });
-  const text = `Welcome to boxscore!\n\nThe full digest for ${opts.digestPrettyDate} is in this email. You'll get one every morning at 5am ET.\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `Welcome to boxscore!\n\nThe full digest for ${opts.digestPrettyDate} is in this email. You'll get one every morning at 5am ET.\n\nManage subscriptions: ${opts.manageUrl}\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
@@ -160,7 +162,10 @@ export function dailyEmail(opts: {
   digestPrettyDate: string;    // long form, used in preview text + plain-text body
   digestUrl: string;
   unsubscribeUrl: string;
+  manageUrl: string;
   digestEmailHtml: string;
+  announcementBanner?: string; // optional product/feature note prepended
+                                // above the digest body
 }): { subject: string; html: string; text: string } {
   const sportTag = opts.sport.toUpperCase();
   const subject = `boxscore - ${sportTag} - ${shortPrettyDate(opts.digestDate)}`;
@@ -168,9 +173,11 @@ export function dailyEmail(opts: {
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
+    manageUrl: opts.manageUrl,
+    announcementBanner: opts.announcementBanner,
     previewText: `${opts.digestPrettyDate} · ${sportTag} digest from boxscore.`,
   });
-  const text = `${subject}\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `${subject}\n\nManage subscriptions: ${opts.manageUrl}\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
@@ -184,28 +191,39 @@ export function teamDailyEmail(opts: {
   digestPrettyDate: string;
   digestUrl: string;
   unsubscribeUrl: string;
+  manageUrl: string;
   digestEmailHtml: string;
+  announcementBanner?: string;
 }): { subject: string; html: string; text: string } {
   const subject = `boxscore: ${opts.teamName} · ${opts.digestPrettyDate}`;
   const html = wrapWithDigest({
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
+    manageUrl: opts.manageUrl,
+    announcementBanner: opts.announcementBanner,
     previewText: `${opts.digestPrettyDate} · ${opts.teamName} digest from boxscore.`,
   });
-  const text = `boxscore — ${opts.teamName} — ${opts.digestPrettyDate}\n\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `boxscore — ${opts.teamName} — ${opts.digestPrettyDate}\n\nManage subscriptions: ${opts.manageUrl}\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
 /**
  * Used for any email that embeds a daily digest. 600px wide outer table to
  * fit the digest's content, with a thin chrome on top and bottom.
+ *
+ * manageUrl points at /settings — surfaced in the TOP utility row alongside
+ * "View in browser" because Gmail clips messages above ~102KB; anything
+ * subscribers might actually click (preferences, sign-in) has to live above
+ * the digest body so it survives the clip threshold.
  */
 function wrapWithDigest(opts: {
   welcomeBanner?: string;
+  announcementBanner?: string;
   digestEmailHtml: string;
   unsubscribeUrl: string;
   digestUrl: string;
+  manageUrl: string;
   previewText?: string;
 }): string {
   const preview = opts.previewText
@@ -227,26 +245,26 @@ ${preview}
   <tr><td style="padding:8px 8px 24px;">
 
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-      <tr><td align="right" style="padding-bottom:6px; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; font-style:italic; color:${MUTED};">
-        <a href="${opts.digestUrl}" style="color:${MUTED}; text-decoration:underline;">View in browser →</a>
-      </td></tr>
-
       <tr><td style="padding-bottom:4px; border-bottom:2px solid ${INK};">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
           <tr>
             <td align="left" style="vertical-align:bottom; line-height:1;">
-              <a href="https://boxscore.email/" style="text-decoration:none; color:${INK}; font-weight:800; font-size:20px; letter-spacing:-0.01em; font-family:'Source Sans 3', Helvetica, Arial, sans-serif;">
+              <a href="${opts.digestUrl}" style="text-decoration:none; color:${INK}; font-weight:800; font-size:20px; letter-spacing:-0.01em; font-family:'Source Sans 3', Helvetica, Arial, sans-serif;">
                 <img src="https://boxscore.email/icon.png" alt="" width="24" height="24" style="vertical-align:bottom; margin-right:6px; border-radius:4px;">boxscore
               </a>
             </td>
             <td align="right" style="vertical-align:bottom;">
-              <a href="https://boxscore.email/r/support?src=email-header" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; font-weight:700; background:#fff; color:${INK}; padding:5px 12px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Support</a>
+              <a href="${opts.manageUrl}" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; font-weight:700; background:#fff; color:${INK}; padding:5px 12px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Manage subscriptions</a>
             </td>
           </tr>
         </table>
       </td></tr>
 
       ${opts.welcomeBanner ? `<tr><td style="padding:14px 0 8px;">${opts.welcomeBanner}</td></tr>` : ""}
+
+      ${opts.announcementBanner ? `<tr><td style="padding:14px 0 8px; border-bottom:1px solid ${RULE};">
+        ${opts.announcementBanner}
+      </td></tr>` : ""}
 
       <tr><td style="padding-top:6px;">
         ${opts.digestEmailHtml}

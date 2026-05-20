@@ -7,6 +7,7 @@
 export const ALL_CRON_ROUTES = [
   "generate",
   "send-email",
+  "send-team-email",
   "post-twitter",
   "post-bluesky",
 ] as const;
@@ -25,6 +26,9 @@ export type SportFeatures = {
 
 export const SPORT_FEATURES: Record<string, SportFeatures> = {
   mlb:  { hasPreview: true,  hasShareImages: true,  hasTeamDigests: true,  hasRegenAll: true,  expectedRoutes: ALL_CRON_ROUTES },
+  // NBA/WNBA have no send-team-email yet (no per-team renderer), so the team
+  // route is intentionally left out of expectedRoutes — the watchwall will
+  // not flag it as missing.
   nba:  { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate"] },
   wnba: { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate"] },
 };

@@ -67,6 +67,10 @@ export async function GET(req: Request) {
 
     let sent = 0, failed = 0;
 
+    const manageUrl = `${origin}/settings`;
+    const { getAnnouncement } = await import("@/lib/announcements");
+    const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
+
     for (const group of chunk(toSend, BATCH_SIZE)) {
       const payload = group.map((sub) => {
         const unsubscribeUrl = `${origin}/u/${sub.unsubscribe_token}`;
@@ -80,6 +84,8 @@ export async function GET(req: Request) {
           digestPrettyDate,
           digestUrl,
           unsubscribeUrl,
+          manageUrl,
+          announcementBanner,
           digestEmailHtml: digest.email_html!,
         });
         return {

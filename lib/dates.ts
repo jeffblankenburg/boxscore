@@ -48,6 +48,13 @@ export function nextDay(iso: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
+export function prevDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return dt.toISOString().slice(0, 10);
+}
+
 // Format an ISO-8601 timestamp (UTC) as a short ET clock time, e.g. "7:05 PM ET".
 // Returns "TBD" without the suffix when the input isn't a valid date.
 export function timeInET(iso: string): string {

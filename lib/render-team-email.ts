@@ -120,9 +120,7 @@ async function fetchProbables(games: ScheduleGame[], season: number): Promise<Ma
 // ─── sections ─────────────────────────────────────────────────────────────
 
 function formatRecord(r: { wins: number; losses: number; gamesBack: string }): string {
-  const wl = `${r.wins}-${r.losses}`;
-  if (!r.gamesBack || r.gamesBack === "-") return `(${wl})`;
-  return `(${wl}, ${r.gamesBack}GB)`;
+  return `(${r.wins}-${r.losses})`;
 }
 
 function teamSectionHeading(data: TeamEmailData): string {
@@ -135,13 +133,12 @@ function teamSectionHeading(data: TeamEmailData): string {
   return `<h2 class="es-section-h" style="font-size:17px;letter-spacing:0;">${esc(title)}</h2>`;
 }
 
-function renderTeamYesterday(data: TeamEmailData): string {
+function renderTeamYesterdayBox(data: TeamEmailData): string {
   const g = data.yesterdayGame;
-  const heading = teamSectionHeading(data);
   if (!g || !g.box || !g.scoring || g.game.status.codedGameState !== "F") {
-    return `${heading}<p class="es-info">No game played on ${esc(data.prettyDate)}.</p>`;
+    return `<p class="es-info">No game played on ${esc(data.prettyDate)}.</p>`;
   }
-  return `${heading}${renderGame(g as Required<GameDetail>, data.liveAbbrev)}`;
+  return renderGame(g as Required<GameDetail>, data.liveAbbrev);
 }
 
 // ─── standings ────────────────────────────────────────────────────────────
@@ -404,7 +401,7 @@ function shortDate(isoTs: string): string {
 
 function renderTeamUpcoming(data: TeamEmailData): string {
   if (data.upcoming.length === 0) {
-    return `${sectionH("Upcoming")}<p class="es-info">No games scheduled this week.</p>`;
+    return `${sectionH("Upcoming Games")}<p class="es-info">No games scheduled this week.</p>`;
   }
   const probable = (full: string | undefined, stats: ProbableStats | undefined): string => {
     if (!full) return "TBD";
@@ -439,7 +436,7 @@ function renderTeamUpcoming(data: TeamEmailData): string {
       <td colspan="3" style="font-size:12px;color:#6a6354;padding:0 0 4px;border-bottom:1px dotted #e8e2d4;">${matchup}</td>
     </tr>`;
   }).join("");
-  return `${sectionH("Upcoming")}
+  return `${sectionH("Upcoming Games")}
     <table cellpadding="0" cellspacing="0" border="0" width="100%">
       <tbody>${rows}</tbody>
     </table>`;
@@ -455,14 +452,65 @@ function renderTeamTransactions(data: TeamEmailData): string {
 
 // ─── entry ────────────────────────────────────────────────────────────────
 
+// Team-digest day-state. Mirrors the MLB league digest's DigestMode
+// classifier pattern — the section list shifts based on what's actually
+// available, so single-team subscribers get a morning ritual every day
+// without "no game played" filler taking up space.
+//
+//   "game"      — yesterday had a final game; the full game-day layout
+//   "no-game"   — season is active but the team didn't play; surface
+//                 standings + upcoming + transactions instead of placeholder
+//   "offseason" — no game yesterday AND no upcoming games this week; show
+//                 transactions only (hot stove still happens). Final regular-
+//                 season standings are intentionally suppressed here to keep
+//                 the spec literal — revisit if subscribers ask for them
+type TeamDigestMode = "game" | "no-game" | "offseason";
+
+function classifyTeamMode(data: TeamEmailData): TeamDigestMode {
+  const g = data.yesterdayGame;
+  const hasGame = !!(
+    g && g.box && g.scoring && g.game.status.codedGameState === "F"
+  );
+  if (hasGame) return "game";
+  if (data.upcoming.length > 0) return "no-game";
+  return "offseason";
+}
+
 export function renderTeamEmailContent(data: TeamEmailData): string {
-  return `<div class="es">
-${dateline(data.prettyDate)}
-${renderTeamYesterday(data)}
-${renderTeamStandings(data)}
-${renderTeamStatSheet(data)}
-${renderAdvancedStats(data)}
-${renderTeamUpcoming(data)}
-${renderTeamTransactions(data)}
-</div>`;
+  const mode = classifyTeamMode(data);
+  const parts: string[] = [`<div class="es">`, dateline(data.prettyDate)];
+
+  if (mode === "game") {
+    parts.push(
+      teamSectionHeading(data),
+      renderTeamStandings(data),
+      renderTeamYesterdayBox(data),
+      renderTeamStatSheet(data),
+      renderAdvancedStats(data),
+      renderTeamUpcoming(data),
+      renderTeamTransactions(data),
+    );
+  } else if (mode === "no-game") {
+    // Active season, just no game today. Skip the "no game played"
+    // placeholder and the stat-sheet/advanced-stats tables — subscribers
+    // see those plenty on game days. Lead with team identity + record so
+    // they know they're in the right inbox.
+    parts.push(
+      teamSectionHeading(data),
+      renderTeamStandings(data),
+      renderTeamUpcoming(data),
+      renderTeamTransactions(data),
+    );
+  } else {
+    // Offseason. Transactions are the only structured signal worth a
+    // morning email here; if there aren't any, the cron should choose to
+    // skip the send entirely (renderer still produces a thin shell).
+    parts.push(
+      teamSectionHeading(data),
+      renderTeamTransactions(data),
+    );
+  }
+
+  parts.push(`</div>`);
+  return parts.join("\n");
 }

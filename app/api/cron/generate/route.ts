@@ -3,6 +3,10 @@ import { loadDailyData } from "@/lib/daily";
 import { renderContent } from "@/lib/render";
 import { renderEmailContent } from "@/lib/render-email";
 import { upsertDigest } from "@/lib/digests";
+import { upsertTeamDigest } from "@/lib/team-digests";
+import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
+import { renderTeamWebContent } from "@/lib/render-team-web";
+import { teamsBySport } from "@/lib/teams";
 import { loadNbaData } from "@/lib/nba";
 import { loadWnbaData } from "@/lib/wnba";
 import {
@@ -13,7 +17,11 @@ import { yesterdayInET, isValidIsoDate } from "@/lib/dates";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Team-digest generation extends the wall-clock; MLB v1 has 30 teams,
+// each touching the MLB API for roster/schedule/probables. Even with the
+// cached daily_raw hitting the box endpoints, per-team waves add up.
+// Bump to the platform's 300s ceiling so we don't time out on heavy days.
+export const maxDuration = 300;
 
 function isAuthorized(req: Request): boolean {
   if (process.env.NODE_ENV === "development") return true;
@@ -32,6 +40,11 @@ export async function GET(req: Request) {
   const date = url.searchParams.get("date") ?? yesterdayInET();
   const trigger = url.searchParams.get("trigger") === "manual" ? "manual" : "cron";
   const refetch = url.searchParams.get("refetch") === "true";
+  // Bulk regenerate uses skip_teams=1 so each /api/cron/generate hit only
+  // refreshes the league HTML — without this, regenerating ~50 dates also
+  // fans out to ~30 teams per date and blows past any function timeout.
+  // The daily cron at 9:00 UTC never sets this flag.
+  const skipTeams = url.searchParams.get("skip_teams") === "1";
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
@@ -51,14 +64,56 @@ export async function GET(req: Request) {
       const html = renderContent(data);
       const email_html = renderEmailContent(data);
       await upsertDigest({
-        sport, date, html, email_html, game_count: data.games.length,
+        sport, date, html, email_html,
+        game_count: data.games.length,
+        mode: data.mode,
       });
+
+      // Per-team digests cached alongside the league digest. Running them
+      // here (rather than on-demand in send-team-email) lets the public web
+      // page at /[sport]/[slug]/[date] serve static HTML for every team —
+      // including teams without subscribers, since those pages should still
+      // be browseable. Per-team errors are isolated so one team's data
+      // failure doesn't tank the whole cron.
+      //
+      // Skipped during bulk regenerate (skip_teams=1) — the bulk action is
+      // almost always used to roll out a league-template change; team
+      // digests would multiply the wall-clock 30x and bust function timeouts.
+      const teams = skipTeams ? [] : teamsBySport(sport);
+      let teamOk = 0;
+      const teamFails: string[] = [];
+      for (const team of teams) {
+        try {
+          const td = await loadTeamEmailData(team, date);
+          const teamHtml = renderTeamWebContent(td);
+          const teamEmailHtml = renderTeamEmailContent(td);
+          const hasGame = !!(
+            td.yesterdayGame &&
+            td.yesterdayGame.box &&
+            td.yesterdayGame.game.status.codedGameState === "F"
+          );
+          await upsertTeamDigest({
+            sport, team_slug: team.slug, date,
+            has_game: hasGame, mode: data.mode,
+            html: teamHtml, email_html: teamEmailHtml,
+          });
+          teamOk++;
+        } catch (err) {
+          const msg = (err as Error).message;
+          console.error(`[generate] team ${team.slug} failed: ${msg}`);
+          teamFails.push(`${team.slug}: ${msg}`);
+        }
+      }
+
       const result = {
         sport, date,
         mode: data.mode,
         game_count: data.games.length,
         html_bytes: html.length,
         email_bytes: email_html.length,
+        teams_generated: teamOk,
+        teams_failed: teamFails.length,
+        ...(teamFails.length > 0 ? { team_failures: teamFails.slice(0, 5) } : {}),
       };
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });

@@ -1,11 +1,16 @@
 import "./globals.css";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { BRAND } from "@/lib/brand";
 import { PaperModeToggle } from "./PaperModeToggle";
 import { PostHogPageview } from "./PostHogProvider";
+import {
+  validateSession,
+  SUBSCRIBER_SESSION_COOKIE,
+} from "@/lib/subscriber-auth";
 
 export const metadata = {
   title: "boxscore",
@@ -35,7 +40,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function SiteHeader() {
+async function SiteHeader() {
+  // Read the session server-side so the right CTA renders on first paint —
+  // signed-in users go straight to "⚙ Settings"; anonymous visitors see
+  // "Subscribe →". Cost: every page is now dynamically rendered, which
+  // drops the static cache on the digest pages. The DB query is one
+  // session lookup per request, cheap at our traffic.
+  const jar = await cookies();
+  const session = await validateSession(jar.get(SUBSCRIBER_SESSION_COOKIE)?.value);
+  const isAuthed = !!session;
   return (
     <header className="site-header">
       <div className="brand">
@@ -50,8 +63,14 @@ function SiteHeader() {
         ))}
       </nav>
       <div className="header-cta">
-        <a className="support" href="/r/support?src=web-header" target="_blank" rel="noopener noreferrer">Support</a>
-        <a className="subscribe" href={BRAND.subscribeUrl}>Subscribe →</a>
+        <a className="support" href="/r/support?src=web-header" target="_blank" rel="noopener noreferrer">Tip Jar</a>
+        {isAuthed ? (
+          <a className="subscribe" href="/settings">
+            <span className="auth-gear" aria-hidden="true">⚙</span> Settings
+          </a>
+        ) : (
+          <a className="subscribe" href={BRAND.subscribeUrl}>Subscribe →</a>
+        )}
       </div>
     </header>
   );

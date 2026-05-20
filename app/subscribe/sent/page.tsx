@@ -2,15 +2,31 @@ export const metadata = {
   title: "Check your inbox — boxscore",
 };
 
-export default function SubscribeSentPage() {
+export default async function SubscribeSentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const { mode } = await searchParams;
+  const isSignin = mode === "signin";
+
   return (
     <section className="subscribe-card">
       <h1 className="subscribe-h1">Check your inbox</h1>
-      <p className="subscribe-lede">
-        We just sent a confirmation email from{" "}
-        <strong>digest@boxscore.email</strong>. Click the link inside and
-        you&rsquo;re in. The link is good for 30 days.
-      </p>
+      {isSignin ? (
+        <p className="subscribe-lede">
+          That address is already subscribed — so we sent you a sign-in link
+          instead, from <strong>digest@boxscore.email</strong>. Click it to
+          jump to your subscription settings. The link is good for 15 minutes
+          and only works once.
+        </p>
+      ) : (
+        <p className="subscribe-lede">
+          We just sent a confirmation email from{" "}
+          <strong>digest@boxscore.email</strong>. Click the link inside and
+          you&rsquo;re in. The link is good for 30 days.
+        </p>
+      )}
 
       <h2 className="subscribe-subhead">Didn&rsquo;t see it?</h2>
       <ul className="subscribe-checklist">

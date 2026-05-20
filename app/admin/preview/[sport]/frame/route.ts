@@ -57,7 +57,7 @@ function siteHeaderHtml(iconUrl: string): string {
   </div>
   <nav class="social">${socialLinks}</nav>
   <div class="header-cta">
-    <a class="support" href="/r/support?src=web-header">Support</a>
+    <a class="support" href="/r/support?src=web-header">Tip Jar</a>
     <a class="subscribe" href="${BRAND.subscribeUrl}">Subscribe →</a>
   </div>
 </header>`;
@@ -117,12 +117,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
 
   let html: string;
   if (surface === "email") {
+    const { getAnnouncement } = await import("@/lib/announcements");
+    const announcementBanner = (await getAnnouncement(sport, digestDate)) ?? undefined;
     html = dailyEmail({
       sport,
       digestDate,
       digestPrettyDate,
       digestUrl: "#",
       unsubscribeUrl: "#",
+      manageUrl: "#",
+      announcementBanner,
       digestEmailHtml: emailBody,
     }).html;
   } else {
