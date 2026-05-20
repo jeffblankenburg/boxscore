@@ -108,6 +108,14 @@ export default async function SubscribePage({
                   />
                   <span>{team.name}</span>
                 </label>
+                <a
+                  href={`/${teamTabs[0]!.id}/${team.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="settings-preview-link"
+                >
+                  Preview →
+                </a>
               </li>
             ))}
           </ul>
@@ -155,6 +163,14 @@ export default async function SubscribePage({
                         />
                         <span>{team.name}</span>
                       </label>
+                      <a
+                        href={`/${tab.id}/${team.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="settings-preview-link"
+                      >
+                        Preview →
+                      </a>
                     </li>
                   ))}
                 </ul>

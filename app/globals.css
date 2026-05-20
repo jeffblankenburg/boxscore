@@ -444,15 +444,28 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
   padding: 3px 11px; border-radius: 999px; cursor: pointer;
 }
-/* /subscribe variant: each row is a label wrapping a checkbox + name. */
+/* /subscribe + /settings variant: each row is a label wrapping a checkbox
+   + name. flex:1 so the label takes whatever space remains after siblings
+   (e.g. the team-row Preview link); min-width:0 so long team names can
+   ellipsize cleanly instead of pushing the link off-row. */
 .settings-pick-label {
   display: flex; align-items: center; gap: 8px;
-  width: 100%; cursor: pointer;
+  flex: 1; min-width: 0; cursor: pointer;
   font-size: 14px; font-weight: 600;
 }
 .settings-pick-label input[type="checkbox"] {
   width: 15px; height: 15px; flex: 0 0 auto;
 }
+/* Preview link in team rows on /settings — opens the team's web digest in
+   a new tab so the subscriber can see what they'd be getting before
+   committing the toggle. Subtle by default (muted, no underline), darker
+   on hover. */
+.settings-preview-link {
+  flex: 0 0 auto; font-size: 12px; color: var(--text-muted);
+  text-decoration: none; padding: 2px 6px;
+}
+.settings-preview-link:hover { color: var(--text-primary);
+                                text-decoration: underline; }
 .subscribe-input-block { width: 100%; box-sizing: border-box; margin: 4px 0; }
 .subscribe-button-block { width: 100%; margin-top: 16px; }
 

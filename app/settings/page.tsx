@@ -154,6 +154,14 @@ export default async function SettingsPage({
                         fields={{ sport: sport.id, team: team.slug }}
                         label={team.name}
                       />
+                      <a
+                        href={`/${sport.id}/${team.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="settings-preview-link"
+                      >
+                        Preview →
+                      </a>
                     </li>
                   );
                 })}
