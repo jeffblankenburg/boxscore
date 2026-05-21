@@ -2,8 +2,9 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "../../../require-admin";
 import { AdminNav } from "../../../AdminNav";
 import { PreviewTeamTabs } from "../PreviewTeamTabs";
+import { DateInputWithToday } from "../DateInputWithToday";
 import { findTeam, type Sport } from "@/lib/teams";
-import { yesterdayInET, isValidIsoDate } from "@/lib/dates";
+import { yesterdayInET, isValidIsoDate, nextDay, prevDay, shortPrettyDate } from "@/lib/dates";
 
 // Per-team variant of /admin/preview/[sport]. Same chrome (AdminNav,
 // LeagueSwitcher, PreviewTeamTabs) as the league preview; controls below
@@ -50,14 +51,19 @@ export default async function TeamPreviewPage({
   if (!team) notFound();
 
   const { date: dateParam, surface: surfaceParam, width: widthParam } = await searchParams;
-  const date = dateParam && isValidIsoDate(dateParam) ? dateParam : yesterdayInET();
+  // `date` is the EDITION date the operator sees on the masthead; the
+  // team digest URL and frame route both expect games_date, so we
+  // translate at the boundary.
+  const todayIsoEt = nextDay(yesterdayInET());
+  const date = dateParam && isValidIsoDate(dateParam) ? dateParam : todayIsoEt;
+  const gamesDate = prevDay(date);
   const surface: "web" | "email" = surfaceParam === "email" ? "email" : "web";
   const width = asWidth(widthParam, surface);
   const widthPx = WIDTH_PRESETS.find((p) => p.key === width)?.px ?? null;
 
   const frameSrc = surface === "web"
-    ? `/${sport}/${team.slug}/${date}`
-    : `/admin/preview/${sport}/${team.slug}/frame?date=${date}`;
+    ? `/${sport}/${team.slug}/${gamesDate}`
+    : `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}`;
 
   const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string }) => {
     const d = overrides.date ?? date;
@@ -69,6 +75,8 @@ export default async function TeamPreviewPage({
   const containerStyle: React.CSSProperties = widthPx
     ? { maxWidth: `${widthPx}px`, margin: "0 auto" }
     : {};
+  // Mirrors teamDailyEmail in lib/emails/templates.ts.
+  const emailSubject = `${team.name} - ${shortPrettyDate(date)}`;
 
   return (
     <main className="admin admin-preview">
@@ -78,15 +86,7 @@ export default async function TeamPreviewPage({
         <section className="preview-main">
           <div className="preview-bar">
             <form method="get" className="preview-date-form">
-              <label className="preview-date-label">
-                <span>Date</span>
-                <input
-                  type="date"
-                  name="date"
-                  defaultValue={date}
-                  className="admin-input"
-                />
-              </label>
+              <DateInputWithToday defaultValue={date} />
               <input type="hidden" name="surface" value={surface} />
               <input type="hidden" name="width" value={width} />
               <button type="submit" className="admin-btn admin-btn-small">
@@ -131,6 +131,13 @@ export default async function TeamPreviewPage({
               <code>{date}</code>
             </div>
           </div>
+
+          {surface === "email" && (
+            <div className="preview-subject">
+              <span className="preview-subject-label">Subject</span>
+              <span className="preview-subject-text">{emailSubject}</span>
+            </div>
+          )}
 
           <iframe
             className={surface === "web" ? "preview-web-frame" : "preview-email-frame"}

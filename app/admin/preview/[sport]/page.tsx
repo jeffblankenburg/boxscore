@@ -5,8 +5,9 @@ import { SubmitButton } from "../../SubmitButton";
 import { triggerCron } from "../../actions";
 import { CopyId } from "./CopyId";
 import { PreviewTeamTabs } from "./PreviewTeamTabs";
+import { DateInputWithToday } from "./DateInputWithToday";
 import { loadDailyData } from "@/lib/daily";
-import { isValidIsoDate } from "@/lib/dates";
+import { isValidIsoDate, nextDay, prevDay, shortPrettyDate, yesterdayInET } from "@/lib/dates";
 import { MLB_PREVIEW_FIXTURES, MLB_PREVIEW_MODES } from "@/lib/mlb-preview-fixtures";
 import {
   BASKETBALL_PREVIEW_MODES,
@@ -75,8 +76,14 @@ export default async function PreviewPage({
   if (!VALID_SPORTS.has(sport)) notFound();
 
   const { date: dateParam, surface: surfaceParam, width: widthParam } = await searchParams;
-  const { modes, fixtures, defaultDate } = modeOptionsFor(sport);
-  const date = dateParam && isValidIsoDate(dateParam) ? dateParam : defaultDate;
+  const { modes, fixtures } = modeOptionsFor(sport);
+  // `date` is the EDITION date (what subscribers see at the top of the
+  // email — the day a newspaper would be dated). Backend lookups use
+  // games_date = edition - 1 day, since digests are stored under the
+  // date the games were played.
+  const todayIsoEt = nextDay(yesterdayInET());
+  const date = dateParam && isValidIsoDate(dateParam) ? dateParam : todayIsoEt;
+  const gamesDate = prevDay(date);
   const surface: "web" | "email" = surfaceParam === "email" ? "email" : "web";
   const width = asWidth(widthParam, surface);
   const widthPx = WIDTH_PRESETS.find((p) => p.key === width)?.px ?? null;
@@ -86,15 +93,13 @@ export default async function PreviewPage({
   // all-star, etc.) — useful when typing a freeform date.
   let mlbActualMode: string | null = null;
   if (sport === "mlb") {
-    const data = await loadDailyData(date);
+    const data = await loadDailyData(gamesDate);
     mlbActualMode = data.mode;
   }
 
-  // The actual rendered preview HTML (web doc with site chrome + globals.css
-  // inlined, or full email HTML from dailyEmail()) lives at /frame so the
-  // iframe can fetch it by URL — same URL works for the "Pop out" link
-  // that opens an unconstrained full-window preview in a new tab.
-  const frameSrc = `/admin/preview/${sport}/frame?date=${date}&surface=${surface}`;
+  // The /frame route still expects games_date as its `date` param, so we
+  // translate here. Same URL is reused for the "Pop out" link.
+  const frameSrc = `/admin/preview/${sport}/frame?date=${gamesDate}&surface=${surface}`;
 
   const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string }) => {
     const d = overrides.date ?? date;
@@ -108,6 +113,9 @@ export default async function PreviewPage({
     : {};
 
   const previewId = `${date}/${surface}/${width}`;
+  // What the actual league send will use as the subject for this edition.
+  // Mirrors the format in lib/emails/templates.ts:dailyEmail.
+  const emailSubject = `${sport.toUpperCase()} - ${shortPrettyDate(date)}`;
 
   return (
     <main className="admin admin-preview">
@@ -116,15 +124,7 @@ export default async function PreviewPage({
       <section className="preview-main preview-main-full">
         <div className="preview-bar">
           <form method="get" className="preview-date-form">
-            <label className="preview-date-label">
-              <span>Date</span>
-              <input
-                type="date"
-                name="date"
-                defaultValue={date}
-                className="admin-input"
-              />
-            </label>
+            <DateInputWithToday defaultValue={date} />
             <input type="hidden" name="surface" value={surface} />
             <input type="hidden" name="width" value={width} />
             <button type="submit" className="admin-btn admin-btn-small">
@@ -159,13 +159,13 @@ export default async function PreviewPage({
           <form method="get" className="preview-date-form">
             <label className="preview-date-label">
               <span>Variant</span>
-              {/* Quick-jump dropdown: the selected option's VALUE is the
-                  fixture date for that mode, so picking a mode + Go
-                  navigates to the right date. */}
+              {/* Quick-jump dropdown. Fixtures are stored as games_dates;
+                  shift each to its edition_date (= games + 1) so the URL
+                  date stays consistent with the page's edition-date model. */}
               <select name="date" defaultValue="" className="admin-input">
                 <option value="" disabled>Jump to mode…</option>
                 {modes.map((m) => (
-                  <option key={m} value={fixtures[m]}>
+                  <option key={m} value={nextDay(fixtures[m])}>
                     {m}
                   </option>
                 ))}
@@ -181,7 +181,8 @@ export default async function PreviewPage({
           <form action={triggerCron} className="preview-regen-form">
             <input type="hidden" name="route" value="generate" />
             <input type="hidden" name="sport" value={sport} />
-            <input type="hidden" name="date" value={date} />
+            {/* Cron API expects games_date; translate from edition_date. */}
+            <input type="hidden" name="date" value={gamesDate} />
             <input type="hidden" name="returnTo" value={link({})} />
             <SubmitButton idleLabel="Regen" pendingLabel="Regenerating\u2026" />
           </form>
@@ -203,6 +204,13 @@ export default async function PreviewPage({
             )}
           </div>
         </div>
+
+        {surface === "email" && (
+          <div className="preview-subject">
+            <span className="preview-subject-label">Subject</span>
+            <span className="preview-subject-text">{emailSubject}</span>
+          </div>
+        )}
 
         <iframe
           className={surface === "web" ? "preview-web-frame" : "preview-email-frame"}

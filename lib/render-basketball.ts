@@ -26,7 +26,7 @@ import type {
   BasketballTransaction,
 } from "./basketball";
 import { lastName } from "./render-email";
-import { timeInET } from "./dates";
+import { issueNumber, nextDay, prettyDate, timeInET, volumeNumber } from "./dates";
 
 // 7-column box score per Jeff's call. The full ESPN set has 14; these are
 // the high-signal ones for a glance. Tweak this array to change the line.
@@ -54,7 +54,9 @@ export function renderBasketballContent(data: BasketballData): string {
 }
 
 export function renderBasketballEmailContent(data: BasketballData): string {
-  return renderBody(data);
+  // Email dateline = the day this email goes out (i.e. digest date + 1).
+  // Mirrors a newspaper: today's edition shows yesterday's results.
+  return renderBody({ ...data, prettyDate: prettyDate(nextDay(data.date)) });
 }
 
 // ---- Body -----------------------------------------------------------------
@@ -90,11 +92,16 @@ function renderBody(data: BasketballData): string {
   return sections.filter((s) => s.length > 0).join("\n");
 }
 
-// Single-line plain dateline, matching baseball's es-dateline pattern. The
-// sport label lives in the email subject + browser title, so the dateline
-// itself stays focused on the date.
+// Centered date plus "Vol. X, Issue Y" small caps in the bottom-right of
+// the same masthead band. Send-date drives both — matches the MLB renderer.
+// Pre-launch dates (issueNumber === 0) render without the counter.
 function renderDateline(data: BasketballData): string {
-  return `<div class="bb-dateline">${escapeHtml(data.prettyDate)}</div>`;
+  const sendIso = nextDay(data.date);
+  const issue = issueNumber(sendIso);
+  const counter = issue
+    ? `<div class="bb-issue-no">Vol. ${volumeNumber(sendIso)}, Issue ${issue}</div>`
+    : "";
+  return `<div class="bb-dateline"><div class="bb-dateline-text">${escapeHtml(data.prettyDate)}</div>${counter}</div>`;
 }
 
 // ---- Yesterday's results --------------------------------------------------
@@ -620,9 +627,17 @@ export const BASKETBALL_EMAIL_STYLES = `
 .bb-dateline {
   border-top: 3px double #161410; border-bottom: 1px solid #161410;
   padding: 8px 0; margin: 0 0 14px; text-align: center;
+  position: relative;
+}
+.bb-dateline-text {
   font-style: italic; font-weight: 800; letter-spacing: -0.005em;
   font-size: 22px;
   font-size: clamp(16px, 4.2vw, 24px);
+}
+.bb-issue-no {
+  position: absolute; right: 6px; bottom: 2px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #6a6354;
 }
 .bb-empty { font-size: 13px; color: #6a6354; font-style: italic;
             margin: 6px 0; text-align: center; }

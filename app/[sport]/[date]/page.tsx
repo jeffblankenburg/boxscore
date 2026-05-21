@@ -19,9 +19,12 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
   if (!row || row.visibility !== "public") return {};
 
   if (isValidIsoDate(date)) {
+    // Browser tab + share metadata use the edition date — matches the
+    // masthead inside the page (which is games_date + 1).
+    const editionDate = prettyDate(nextDay(date));
     return {
-      title: `${row.name} — ${prettyDate(date)} | boxscore`,
-      description: `Daily ${row.name} digest for ${prettyDate(date)}.`,
+      title: `${row.name} — ${editionDate} | boxscore`,
+      description: `Daily ${row.name} digest for ${editionDate}.`,
     };
   }
   const team = findTeam(sport as Sport, date);

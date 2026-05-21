@@ -74,13 +74,28 @@ a { color: inherit; }
   border-top: 3px double var(--border-strong);
   border-bottom: 1px solid var(--border-strong);
   padding: 6px 0; margin: 0 0 18px;
-  text-align: center; font-weight: 800;
+  text-align: center;
+  position: relative;
+}
+/* Arrows position relative to the dated row so they stay vertically
+   centered on the date. */
+.dateline-row {
+  font-weight: 800;
   font-style: italic; letter-spacing: -0.005em;
-  /* Fluid sizing so the longest possible date ("Wednesday, September 24, 2025"
-     ≈ 29 chars) never wraps. ~4vw fits the date across the full width range
-     from ~375px (clamped to 16px min) up through desktop (clamped to 28px max). */
   font-size: clamp(18px, 4.2vw, 28px);
   position: relative;
+}
+/* "Vol. X, Issue Y" overlays the band's bottom-right corner — same band
+   as the date, no extra vertical space consumed. */
+.dateline-issue-no {
+  position: absolute; right: 8px; bottom: 4px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.dateline-issue-no {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 2px;
 }
 /* Day-nav arrows in the dateline. Near-invisible by default (low opacity,
    not italic, lighter weight) — present for users who look for them,
@@ -204,6 +219,7 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 }
 .game-upcoming:last-child { border-bottom: none; }
 .game-matchup { font-weight: 700; }
+.game-matchup .game-record { font-weight: 400; }
 .game-pitchers { font-size: 12px; line-height: 1.3; }
 .game-time { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .probable { color: var(--text-muted); font-weight: 400; font-size: 0.92em; }
@@ -992,6 +1008,14 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 }
 .admin-team-col-num { text-align: right; font-variant-numeric: tabular-nums; }
 .admin-team-col-state { font-size: 12px; }
+/* Totals row in the team console <tfoot>. A heavier top rule separates
+   the sum row from the per-team data above it; no bottom rule. */
+.admin-team-totals td {
+  font-weight: 700;
+  border-top: 2px solid var(--border-strong);
+  border-bottom: none;
+  padding-top: 6px;
+}
 .admin-team-col-actions { text-align: right; padding-right: 0; }
 .admin-team-ok { color: var(--text-primary); }
 .admin-team-bad { color: #b03a2e; font-weight: 600; }
@@ -1137,6 +1161,28 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .preview-date-label { display: inline-flex; align-items: center; gap: 6px;
                        font-size: 12px; color: var(--text-muted); }
 .preview-date-label .admin-input { font-size: 13px; padding: 3px 6px; }
+.preview-date-label-clickable {
+  cursor: pointer; user-select: none;
+  text-decoration: underline dotted; text-underline-offset: 2px;
+}
+.preview-date-label-clickable:hover { color: var(--text-primary); }
+
+/* What subscribers will see as the email's subject line. Surfaced on
+   the email-surface preview so the operator can sanity-check the inbox
+   appearance without firing a send-to-me. */
+.preview-subject {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 6px 10px; margin: 8px 0 4px;
+  background: var(--surface-muted, #f0ebde);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  font-size: 13px;
+}
+.preview-subject-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.preview-subject-text { font-weight: 600; }
 
 .preview-shell { display: flex; gap: 24px; margin-top: 12px; align-items: flex-start; }
 .preview-sidebar { width: 160px; flex-shrink: 0; }

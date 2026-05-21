@@ -144,6 +144,54 @@ export async function getActiveSubscriberIdSet(): Promise<Set<string>> {
   return out;
 }
 
+/**
+ * IDs of subscribers who were active at a specific point in time. Used by
+ * send-coverage so the denominator reflects "who could the cron have
+ * reached when it actually ran," not "who is on the list right now."
+ *
+ * Rules, mirroring what the cron actually sees:
+ *   - status='active' now AND existed before cutoff → was active at cutoff
+ *   - status='unsubscribed' now AND unsubscribed_at > cutoff AND existed before cutoff
+ *       → was still active at cutoff (got the send, opted out after)
+ *   - status='pending' → never active, excluded
+ *
+ * "Existed before cutoff" uses confirmed_at when present, falling back to
+ * created_at — early signups and admin-inserted rows can have a null
+ * confirmed_at while still being status='active', and the send cron only
+ * looks at status, so we'd silently undercount otherwise.
+ */
+export async function getActiveSubscriberIdSetAt(cutoff: string): Promise<Set<string>> {
+  const out = new Set<string>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin()
+      .from("subscribers")
+      .select("id, status, created_at, confirmed_at, unsubscribed_at")
+      .in("status", ["active", "unsubscribed"])
+      .order("created_at", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`getActiveSubscriberIdSetAt: ${error.message}`);
+    const page = (data ?? []) as Array<{
+      id: string;
+      status: string;
+      created_at: string;
+      confirmed_at: string | null;
+      unsubscribed_at: string | null;
+    }>;
+    for (const row of page) {
+      const activatedAt = row.confirmed_at ?? row.created_at;
+      if (activatedAt > cutoff) continue;
+      if (row.status === "active") {
+        out.add(row.id);
+      } else if (row.status === "unsubscribed" && row.unsubscribed_at && row.unsubscribed_at > cutoff) {
+        out.add(row.id);
+      }
+    }
+    if (page.length < pageSize) break;
+  }
+  return out;
+}
+
 export async function getActiveSubscribers(): Promise<Subscriber[]> {
   // Supabase silently caps SELECT at 1000 rows; paginate so we get everyone.
   const out: Subscriber[] = [];

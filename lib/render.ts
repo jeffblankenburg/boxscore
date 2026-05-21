@@ -5,7 +5,7 @@ import type {
 } from "./mlb";
 import type { DigestMode } from "./digest-mode";
 import { findTeamByMlbApiId } from "./teams";
-import { prevDay, nextDay } from "./dates";
+import { prevDay, nextDay, prettyDate, issueNumber, volumeNumber } from "./dates";
 
 export type GameDetail = {
   game: ScheduleGame;
@@ -19,6 +19,12 @@ export type UpcomingGame = {
   gamePk: number;
   awayName: string;
   homeName: string;
+  // MLB API team IDs — used to look up records in the standings table by ID
+  // rather than name, since the schedule and standings endpoints sometimes
+  // disagree on the exact string ("Athletics" vs "Oakland Athletics", or
+  // city-only vs full name on certain teams).
+  awayTeamId?: number;
+  homeTeamId?: number;
   // Full name of probable pitcher; renderer applies lastName() formatting.
   awayProbable?: string;
   homeProbable?: string;
@@ -182,27 +188,43 @@ export const lastName = (full: string): string => {
   return parts[i] ?? full;
 };
 
+// team.id → "W-L" for the Today's Games matchup row. ID-keyed because the
+// schedule and standings endpoints don't always agree on team.name strings.
+function buildTeamRecordMap(standings: DivisionStandings[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const div of standings) {
+    for (const tr of div.teamRecords) {
+      out.set(tr.team.id, `${tr.wins}-${tr.losses}`);
+    }
+  }
+  return out;
+}
+
 export function renderContent(data: DailyData): string {
   // League digests live at /mlb/{date}. Prev/next links are best-effort —
   // they may 404 if the cron hasn't generated that day yet, but the page
   // handles that gracefully.
+  const sendIso = nextDay(data.date);
   const datelineOpts = {
     prevUrl: `/mlb/${prevDay(data.date)}`,
     nextUrl: `/mlb/${nextDay(data.date)}`,
+    volume: volumeNumber(sendIso),
+    issue: issueNumber(sendIso),
   };
+  const teamRecords = buildTeamRecordMap(data.standings);
 
   if (data.mode === "no-games") {
-    return `${renderDateline(data.prettyDate, datelineOpts)}
+    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
 
 <p class="no-games-note">No games yesterday.</p>
 
-${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev, teamRecords)}
 
 ${renderTransactions(data.transactions)}`;
   }
 
   if (data.mode === "all-star") {
-    return `${renderDateline(data.prettyDate, datelineOpts)}
+    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
 
 <div class="edition-subtitle">All-Star Game Edition</div>
 
@@ -214,14 +236,14 @@ ${renderTransactions(data.transactions)}`;
   ${renderAllStarLeague("National League", 104, data)}
 </div>
 
-${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev, teamRecords)}
 
 ${renderAllStarGame(data.games, data.teamAbbrev)}
 
 ${renderTransactions(data.transactions)}`;
   }
 
-  return `${renderDateline(data.prettyDate, datelineOpts)}
+  return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
 
 <div class="section">
   ${renderLeague("American League", 103, data)}
@@ -233,7 +255,7 @@ ${renderTransactions(data.transactions)}`;
 
 ${renderSchedule(data.games)}
 
-${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev, teamRecords)}
 
 <div class="boxscores-title">Yesterday's Box Scores</div>
 ${renderGames(data.games, data.teamAbbrev)}
@@ -255,7 +277,7 @@ export function renderTransactions(txs: Transaction[]): string {
 
 export function renderDateline(
   pretty: string,
-  opts: { prevUrl?: string; nextUrl?: string } = {},
+  opts: { prevUrl?: string; nextUrl?: string; volume?: number; issue?: number } = {},
 ): string {
   // Subtle day-nav arrows positioned at each end of the dateline. CSS keeps
   // them near-invisible (low opacity) until hovered; the chevrons survive
@@ -267,7 +289,10 @@ export function renderDateline(
   const next = opts.nextUrl
     ? `<a class="dateline-arrow dateline-next" href="${esc(opts.nextUrl)}" aria-label="Next day" rel="next">&#x203A;</a>`
     : "";
-  return `<div class="dateline">${prev}<span class="dateline-text">${esc(pretty)}</span>${next}</div>`;
+  const counter = opts.volume && opts.issue
+    ? `<div class="dateline-issue-no">Vol. ${opts.volume}, Issue ${opts.issue}</div>`
+    : "";
+  return `<div class="dateline"><div class="dateline-row">${prev}<span class="dateline-text">${esc(pretty)}</span>${next}</div>${counter}</div>`;
 }
 
 function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leaderLimit = 5): string {
@@ -536,7 +561,11 @@ function renderSchedule(games: GameDetail[]): string {
 </div>`;
 }
 
-function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
+function renderTodaysGames(
+  games: UpcomingGame[],
+  liveAbbrev: Record<string, string>,
+  teamRecords: Map<number, string>,
+): string {
   if (games.length === 0) return "";
   const probable = (full?: string, record?: string, era?: string | null) => {
     if (!full) return "TBD";
@@ -547,10 +576,18 @@ function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, str
     if (detail.length > 0) parts.push(`(${detail.join(", ")})`);
     return parts.join(" ");
   };
+  // Team abbreviation + W-L. parens stay non-bold even though the surrounding
+  // matchup span is bold. .game-record CSS resets weight to 400.
+  const teamWithRecord = (name: string, teamId: number | undefined) => {
+    const tlaName = esc(tla(name, liveAbbrev));
+    const record = teamId != null ? teamRecords.get(teamId) : undefined;
+    if (!record) return tlaName;
+    return `${tlaName} <span class="game-record">(${esc(record)})</span>`;
+  };
   const lines = games.map((g) => {
     const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
     const right = isOff ? g.status : g.startTime;
-    const matchup = `${esc(tla(g.awayName, liveAbbrev))} @ ${esc(tla(g.homeName, liveAbbrev))}`;
+    const matchup = `${teamWithRecord(g.awayName, g.awayTeamId)} @ ${teamWithRecord(g.homeName, g.homeTeamId)}`;
     const pitchers = `${probable(g.awayProbable, g.awayProbableRecord, g.awayProbableEra)} vs ${probable(g.homeProbable, g.homeProbableRecord, g.homeProbableEra)}`;
     return `<div class="game-upcoming">
       <div class="game-score-line">

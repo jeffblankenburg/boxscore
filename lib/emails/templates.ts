@@ -8,7 +8,7 @@
 //     Gmail's ~102KB cap.
 
 import { EMAIL_STYLES } from "../render-email";
-import { shortPrettyDate } from "../dates";
+import { nextDay, prettyDate, shortPrettyDate } from "../dates";
 
 const PAPER = "#f9f7f1";
 const INK = "#161410";
@@ -145,7 +145,7 @@ export function welcomeEmail(opts: {
     manageUrl: opts.manageUrl,
     previewText: `Welcome — your boxscore digest for ${opts.digestPrettyDate} is below.`,
   });
-  const text = `Welcome to boxscore!\n\nThe full digest for ${opts.digestPrettyDate} is in this email. You'll get one every morning at 5am ET.\n\nManage subscriptions: ${opts.manageUrl}\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `Welcome to boxscore!\n\nThe full digest for ${opts.digestPrettyDate} is in this email. You'll get one every morning at 5am ET.\n\nRead online: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
@@ -168,16 +168,20 @@ export function dailyEmail(opts: {
                                 // above the digest body
 }): { subject: string; html: string; text: string } {
   const sportTag = opts.sport.toUpperCase();
-  const subject = `boxscore - ${sportTag} - ${shortPrettyDate(opts.digestDate)}`;
+  // Subject + preview text use the EDITION date (the day the email arrives)
+  // so the inbox header matches the masthead inside the body. digestDate
+  // is games_date; nextDay() shifts to edition date.
+  const editionDateIso = nextDay(opts.digestDate);
+  const subject = `${sportTag} - ${shortPrettyDate(editionDateIso)}`;
   const html = wrapWithDigest({
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
     manageUrl: opts.manageUrl,
     announcementBanner: opts.announcementBanner,
-    previewText: `${opts.digestPrettyDate} · ${sportTag} digest from boxscore.`,
+    previewText: `${prettyDate(editionDateIso)} · ${sportTag} digest from boxscore.`,
   });
-  const text = `${subject}\n\nManage subscriptions: ${opts.manageUrl}\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `${subject}\n\nRead online: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
@@ -196,19 +200,21 @@ export function teamDailyEmail(opts: {
   digestEmailHtml: string;
   announcementBanner?: string;
 }): { subject: string; html: string; text: string } {
-  // Match the league subject shape: "boxscore - {label} - {short date}".
-  // Replaces the prior "boxscore: {team} · {long date}" so subscribers who
-  // get both a league and a team digest see a uniform thread style.
-  const subject = `boxscore - ${opts.teamName} - ${shortPrettyDate(opts.digestDate)}`;
+  // Sender name already shows "boxscore", so the subject leads with the
+  // distinguishing label ({team name} or {sport}) — keeps the inbox preview
+  // free of redundant brand text. Subject + preview text use the EDITION
+  // date (digestDate + 1) so they match the masthead inside the body.
+  const editionDateIso = nextDay(opts.digestDate);
+  const subject = `${opts.teamName} - ${shortPrettyDate(editionDateIso)}`;
   const html = wrapWithDigest({
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
     manageUrl: opts.manageUrl,
     announcementBanner: opts.announcementBanner,
-    previewText: `${opts.digestPrettyDate} · ${opts.teamName} digest from boxscore.`,
+    previewText: `${prettyDate(editionDateIso)} · ${opts.teamName} digest from boxscore.`,
   });
-  const text = `${subject}\n\nManage subscriptions: ${opts.manageUrl}\nView in browser: ${opts.digestUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  const text = `${subject}\n\nRead online: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };
 }
 
@@ -276,8 +282,6 @@ ${preview}
       </td></tr>
 
       <tr><td style="padding-top:18px; border-top:1px solid ${RULE}; text-align:center; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; color:${MUTED}; font-style:italic;">
-        <a href="${opts.digestUrl}" style="color:${MUTED};">View in browser</a>
-        &nbsp;·&nbsp;
         <a href="${opts.unsubscribeUrl}" style="color:${MUTED};">Unsubscribe in one click</a>
       </td></tr>
 

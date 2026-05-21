@@ -23,6 +23,14 @@ import type {
 } from "./mlb";
 import type { DailyData, GameDetail, LeaderGroup, UpcomingGame } from "./render";
 import type { Transaction } from "./mlb";
+import { issueNumber, nextDay, prettyDate, volumeNumber } from "./dates";
+import { findTeamByMlbApiId } from "./teams";
+
+// Hardcoded production origin used to build absolute links inside cached
+// email HTML. The renderer runs at digest-generation time (no request
+// context), and email clients can't resolve relative URLs, so links bake
+// to https://boxscore.email/… regardless of where the digest is rendered.
+const EMAIL_LINK_BASE = "https://boxscore.email";
 // EMAIL_STYLES is concatenated with the basketball renderer's class rules so
 // the same stylesheet is injected into every digest email regardless of
 // sport. Both stylesheets use disjoint class prefixes (es-* for MLB, bb-*
@@ -35,16 +43,33 @@ export const EMAIL_STYLES = `
   .es * { box-sizing: border-box; }
   .es { font-family: 'Source Sans 3', Helvetica, Arial, sans-serif; color: #161410; }
   .es a { color: inherit; }
+  /* Team-name links inside the standings table: invisible — same color
+     as the cell, no underline. Backup for clients that strip the inline
+     style on the <a> element. */
+  .es-team-link { color: inherit !important; text-decoration: none !important; }
 
   .es-dateline {
     border-top: 3px double #161410; border-bottom: 1px solid #161410;
     padding: 8px 0; margin: 0 0 14px; text-align: center;
+    position: relative;
+  }
+  .es-dateline-text {
     font-style: italic; font-weight: 800; letter-spacing: -0.005em;
     /* Fluid: fit the longest dateline ("Wednesday, September 24, 2025") at
        any iframe / email-client width without wrapping. Many clients strip
        clamp() — the explicit font-size fallback below keeps them sane. */
     font-size: 22px;
     font-size: clamp(16px, 4.2vw, 24px);
+  }
+  .es-issue-no {
+    /* Small caps "Vol. X, Issue Y" tucked into the bottom-right corner of
+       the band, overlaying rather than pushing the date down. Modern web
+       clients (Gmail, Apple Mail) honor absolute positioning; legacy
+       Outlook strips it and renders inline below the date, which is an
+       acceptable fallback. */
+    position: absolute; right: 6px; bottom: 2px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #6a6354;
   }
   .es-section-h {
     font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
@@ -98,6 +123,12 @@ export const EMAIL_STYLES = `
     .es-table th { font-size: 9px; padding-bottom: 2px; }
   }
   .es-totals td { font-weight: 700; border-top: 1px solid #161410; }
+  /* Highlight for the subscriber's own team inside a standings table —
+     bold only, no top border (which would look like an unwanted horizontal
+     rule when the team isn't in first place). Distinct from .es-totals,
+     which intentionally has the rule because it sits at the bottom of a
+     box score's totals row. */
+  .es-row-self td { font-weight: 700; }
   .es-cutoff td { border-top: 2px dashed #161410; }
   .es-fixed { table-layout: fixed; }
   .es-mut { color: #6a6354; font-size: 11px; }
@@ -235,8 +266,14 @@ export const lastName = (full: string) => {
 
 // ─── building blocks ──────────────────────────────────────────────────────
 
-export const dateline = (pretty: string) =>
-  `<div class="es-dateline">${esc(pretty)}</div>`;
+// Newspaper-style masthead: centered date with "Vol. X, Issue Y" tucked
+// into the bottom-right corner of the bordered band.
+export const dateline = (pretty: string, opts?: { volume?: number; issue?: number }) => {
+  const counter = opts && opts.volume && opts.issue
+    ? `<div class="es-issue-no">Vol. ${opts.volume}, Issue ${opts.issue}</div>`
+    : "";
+  return `<div class="es-dateline"><div class="es-dateline-text">${esc(pretty)}</div>${counter}</div>`;
+};
 
 export const sectionH = (t: string) => `<h2 class="es-section-h">${esc(t)}</h2>`;
 const subH = (t: string) => `<h3 class="es-sub-h">${esc(t)}</h3>`;
@@ -272,12 +309,19 @@ function standingsRow(
   r: {
     nickname: string; wins: number; losses: number; pct: string;
     gb: string; diff: string; home: string; away: string; l10: string; strk: string;
+    // When provided, the nickname renders as a link to the team's digest.
+    // Styled to be invisible — same color and no underline as the parent
+    // cell — so subscribers don't see a "click me" cue inside the table.
+    teamHref?: string;
   },
   rowClass = "",
 ): string {
   const cls = rowClass ? ` class="${rowClass}"` : "";
+  const nameCell = r.teamHref
+    ? `<a href="${r.teamHref}" class="es-team-link" style="color:inherit;text-decoration:none">${esc(r.nickname)}</a>`
+    : esc(r.nickname);
   return `<tr${cls}>
-    <td align="left">${esc(r.nickname)}</td>
+    <td align="left">${nameCell}</td>
     <td align="right">${r.wins}</td>
     <td align="right">${r.losses}</td>
     <td align="right">${esc(r.pct)}</td>
@@ -293,7 +337,7 @@ function standingsRow(
 export function renderDivisionStandings(
   label: string,
   d: DivisionStandings,
-  opts?: { highlightTeamId?: number },
+  opts?: { highlightTeamId?: number; sport?: string; date?: string },
 ): string {
   const rows = [...d.teamRecords]
     .sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank))
@@ -301,7 +345,15 @@ export function renderDivisionStandings(
       const home = t.records?.splitRecords?.find((s) => s.type === "home");
       const away = t.records?.splitRecords?.find((s) => s.type === "away");
       const l10 = t.records?.splitRecords?.find((s) => s.type === "lastTen");
-      const rowClass = opts?.highlightTeamId === t.team.id ? "es-totals" : "";
+      const rowClass = opts?.highlightTeamId === t.team.id ? "es-row-self" : "";
+      // Build the team's digest URL when caller supplied sport + date.
+      // Same /sport/slug/date convention as the public web routes.
+      const slug = opts?.sport && opts?.date
+        ? findTeamByMlbApiId(t.team.id)?.slug
+        : undefined;
+      const teamHref = slug && opts?.sport && opts?.date
+        ? `${EMAIL_LINK_BASE}/${opts.sport}/${slug}/${opts.date}`
+        : undefined;
       return standingsRow({
         nickname: nickname(t.team.name),
         wins: t.wins, losses: t.losses,
@@ -312,6 +364,7 @@ export function renderDivisionStandings(
         away: away ? `${away.wins}-${away.losses}` : "—",
         l10: l10 ? `${l10.wins}-${l10.losses}` : "—",
         strk: t.streak?.streakCode ?? "—",
+        teamHref,
       }, rowClass);
     }).join("");
   return `${subH(label + " Division")}
@@ -362,7 +415,9 @@ function renderLeagueStandings(label: string, key: "AL" | "NL", data: DailyData)
   const divs = DIVISIONS[key];
   const standingsHtml = divs.map((d) => {
     const rec = data.standings.find((r) => r.division.id === d.id);
-    return rec ? renderDivisionStandings(d.name, rec) : "";
+    // Pass sport + games_date so each team name becomes an invisible link
+    // to that team's digest for the same date.
+    return rec ? renderDivisionStandings(d.name, rec, { sport: "mlb", date: data.date }) : "";
   }).join("");
   // Wild card intentionally omitted in email — keeps the email tighter; the
   // full wild card race is still on the web.
@@ -711,7 +766,11 @@ function renderTransactions(txs: Transaction[]): string {
   return `${sectionH("Transactions")}<div class="es-tx-block">${items}</div>`;
 }
 
-function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, string>): string {
+function renderTodaysGames(
+  games: UpcomingGame[],
+  liveAbbrev: Record<string, string>,
+  teamRecords: Map<number, string>,
+): string {
   if (games.length === 0) return "";
   const probable = (full?: string, record?: string, era?: string | null) => {
     if (!full) return "TBD";
@@ -722,10 +781,19 @@ function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, str
     if (detail.length > 0) parts.push(`(${detail.join(", ")})`);
     return parts.join(" ");
   };
+  // Team abbreviation followed by W-L in non-bold parens. Surrounding <td>
+  // is font-weight:700, so the abbreviation inherits bold and the inner
+  // <span> resets to 400 for the (record) suffix only.
+  const teamWithRecord = (name: string, teamId: number | undefined) => {
+    const tlaName = esc(tla(name, liveAbbrev));
+    const record = teamId != null ? teamRecords.get(teamId) : undefined;
+    if (!record) return tlaName;
+    return `${tlaName} <span style="font-weight:400;">(${esc(record)})</span>`;
+  };
   const rows = games.map((g) => {
     const isOff = g.status === "Postponed" || g.status === "Cancelled" || g.status === "Suspended";
     const right = isOff ? g.status : g.startTime;
-    const matchup = `${esc(tla(g.awayName, liveAbbrev))} @ ${esc(tla(g.homeName, liveAbbrev))}`;
+    const matchup = `${teamWithRecord(g.awayName, g.awayTeamId)} @ ${teamWithRecord(g.homeName, g.homeTeamId)}`;
     const pitchers = `${probable(g.awayProbable, g.awayProbableRecord, g.awayProbableEra)} vs ${probable(g.homeProbable, g.homeProbableRecord, g.homeProbableEra)}`;
     // Two rows per game: matchup + time on row 1, probable pitchers (muted) on
     // row 2 spanning both columns. A small bottom border on the pitcher row
@@ -746,37 +814,53 @@ function renderTodaysGames(games: UpcomingGame[], liveAbbrev: Record<string, str
 
 // ─── entry ────────────────────────────────────────────────────────────────
 
+// team.id → "W-L" using the same standings rows the dateline section
+// already loaded. Used by renderTodaysGames so each matchup shows
+// "TOR (23-15) @ WSH (18-13)". Keyed by ID rather than name because
+// MLB's schedule and standings endpoints don't always agree on the
+// exact team name string (e.g. "Athletics" vs "Oakland Athletics").
+function buildTeamRecordMap(standings: DivisionStandings[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const div of standings) {
+    for (const tr of div.teamRecords) {
+      out.set(tr.team.id, `${tr.wins}-${tr.losses}`);
+    }
+  }
+  return out;
+}
+
 export function renderEmailContent(data: DailyData): string {
+  const teamRecords = buildTeamRecordMap(data.standings);
   if (data.mode === "no-games") {
     return `<div class="es">
-${dateline(data.prettyDate)}
+${dateline(prettyDate(nextDay(data.date)), { volume: volumeNumber(nextDay(data.date)), issue: issueNumber(nextDay(data.date)) })}
 <p class="es-no-games">No games yesterday.</p>
-${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev, teamRecords)}
 ${renderTransactions(data.transactions)}
 </div>`;
   }
 
   if (data.mode === "all-star") {
     return `<div class="es">
-${dateline(data.prettyDate)}
+${dateline(prettyDate(nextDay(data.date)), { volume: volumeNumber(nextDay(data.date)), issue: issueNumber(nextDay(data.date)) })}
 <div class="es-edition">All-Star Game Edition</div>
 ${renderLeagueStandings("American League Standings", "AL", data)}
 ${renderSingleLeagueLeaders("American League", data.leaders.AL, data.teamAbbrev, 15)}
 ${renderLeagueStandings("National League Standings", "NL", data)}
 ${renderSingleLeagueLeaders("National League", data.leaders.NL, data.teamAbbrev, 15)}
-${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev, teamRecords)}
 ${renderAllStarGame(data.games, data.teamAbbrev)}
 ${renderTransactions(data.transactions)}
 </div>`;
   }
 
   return `<div class="es">
-${dateline(data.prettyDate)}
+${dateline(prettyDate(nextDay(data.date)), { volume: volumeNumber(nextDay(data.date)), issue: issueNumber(nextDay(data.date)) })}
 ${renderLeagueStandings("American League Standings", "AL", data)}
 ${renderSingleLeagueLeaders("American League", data.leaders.AL, data.teamAbbrev)}
 ${renderLeagueStandings("National League Standings", "NL", data)}
 ${renderSingleLeagueLeaders("National League", data.leaders.NL, data.teamAbbrev)}
-${renderTodaysGames(data.todaysGames, data.teamAbbrev)}
+${renderTodaysGames(data.todaysGames, data.teamAbbrev, teamRecords)}
 ${renderBoxScores(data.games, data.teamAbbrev)}
 ${renderTransactions(data.transactions)}
 </div>`;

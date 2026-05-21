@@ -19,9 +19,12 @@ export async function generateMetadata({ params }: {
   const { sport, date: slug, teamDate: date } = await params;
   const team = findTeam(sport as Sport, slug);
   if (!team || !isValidIsoDate(date)) return {};
+  // Browser tab + share metadata use the edition date — matches the
+  // masthead inside the page (games_date + 1).
+  const editionDate = prettyDate(nextDay(date));
   return {
-    title: `${team.name} — ${prettyDate(date)} | boxscore`,
-    description: `${team.name} digest for ${prettyDate(date)}.`,
+    title: `${team.name} — ${editionDate} | boxscore`,
+    description: `${team.name} digest for ${editionDate}.`,
   };
 }
 

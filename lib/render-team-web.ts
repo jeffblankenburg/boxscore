@@ -9,7 +9,7 @@
 // cached output. No request-time rendering.
 
 import type { ScheduleGame, RosterPlayer } from "./mlb";
-import { timeInET, prevDay, nextDay } from "./dates";
+import { issueNumber, prettyDate, prevDay, nextDay, timeInET, volumeNumber } from "./dates";
 import {
   esc, pad, fmtAvg, fmtEra, lastName,
   renderGame, renderDateline, renderTransactions, renderDivisionTable,
@@ -298,12 +298,20 @@ function classifyMode(data: TeamEmailData): TeamDigestMode {
 export function renderTeamWebContent(data: TeamEmailData): string {
   const mode = classifyMode(data);
   // Team digests live at /{sport}/{slug}/{date}. Prev/next arrows let
-  // readers walk back through past days for the same team.
+  // readers walk back through past days for the same team. Dateline
+  // shows the EDITION date (= games date + 1) and the Vol./Issue
+  // counter — mirrors the league digest header.
+  const sendIso = nextDay(data.date);
   const datelineOpts = {
     prevUrl: `/${data.team.sport}/${data.team.slug}/${prevDay(data.date)}`,
     nextUrl: `/${data.team.sport}/${data.team.slug}/${nextDay(data.date)}`,
+    volume: volumeNumber(sendIso),
+    issue: issueNumber(sendIso),
   };
-  const parts: string[] = [renderDateline(data.prettyDate, datelineOpts), teamHeading(data)];
+  const parts: string[] = [
+    renderDateline(prettyDate(sendIso), datelineOpts),
+    teamHeading(data),
+  ];
 
   if (mode === "game") {
     parts.push(

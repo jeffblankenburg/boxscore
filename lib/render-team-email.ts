@@ -17,7 +17,7 @@ import type {
   ScheduleGame, TeamRoster, RosterPlayer,
   DivisionStandings, Transaction,
 } from "./mlb";
-import { nextDay, prettyDate, timeInET } from "./dates";
+import { issueNumber, nextDay, prettyDate, timeInET, volumeNumber } from "./dates";
 import type { Team } from "./teams";
 import type { GameDetail } from "./render";
 import {
@@ -155,7 +155,14 @@ const DIVISION_NAMES: Record<number, string> = {
 function renderTeamStandings(data: TeamEmailData): string {
   if (!data.division || !data.team.mlbApiId) return "";
   const label = DIVISION_NAMES[data.division.division.id] ?? "Division";
-  return `${sectionH("Standings")}${renderDivisionStandings(label, data.division, { highlightTeamId: data.team.mlbApiId })}`;
+  // Pass sport + games_date so every team name becomes an invisible link
+  // to that team's digest for the same date (current team links to itself
+  // but renders the same — the highlight row makes "this is you" obvious).
+  return `${sectionH("Standings")}${renderDivisionStandings(label, data.division, {
+    highlightTeamId: data.team.mlbApiId,
+    sport: data.team.sport,
+    date: data.date,
+  })}`;
 }
 
 // A player is treated as a pitcher (for the pitching table) if their listed
@@ -478,7 +485,13 @@ function classifyTeamMode(data: TeamEmailData): TeamDigestMode {
 
 export function renderTeamEmailContent(data: TeamEmailData): string {
   const mode = classifyTeamMode(data);
-  const parts: string[] = [`<div class="es">`, dateline(data.prettyDate)];
+  // Email dateline = the day this email goes out (i.e. digest date + 1).
+  // Mirrors a newspaper: today's edition, yesterday's results.
+  const sendIso = nextDay(data.date);
+  const parts: string[] = [
+    `<div class="es">`,
+    dateline(prettyDate(sendIso), { volume: volumeNumber(sendIso), issue: issueNumber(sendIso) }),
+  ];
 
   if (mode === "game") {
     parts.push(

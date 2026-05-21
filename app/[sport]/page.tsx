@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getDigest } from "@/lib/digests";
-import { prettyDate, yesterdayInET } from "@/lib/dates";
+import { prettyDate, yesterdayInET, nextDay } from "@/lib/dates";
 import { getSportById, isSportVisible } from "@/lib/sports";
 import { PaperMasthead } from "@/app/PaperMasthead";
 
@@ -20,10 +20,13 @@ export async function generateMetadata({
   const { sport } = await params;
   const row = await getSportById(sport);
   if (!row || row.visibility !== "public") return {};
-  const date = yesterdayInET();
+  // Title shows the edition date (when the email goes out) rather than the
+  // games date — matches the dateline at the top of the page and the way
+  // a newspaper labels its day.
+  const editionDate = prettyDate(nextDay(yesterdayInET()));
   return {
-    title: `${row.name} — ${prettyDate(date)} | boxscore`,
-    description: `Daily ${row.name} digest for ${prettyDate(date)}.`,
+    title: `${row.name} — ${editionDate} | boxscore`,
+    description: `Daily ${row.name} digest for ${editionDate}.`,
   };
 }
 

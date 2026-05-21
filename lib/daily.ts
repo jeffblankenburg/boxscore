@@ -135,6 +135,8 @@ function upcomingFromRaw(
       gamePk: g.gamePk,
       awayName: g.teams.away.team.name,
       homeName: g.teams.home.team.name,
+      awayTeamId: g.teams.away.team.id,
+      homeTeamId: g.teams.home.team.id,
       awayProbable: ap?.fullName,
       homeProbable: hp?.fullName,
       awayProbableRecord: apStats ? `${apStats.wins}-${apStats.losses}` : undefined,

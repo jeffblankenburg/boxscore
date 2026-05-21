@@ -470,7 +470,7 @@ export async function searchSends(query: string): Promise<SendSearchRow[]> {
     return {
       id: s.id,
       to: emailById.get(s.subscriber_id) ?? "(unknown)",
-      subject: `boxscore - ${s.digest_sport.toUpperCase()} - ${prettyDate(s.digest_date)}`,
+      subject: `${s.digest_sport.toUpperCase()} - ${prettyDate(s.digest_date)}`,
       status,
       sentAt: s.sent_at,
     };

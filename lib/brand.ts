@@ -6,7 +6,7 @@ export const BRAND = {
   tipJarUrl: "https://ko-fi.com/jeffblankenburg",
   social: [
     { label: "Twitter", href: "https://twitter.com/boxscoreemail" },
-    { label: "BlueSky", href: "https://bsky.app/profile/boxscore.email" },
+    { label: "Bluesky", href: "https://bsky.app/profile/boxscore.email" },
     { label: "Facebook", href: "https://facebook.com/boxscore.email" },
   ],
 } as const;

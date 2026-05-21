@@ -2,7 +2,7 @@ import { supabaseAdmin } from "./supabase";
 import { yesterdayInET } from "./dates";
 import { getVisibleSports } from "./sports";
 import { featuresFor, type CronRoute as SportCronRoute } from "./sport-features";
-import { getActiveSubscriberIdSet } from "./subscribers";
+import { getActiveSubscriberIdSet, getActiveSubscriberIdSetAt } from "./subscribers";
 
 // Supabase's JS client caps un-paginated `select` at 1000 rows. The `sends`
 // and `subscribers` tables both grow past that, so any aggregation that needs
@@ -787,15 +787,40 @@ function makeBucket(eligible: number, sent: number): SendCoverageBucket {
   return { eligible, sent, coverage, warn };
 }
 
+// Most recent successful cron_runs.started_at for a given (route, sport, date).
+// We use this as the cutoff for "who was eligible at cron time" — opt-ins
+// created after the cron fired weren't subscribed yet and shouldn't be in
+// the denominator. Returns null when no completed run exists yet (e.g. for
+// a sport whose cron hasn't been scheduled).
+async function getCronStartedAt(
+  route: string,
+  sport: string,
+  date: string,
+): Promise<string | null> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("cron_runs")
+    .select("started_at")
+    .eq("route", route)
+    .eq("sport", sport)
+    .eq("date", date)
+    .eq("status", "ok")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`getCronStartedAt ${route}/${sport}/${date}: ${error.message}`);
+  return data?.started_at ?? null;
+}
+
 export async function getSendCoverage(): Promise<SendCoverageRow[]> {
   const date = yesterdayInET();
   const sports = await getVisibleSports({ includeAdminOnly: true });
   const db = supabaseAdmin();
 
-  // Paginated active-subscriber IDs — without pagination Supabase silently
-  // caps at 1000 rows and we silently under-count opt-ins by ~80% on
-  // larger accounts. Same root cause as the team-send cron bug.
-  const activeIds = await getActiveSubscriberIdSet();
+  // Fallback for when no cron has fired yet — denominator = currently
+  // active subscribers. Once a cron exists, we use a cutoff-aware set
+  // instead so churn since the cron doesn't skew the ratio.
+  const currentlyActiveIds = await getActiveSubscriberIdSet();
 
   const rows: SendCoverageRow[] = [];
   for (const sport of sports) {
@@ -803,12 +828,26 @@ export async function getSendCoverage(): Promise<SendCoverageRow[]> {
 
     let league: SendCoverageBucket | null = null;
     if (features.expectedRoutes.includes("send-email")) {
+      // We use the cron's started_at to decide who was active *as a
+      // subscriber* at the time. The email_subscriptions row's own
+      // created_at is unreliable — applyInitialSubscriptions deletes and
+      // recreates rows on resubscribe, so an existing opt-in can appear
+      // "newly created" even though it was effectively in place at cron
+      // time. The subscriber-level cutoff is solid; the opt-in side just
+      // checks current active=true.
+      const cutoff = await getCronStartedAt("send-email", sport.id, date);
+      const activeIds = cutoff
+        ? await getActiveSubscriberIdSetAt(cutoff)
+        : currentlyActiveIds;
       const [optIns, sent] = await Promise.all([
-        db.from("email_subscriptions")
-          .select("subscriber_id")
-          .eq("sport", sport.id)
-          .eq("scope", "league")
-          .eq("active", true),
+        fetchAll<{ subscriber_id: string }>(
+          () => db.from("email_subscriptions")
+            .select("subscriber_id")
+            .eq("sport", sport.id)
+            .eq("scope", "league")
+            .eq("active", true),
+          `getSendCoverage league opt-ins (${sport.id})`,
+        ),
         db.from("sends")
           .select("subscriber_id", { count: "exact", head: true })
           .eq("digest_sport", sport.id)
@@ -816,10 +855,9 @@ export async function getSendCoverage(): Promise<SendCoverageRow[]> {
           .is("team_id", null)
           .is("error", null),
       ]);
-      if (optIns.error) throw new Error(`getSendCoverage league opt-ins: ${optIns.error.message}`);
       if (sent.error) throw new Error(`getSendCoverage league sends: ${sent.error.message}`);
       let eligible = 0;
-      for (const r of (optIns.data ?? []) as Array<{ subscriber_id: string }>) {
+      for (const r of optIns) {
         if (activeIds.has(r.subscriber_id)) eligible++;
       }
       league = makeBucket(eligible, sent.count ?? 0);
@@ -827,12 +865,19 @@ export async function getSendCoverage(): Promise<SendCoverageRow[]> {
 
     let team: SendCoverageBucket | null = null;
     if (features.expectedRoutes.includes("send-team-email")) {
+      const cutoff = await getCronStartedAt("send-team-email", sport.id, date);
+      const activeIds = cutoff
+        ? await getActiveSubscriberIdSetAt(cutoff)
+        : currentlyActiveIds;
       const [optIns, sent] = await Promise.all([
-        db.from("email_subscriptions")
-          .select("subscriber_id")
-          .eq("sport", sport.id)
-          .eq("scope", "team")
-          .eq("active", true),
+        fetchAll<{ subscriber_id: string }>(
+          () => db.from("email_subscriptions")
+            .select("subscriber_id")
+            .eq("sport", sport.id)
+            .eq("scope", "team")
+            .eq("active", true),
+          `getSendCoverage team opt-ins (${sport.id})`,
+        ),
         db.from("sends")
           .select("subscriber_id", { count: "exact", head: true })
           .eq("digest_sport", sport.id)
@@ -840,10 +885,9 @@ export async function getSendCoverage(): Promise<SendCoverageRow[]> {
           .not("team_id", "is", null)
           .is("error", null),
       ]);
-      if (optIns.error) throw new Error(`getSendCoverage team opt-ins: ${optIns.error.message}`);
       if (sent.error) throw new Error(`getSendCoverage team sends: ${sent.error.message}`);
       let eligible = 0;
-      for (const r of (optIns.data ?? []) as Array<{ subscriber_id: string }>) {
+      for (const r of optIns) {
         if (activeIds.has(r.subscriber_id)) eligible++;
       }
       team = makeBucket(eligible, sent.count ?? 0);

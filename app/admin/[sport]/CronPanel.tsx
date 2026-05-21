@@ -5,9 +5,20 @@
 // safeguards for the destructive sends (send-email, send-team-email) are
 // inlined here — clicking Run on a guarded route opens the two-step
 // confirm-then-type-SEND flow before any request fires.
+//
+// Date semantics: the input shows the EDITION date (the day the email
+// goes out / the masthead date). The cron API expects games_date, so
+// buildFormData translates by subtracting one day.
 
 import { useState, useTransition } from "react";
 import { triggerCron } from "../actions";
+
+function prevDayIso(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return dt.toISOString().slice(0, 10);
+}
 
 type Route =
   | "generate"
@@ -60,7 +71,8 @@ export function CronPanel({
   function buildFormData(): FormData {
     const fd = new FormData();
     fd.set("route", route);
-    fd.set("date", date);
+    // Input is edition date; cron API expects games_date = edition - 1.
+    fd.set("date", prevDayIso(date));
     fd.set("sport", sport);
     fd.set("returnTo", returnTo);
     if (reset && isResettable) fd.set("reset", "1");

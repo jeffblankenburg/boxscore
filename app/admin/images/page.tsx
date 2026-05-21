@@ -1,5 +1,5 @@
 import { listStoredImages } from "@/lib/share-storage";
-import { yesterdayInET, prettyDate } from "@/lib/dates";
+import { yesterdayInET, prettyDate, nextDay, prevDay } from "@/lib/dates";
 import { regenerateShareImages } from "../actions";
 import { SubmitButton } from "../SubmitButton";
 import { requireAdmin } from "../require-admin";
@@ -14,7 +14,9 @@ export default async function AdminImagesView({
   searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
   await requireAdmin();
-  const defaultDate = yesterdayInET();
+  // Input shows the edition date (today); regenerateShareImages expects
+  // games_date so the form wrapper translates at submission.
+  const defaultDate = nextDay(yesterdayInET());
   const { date, images } = await listStoredImages();
   const { error, ok } = await searchParams;
 
@@ -38,7 +40,16 @@ export default async function AdminImagesView({
           : "Nothing in Storage yet."}
       </p>
 
-      <form action={regenerateShareImages} className="admin-regen-form">
+      <form
+        action={async (formData: FormData) => {
+          "use server";
+          // Edition date → games_date at the boundary.
+          const raw = formData.get("date");
+          if (typeof raw === "string" && raw) formData.set("date", prevDay(raw));
+          await regenerateShareImages(formData);
+        }}
+        className="admin-regen-form"
+      >
         <label>
           Date:{" "}
           <input

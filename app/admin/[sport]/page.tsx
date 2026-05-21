@@ -17,7 +17,7 @@ import { getActiveSubscribersForSport } from "@/lib/subscribers";
 import { countActiveTeamSubscriptions } from "@/lib/email-subscriptions";
 import { recentCronRunsForSports, type CronRun } from "@/lib/cron-runs";
 import { supabaseAdmin } from "@/lib/supabase";
-import { yesterdayInET, prettyDate } from "@/lib/dates";
+import { yesterdayInET, prettyDate, nextDay, prevDay } from "@/lib/dates";
 import { featuresFor, type CronRoute } from "@/lib/sport-features";
 import { teamsBySport, type Sport } from "@/lib/teams";
 
@@ -45,21 +45,26 @@ export default async function LeagueDashboard({
   const { ok, error } = await searchParams;
 
   const features = featuresFor(sport);
-  const date = yesterdayInET();
+  // gamesDate = the day the games we're showing were played (yesterday).
+  // editionDate = the day the email goes out (today). Backend lookups
+  // use gamesDate; date INPUTS show editionDate. Forms translate edition
+  // → games at submission time.
+  const gamesDate = yesterdayInET();
+  const editionDate = nextDay(gamesDate);
   const returnTo = `/admin/${sport}`;
 
   const [activeSubs, teamSendCount, generateRun, lastSend, cronPulse, recentRuns, regenDates, sportAnnouncement, globalAnnouncement, announcementList, teamConsoleRows] = await Promise.all([
     getActiveSubscribersForSport(sport).then((rows) => rows.length),
     features.hasTeamDigests ? countActiveTeamSubscriptions(sport) : Promise.resolve(0),
-    getMostRecentCronRunForDate(sport, "generate", date),
+    getMostRecentCronRunForDate(sport, "generate", gamesDate),
     getMostRecentSendForSport(sport),
-    getCronPulseForDate(sport, date, features.expectedRoutes),
+    getCronPulseForDate(sport, gamesDate, features.expectedRoutes),
     recentCronRunsForSports([sport], 20),
     features.hasRegenAll ? listCachedDigestDates(sport) : Promise.resolve([]),
-    getSpecificAnnouncement(sport, date),
-    getSpecificAnnouncement(GLOBAL_ANNOUNCEMENT_SPORT, date),
+    getSpecificAnnouncement(sport, gamesDate),
+    getSpecificAnnouncement(GLOBAL_ANNOUNCEMENT_SPORT, gamesDate),
     listAnnouncements(sport),
-    features.hasTeamDigests ? loadTeamConsoleRows(sport, date) : Promise.resolve([]),
+    features.hasTeamDigests ? loadTeamConsoleRows(sport, gamesDate) : Promise.resolve([]),
   ]);
 
   const generateResult = (generateRun?.result ?? null) as
@@ -88,7 +93,7 @@ export default async function LeagueDashboard({
           sub="opted in to this digest"
         />
         <KpiCard
-          label={`Digest · ${prettyDate(date)}`}
+          label={`Digest · ${prettyDate(gamesDate)}`}
           value={generateRun
             ? gameCount != null ? gameCount.toString() : (generateRun.status === "failed" ? "FAIL" : "—")
             : "—"}
@@ -127,20 +132,20 @@ export default async function LeagueDashboard({
       </section>
 
       <section>
-        <h2>Cron pulse · {date}</h2>
+        <h2>Cron pulse · {gamesDate}</h2>
         <CronPulseStrip pulse={cronPulse} routes={features.expectedRoutes} />
       </section>
 
       <section>
         <h2>Run a cron</h2>
         <p className="admin-meta">
-          Manually fire any cron route. Date defaults to yesterday in ET;
+          Manually fire any cron route. Date defaults to today&apos;s edition;
           results land in the recent-runs table below.
         </p>
         <CronPanel
           sport={sport}
           returnTo={returnTo}
-          defaultDate={date}
+          defaultDate={editionDate}
           expectedRoutes={features.expectedRoutes}
           activeSubs={activeSubs}
           teamSendCount={teamSendCount}
@@ -152,13 +157,13 @@ export default async function LeagueDashboard({
         <section>
           <h2>Team digest console</h2>
           <p className="admin-meta">
-            Per-team rollup for <code>{date}</code>. Subs = opted-in
+            Per-team rollup for <code>{gamesDate}</code>&apos;s games. Subs = opted-in
             subscribers. Yesterday = whether the team played + a final box
             score was cached. Send = sent/failed counts from the team-send
-            cron for this date. Preview opens the team's web digest in a
+            cron for this date. Preview opens the team&apos;s web digest in a
             new tab.
           </p>
-          <TeamConsole rows={teamConsoleRows} sport={sport} date={date} />
+          <TeamConsole rows={teamConsoleRows} sport={sport} date={gamesDate} />
         </section>
       )}
 
@@ -166,14 +171,14 @@ export default async function LeagueDashboard({
         <h2>Email announcement banner</h2>
         <p className="admin-meta">
           One-off note prepended above the digest body in both the league
-          send and every per-team send for the chosen date. Line breaks are
-          preserved. Markdown: <code>**bold**</code>, <code>*italic*</code>,{" "}
+          send and every per-team send for the chosen edition date. Line breaks
+          are preserved. Markdown: <code>**bold**</code>, <code>*italic*</code>,{" "}
           <code>__underline__</code>, <code>[link](https://…)</code>. Raw
           HTML also accepted. Empty + Save clears it.
         </p>
         <AnnouncementForm
           sport={sport}
-          date={date}
+          date={editionDate}
           returnTo={returnTo}
           sportAnnouncement={sportAnnouncement}
           globalAnnouncement={globalAnnouncement}
@@ -189,11 +194,11 @@ export default async function LeagueDashboard({
         <section>
           <h2>Send today&apos;s email to me</h2>
           <p className="admin-meta">
-            Renders + emails the {sportRow.name} digest for the chosen date to
-            the signed-in admin&apos;s address. Useful for eyeballing a render
-            before firing the real send.
+            Renders + emails the {sportRow.name} digest for the chosen edition
+            date to the signed-in admin&apos;s address. Useful for eyeballing a
+            render before firing the real send.
           </p>
-          <SendToMeForm date={date} sport={sport} returnTo={returnTo} />
+          <SendToMeForm date={editionDate} sport={sport} returnTo={returnTo} />
         </section>
       )}
 
@@ -206,7 +211,7 @@ export default async function LeagueDashboard({
             send-team-email cron so you can preview off-day templates too.
           </p>
           <SendTeamToMeForm
-            date={date}
+            date={editionDate}
             sport={sport}
             returnTo={returnTo}
             teams={teamsBySport(sport as Sport)}
@@ -226,8 +231,8 @@ export default async function LeagueDashboard({
             )}
             {features.hasPreview && (
               <li>
-                <a href={`/admin/email/${date}`} target="_blank" rel="noreferrer">
-                  Email preview ({date}) →
+                <a href={`/admin/email/${gamesDate}`} target="_blank" rel="noreferrer">
+                  Email preview ({gamesDate}) →
                 </a>
                 <span className="admin-meta"> · rendered email for the day</span>
               </li>
@@ -487,7 +492,10 @@ function SendToMeForm({
       action={async (formData: FormData) => {
         "use server";
         const rawDate = formData.get("date");
-        const targetDate = typeof rawDate === "string" && rawDate ? rawDate : date;
+        // Input value is edition date; backend (sendAdminPreview → digest
+        // lookup) expects games_date. Translate at submission.
+        const editionDate = typeof rawDate === "string" && rawDate ? rawDate : date;
+        const targetDate = prevDay(editionDate);
         await sendAdminPreview(targetDate, sport, returnTo);
       }}
       className="admin-trigger-form"
@@ -523,7 +531,10 @@ function SendTeamToMeForm({
         "use server";
         const rawDate = formData.get("date");
         const rawTeam = formData.get("team");
-        const targetDate = typeof rawDate === "string" && rawDate ? rawDate : date;
+        // Edition date in, games_date out — same boundary translation as
+        // the league-send form above.
+        const editionDate = typeof rawDate === "string" && rawDate ? rawDate : date;
+        const targetDate = prevDay(editionDate);
         const targetTeam = typeof rawTeam === "string" ? rawTeam : "";
         await sendTeamAdminPreview(targetDate, sport, targetTeam, returnTo);
       }}
@@ -567,6 +578,17 @@ function TeamConsole({
       <p className="admin-meta">No team registry entries for this sport.</p>
     );
   }
+  // Totals across every team in the table. "Played yesterday" counts only
+  // teams whose schedule had a final game; null (unknown / no data) is
+  // excluded. "Generated" counts teams with a cached digest row.
+  const totals = {
+    subs: rows.reduce((s, r) => s + r.subscribers, 0),
+    played: rows.reduce((s, r) => s + (r.hasGameYesterday ? 1 : 0), 0),
+    generated: rows.reduce((s, r) => s + (r.digestGenerated ? 1 : 0), 0),
+    sent: rows.reduce((s, r) => s + (r.send?.sent ?? 0), 0),
+    failed: rows.reduce((s, r) => s + (r.send?.failed ?? 0), 0),
+    teams: rows.length,
+  };
   return (
     <table className="admin-team-console">
       <thead>
@@ -624,6 +646,20 @@ function TeamConsole({
           );
         })}
       </tbody>
+      <tfoot>
+        <tr className="admin-team-totals">
+          <td className="admin-team-col-name">Totals ({totals.teams} teams)</td>
+          <td className="admin-team-col-num">{totals.subs.toLocaleString()}</td>
+          <td className="admin-team-col-state">{totals.played} played</td>
+          <td className="admin-team-col-state">{totals.generated}/{totals.teams} generated</td>
+          <td className="admin-team-col-state">
+            <span className={totals.failed > 0 ? "admin-team-bad" : "admin-team-ok"}>
+              {totals.sent}/{totals.failed}
+            </span>
+          </td>
+          <td className="admin-team-col-actions"></td>
+        </tr>
+      </tfoot>
     </table>
   );
 }
@@ -648,7 +684,18 @@ function AnnouncementForm({
   const prefillIsGlobal = !sportAnnouncement && !!globalAnnouncement;
 
   return (
-    <form action={setAnnouncement} className="admin-announcement-form">
+    <form
+      action={async (formData: FormData) => {
+        "use server";
+        // Input is edition date; announcements table keys by games_date
+        // (the digest's identity). Translate at the boundary.
+        const rawDate = formData.get("date");
+        const editionDate = typeof rawDate === "string" && rawDate ? rawDate : date;
+        formData.set("date", prevDay(editionDate));
+        await setAnnouncement(formData);
+      }}
+      className="admin-announcement-form"
+    >
       <input type="hidden" name="sport" value={sport} />
       <input type="hidden" name="returnTo" value={returnTo} />
       <div className="admin-announcement-meta">
