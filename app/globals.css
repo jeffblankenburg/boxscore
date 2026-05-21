@@ -243,8 +243,33 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 }
 .team-line .team-score {
   flex: 0 0 auto;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: baseline;
+  /* Wider gap between inning thirds (1/2/3  4/5/6  7/8/9) gives the line its
+     newspaper rhythm. Within-third and within-RHE spacing is tighter. */
+  column-gap: 1ch;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0; white-space: pre;
+  letter-spacing: 0;
+}
+.team-line .team-score .inn-grp {
+  display: grid;
+  grid-template-columns: repeat(3, 1ch);
+  column-gap: 0.35ch;
+}
+.team-line .team-score.bigInning .inn-grp {
+  grid-template-columns: repeat(3, 2ch);
+}
+.team-line .team-score .inn { text-align: right; }
+.team-line .team-score .sep { padding: 0; }
+.team-line .team-score .rhe-grp {
+  display: grid;
+  grid-auto-flow: column;
+  column-gap: 0.4ch;
+}
+.team-line .team-score .rhe {
+  min-width: 2ch;
+  text-align: right;
 }
 
 .batting-table, .pitching-table { font-size: 13px; margin-top: 4px; }
