@@ -10,7 +10,7 @@
 // + lookup + send path.
 
 import { NextResponse } from "next/server";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { requestMagicLink, validateEmail } from "@/lib/subscriber-auth";
 
 export const runtime = "nodejs";
@@ -47,11 +47,10 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  const origin = await siteOrigin();
   await requestMagicLink({
     email: raw,
     ip: clientIp(req),
-    buildUrl: (token) => `${origin}/auth/${token}`,
+    buildUrl: (token) => `${EMAIL_LINK_BASE}/auth/${token}`,
   });
   return NextResponse.json({
     ok: true,

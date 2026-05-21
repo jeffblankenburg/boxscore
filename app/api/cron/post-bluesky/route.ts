@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
 import { deleteBlueskyPost, postToBlueskyWithImage } from "@/lib/bluesky";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE, siteOrigin } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
@@ -69,9 +69,11 @@ export async function GET(req: Request) {
     if (delErr) throw new Error(`reset delete: ${delErr.message}`);
   }
 
+  // Puppeteer's baseUrl needs the reachable host (dev → localhost, prod →
+  // boxscore.email, preview → vercel.app); the digestUrl embedded in the
+  // public post text always uses the canonical email/social origin.
   const origin = await siteOrigin();
-  // Public URL uses edition_date (games_date + 1).
-  const digestUrl = `${origin}/${sport}/${nextDay(date)}`;
+  const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${nextDay(date)}`;
   const pretty = prettyDate(date);
 
   // Render share images in-memory using the same renderer as the local script.

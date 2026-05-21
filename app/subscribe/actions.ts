@@ -6,7 +6,7 @@ import { findByEmail, startSubscription } from "@/lib/subscribers";
 import { applyInitialSubscriptions } from "@/lib/email-subscriptions";
 import { sendEmail } from "@/lib/email";
 import { confirmationEmail } from "@/lib/emails/templates";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { requestMagicLink } from "@/lib/subscriber-auth";
 import { isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
@@ -68,7 +68,6 @@ export async function subscribe(formData: FormData): Promise<void> {
   }
 
   const existing = await findByEmail(email);
-  const origin = await siteOrigin();
 
   if (existing && existing.status === "active") {
     // Already a subscriber — quietly issue a sign-in link. They were given a
@@ -81,7 +80,7 @@ export async function subscribe(formData: FormData): Promise<void> {
     await requestMagicLink({
       email,
       ip,
-      buildUrl: (token) => `${origin}/auth/${token}`,
+      buildUrl: (token) => `${EMAIL_LINK_BASE}/auth/${token}`,
     });
     redirect("/subscribe/sent?mode=signin");
   }
@@ -93,7 +92,7 @@ export async function subscribe(formData: FormData): Promise<void> {
   const subscriber = await startSubscription(email);
   await applyInitialSubscriptions(subscriber.id, { leagues, teams });
 
-  const confirmUrl = `${origin}/c/${subscriber.confirm_token}`;
+  const confirmUrl = `${EMAIL_LINK_BASE}/c/${subscriber.confirm_token}`;
   const { subject, html, text } = confirmationEmail({ confirmUrl });
   await sendEmail({ to: subscriber.email, subject, html, text });
 

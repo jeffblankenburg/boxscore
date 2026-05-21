@@ -5,7 +5,7 @@ import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
 import { dailyEmail } from "@/lib/emails/templates";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
 export const runtime = "nodejs";
@@ -37,6 +37,10 @@ export async function GET(req: Request) {
   const date = url.searchParams.get("date") ?? yesterdayInET();
   const sport = url.searchParams.get("sport") ?? "mlb";
   const trigger = url.searchParams.get("trigger") === "manual" ? "manual" : "cron";
+  // force=true bypasses the already-sent filter so we can re-send a
+  // corrected digest after a bad render. Sends are upserted on
+  // (subscriber, sport, date) so re-sending replaces the prior row.
+  const force = url.searchParams.get("force") === "true";
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
@@ -50,10 +54,12 @@ export async function GET(req: Request) {
       throw new Error(`no digest for ${sport} ${date}`);
     }
 
-    const origin = await siteOrigin();
+    // Email links bake to https://boxscore.email/… regardless of where the
+    // cron ran. A dev send to a real inbox must never embed a localhost URL,
+    // and a preview-deployment cron must never embed a vercel.app URL.
     // Public URL uses the EDITION date (= games_date + 1). The send goes
     // out on edition day with yesterday's results.
-    const digestUrl = `${origin}/${sport}/${nextDay(date)}`;
+    const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${nextDay(date)}`;
     const digestPrettyDate = prettyDate(date);
 
     // Only subscribers who have opted in to this sport's league digest.
@@ -63,23 +69,25 @@ export async function GET(req: Request) {
     // One bulk fetch instead of one round-trip per subscriber. At thousands
     // of subscribers the serial-check pattern can use as much wall-clock as
     // the actual sending did.
-    const alreadySent = await getSentSubscriberIds(sport, date);
+    // Skip already-sent unless force=true. Force is used to re-send a
+    // corrected digest after a bad render.
+    const alreadySent = force ? new Set<string>() : await getSentSubscriberIds(sport, date);
     const toSend = subscribers.filter((s) => !alreadySent.has(s.id));
     const skipped = subscribers.length - toSend.length;
 
     let sent = 0, failed = 0;
 
-    const manageUrl = `${origin}/settings`;
+    const manageUrl = `${EMAIL_LINK_BASE}/settings`;
     const { getAnnouncement } = await import("@/lib/announcements");
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
 
     for (const group of chunk(toSend, BATCH_SIZE)) {
       const payload = group.map((sub) => {
-        const unsubscribeUrl = `${origin}/u/${sub.unsubscribe_token}`;
+        const unsubscribeUrl = `${EMAIL_LINK_BASE}/u/${sub.unsubscribe_token}`;
         // Mail-client native "Unsubscribe" buttons POST to this URL (RFC 8058).
         // It's a separate endpoint from the human-facing /u/[token] page so
         // GET requests from link scanners can't auto-unsubscribe real users.
-        const oneClickUrl = `${origin}/api/u/${sub.unsubscribe_token}`;
+        const oneClickUrl = `${EMAIL_LINK_BASE}/api/u/${sub.unsubscribe_token}`;
         const { subject, html, text } = dailyEmail({
           sport,
           digestDate: date,

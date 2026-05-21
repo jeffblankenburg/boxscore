@@ -36,7 +36,7 @@ import {
 } from "@/lib/subscriber-auth";
 import { sendEmail } from "@/lib/email";
 import { welcomeEmail } from "@/lib/emails/templates";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { getDigest } from "@/lib/digests";
 import { nextDay, yesterdayInET, prettyDate } from "@/lib/dates";
 import { isLikelyBot } from "@/lib/bot-detect";
@@ -92,14 +92,13 @@ export async function GET(
   // first thing the new subscriber sees in their inbox is the actual
   // product, not a thank-you screen.
   try {
-    const origin = await siteOrigin();
     const digestDate = yesterdayInET();
     const digest = await getDigest("mlb", digestDate);
     if (digest && digest.email_html) {
       // Public URL uses edition_date (games_date + 1).
-      const digestUrl = `${origin}/mlb/${nextDay(digestDate)}`;
-      const unsubscribeUrl = `${origin}/u/${justActivated.unsubscribe_token}`;
-      const manageUrl = `${origin}/settings`;
+      const digestUrl = `${EMAIL_LINK_BASE}/mlb/${nextDay(digestDate)}`;
+      const unsubscribeUrl = `${EMAIL_LINK_BASE}/u/${justActivated.unsubscribe_token}`;
+      const manageUrl = `${EMAIL_LINK_BASE}/settings`;
       const { subject, html, text } = welcomeEmail({
         digestPrettyDate: prettyDate(digestDate),
         digestUrl,

@@ -1,15 +1,15 @@
 {
   "crons": [
     {
-      "path": "/api/cron/generate?sport=mlb",
+      "path": "/api/cron/generate?sport=mlb&refetch=true",
       "schedule": "0 9 * * *"
     },
     {
-      "path": "/api/cron/generate?sport=nba",
+      "path": "/api/cron/generate?sport=nba&refetch=true",
       "schedule": "0 9 * * *"
     },
     {
-      "path": "/api/cron/generate?sport=wnba",
+      "path": "/api/cron/generate?sport=wnba&refetch=true",
       "schedule": "0 9 * * *"
     },
     {

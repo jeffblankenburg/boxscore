@@ -27,7 +27,7 @@ function wrap(inner: string, options: { previewText?: string } = {}): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="margin:0; padding:0; background:${PAPER}; ${BASE_STYLES}">
+<body style="margin:0; padding:0; background:${PAPER}; ${BASE_STYLES} -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; text-size-adjust:100%;">
 ${preview}
 <div style="max-width:560px; margin:0 auto; padding:32px 24px; background:#fff; box-shadow:0 0 10px rgba(0,0,0,0.08);">
   <div style="text-align:center; padding-bottom:14px; border-bottom:1px solid ${INK};">
@@ -249,7 +249,7 @@ function wrapWithDigest(opts: {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap">
 <style>${EMAIL_STYLES}</style>
 </head>
-<body style="margin:0; padding:0; background:${PAPER}; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; color:${INK};">
+<body style="margin:0; padding:0; background:${PAPER}; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; color:${INK}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; text-size-adjust:100%;">
 ${preview}
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fff;">
   <tr><td style="padding:8px 8px 24px;">

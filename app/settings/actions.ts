@@ -2,7 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   requestMagicLink,
@@ -25,11 +25,10 @@ export async function requestSignInLink(formData: FormData) {
   const h = await headers();
   const fwd = h.get("x-forwarded-for");
   const ip = fwd ? (fwd.split(",")[0]?.trim() ?? null) : (h.get("x-real-ip") ?? null);
-  const origin = await siteOrigin();
   await requestMagicLink({
     email: rawEmail,
     ip,
-    buildUrl: (token) => `${origin}/auth/${token}`,
+    buildUrl: (token) => `${EMAIL_LINK_BASE}/auth/${token}`,
   });
   redirect("/settings?sent=1");
 }

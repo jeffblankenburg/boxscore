@@ -25,12 +25,7 @@ import type { DailyData, GameDetail, LeaderGroup, UpcomingGame } from "./render"
 import type { Transaction } from "./mlb";
 import { issueNumber, nextDay, prettyDate, volumeNumber } from "./dates";
 import { findTeamByMlbApiId } from "./teams";
-
-// Hardcoded production origin used to build absolute links inside cached
-// email HTML. The renderer runs at digest-generation time (no request
-// context), and email clients can't resolve relative URLs, so links bake
-// to https://boxscore.email/… regardless of where the digest is rendered.
-const EMAIL_LINK_BASE = "https://boxscore.email";
+import { EMAIL_LINK_BASE } from "./site";
 // EMAIL_STYLES is concatenated with the basketball renderer's class rules so
 // the same stylesheet is injected into every digest email regardless of
 // sport. Both stylesheets use disjoint class prefixes (es-* for MLB, bb-*

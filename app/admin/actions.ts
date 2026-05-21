@@ -8,7 +8,7 @@ import { dailyEmail, teamDailyEmail } from "@/lib/emails/templates";
 import { nextDay, prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE, siteOrigin } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
 import { findTeam, type Sport } from "@/lib/teams";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
@@ -36,16 +36,17 @@ export async function sendAdminPreview(
       throw new Error(`No email_html for ${sport}/${date}`);
     }
 
-    const origin = await siteOrigin();
     const { getAnnouncement } = await import("@/lib/announcements");
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
+    // Admin preview emails should match what subscribers get — bake links
+    // to https://boxscore.email/… even when running locally.
     const { subject, html, text } = dailyEmail({
       sport,
       digestDate: date,
       digestPrettyDate: prettyDate(date),
-      digestUrl: `${origin}/${sport}/${nextDay(date)}`,
-      unsubscribeUrl: `${origin}/u/admin-preview`,
-      manageUrl: `${origin}/settings`,
+      digestUrl: `${EMAIL_LINK_BASE}/${sport}/${nextDay(date)}`,
+      unsubscribeUrl: `${EMAIL_LINK_BASE}/u/admin-preview`,
+      manageUrl: `${EMAIL_LINK_BASE}/settings`,
       announcementBanner,
       digestEmailHtml: digest.email_html,
     });
@@ -88,16 +89,15 @@ export async function sendTeamAdminPreview(
 
     const data = await loadTeamEmailData(team, date);
     const body = renderTeamEmailContent(data);
-    const origin = await siteOrigin();
     const { getAnnouncement } = await import("@/lib/announcements");
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
     const { subject, html, text } = teamDailyEmail({
       teamName: team.name,
       digestDate: date,
       digestPrettyDate: prettyDate(date),
-      digestUrl: `${origin}/${sport}/${team.slug}/${nextDay(date)}`,
-      unsubscribeUrl: `${origin}/u/admin-preview`,
-      manageUrl: `${origin}/settings`,
+      digestUrl: `${EMAIL_LINK_BASE}/${sport}/${team.slug}/${nextDay(date)}`,
+      unsubscribeUrl: `${EMAIL_LINK_BASE}/u/admin-preview`,
+      manageUrl: `${EMAIL_LINK_BASE}/settings`,
       announcementBanner,
       digestEmailHtml: body,
     });
@@ -132,6 +132,7 @@ export async function triggerCron(formData: FormData): Promise<void> {
   const rawDate = formData.get("date");
   const date = typeof rawDate === "string" && rawDate ? rawDate : yesterdayInET();
   const reset = formData.get("reset") === "1";
+  const force = formData.get("force") === "1";
   const sport = String(formData.get("sport") ?? "mlb");
   const returnToRaw = formData.get("returnTo");
   const returnTo =
@@ -150,6 +151,16 @@ export async function triggerCron(formData: FormData): Promise<void> {
     const origin = await siteOrigin();
     const params = new URLSearchParams({ trigger: "manual", date, sport });
     if (reset) params.set("reset", "1");
+    // Manual Regen should always hit MLB/ESPN fresh. Without refetch=true,
+    // the generator reuses whatever's in daily_raw — which is exactly the
+    // stale row a "Regen" click is trying to fix.
+    if (route === "generate") params.set("refetch", "true");
+    // Force resend: only for the guarded send routes, opt-in from the
+    // confirm modal. Bypasses the already-sent filter so the second send
+    // reaches subscribers who got an earlier (bad) version.
+    if (force && (route === "send-email" || route === "send-team-email")) {
+      params.set("force", "true");
+    }
     const url = `${origin}/api/cron/${route}?${params}`;
 
     const headers: HeadersInit = {};
@@ -263,6 +274,9 @@ export async function regenerateOneDigest(
 
   const params = new URLSearchParams({ date, sport, trigger: "manual" });
   if (!includeTeams) params.set("skip_teams", "1");
+  // Force a fresh MLB/ESPN fetch — the whole point of clicking Regen is
+  // to bypass the cached daily_raw row.
+  params.set("refetch", "true");
 
   try {
     const res = await fetch(`${origin}/api/cron/generate?${params}`, { headers });
@@ -318,7 +332,7 @@ export async function regenerateAllDigests(formData: FormData): Promise<void> {
     for (const row of rows) {
       try {
         const res = await fetch(
-          `${origin}/api/cron/generate?date=${row.date}&sport=${row.sport}&trigger=manual&skip_teams=1`,
+          `${origin}/api/cron/generate?date=${row.date}&sport=${row.sport}&trigger=manual&skip_teams=1&refetch=true`,
           { headers },
         );
         const body = (await res.json()) as { error?: string };

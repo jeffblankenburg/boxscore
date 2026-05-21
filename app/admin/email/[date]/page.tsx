@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getDigest } from "@/lib/digests";
 import { dailyEmail } from "@/lib/emails/templates";
 import { isValidIsoDate, nextDay, prettyDate } from "@/lib/dates";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { requireAdmin } from "../../require-admin";
 import { AdminNav } from "../../AdminNav";
 
@@ -29,16 +29,15 @@ export default async function AdminEmailPreview({
     );
   }
 
-  const origin = await siteOrigin();
   const { getAnnouncement } = await import("@/lib/announcements");
   const announcementBanner = (await getAnnouncement("mlb", date)) ?? undefined;
   const { html } = dailyEmail({
     sport: "mlb",
     digestDate: date,
     digestPrettyDate: prettyDate(date),
-    digestUrl: `${origin}/mlb/${nextDay(date)}`,
-    unsubscribeUrl: `${origin}/u/admin-preview`,
-    manageUrl: `${origin}/settings`,
+    digestUrl: `${EMAIL_LINK_BASE}/mlb/${nextDay(date)}`,
+    unsubscribeUrl: `${EMAIL_LINK_BASE}/u/admin-preview`,
+    manageUrl: `${EMAIL_LINK_BASE}/settings`,
     announcementBanner,
     digestEmailHtml: digest.email_html,
   });

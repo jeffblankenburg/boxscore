@@ -8,7 +8,7 @@ import { getTeamDigest } from "@/lib/team-digests";
 import { getAnnouncement } from "@/lib/announcements";
 import { findTeam, type Sport } from "@/lib/teams";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
-import { siteOrigin } from "@/lib/site";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
 // Team-digest send cron. One run iterates every team that has at least one
@@ -60,6 +60,9 @@ export async function GET(req: Request) {
   const date = url.searchParams.get("date") ?? yesterdayInET();
   const sport = url.searchParams.get("sport") ?? "mlb";
   const trigger = url.searchParams.get("trigger") === "manual" ? "manual" : "cron";
+  // force=true bypasses the already-sent filter so we can re-send corrected
+  // team digests after a bad render.
+  const force = url.searchParams.get("force") === "true";
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
@@ -84,7 +87,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
 
-    const origin = await siteOrigin();
+    // Email links bake to https://boxscore.email/… regardless of where the
+    // cron ran (dev box, preview deployment). See lib/site.ts EMAIL_LINK_BASE.
     const digestPrettyDate = prettyDate(date);
     // Announcement is league-wide for the day; fetched once and applied to
     // every team's send below.
@@ -145,7 +149,9 @@ export async function GET(req: Request) {
           const sub = subscriberById.get(id);
           if (sub) subscribers.push(sub);
         }
-        const alreadySent = await getSentSubscriberIds(sport, date, teamId);
+        const alreadySent = force
+          ? new Set<string>()
+          : await getSentSubscriberIds(sport, date, teamId);
         const toSend = subscribers.filter((s) => !alreadySent.has(s.id));
         const skipped = subscribers.length - toSend.length;
 
@@ -153,16 +159,16 @@ export async function GET(req: Request) {
         let failed = 0;
         // Per-team archive page: /{sport}/{slug}/{edition_date}. Served
         // from team_digests.html (no request-time rendering).
-        const digestUrl = `${origin}/${sport}/${team.slug}/${nextDay(date)}`;
-        const manageUrl = `${origin}/settings`;
+        const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${team.slug}/${nextDay(date)}`;
+        const manageUrl = `${EMAIL_LINK_BASE}/settings`;
 
         for (const group of chunk(toSend, BATCH_SIZE)) {
           const payload = group.map((sub) => {
-            const unsubscribeUrl = `${origin}/u/${sub.unsubscribe_token}`;
+            const unsubscribeUrl = `${EMAIL_LINK_BASE}/u/${sub.unsubscribe_token}`;
             // Mail-client native one-click unsubscribe (RFC 8058). Separate
             // POST endpoint so a forwarded email / link scanner can't auto-
             // unsubscribe the real user.
-            const oneClickUrl = `${origin}/api/u/${sub.unsubscribe_token}`;
+            const oneClickUrl = `${EMAIL_LINK_BASE}/api/u/${sub.unsubscribe_token}`;
             const { subject, html, text } = teamDailyEmail({
               teamName: team.name,
               digestDate: date,

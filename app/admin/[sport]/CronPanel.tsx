@@ -58,6 +58,10 @@ export function CronPanel({
   const [date, setDate] = useState(defaultDate);
   const [route, setRoute] = useState<Route>(expectedRoutes[0] ?? "generate");
   const [reset, setReset] = useState(false);
+  // force=true bypasses the "already sent" filter for send-email and
+  // send-team-email. Only meaningful inside the confirm modal; resets
+  // whenever the modal closes or the route changes.
+  const [force, setForce] = useState(false);
   const [stage, setStage] = useState<"idle" | "confirm" | "typed">("idle");
   const [typed, setTyped] = useState("");
   const [pending, startTransition] = useTransition();
@@ -76,6 +80,7 @@ export function CronPanel({
     fd.set("sport", sport);
     fd.set("returnTo", returnTo);
     if (reset && isResettable) fd.set("reset", "1");
+    if (force && isGuarded) fd.set("force", "1");
     return fd;
   }
 
@@ -90,6 +95,7 @@ export function CronPanel({
   function cancel() {
     setStage("idle");
     setTyped("");
+    setForce(false);
   }
 
   function fire() {
@@ -193,6 +199,19 @@ export function CronPanel({
                   placeholder="SEND"
                   aria-label="Type SEND to confirm"
                 />
+                <label className="admin-guard-force">
+                  <input
+                    type="checkbox"
+                    checked={force}
+                    onChange={(e) => setForce(e.target.checked)}
+                  />
+                  <span>
+                    <strong>Force resend</strong> — also send to subscribers
+                    who already received this date&apos;s digest. Use this only
+                    to re-send a corrected digest after a bad render. Sends
+                    are upserted, so the previous send row is replaced.
+                  </span>
+                </label>
                 <div className="admin-guard-actions">
                   <button type="button" className="admin-btn admin-btn-ghost" onClick={cancel}>
                     Cancel

@@ -1,10 +1,26 @@
 import { headers } from "next/headers";
 
 /**
- * The canonical site origin (e.g., "https://boxscore.email" or
- * "http://localhost:3001"). Used to build absolute URLs for email links AND
- * for puppeteer to fetch the rendered digest page when generating share
- * images.
+ * Hardcoded production origin for anything externally visible — links baked
+ * into outbound emails (confirm/unsub/digest/manage), magic-link tokens, and
+ * URLs embedded in social-post text. The origin must be reachable to the
+ * recipient, which means it must NOT be `localhost` even when the renderer
+ * happened to run on a dev box, and must NOT be a Vercel deployment-specific
+ * URL even when the cron ran on a preview deployment.
+ *
+ * Use this — not `siteOrigin()` — anywhere a URL ends up in front of a
+ * subscriber's eyeballs. Reserve `siteOrigin()` for server-to-server fetches
+ * inside the same deployment (admin → /api/cron/*) and for puppeteer's
+ * `baseUrl` when rendering share images.
+ */
+export const EMAIL_LINK_BASE = "https://boxscore.email";
+
+/**
+ * The reachable site origin for the current deployment (e.g.,
+ * "https://boxscore.email", "https://boxscore-abc123.vercel.app", or
+ * "http://localhost:3001"). Used by admin server actions to fetch their own
+ * /api/cron routes and by puppeteer to fetch the rendered digest page when
+ * generating share images.
  *
  * Resolution order:
  *   1. SITE_ORIGIN env var (explicit override; useful in CI/scripts).

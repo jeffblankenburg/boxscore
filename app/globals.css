@@ -1318,6 +1318,19 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
                      font-family: ui-monospace, monospace; }
 .admin-guard-actions { display: flex; gap: 12px; justify-content: flex-end;
                        margin-top: 4px; }
+/* Opt-in "Force resend" toggle inside the SEND-confirmation modal. Visually
+   tucked between the type-confirmation input and the action buttons; only
+   appears when sending to subscribers, so the explanatory copy can be a
+   bit longer than a typical checkbox label. */
+.admin-guard-force {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 12px; line-height: 1.45;
+  padding: 8px 10px; margin: 0 0 12px;
+  background: var(--surface-muted, #f0ebde);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+}
+.admin-guard-force input[type="checkbox"] { margin-top: 2px; }
 
 /* Dashboard --------------------------------------------------------------- */
 .admin-window-selector { display: flex; flex-wrap: wrap; align-items: center;
