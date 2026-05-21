@@ -17,7 +17,7 @@ import type {
   ScheduleGame, TeamRoster, RosterPlayer,
   DivisionStandings, Transaction,
 } from "./mlb";
-import { issueNumber, nextDay, prettyDate, timeInET, volumeNumber } from "./dates";
+import { nextDay, prettyDate, timeInET } from "./dates";
 import type { Team } from "./teams";
 import type { GameDetail } from "./render";
 import {
@@ -492,7 +492,7 @@ export function renderTeamEmailContent(data: TeamEmailData): string {
   const sendIso = nextDay(data.date);
   const parts: string[] = [
     `<div class="es">`,
-    dateline(prettyDate(sendIso), { volume: volumeNumber(sendIso), issue: issueNumber(sendIso) }),
+    dateline(prettyDate(sendIso)),
   ];
 
   if (mode === "game") {

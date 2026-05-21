@@ -103,6 +103,18 @@ export type BasketballData = {
   // description text from ESPN (e.g. "New Orleans hired Jamahl Mosley as
   // head coach"). Empty array means none returned.
   transactions: BasketballTransaction[];
+  // Optional playoff bracket. Only set during admin preview (via fixture)
+  // for now — real data wiring lands in a follow-up. When set, the bracket
+  // section renders above the results.
+  playoffBracket?: PlayoffBracketData;
+};
+
+// Conferences stack vertically; finals (if set) sits between them with the
+// two conference champions labeled. Sport-agnostic shape — MLB/NHL/NFL will
+// populate the same structure from their respective adapters.
+export type PlayoffBracketData = {
+  conferences: import("./render-bracket").Bracket[];
+  finals?: { westChamp: string | null; eastChamp: string | null };
 };
 
 // ---- Cache helpers (same table as MLB, different payload shape) -----------

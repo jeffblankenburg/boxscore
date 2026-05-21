@@ -23,7 +23,7 @@ import type {
 } from "./mlb";
 import type { DailyData, GameDetail, LeaderGroup, UpcomingGame } from "./render";
 import type { Transaction } from "./mlb";
-import { issueNumber, nextDay, prettyDate, volumeNumber } from "./dates";
+import { nextDay, prettyDate } from "./dates";
 import { findTeamByMlbApiId } from "./teams";
 import { EMAIL_LINK_BASE } from "./site";
 // EMAIL_STYLES is concatenated with the basketball renderer's class rules so
@@ -46,7 +46,6 @@ export const EMAIL_STYLES = `
   .es-dateline {
     border-top: 3px double #161410; border-bottom: 1px solid #161410;
     padding: 8px 0; margin: 0 0 14px; text-align: center;
-    position: relative;
   }
   .es-dateline-text {
     font-style: italic; font-weight: 800; letter-spacing: -0.005em;
@@ -55,16 +54,6 @@ export const EMAIL_STYLES = `
        clamp() — the explicit font-size fallback below keeps them sane. */
     font-size: 22px;
     font-size: clamp(16px, 4.2vw, 24px);
-  }
-  .es-issue-no {
-    /* Small caps "Vol. X, Issue Y" tucked into the bottom-right corner of
-       the band, overlaying rather than pushing the date down. Modern web
-       clients (Gmail, Apple Mail) honor absolute positioning; legacy
-       Outlook strips it and renders inline below the date, which is an
-       acceptable fallback. */
-    position: absolute; right: 6px; bottom: 2px;
-    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
-    text-transform: uppercase; color: #6a6354;
   }
   .es-section-h {
     font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
@@ -244,6 +233,10 @@ export const pad = (n: number | undefined) => (n == null ? "—" : String(n));
 const padRhe = (n: number | undefined) => (n == null ? " —" : String(n).padStart(2));
 export const fmtAvg = (s: string | undefined) =>
   !s || s === "-.--" ? ".---" : s.replace(/^0/, "");
+// OPS shares AVG's display rule: strip a leading "0." into ".xxx" so the
+// number is wider only when it crosses 1.000 ("1.234").
+export const fmtOps = (s: string | undefined) =>
+  !s || s === "-.--" ? ".---" : s.replace(/^0/, "");
 export const fmtEra = (s: string | undefined) =>
   !s || s === "-.--" ? "—" : s;
 const fmtDiff = (scored: number | undefined, allowed: number | undefined) => {
@@ -261,14 +254,9 @@ export const lastName = (full: string) => {
 
 // ─── building blocks ──────────────────────────────────────────────────────
 
-// Newspaper-style masthead: centered date with "Vol. X, Issue Y" tucked
-// into the bottom-right corner of the bordered band.
-export const dateline = (pretty: string, opts?: { volume?: number; issue?: number }) => {
-  const counter = opts && opts.volume && opts.issue
-    ? `<div class="es-issue-no">Vol. ${opts.volume}, Issue ${opts.issue}</div>`
-    : "";
-  return `<div class="es-dateline"><div class="es-dateline-text">${esc(pretty)}</div>${counter}</div>`;
-};
+// Newspaper-style masthead: centered date in a bordered band.
+export const dateline = (pretty: string) =>
+  `<div class="es-dateline"><div class="es-dateline-text">${esc(pretty)}</div></div>`;
 
 export const sectionH = (t: string) => `<h2 class="es-section-h">${esc(t)}</h2>`;
 const subH = (t: string) => `<h3 class="es-sub-h">${esc(t)}</h3>`;
@@ -523,6 +511,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     if (b.atBats == null && b.baseOnBalls == null && b.strikeOuts == null && b.hits == null) return "";
     const pos = (p.allPositions?.map((x) => x.abbreviation).join("-") ?? p.position.abbreviation).toLowerCase();
     const avg = fmtAvg(p.seasonStats.batting.avg);
+    const ops = fmtOps(p.seasonStats.batting.ops);
     const isStarter = !!p.battingOrder && p.battingOrder.endsWith("00");
     const indent = isStarter ? "" : ' style="padding-left:10px;"';
     return `<tr>
@@ -533,6 +522,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
       <td align="right">${pad(b.rbi)}</td>
       <td align="right">${pad(b.baseOnBalls)}</td>
       <td align="right">${pad(b.strikeOuts)}</td>
+      <td align="right">${ops}</td>
       <td align="right">${avg}</td>
     </tr>`;
   }).join("");
@@ -546,13 +536,14 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     <td align="right">${pad(ts.baseOnBalls)}</td>
     <td align="right">${pad(ts.strikeOuts)}</td>
     <td></td>
+    <td></td>
   </tr>`;
   const extras = hittingExtras(ordered);
   return `<div class="es-team-label">${esc(cityName)} Batting</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
-        <col width="38%"><col width="8%"><col width="8%"><col width="8%">
-        <col width="8%"><col width="8%"><col width="8%"><col width="14%">
+        <col width="30%"><col width="8%"><col width="8%"><col width="8%">
+        <col width="8%"><col width="8%"><col width="8%"><col width="12%"><col width="10%">
       </colgroup>
       <thead><tr>
         <th align="left">Batter</th>
@@ -562,6 +553,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
         <th align="right">RBI</th>
         <th align="right">BB</th>
         <th align="right">SO</th>
+        <th align="right">OPS</th>
         <th align="right">Avg</th>
       </tr></thead>
       <tbody>${rows}${totals}</tbody>
@@ -828,7 +820,7 @@ export function renderEmailContent(data: DailyData): string {
   const teamRecords = buildTeamRecordMap(data.standings);
   if (data.mode === "no-games") {
     return `<div class="es">
-${dateline(prettyDate(nextDay(data.date)), { volume: volumeNumber(nextDay(data.date)), issue: issueNumber(nextDay(data.date)) })}
+${dateline(prettyDate(nextDay(data.date)))}
 <p class="es-no-games">No games yesterday.</p>
 ${renderTodaysGames(data.todaysGames, data.teamAbbrev, teamRecords)}
 ${renderTransactions(data.transactions)}
@@ -837,7 +829,7 @@ ${renderTransactions(data.transactions)}
 
   if (data.mode === "all-star") {
     return `<div class="es">
-${dateline(prettyDate(nextDay(data.date)), { volume: volumeNumber(nextDay(data.date)), issue: issueNumber(nextDay(data.date)) })}
+${dateline(prettyDate(nextDay(data.date)))}
 <div class="es-edition">All-Star Game Edition</div>
 ${renderLeagueStandings("American League Standings", "AL", data)}
 ${renderSingleLeagueLeaders("American League", data.leaders.AL, data.teamAbbrev, 15)}
@@ -850,7 +842,7 @@ ${renderTransactions(data.transactions)}
   }
 
   return `<div class="es">
-${dateline(prettyDate(nextDay(data.date)), { volume: volumeNumber(nextDay(data.date)), issue: issueNumber(nextDay(data.date)) })}
+${dateline(prettyDate(nextDay(data.date)))}
 ${renderLeagueStandings("American League Standings", "AL", data)}
 ${renderSingleLeagueLeaders("American League", data.leaders.AL, data.teamAbbrev)}
 ${renderLeagueStandings("National League Standings", "NL", data)}

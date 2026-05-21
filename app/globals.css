@@ -249,8 +249,13 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 
 .batting-table, .pitching-table { font-size: 13px; margin-top: 4px; }
 .batting-table .player-col, .pitching-table .player-col { width: 42%; }
+/* Batting needs room for an extra (OPS) column the pitching table doesn't
+   carry — shrink the name column and widen OPS so "1.234" doesn't truncate
+   to "1.23". */
+.batting-table .player-col { width: 30%; }
 .batting-table .stat-col, .pitching-table .stat-col { width: 8%; }
 .batting-table .r-col, .pitching-table .r-col { width: 6%; }
+.batting-table .ops-col { width: 12%; }
 .batting-table .avg-col, .pitching-table .era-col { width: 10%; }
 .batting-table .player-col.is-sub { padding-left: 10px; }
 .no-games-note { font-size: 14px; font-style: italic; color: var(--text-muted); text-align: center; margin: 6px 0 12px; }

@@ -99,6 +99,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
     const data = sport === "nba"
       ? await loadNbaData(targetDate)
       : await loadWnbaData(targetDate);
+    // Playoff bracket: build from real ESPN data (standings + every
+    // playoff series in the digest's date plus the upcoming window). Returns
+    // null when ESPN hasn't set the bracket yet (no playoffSeed on standings,
+    // missing conferences) — in which case we leave playoffBracket unset and
+    // no bracket section renders.
+    if (sport === "nba") {
+      const { buildNbaBracket } = await import("@/lib/nba-bracket-adapter");
+      const events = [...data.games.map((g) => g.event), ...data.upcomingEvents];
+      const bracket = buildNbaBracket(events, data.standings);
+      if (bracket) {
+        data.isPlayoffs = true;
+        data.playoffBracket = bracket;
+      }
+    }
     digestDate = data.date;
     digestPrettyDate = data.prettyDate;
     webBody = renderBasketballContent(data);

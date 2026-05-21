@@ -169,6 +169,11 @@ export const esc = (s: string | number | undefined): string =>
 export const pad = (n: number | undefined): string => (n == null ? "—" : String(n));
 export const fmtAvg = (s: string | undefined): string =>
   !s || s === "-.--" ? ".---" : s.replace(/^0/, "");
+// OPS shares AVG's display rule: strip a leading "0." into ".xxx" so the
+// number is wider only when it actually crosses 1.000 ("1.234"), saving a
+// character in the common case.
+export const fmtOps = (s: string | undefined): string =>
+  !s || s === "-.--" ? ".---" : s.replace(/^0/, "");
 export const fmtEra = (s: string | undefined): string =>
   !s || s === "-.--" ? "—" : s;
 
@@ -740,6 +745,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     if (b.atBats == null && b.baseOnBalls == null && b.strikeOuts == null && b.hits == null) return "";
     const pos = (p.allPositions?.map((x) => x.abbreviation).join("-") ?? p.position.abbreviation).toLowerCase();
     const avg = fmtAvg(p.seasonStats.batting.avg);
+    const ops = fmtOps(p.seasonStats.batting.ops);
     const isStarter = !!p.battingOrder && p.battingOrder.endsWith("00");
     const playerCls = isStarter ? "player-col" : "player-col is-sub";
     return `<tr>
@@ -750,6 +756,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
       <td class="stat-col">${pad(b.rbi)}</td>
       <td class="stat-col">${pad(b.baseOnBalls)}</td>
       <td class="stat-col">${pad(b.strikeOuts)}</td>
+      <td class="ops-col">${ops}</td>
       <td class="avg-col">${avg}</td>
     </tr>`;
   }).join("");
@@ -763,6 +770,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     <td class="stat-col">${pad(ts.rbi)}</td>
     <td class="stat-col">${pad(ts.baseOnBalls)}</td>
     <td class="stat-col">${pad(ts.strikeOuts)}</td>
+    <td class="ops-col"></td>
     <td class="avg-col"></td>
   </tr>`;
 
@@ -777,6 +785,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
         <th class="stat-col">RBI</th>
         <th class="stat-col">BB</th>
         <th class="stat-col">SO</th>
+        <th class="ops-col">OPS</th>
         <th class="avg-col">Avg</th>
       </tr>
     </thead>

@@ -26,7 +26,8 @@ import type {
   BasketballTransaction,
 } from "./basketball";
 import { lastName } from "./render-email";
-import { issueNumber, nextDay, prettyDate, timeInET, volumeNumber } from "./dates";
+import { nextDay, prettyDate, timeInET } from "./dates";
+import { renderBracket } from "./render-bracket";
 
 // 7-column box score per Jeff's call. The full ESPN set has 14; these are
 // the high-signal ones for a glance. Tweak this array to change the line.
@@ -70,6 +71,7 @@ function renderBody(data: BasketballData): string {
   if (data.isPlayoffs) {
     const sections = [
       renderDateline(data),
+      renderPlayoffBracket(data),
       renderResults(data, "Yesterday\u2019s games"),
       renderPlayoffSeries(data),
       // Today's games surfaces a Game N of an ongoing series scheduled for
@@ -92,16 +94,45 @@ function renderBody(data: BasketballData): string {
   return sections.filter((s) => s.length > 0).join("\n");
 }
 
-// Centered date plus "Vol. X, Issue Y" small caps in the bottom-right of
-// the same masthead band. Send-date drives both — matches the MLB renderer.
-// Pre-launch dates (issueNumber === 0) render without the counter.
+// Centered date in a bordered masthead band. Send-date drives the value —
+// matches the MLB renderer.
 function renderDateline(data: BasketballData): string {
-  const sendIso = nextDay(data.date);
-  const issue = issueNumber(sendIso);
-  const counter = issue
-    ? `<div class="bb-issue-no">Vol. ${volumeNumber(sendIso)}, Issue ${issue}</div>`
+  return `<div class="bb-dateline"><div class="bb-dateline-text">${escapeHtml(data.prettyDate)}</div></div>`;
+}
+
+// Text-only playoff bracket. Each conference renders as a <pre> block of
+// monospaced box-drawing characters. Stacks vertically (West first, then
+// East) with an optional Finals row showing the two conference champions.
+// Returns "" when no bracket data is attached (regular season, or playoffs
+// before the bracket adapter is wired to real data).
+function renderPlayoffBracket(data: BasketballData): string {
+  const bracket = data.playoffBracket;
+  if (!bracket || bracket.conferences.length === 0) return "";
+
+  const blocks = bracket.conferences.map((c) => `
+<div class="bb-bracket-block">
+  <h3 class="bb-bracket-title">${escapeHtml(c.title)}</h3>
+  <pre class="bb-bracket">${escapeHtml(renderBracket(c))}</pre>
+</div>`.trim()).join("\n");
+
+  const finals = bracket.finals
+    ? `<div class="bb-bracket-finals">
+  <h3 class="bb-bracket-title">NBA Finals</h3>
+  <p class="bb-bracket-finals-line">
+    (W) ${escapeHtml(bracket.finals.westChamp ?? "___")}
+    &nbsp;vs&nbsp;
+    ${escapeHtml(bracket.finals.eastChamp ?? "___")} (E)
+  </p>
+</div>`
     : "";
-  return `<div class="bb-dateline"><div class="bb-dateline-text">${escapeHtml(data.prettyDate)}</div>${counter}</div>`;
+
+  return `
+<section class="bb-section">
+  <h2 class="bb-section-title">Playoff bracket</h2>
+  ${blocks}
+  ${finals}
+</section>
+`.trim();
 }
 
 // ---- Yesterday's results --------------------------------------------------
@@ -627,20 +658,33 @@ export const BASKETBALL_EMAIL_STYLES = `
 .bb-dateline {
   border-top: 3px double #161410; border-bottom: 1px solid #161410;
   padding: 8px 0; margin: 0 0 14px; text-align: center;
-  position: relative;
 }
 .bb-dateline-text {
   font-style: italic; font-weight: 800; letter-spacing: -0.005em;
   font-size: 22px;
   font-size: clamp(16px, 4.2vw, 24px);
 }
-.bb-issue-no {
-  position: absolute; right: 6px; bottom: 2px;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
-  text-transform: uppercase; color: #6a6354;
-}
 .bb-empty { font-size: 13px; color: #6a6354; font-style: italic;
             margin: 6px 0; text-align: center; }
+
+.bb-bracket-block { margin: 8px 0 14px; }
+.bb-bracket-title { font-size: 13px; font-weight: 700; text-transform: uppercase;
+                    letter-spacing: 0.08em; color: #6a6354; margin: 6px 0 4px;
+                    padding-bottom: 2px; border-bottom: 1px solid #c4baa5; }
+/* Mono block for the bracket itself. Same font family as the MLB linescore
+   so the rendering matches the rest of the boxscore aesthetic. Narrow
+   viewports get horizontal scroll inside the <pre> rather than wrap, since
+   wrapping would destroy the bracket geometry. */
+.bb-bracket {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px; line-height: 1.3;
+  margin: 0; padding: 4px 0; color: #161410;
+  white-space: pre;
+  overflow-x: auto;
+}
+.bb-bracket-finals { margin: 10px 0 4px; text-align: center; }
+.bb-bracket-finals-line { font-size: 14px; font-weight: 700;
+                          letter-spacing: 0.02em; margin: 4px 0; }
 
 .bb-game { margin: 18px 0 6px; padding-top: 6px; border-top: 1px solid #c4baa5; }
 .bb-game-context { font-size: 11px; font-style: italic; color: #6a6354;
