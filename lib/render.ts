@@ -201,15 +201,14 @@ function buildTeamRecordMap(standings: DivisionStandings[]): Map<number, string>
 }
 
 export function renderContent(data: DailyData): string {
-  // League digests live at /mlb/{date}. Prev/next links are best-effort —
-  // they may 404 if the cron hasn't generated that day yet, but the page
-  // handles that gracefully.
-  const sendIso = nextDay(data.date);
+  // League digests live at /mlb/{edition_date}. data.date is games_date,
+  // so editionDate = games_date + 1. Prev/next move ±1 day from there.
+  const editionDate = nextDay(data.date);
   const datelineOpts = {
-    prevUrl: `/mlb/${prevDay(data.date)}`,
-    nextUrl: `/mlb/${nextDay(data.date)}`,
-    volume: volumeNumber(sendIso),
-    issue: issueNumber(sendIso),
+    prevUrl: `/mlb/${prevDay(editionDate)}`,
+    nextUrl: `/mlb/${nextDay(editionDate)}`,
+    volume: volumeNumber(editionDate),
+    issue: issueNumber(editionDate),
   };
   const teamRecords = buildTeamRecordMap(data.standings);
 
@@ -300,7 +299,9 @@ function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leade
   const divs = DIVISIONS[key];
   const standingsHtml = divs.map((d) => {
     const rec = data.standings.find((r) => r.division.id === d.id);
-    return rec ? renderDivisionTable(d.name, rec, { date: data.date }) : "";
+    // Team-name links in standings go to /mlb/{slug}/{editionDate};
+    // data.date is games_date so shift +1 for the URL.
+    return rec ? renderDivisionTable(d.name, rec, { date: nextDay(data.date) }) : "";
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league.id === leagueId);
   const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord) : "";

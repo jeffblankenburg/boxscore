@@ -10,7 +10,7 @@
 
 import { existsSync } from "node:fs";
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
-import { prettyDate } from "./dates";
+import { nextDay, prettyDate } from "./dates";
 
 export type ManifestEntry =
   | { file: string; subId: string; type: "standings"; league: "AL" | "NL" }
@@ -156,7 +156,8 @@ export async function renderShareImages(args: {
   baseUrl: string; // e.g. "https://boxscore.email" or "http://localhost:3001"
 }): Promise<RenderedImage[]> {
   const { date, baseUrl } = args;
-  const url = `${baseUrl}/mlb/${date}`;
+  // Caller passes games_date; the public page now lives at edition_date.
+  const url = `${baseUrl}/mlb/${nextDay(date)}`;
   const dateStr = prettyDate(date);
 
   const browser = await launchBrowser();

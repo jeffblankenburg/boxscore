@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { yesterdayInET, prettyDate } from "@/lib/dates";
+import { nextDay, yesterdayInET, prettyDate } from "@/lib/dates";
 import { siteOrigin } from "@/lib/site";
 import { findTeam, teamsBySport, type Team } from "@/lib/teams";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
@@ -43,7 +43,7 @@ export default async function AdminTeamEmailPreview({
     teamName: team.name,
     digestDate: date,
     digestPrettyDate: prettyDate(date),
-    digestUrl: `${origin}/mlb/${team.slug}/${date}`,
+    digestUrl: `${origin}/mlb/${team.slug}/${nextDay(date)}`,
     unsubscribeUrl: `${origin}/u/admin-preview`,
     manageUrl: `${origin}/settings`,
     announcementBanner,

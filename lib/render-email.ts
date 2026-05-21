@@ -415,9 +415,9 @@ function renderLeagueStandings(label: string, key: "AL" | "NL", data: DailyData)
   const divs = DIVISIONS[key];
   const standingsHtml = divs.map((d) => {
     const rec = data.standings.find((r) => r.division.id === d.id);
-    // Pass sport + games_date so each team name becomes an invisible link
-    // to that team's digest for the same date.
-    return rec ? renderDivisionStandings(d.name, rec, { sport: "mlb", date: data.date }) : "";
+    // Team-name links go to /mlb/{slug}/{edition_date}. data.date is
+    // games_date so shift +1 for the URL.
+    return rec ? renderDivisionStandings(d.name, rec, { sport: "mlb", date: nextDay(data.date) }) : "";
   }).join("");
   // Wild card intentionally omitted in email — keeps the email tighter; the
   // full wild card race is still on the web.

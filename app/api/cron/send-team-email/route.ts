@@ -7,7 +7,7 @@ import { teamDailyEmail } from "@/lib/emails/templates";
 import { getTeamDigest } from "@/lib/team-digests";
 import { getAnnouncement } from "@/lib/announcements";
 import { findTeam, type Sport } from "@/lib/teams";
-import { isValidIsoDate, prettyDate, yesterdayInET } from "@/lib/dates";
+import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { siteOrigin } from "@/lib/site";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
@@ -151,9 +151,9 @@ export async function GET(req: Request) {
 
         let sent = 0;
         let failed = 0;
-        // Per-team archive page: /{sport}/{slug}/{date}. Served from
-        // team_digests.html (no request-time rendering).
-        const digestUrl = `${origin}/${sport}/${team.slug}/${date}`;
+        // Per-team archive page: /{sport}/{slug}/{edition_date}. Served
+        // from team_digests.html (no request-time rendering).
+        const digestUrl = `${origin}/${sport}/${team.slug}/${nextDay(date)}`;
         const manageUrl = `${origin}/settings`;
 
         for (const group of chunk(toSend, BATCH_SIZE)) {

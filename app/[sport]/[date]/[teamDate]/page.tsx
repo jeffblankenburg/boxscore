@@ -19,12 +19,10 @@ export async function generateMetadata({ params }: {
   const { sport, date: slug, teamDate: date } = await params;
   const team = findTeam(sport as Sport, slug);
   if (!team || !isValidIsoDate(date)) return {};
-  // Browser tab + share metadata use the edition date — matches the
-  // masthead inside the page (games_date + 1).
-  const editionDate = prettyDate(nextDay(date));
+  // URL date IS the edition date.
   return {
-    title: `${team.name} — ${editionDate} | boxscore`,
-    description: `${team.name} digest for ${editionDate}.`,
+    title: `${team.name} — ${prettyDate(date)} | boxscore`,
+    description: `${team.name} digest for ${prettyDate(date)}.`,
   };
 }
 
@@ -37,10 +35,12 @@ export default async function TeamDatePage({ params }: {
   const team = findTeam(sport as Sport, slug);
   if (!team) notFound();
 
+  // URL segment is edition_date; team_digests row is keyed by games_date.
+  const gamesDate = prevDay(date);
   const [cached, hasPrev, hasNext] = await Promise.all([
-    getTeamDigest(sport, team.slug, date),
-    hasInSeasonTeamDigest(sport, team.slug, prevDay(date)),
-    hasInSeasonTeamDigest(sport, team.slug, nextDay(date)),
+    getTeamDigest(sport, team.slug, gamesDate),
+    hasInSeasonTeamDigest(sport, team.slug, prevDay(gamesDate)),
+    hasInSeasonTeamDigest(sport, team.slug, nextDay(gamesDate)),
   ]);
   if (!cached) notFound();
 

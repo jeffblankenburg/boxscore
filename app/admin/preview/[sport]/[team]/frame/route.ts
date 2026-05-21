@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { findTeam, type Sport } from "@/lib/teams";
-import { isValidIsoDate, prettyDate, yesterdayInET } from "@/lib/dates";
+import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
 import { teamDailyEmail } from "@/lib/emails/templates";
 import { getAnnouncement } from "@/lib/announcements";
@@ -38,7 +38,7 @@ export async function GET(
     teamName: team.name,
     digestDate: date,
     digestPrettyDate: prettyDate(date),
-    digestUrl: `${origin}/${sport}/${team.slug}/${date}`,
+    digestUrl: `${origin}/${sport}/${team.slug}/${nextDay(date)}`,
     unsubscribeUrl: `${origin}/u/admin-preview`,
     manageUrl: `${origin}/settings`,
     announcementBanner,

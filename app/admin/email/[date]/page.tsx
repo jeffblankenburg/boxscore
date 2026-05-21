@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDigest } from "@/lib/digests";
 import { dailyEmail } from "@/lib/emails/templates";
-import { isValidIsoDate, prettyDate } from "@/lib/dates";
+import { isValidIsoDate, nextDay, prettyDate } from "@/lib/dates";
 import { siteOrigin } from "@/lib/site";
 import { requireAdmin } from "../../require-admin";
 import { AdminNav } from "../../AdminNav";
@@ -36,7 +36,7 @@ export default async function AdminEmailPreview({
     sport: "mlb",
     digestDate: date,
     digestPrettyDate: prettyDate(date),
-    digestUrl: `${origin}/mlb/${date}`,
+    digestUrl: `${origin}/mlb/${nextDay(date)}`,
     unsubscribeUrl: `${origin}/u/admin-preview`,
     manageUrl: `${origin}/settings`,
     announcementBanner,

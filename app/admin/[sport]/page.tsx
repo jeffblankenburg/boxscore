@@ -163,7 +163,7 @@ export default async function LeagueDashboard({
             cron for this date. Preview opens the team&apos;s web digest in a
             new tab.
           </p>
-          <TeamConsole rows={teamConsoleRows} sport={sport} date={gamesDate} />
+          <TeamConsole rows={teamConsoleRows} sport={sport} date={editionDate} />
         </section>
       )}
 

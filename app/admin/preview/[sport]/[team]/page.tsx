@@ -61,8 +61,11 @@ export default async function TeamPreviewPage({
   const width = asWidth(widthParam, surface);
   const widthPx = WIDTH_PRESETS.find((p) => p.key === width)?.px ?? null;
 
+  // Web surface points at the public team-digest page, which now expects
+  // edition_date in its URL. Email frame route still keys by games_date
+  // because that's the column in team_digests.html.
   const frameSrc = surface === "web"
-    ? `/${sport}/${team.slug}/${gamesDate}`
+    ? `/${sport}/${team.slug}/${date}`
     : `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}`;
 
   const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string }) => {

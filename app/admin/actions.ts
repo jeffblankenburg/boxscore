@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getDigest } from "@/lib/digests";
 import { sendEmail } from "@/lib/email";
 import { dailyEmail, teamDailyEmail } from "@/lib/emails/templates";
-import { prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates";
+import { nextDay, prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
 import { siteOrigin } from "@/lib/site";
@@ -43,7 +43,7 @@ export async function sendAdminPreview(
       sport,
       digestDate: date,
       digestPrettyDate: prettyDate(date),
-      digestUrl: `${origin}/${sport}/${date}`,
+      digestUrl: `${origin}/${sport}/${nextDay(date)}`,
       unsubscribeUrl: `${origin}/u/admin-preview`,
       manageUrl: `${origin}/settings`,
       announcementBanner,
@@ -95,7 +95,7 @@ export async function sendTeamAdminPreview(
       teamName: team.name,
       digestDate: date,
       digestPrettyDate: prettyDate(date),
-      digestUrl: `${origin}/${sport}/${team.slug}/${date}`,
+      digestUrl: `${origin}/${sport}/${team.slug}/${nextDay(date)}`,
       unsubscribeUrl: `${origin}/u/admin-preview`,
       manageUrl: `${origin}/settings`,
       announcementBanner,

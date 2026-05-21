@@ -158,10 +158,12 @@ function renderTeamStandings(data: TeamEmailData): string {
   // Pass sport + games_date so every team name becomes an invisible link
   // to that team's digest for the same date (current team links to itself
   // but renders the same — the highlight row makes "this is you" obvious).
+  // Team-name links use the EDITION date (games_date + 1) so they point
+  // at the same /{sport}/{slug}/{edition} URL shape used everywhere else.
   return `${sectionH("Standings")}${renderDivisionStandings(label, data.division, {
     highlightTeamId: data.team.mlbApiId,
     sport: data.team.sport,
-    date: data.date,
+    date: nextDay(data.date),
   })}`;
 }
 

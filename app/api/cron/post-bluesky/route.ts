@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isValidIsoDate, prettyDate, yesterdayInET } from "@/lib/dates";
+import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
 import { deleteBlueskyPost, postToBlueskyWithImage } from "@/lib/bluesky";
 import { siteOrigin } from "@/lib/site";
@@ -70,7 +70,8 @@ export async function GET(req: Request) {
   }
 
   const origin = await siteOrigin();
-  const digestUrl = `${origin}/${sport}/${date}`;
+  // Public URL uses edition_date (games_date + 1).
+  const digestUrl = `${origin}/${sport}/${nextDay(date)}`;
   const pretty = prettyDate(date);
 
   // Render share images in-memory using the same renderer as the local script.

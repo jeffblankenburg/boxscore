@@ -4,7 +4,7 @@ import { getActiveSubscribersForSport } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
 import { dailyEmail } from "@/lib/emails/templates";
-import { isValidIsoDate, prettyDate, yesterdayInET } from "@/lib/dates";
+import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { siteOrigin } from "@/lib/site";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
@@ -51,7 +51,9 @@ export async function GET(req: Request) {
     }
 
     const origin = await siteOrigin();
-    const digestUrl = `${origin}/${sport}/${date}`;
+    // Public URL uses the EDITION date (= games_date + 1). The send goes
+    // out on edition day with yesterday's results.
+    const digestUrl = `${origin}/${sport}/${nextDay(date)}`;
     const digestPrettyDate = prettyDate(date);
 
     // Only subscribers who have opted in to this sport's league digest.

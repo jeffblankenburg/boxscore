@@ -38,7 +38,7 @@ import { sendEmail } from "@/lib/email";
 import { welcomeEmail } from "@/lib/emails/templates";
 import { siteOrigin } from "@/lib/site";
 import { getDigest } from "@/lib/digests";
-import { yesterdayInET, prettyDate } from "@/lib/dates";
+import { nextDay, yesterdayInET, prettyDate } from "@/lib/dates";
 import { isLikelyBot } from "@/lib/bot-detect";
 
 export const dynamic = "force-dynamic";
@@ -96,7 +96,8 @@ export async function GET(
     const digestDate = yesterdayInET();
     const digest = await getDigest("mlb", digestDate);
     if (digest && digest.email_html) {
-      const digestUrl = `${origin}/mlb/${digestDate}`;
+      // Public URL uses edition_date (games_date + 1).
+      const digestUrl = `${origin}/mlb/${nextDay(digestDate)}`;
       const unsubscribeUrl = `${origin}/u/${justActivated.unsubscribe_token}`;
       const manageUrl = `${origin}/settings`;
       const { subject, html, text } = welcomeEmail({

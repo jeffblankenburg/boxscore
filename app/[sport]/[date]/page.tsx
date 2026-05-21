@@ -19,12 +19,11 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
   if (!row || row.visibility !== "public") return {};
 
   if (isValidIsoDate(date)) {
-    // Browser tab + share metadata use the edition date — matches the
-    // masthead inside the page (which is games_date + 1).
-    const editionDate = prettyDate(nextDay(date));
+    // URL date IS the edition date now (the day labeled on the masthead).
+    // Storage and metadata both use that string directly.
     return {
-      title: `${row.name} — ${editionDate} | boxscore`,
-      description: `Daily ${row.name} digest for ${editionDate}.`,
+      title: `${row.name} — ${prettyDate(date)} | boxscore`,
+      description: `Daily ${row.name} digest for ${prettyDate(date)}.`,
     };
   }
   const team = findTeam(sport as Sport, date);
@@ -47,16 +46,17 @@ export default async function DayPage({
   const { sport, date } = await params;
   if (!(await isSportVisible(sport))) notFound();
 
-  // Branch A: date-shaped → league digest (the original behavior).
+  // Branch A: date-shaped → league digest. URL segment is the EDITION
+  // date; the underlying digest is keyed by games_date = edition − 1.
   if (isValidIsoDate(date)) {
-    // Per-date existence check: hide the prev/next arrow when the literal
-    // ±1-day URL doesn't point at an in-season cached digest. Simpler and
-    // more correct than bounds-based logic — works across the multi-month
-    // gap between seasons.
+    const editionDate = date;
+    const gamesDate = prevDay(editionDate);
+    // Existence checks for prev/next arrows look at adjacent EDITION
+    // dates, which translate to gamesDate ±1 from the current one.
     const [digest, hasPrev, hasNext] = await Promise.all([
-      getDigest(sport, date),
-      hasInSeasonDigest(sport, prevDay(date)),
-      hasInSeasonDigest(sport, nextDay(date)),
+      getDigest(sport, gamesDate),
+      hasInSeasonDigest(sport, prevDay(gamesDate)),
+      hasInSeasonDigest(sport, nextDay(gamesDate)),
     ]);
     if (!digest) notFound();
     const { paper } = await searchParams;
@@ -68,7 +68,7 @@ export default async function DayPage({
     ].filter(Boolean).join(" ") || undefined;
     return (
       <div className={classes}>
-        {paperMode && <PaperMasthead date={date} />}
+        {paperMode && <PaperMasthead date={editionDate} />}
         <div dangerouslySetInnerHTML={{ __html: digest.html }} />
       </div>
     );
