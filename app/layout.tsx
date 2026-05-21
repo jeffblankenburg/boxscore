@@ -83,10 +83,15 @@ function SiteFooter() {
         <a href="/">{BRAND.name}</a> · {BRAND.tagline}
       </span>
       <span className="site-footer-legal">
-        <a href="/about">About</a>
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="/r/support?src=web-footer" target="_blank" rel="noopener noreferrer">Tip Jar</a>
+        {BRAND.footerLinks.map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          >
+            {link.label}
+          </a>
+        ))}
       </span>
       <Suspense fallback={null}>
         <PaperModeToggle />

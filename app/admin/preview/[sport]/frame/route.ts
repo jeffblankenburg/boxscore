@@ -48,15 +48,17 @@ function siteHeaderHtml(iconUrl: string): string {
 }
 
 function siteFooterHtml(): string {
+  const legal = BRAND.footerLinks
+    .map((link) => {
+      const attrs = link.external ? ` target="_blank" rel="noopener noreferrer"` : "";
+      return `<a href="${link.href}"${attrs}>${link.label}</a>`;
+    })
+    .join("");
   return `<footer class="site-footer">
   <span class="site-footer-credit">
     <a href="/">${BRAND.name}</a> · ${BRAND.tagline}
   </span>
-  <span class="site-footer-legal">
-    <a href="/r/support?src=web-footer">Tip jar</a>
-    <a href="/privacy">Privacy</a>
-    <a href="/terms">Terms</a>
-  </span>
+  <span class="site-footer-legal">${legal}</span>
 </footer>`;
 }
 
