@@ -845,7 +845,7 @@ export async function getSendCoverage(): Promise<SendCoverageRow[]> {
             .select("subscriber_id")
             .eq("sport", sport.id)
             .eq("scope", "league")
-            .eq("active", true),
+            .eq("active", true) as unknown as QueryBuilder<{ subscriber_id: string }>,
           `getSendCoverage league opt-ins (${sport.id})`,
         ),
         db.from("sends")
@@ -875,7 +875,7 @@ export async function getSendCoverage(): Promise<SendCoverageRow[]> {
             .select("subscriber_id")
             .eq("sport", sport.id)
             .eq("scope", "team")
-            .eq("active", true),
+            .eq("active", true) as unknown as QueryBuilder<{ subscriber_id: string }>,
           `getSendCoverage team opt-ins (${sport.id})`,
         ),
         db.from("sends")
