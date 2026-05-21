@@ -164,11 +164,17 @@ export default async function PreviewPage({
                   date stays consistent with the page's edition-date model. */}
               <select name="date" defaultValue="" className="admin-input">
                 <option value="" disabled>Jump to mode…</option>
-                {modes.map((m) => (
-                  <option key={m} value={nextDay(fixtures[m])}>
-                    {m}
-                  </option>
-                ))}
+                {modes.map((m) => {
+                  // fixtures[m] is guaranteed present because modes is the
+                  // exact key set used to build fixtures (Object.fromEntries
+                  // up in modeOptionsFor). TS just can't see that.
+                  const games = fixtures[m]!;
+                  return (
+                    <option key={m} value={nextDay(games)}>
+                      {m}
+                    </option>
+                  );
+                })}
               </select>
             </label>
             <input type="hidden" name="surface" value={surface} />
