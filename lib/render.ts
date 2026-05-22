@@ -492,9 +492,21 @@ function renderAllStarDivisionTable(label: string, d: DivisionStandings): string
 </table></div>`;
 }
 
+// Extend the cutoff through any tie with the last visible player. E.g. if the
+// 5th-ranked player shares rank=5 with the 6th and 7th, all three show. Stops
+// at the first player whose rank exceeds the last-included rank. Bounded by
+// the underlying fetch size (currently 20 — see fetchLeadersRaw in daily.ts).
+export function leadersThroughTies<T extends { rank: number }>(rows: T[], limit: number): T[] {
+  if (rows.length <= limit) return rows;
+  let cutoff = limit;
+  const lastRank = rows[cutoff - 1]!.rank;
+  while (cutoff < rows.length && rows[cutoff]!.rank === lastRank) cutoff++;
+  return rows.slice(0, cutoff);
+}
+
 function renderAllStarLeaders(groups: LeaderGroup[], liveAbbrev: Record<string, string>): string {
   const cards = groups.map((g) => {
-    const rows = g.rows.slice(0, 15).map((L) => `
+    const rows = leadersThroughTies(g.rows, 15).map((L) => `
       <tr>
         <td class="player-col">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
         <td>${esc(L.value)}</td>
@@ -534,7 +546,7 @@ function renderAllStarLeague(label: string, leagueId: 103 | 104, data: DailyData
 
 function renderLeagueLeaders(groups: LeaderGroup[], liveAbbrev: Record<string, string>, limit = 5): string {
   const cards = groups.map((g) => {
-    const rows = g.rows.slice(0, limit).map((L) => `
+    const rows = leadersThroughTies(g.rows, limit).map((L) => `
       <tr>
         <td class="player-col">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
         <td>${esc(L.value)}</td>

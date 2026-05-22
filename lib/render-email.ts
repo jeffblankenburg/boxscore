@@ -22,6 +22,7 @@ import type {
   WildCardLeagueStandings,
 } from "./mlb";
 import type { DailyData, GameDetail, LeaderGroup, UpcomingGame } from "./render";
+import { leadersThroughTies } from "./render";
 import type { Transaction } from "./mlb";
 import { nextDay, prettyDate } from "./dates";
 import { findTeamByMlbApiId } from "./teams";
@@ -410,7 +411,7 @@ function renderLeagueStandings(label: string, key: "AL" | "NL", data: DailyData)
 // ─── leaders (two columns: AL, NL) ────────────────────────────────────────
 
 function renderLeaderCategory(g: LeaderGroup, liveAbbrev: Record<string, string>, limit = 5): string {
-  const rows = g.rows.slice(0, limit).map((L) =>
+  const rows = leadersThroughTies(g.rows, limit).map((L) =>
     `<tr>
       <td align="left">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
       <td align="right">${esc(L.value)}</td>

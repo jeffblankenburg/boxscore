@@ -48,11 +48,12 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
   const season = Number(date.slice(0, 4));
 
   // First wave: schedules + standings + leaders + teams, in parallel. Fetch
-  // 15 even though regular game days render only 5 — ASG mode renders all 15
-  // and the marginal storage cost is trivial.
+  // 20 even though regular game days render only 5 — gives the renderer
+  // headroom to extend through ties beyond both the top-5 (regular) and
+  // top-15 (ASG) cutoffs without re-fetching. Marginal storage cost is trivial.
   const leaderCalls = LEADER_CATEGORIES.flatMap((c) => [
-    fetchLeadersRaw(c.category, season, 103, 15),
-    fetchLeadersRaw(c.category, season, 104, 15),
+    fetchLeadersRaw(c.category, season, 103, 20),
+    fetchLeadersRaw(c.category, season, 104, 20),
   ]);
   const [
     scheduleRaw, standingsRaw, wildCardRaw, nextDayScheduleRaw, teamsRaw, transactionsRaw,
