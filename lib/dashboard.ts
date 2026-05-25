@@ -114,6 +114,8 @@ export type DashboardKpis = {
   // `tracked` is false when there's never been an open event recorded — used
   // to show "—" instead of "0.0%" before open tracking is configured at Resend.
   openRate: { rate: number; opened: number; sends: number; tracked: boolean };
+  // Lifetime successful digest sends — vanity counter, not windowed.
+  totalDigestsShipped: number;
 };
 
 export async function getKpis(w: Window): Promise<DashboardKpis> {
@@ -229,6 +231,12 @@ export async function getKpis(w: Window): Promise<DashboardKpis> {
   }
   const openRate = sendIds.size === 0 ? 0 : openedInWindow / sendIds.size;
 
+  // All-time successful digest sends. Count-only to dodge the 1000-row cap.
+  const { count: totalDigestsCount } = await db
+    .from("sends")
+    .select("id", { count: "exact", head: true })
+    .is("error", null);
+
   void windowStartDate;
 
   return {
@@ -255,6 +263,7 @@ export async function getKpis(w: Window): Promise<DashboardKpis> {
       sends: sendIds.size,
       tracked: openTracked,
     },
+    totalDigestsShipped: totalDigestsCount ?? 0,
   };
 }
 

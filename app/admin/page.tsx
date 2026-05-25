@@ -105,6 +105,11 @@ export default async function AdminDashboard({
       {/* 2. KPI strip */}
       <section className="admin-kpis">
         <KpiCard
+          label="Digests shipped"
+          value={kpis.totalDigestsShipped.toLocaleString()}
+          sub="all time"
+        />
+        <KpiCard
           label="Active subscribers"
           value={kpis.activeSubscribers.toLocaleString()}
           delta={formatDelta(kpis.activeSubscribersDelta)}
