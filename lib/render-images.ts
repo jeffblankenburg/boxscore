@@ -15,11 +15,19 @@ import { nextDay, prettyDate } from "./dates";
 export type ManifestEntry =
   | { file: string; subId: string; type: "standings"; league: "AL" | "NL" }
   | { file: string; subId: string; type: "leaders"; league: "AL" | "NL" }
-  | { file: string; subId: string; type: "boxscore"; title: string; teams: [string, string] };
+  | { file: string; subId: string; type: "boxscore"; title: string; teams: [string, string] }
+  | { file: string; subId: string; type: "full"; gameCount: number };
+
+export type ImageMime = "image/png" | "image/jpeg";
 
 export type RenderedImage = {
   entry: ManifestEntry;
+  // Image bytes. Format is given by `mime` — historically PNG for per-section
+  // images; the full-day capture is JPEG to fit Bluesky's 1MB cap.
   png: Uint8Array;
+  mime: ImageMime;
+  width: number;   // physical pixels
+  height: number;  // physical pixels
 };
 
 // Must match the installed version of @sparticuz/chromium-min. The `pack.x64`
@@ -224,11 +232,80 @@ export async function renderShareImages(args: {
     for (const { handle, entry } of captures) {
       await handle.scrollIntoView();
       const png = (await handle.screenshot({ type: "png" })) as Uint8Array;
-      results.push({ entry, png });
+      const box = await handle.boundingBox();
+      // boundingBox is CSS px; physical pixels = CSS × deviceScaleFactor (=2 here).
+      const width = box ? Math.round(box.width * 2) : 0;
+      const height = box ? Math.round(box.height * 2) : 0;
+      results.push({ entry, png, mime: "image/png", width, height });
+    }
+
+    // Full-day capture. Posted as the LEAD image — the goal is the tall,
+    // crop-with-tap-to-expand preview on Twitter/Bluesky that hooks scrollers
+    // by showing "all of today's box scores in one shot."
+    //
+    // Constraints driving the format choice:
+    //   - Bluesky caps images at 1MB. A 2x DPR PNG of a 15-game day blows
+    //     past that easily; JPEG at quality ~85 stays well under for
+    //     text-on-white content.
+    //   - Twitter caps any dimension at 8192px. Dropping to 1x DPR and a
+    //     ~600px logical width keeps us inside that limit for the typical
+    //     15-game day; rare 20+ game Saturdays may still exceed and would
+    //     need a follow-up scale-down (see issue #39 "out of scope").
+    //
+    // The capture targets the whole document at 1x DPR after hiding the
+    // site-header/footer chrome so only the digest content lands in the
+    // image. Reusing the same page also means the share-CSS column layout
+    // already injected stays in effect.
+    const fullImage = await captureFullDigest(page, games.length);
+    if (fullImage) {
+      // Prepend so it's the first thing posted, before any per-section follow-ups.
+      results.unshift(fullImage);
     }
 
     return results;
   } finally {
     await browser.close();
   }
+}
+
+const FULL_CAPTURE_WIDTH = 600;       // CSS px; matches the 540px share blocks + a little breathing room
+const FULL_JPEG_QUALITY = 85;
+
+async function captureFullDigest(page: Page, gameCount: number): Promise<RenderedImage | null> {
+  // Hide the site header/footer that wrap the digest body — they're not part
+  // of the data and would only add chrome noise to the share image.
+  await page.addStyleTag({
+    content: `
+      .site-header, .site-footer { display: none !important; }
+      body, .newspaper { background: #fff !important; }
+    `,
+  });
+  // Drop to 1x DPR and snap viewport width so the captured page is tight
+  // around the centered 540px column. Triggers a relayout; small wait lets
+  // the column-flex reflow settle before screenshotting.
+  await page.setViewport({
+    width: FULL_CAPTURE_WIDTH,
+    height: 1024,
+    deviceScaleFactor: 1,
+  });
+  await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
+  await new Promise((r) => setTimeout(r, 300));
+
+  const dims = await page.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    height: document.documentElement.scrollHeight,
+  }));
+  const png = (await page.screenshot({
+    fullPage: true,
+    type: "jpeg",
+    quality: FULL_JPEG_QUALITY,
+  })) as Uint8Array;
+
+  return {
+    entry: { file: "full.jpg", subId: "full", type: "full", gameCount },
+    png,
+    mime: "image/jpeg",
+    width: dims.width,
+    height: dims.height,
+  };
 }
