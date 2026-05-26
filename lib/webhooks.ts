@@ -65,6 +65,35 @@ export async function recordEmailEvent(args: {
   if (error) throw new Error(`recordEmailEvent: ${error.message}`);
 }
 
+// Count prior bounce events of a specific subType for a recipient, within a
+// time window. Used to detect repeated soft bounces that should be treated as
+// effectively permanent — Apple's `554 5.7.1 [CS01]` reputation rejection
+// arrives as `bounce.type="Transient"` `subType="ContentRejected"`, so Resend
+// classifies it as soft. In practice the same recipient bounces every day with
+// the same code, and continuing to send to them only further damages our
+// domain reputation with Apple.
+//
+// Counts on email_events.payload (set to `event.data` at record time), which
+// already contains both the `to` array and the bounce envelope. We don't keep
+// a recipient column on email_events — payload containment is sufficient.
+export async function countRecentBouncesOfSubType(
+  email: string,
+  subType: string,
+  withinDays: number,
+): Promise<number> {
+  const since = new Date(Date.now() - withinDays * 24 * 3600 * 1000).toISOString();
+  const normalized = email.trim().toLowerCase();
+  const { count, error } = await supabaseAdmin()
+    .from("email_events")
+    .select("id", { count: "exact", head: true })
+    .eq("event_type", "email.bounced")
+    .gte("event_at", since)
+    .contains("payload", { to: [normalized] })
+    .eq("payload->bounce->>subType", subType);
+  if (error) throw new Error(`countRecentBouncesOfSubType: ${error.message}`);
+  return count ?? 0;
+}
+
 // Truncate an IP address for privacy. IPv4 → keep first three octets and zero
 // the fourth (/24). IPv6 → keep first three 16-bit groups (/48). Best-effort:
 // returns null if the input isn't a parseable address.

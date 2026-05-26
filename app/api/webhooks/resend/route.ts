@@ -28,11 +28,22 @@ import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { unsubscribeByEmail } from "@/lib/subscribers";
 import {
+  countRecentBouncesOfSubType,
   hasWebhookEvent,
   recordEmailEvent,
   recordWebhookEvent,
   truncateIp,
 } from "@/lib/webhooks";
+
+// Soft-bounce subtypes Resend classifies as `Transient` but which, in practice,
+// recur with the same content rejection (Apple's CS01 reputation reject is the
+// canonical case). Counted across a rolling window; once a recipient hits the
+// threshold we treat it like a hard bounce and unsubscribe. The threshold
+// counts PRIOR bounces — so a value of 1 means "suppress on the 2nd occurrence
+// in the window", giving every recipient one fluke chance before we stop.
+const SOFT_BOUNCE_SUPPRESS_SUBTYPES = ["ContentRejected"] as const;
+const SOFT_BOUNCE_WINDOW_DAYS = 30;
+const SOFT_BOUNCE_PRIOR_THRESHOLD = 1;
 
 export const runtime = "nodejs";
 
@@ -131,22 +142,50 @@ export async function POST(req: Request) {
         break;
       }
       case "email.bounced": {
-        // Resend marks hard vs soft bounces via data.bounce.type. Only hard
-        // bounces auto-unsubscribe; soft bounces are retried by Resend itself.
-        // The event is recorded regardless so the search shows "Bounced".
+        // Resend marks hard vs soft bounces via data.bounce.type. Hard bounces
+        // auto-unsubscribe immediately. Soft bounces normally just get recorded
+        // (Resend retries on its own) — EXCEPT when the subType is one we know
+        // recurs with the same content rejection. Apple's CS01 reputation
+        // bounce arrives as Transient/ContentRejected but the same recipient
+        // bounces every day; continuing to send only worsens our reputation,
+        // so we suppress after the threshold prior occurrences in the window.
         const bounceType = event.data?.bounce?.type?.toLowerCase();
+        const bounceSubType = event.data?.bounce?.subType ?? null;
         const isHard = bounceType === "hard" || bounceType === "permanent";
-        if (isHard) {
-          const email = recipientOf(event);
-          if (email) {
-            const sub = await unsubscribeByEmail(email, "bounce");
-            actionResult = { action: sub ? "unsubscribed" : "noop", email, bounceType };
-          } else {
-            console.warn(`bounce event ${svixId} has no recipient`);
-            actionResult = { action: "no_recipient", bounceType };
+        const email = recipientOf(event);
+
+        let suppressReason: "hard" | "repeated_soft" | null = isHard ? "hard" : null;
+
+        if (
+          !isHard
+          && email
+          && bounceSubType
+          && (SOFT_BOUNCE_SUPPRESS_SUBTYPES as readonly string[]).includes(bounceSubType)
+        ) {
+          const priorCount = await countRecentBouncesOfSubType(
+            email,
+            bounceSubType,
+            SOFT_BOUNCE_WINDOW_DAYS,
+          );
+          if (priorCount >= SOFT_BOUNCE_PRIOR_THRESHOLD) {
+            suppressReason = "repeated_soft";
           }
+        }
+
+        if (suppressReason && email) {
+          const sub = await unsubscribeByEmail(email, "bounce");
+          actionResult = {
+            action: sub ? "unsubscribed" : "noop",
+            email,
+            bounceType,
+            bounceSubType,
+            suppressReason,
+          };
+        } else if (suppressReason && !email) {
+          console.warn(`bounce event ${svixId} has no recipient`);
+          actionResult = { action: "no_recipient", bounceType, bounceSubType };
         } else {
-          actionResult = { action: "soft_bounce_recorded", bounceType };
+          actionResult = { action: "soft_bounce_recorded", bounceType, bounceSubType };
         }
         await logEmailEvent(event);
         break;
