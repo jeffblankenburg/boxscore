@@ -70,11 +70,18 @@ async function launchBrowser(): Promise<Browser> {
   if (isServerless()) {
     const mod = await import("@sparticuz/chromium-min");
     const chromium = mod.default;
+    // DPR=1 in serverless: @sparticuz/chromium-min has been observed painting
+    // the page TWICE into the canvas when deviceScaleFactor=2 (the .newspaper
+    // boundingBox matches local, the DOM has exactly one of every marker, but
+    // the resulting PNG shows the digest twice). Same code at DPR=1 with
+    // system Chrome locally produces a single digest. Drop DPR to 1 here to
+    // dodge the bug — image is half-resolution but still 1280 CSS px wide so
+    // text remains legible.
     return puppeteer.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(SPARTICUZ_CHROMIUM_URL),
       headless: true,
-      defaultViewport: { width: 1280, height: 1024, deviceScaleFactor: 2 },
+      defaultViewport: { width: 1280, height: 1024, deviceScaleFactor: 1 },
     });
   }
   const executablePath = process.env.CHROME_PATH ?? findLocalChrome();
@@ -178,6 +185,13 @@ export async function renderShareImages(args: {
     await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
     await new Promise((r) => setTimeout(r, 200));
 
+    // Pull the actual device pixel ratio from the page — it's 2 in local
+    // Chrome and 1 in @sparticuz/chromium-min on Vercel (see launchBrowser).
+    // We use this to convert CSS-px boundingBox dimensions to physical-px
+    // dimensions for RenderedImage.width/height so the downstream Bluesky
+    // aspectRatio is correct in both environments.
+    const dpr = await page.evaluate(() => window.devicePixelRatio || 1);
+
     const results: RenderedImage[] = [];
 
     // Capture the full-day image FIRST, against the natural web layout —
@@ -185,7 +199,7 @@ export async function renderShareImages(args: {
     // injectShareChrome avoids the single-column flattening that the
     // per-section CSS imposes.
     const gameCount = (await page.$$(".game-container")).length;
-    const fullImage = await captureFullDigest(page, dateStr, gameCount);
+    const fullImage = await captureFullDigest(page, dateStr, gameCount, dpr);
     if (fullImage) results.push(fullImage);
 
     // Now flatten the page for per-section captures.
@@ -248,9 +262,9 @@ export async function renderShareImages(args: {
       await handle.scrollIntoView();
       const png = (await handle.screenshot({ type: "png" })) as Uint8Array;
       const box = await handle.boundingBox();
-      // boundingBox is CSS px; physical pixels = CSS × deviceScaleFactor (=2 here).
-      const width = box ? Math.round(box.width * 2) : 0;
-      const height = box ? Math.round(box.height * 2) : 0;
+      // boundingBox is CSS px; physical pixels = CSS × deviceScaleFactor (dpr).
+      const width = box ? Math.round(box.width * dpr) : 0;
+      const height = box ? Math.round(box.height * dpr) : 0;
       results.push({ entry, png, mime: "image/png", width, height });
     }
 
@@ -277,6 +291,7 @@ async function captureFullDigest(
   page: Page,
   dateStr: string,
   gameCount: number,
+  dpr: number,
 ): Promise<RenderedImage | null> {
   await page.addStyleTag({
     content: `
@@ -428,8 +443,8 @@ async function captureFullDigest(
     type: "png",
     clip: { x: box.x, y: box.y, width: box.width, height: captureHeight },
   })) as Uint8Array;
-  const width = Math.round(box.width * 2);
-  const height = Math.round(captureHeight * 2);
+  const width = Math.round(box.width * dpr);
+  const height = Math.round(captureHeight * dpr);
 
   return {
     entry: { file: "full.png", subId: "full", type: "full", gameCount },
