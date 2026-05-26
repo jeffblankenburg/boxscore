@@ -94,6 +94,14 @@ export function imagePostContent(
   // Twitter charges $0.20/post when a URL is present (vs $0.015 without), so
   // the Twitter paths pass digestUrl=undefined. Bluesky still includes it.
   const tail = digestUrl ? ` ${digestUrl}` : "";
+  if (entry.type === "full") {
+    const games = entry.gameCount;
+    const gamesLabel = games === 1 ? "1 game" : `${games} games`;
+    return {
+      text: `⚾ MLB box scores · ${prettyDate} · ${gamesLabel}\n\n#MLB${tail}`,
+      alt: `Full MLB digest for ${prettyDate}: standings, leaders, and box scores for all ${gamesLabel}.`,
+    };
+  }
   if (entry.type === "standings") {
     const name = entry.league === "AL" ? "American League" : "National League";
     return {

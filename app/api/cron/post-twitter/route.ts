@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { EUploadMimeType } from "twitter-api-v2";
 import { isValidIsoDate, prettyDate, yesterdayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
 import { deleteTweet, postTweetWithImage } from "@/lib/twitter";
@@ -79,7 +80,7 @@ export async function GET(req: Request) {
     let posted = 0, skipped = 0, failed = 0;
     const results: Array<{ subId: string; url?: string; error?: string }> = [];
 
-    for (const { entry, png } of images) {
+    for (const { entry, png, mime } of images) {
       if (await hasAlreadyPosted("twitter", sport, date, entry.subId)) {
         skipped++;
         results.push({ subId: entry.subId, url: "(already posted)" });
@@ -89,10 +90,11 @@ export async function GET(req: Request) {
       // No digestUrl for Twitter: URL-bearing posts cost $0.20 vs $0.015
       // without. The bio link covers click-through.
       const { text, alt } = imagePostContent(entry, pretty);
+      const mimeType = mime === "image/jpeg" ? EUploadMimeType.Jpeg : EUploadMimeType.Png;
 
       try {
         const { id, url: postUrl } = await postTweetWithImage({
-          text, altText: alt, imageBytes: png,
+          text, altText: alt, imageBytes: png, mimeType,
         });
         await recordPost({
           platform: "twitter", sport, date, subId: entry.subId,

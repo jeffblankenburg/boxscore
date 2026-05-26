@@ -51,10 +51,10 @@ export async function uploadShareImages(args: {
   await clearShareImages();
   const supa = supabaseAdmin();
   const entries: ManifestImage[] = [];
-  for (const { entry, png } of args.images) {
+  for (const { entry, png, mime } of args.images) {
     const path = `${args.date}_${entry.file}`;
     const { error } = await supa.storage.from(BUCKET).upload(path, png, {
-      contentType: "image/png",
+      contentType: mime,
       upsert: true,
     });
     if (error) throw new Error(`storage upload ${path}: ${error.message}`);
@@ -110,6 +110,7 @@ export async function listStoredImages(): Promise<{ date: string | null; images:
 }
 
 function imagePriority(file: string): number {
+  if (file === "full.jpg" || file === "full.png") return 0;
   if (file === "al-standings.png") return 1;
   if (file === "al-leaders.png") return 2;
   if (file === "nl-standings.png") return 3;
