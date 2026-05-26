@@ -243,14 +243,12 @@ export async function renderShareImages(args: {
     // crop-with-tap-to-expand preview on Twitter/Bluesky that hooks scrollers
     // by showing "all of today's box scores in one shot."
     //
-    // Constraints driving the format choice:
-    //   - Bluesky caps images at 1MB. A 2x DPR PNG of a 15-game day blows
-    //     past that easily; JPEG at quality ~85 stays well under for
-    //     text-on-white content.
-    //   - Twitter caps any dimension at 8192px. Dropping to 1x DPR and a
-    //     ~600px logical width keeps us inside that limit for the typical
-    //     15-game day; rare 20+ game Saturdays may still exceed and would
-    //     need a follow-up scale-down (see issue #39 "out of scope").
+    // Format: PNG. Text-on-white compresses extremely well via DEFLATE — a
+    // 600×~8000 digest is typically a few hundred KB, well under Bluesky's
+    // 1MB cap. JPEG would shave a bit more but introduces blocking artifacts
+    // around glyph edges that defeat the dense-data-readable point of the
+    // image. Twitter's 8192px dimension cap is the real constraint; 1x DPR
+    // at 600px wide keeps us inside it for the typical 15-game day.
     //
     // The capture targets the whole document at 1x DPR after hiding the
     // site-header/footer chrome so only the digest content lands in the
@@ -269,7 +267,6 @@ export async function renderShareImages(args: {
 }
 
 const FULL_CAPTURE_WIDTH = 600;       // CSS px; matches the 540px share blocks + a little breathing room
-const FULL_JPEG_QUALITY = 85;
 
 async function captureFullDigest(page: Page, gameCount: number): Promise<RenderedImage | null> {
   // Hide the site header/footer that wrap the digest body — they're not part
@@ -297,14 +294,13 @@ async function captureFullDigest(page: Page, gameCount: number): Promise<Rendere
   }));
   const png = (await page.screenshot({
     fullPage: true,
-    type: "jpeg",
-    quality: FULL_JPEG_QUALITY,
+    type: "png",
   })) as Uint8Array;
 
   return {
-    entry: { file: "full.jpg", subId: "full", type: "full", gameCount },
+    entry: { file: "full.png", subId: "full", type: "full", gameCount },
     png,
-    mime: "image/jpeg",
+    mime: "image/png",
     width: dims.width,
     height: dims.height,
   };

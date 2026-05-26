@@ -110,7 +110,7 @@ export async function listStoredImages(): Promise<{ date: string | null; images:
 }
 
 function imagePriority(file: string): number {
-  if (file === "full.jpg" || file === "full.png") return 0;
+  if (file === "full.png") return 0;
   if (file === "al-standings.png") return 1;
   if (file === "al-leaders.png") return 2;
   if (file === "nl-standings.png") return 3;
