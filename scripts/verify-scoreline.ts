@@ -90,6 +90,7 @@ const games: GameDetail[] = [
 const data: DailyData = {
   date: "2026-05-17",
   prettyDate: "Sunday, May 17, 2026",
+  mode: "regular",
   games,
   standings: [],
   wildCard: [],

@@ -55,8 +55,10 @@ async function main() {
     }
     const gamesBefore = await page.$$(".game-container");
     for (let i = 0; i < gamesBefore.length; i++) {
+      const el = gamesBefore[i];
+      if (!el) continue;
       const name = `${String(i + 1).padStart(2, "0")}-${slug(labels[i] ?? "game")}`;
-      await gamesBefore[i].screenshot({ path: resolve(outDir, `${name}-before.png`) as `${string}.png` });
+      await el.screenshot({ path: resolve(outDir, `${name}-before.png`) as `${string}.png` });
       console.log(`  ${name}-before.png`);
     }
 
@@ -67,11 +69,11 @@ async function main() {
         const text = (el.textContent ?? "").trim();
         const parts = text.split(/\s+—\s+/);
         if (parts.length < 2) return;
-        const inningsPart = parts[0];
+        const inningsPart = parts[0] ?? "";
         const rhePart = parts.slice(1).join(" — ");
 
-        const innTokens = (inningsPart.match(/\d+|x/g) ?? []);
-        const rheTokens = (rhePart.match(/\d+|—/g) ?? []).slice(0, 3);
+        const innTokens: string[] = inningsPart.match(/\d+|x/g) ?? [];
+        const rheTokens: string[] = (rhePart.match(/\d+|—/g) ?? []).slice(0, 3);
 
         const bigInning = innTokens.some((t) => t.length >= 2);
         const hasExtras = innTokens.length > 9;
@@ -144,8 +146,10 @@ async function main() {
     }
     const gamesAfter = await page.$$(".game-container");
     for (let i = 0; i < gamesAfter.length; i++) {
+      const el = gamesAfter[i];
+      if (!el) continue;
       const name = `${String(i + 1).padStart(2, "0")}-${slug(labels[i] ?? "game")}`;
-      await gamesAfter[i].screenshot({ path: resolve(outDir, `${name}-after.png`) as `${string}.png` });
+      await el.screenshot({ path: resolve(outDir, `${name}-after.png`) as `${string}.png` });
       console.log(`  ${name}-after.png`);
     }
   } finally {

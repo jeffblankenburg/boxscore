@@ -60,8 +60,10 @@ async function main() {
     ];
     const games = await page.$$(".game-container");
     for (let i = 0; i < Math.min(games.length, labels.length); i++) {
+      const el = games[i];
+      if (!el) continue;
       const png = resolve(outDir, `${labels[i]}-${label}.png`);
-      await games[i].screenshot({ path: png as `${string}.png`, type: "png" });
+      await el.screenshot({ path: png as `${string}.png`, type: "png" });
       console.log(`  ${png}`);
     }
   } finally {
