@@ -166,7 +166,10 @@ export async function renderShareImages(args: {
   const { date, baseUrl } = args;
   // Caller passes games_date; the public page now lives at edition_date.
   const url = `${baseUrl}/mlb/${nextDay(date)}`;
-  const dateStr = prettyDate(date);
+  // Date stamp on the share images is the EDITION date — the day the digest
+  // ships, not the day the games happened (since the image is shared on the
+  // edition day and any reader sees it as "today's edition").
+  const dateStr = prettyDate(nextDay(date));
 
   const browser = await launchBrowser();
   try {
@@ -292,38 +295,63 @@ async function captureFullDigest(
       .full-share-header .share-date { font-size: 17px; font-style: italic; color: #6a6354; }
     `,
   });
-  // Defensive: in production we've observed the rendered DOM containing the
-  // digest wrapper twice — most likely an interaction between Next.js
-  // streaming RSC hydration and the headless Chromium runtime
-  // (@sparticuz/chromium-min) used in the Vercel function. The duplication
-  // doesn't reproduce locally against system Chrome but is consistent in the
-  // cron-rendered image. Counting `.dateline` is the cheap way to detect the
-  // duplicate, since the digest emits exactly one. If we see more than one,
-  // walk up to whichever .newspaper-level sibling contains the duplicate
-  // dateline and drop it before screenshotting.
-  await page.evaluate(() => {
-    const newspapers = document.querySelectorAll(".newspaper");
-    for (let i = 1; i < newspapers.length; i++) newspapers[i]?.remove();
-
-    const newspaper = document.querySelector(".newspaper");
-    if (!newspaper) return;
-    const datelines = newspaper.querySelectorAll(".dateline");
-    if (datelines.length > 1) {
-      for (let i = 1; i < datelines.length; i++) {
-        const start = datelines[i];
+  // Defensive: the rendered DOM has been observed to contain the digest
+  // wrapper twice in puppeteer-driven renders (both Vercel chromium-min and
+  // local system Chrome when invoked through the renderShareImages path) —
+  // most likely an interaction between Next.js streaming RSC hydration and
+  // the headless runtime. The duplication doesn't show up in plain `curl` or
+  // in a minimal standalone puppeteer test, but it's consistent here.
+  //
+  // We don't know exactly which level of the tree duplicates, so be aggressive:
+  // keep only the FIRST of each known marker (.newspaper, .no-next-day,
+  // .dateline, .boxscores-container) and remove the rest, walking up to the
+  // .newspaper-level sibling so we drop the whole duplicate block, not just
+  // the marker node. Logs what it observed so we can debug if duplication
+  // patterns shift in the future.
+  const dedupReport = await page.evaluate(() => {
+    function keepFirstWithinNewspaper(selector: string): number {
+      const newspaper = document.querySelector(".newspaper");
+      if (!newspaper) return 0;
+      const matches = newspaper.querySelectorAll(selector);
+      let removed = 0;
+      for (let i = 1; i < matches.length; i++) {
+        const start = matches[i];
         if (!start) continue;
         let node: Element | null = start;
         while (node && node.parentElement && node.parentElement !== newspaper) {
           node = node.parentElement;
         }
-        node?.remove();
+        if (node && node.parentElement === newspaper) {
+          node.remove();
+          removed++;
+        }
       }
+      return removed;
     }
+
+    const newspapers = document.querySelectorAll(".newspaper");
+    let removedNewspapers = 0;
+    for (let i = 1; i < newspapers.length; i++) {
+      newspapers[i]?.remove();
+      removedNewspapers++;
+    }
+
+    return {
+      newspapersBefore: newspapers.length,
+      removedNewspapers,
+      removedDuplicateDatelineBlocks: keepFirstWithinNewspaper(".dateline"),
+      removedDuplicateNoNextDay: keepFirstWithinNewspaper(".no-next-day"),
+      removedDuplicateBoxscoresContainer: keepFirstWithinNewspaper(".boxscores-container"),
+    };
   });
+  console.log(`[captureFullDigest] dedup pre-injection: ${JSON.stringify(dedupReport)}`);
 
   await page.evaluate((d: string) => {
     const newspaper = document.querySelector(".newspaper");
     if (!newspaper) return;
+    // Remove any pre-existing share-headers (in case this function ran twice
+    // somehow, or a prior injection wasn't cleaned up).
+    newspaper.querySelectorAll(".full-share-header").forEach((el) => el.remove());
     const header = document.createElement("div");
     header.className = "full-share-header";
     header.innerHTML = `
