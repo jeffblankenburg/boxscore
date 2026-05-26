@@ -172,11 +172,23 @@ export async function renderShareImages(args: {
   try {
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
-    await injectShareChrome(page, dateStr);
     await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
     await new Promise((r) => setTimeout(r, 200));
 
     const results: RenderedImage[] = [];
+
+    // Capture the full-day image FIRST, against the natural web layout —
+    // two-up standings/leaders, three-column boxscores. Doing this before
+    // injectShareChrome avoids the single-column flattening that the
+    // per-section CSS imposes.
+    const gameCount = (await page.$$(".game-container")).length;
+    const fullImage = await captureFullDigest(page, dateStr, gameCount);
+    if (fullImage) results.push(fullImage);
+
+    // Now flatten the page for per-section captures.
+    await injectShareChrome(page, dateStr);
+    await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
+    await new Promise((r) => setTimeout(r, 200));
 
     const standings = await page.$$(".col-standings");
     const leaders = await page.$$(".col-leaders");
@@ -239,69 +251,77 @@ export async function renderShareImages(args: {
       results.push({ entry, png, mime: "image/png", width, height });
     }
 
-    // Full-day capture. Posted as the LEAD image — the goal is the tall,
-    // crop-with-tap-to-expand preview on Twitter/Bluesky that hooks scrollers
-    // by showing "all of today's box scores in one shot."
-    //
-    // Format: PNG. Text-on-white compresses extremely well via DEFLATE — a
-    // 600×~8000 digest is typically a few hundred KB, well under Bluesky's
-    // 1MB cap. JPEG would shave a bit more but introduces blocking artifacts
-    // around glyph edges that defeat the dense-data-readable point of the
-    // image. Twitter's 8192px dimension cap is the real constraint; 1x DPR
-    // at 600px wide keeps us inside it for the typical 15-game day.
-    //
-    // The capture targets the whole document at 1x DPR after hiding the
-    // site-header/footer chrome so only the digest content lands in the
-    // image. Reusing the same page also means the share-CSS column layout
-    // already injected stays in effect.
-    const fullImage = await captureFullDigest(page, games.length);
-    if (fullImage) {
-      // Prepend so it's the first thing posted, before any per-section follow-ups.
-      results.unshift(fullImage);
-    }
-
     return results;
   } finally {
     await browser.close();
   }
 }
 
-const FULL_CAPTURE_WIDTH = 600;       // CSS px; matches the 540px share blocks + a little breathing room
-
-async function captureFullDigest(page: Page, gameCount: number): Promise<RenderedImage | null> {
-  // Hide the site header/footer that wrap the digest body — they're not part
-  // of the data and would only add chrome noise to the share image.
+// Full-day capture. Posted as the LEAD image — the goal is the
+// crop-with-tap-to-expand preview on Twitter/Bluesky that hooks scrollers
+// by showing "all of today's box scores in one shot", laid out the way the
+// website lays them out: AL/NL standings + leaders two-up across the top,
+// boxscores in three columns below.
+//
+// Captures the `.newspaper` wrapper at its natural width (max 1280 CSS px
+// per globals.css), with the site header/footer hidden and a single clean
+// brand+date header inserted at the top. Format is PNG — text-on-white
+// compresses very efficiently via DEFLATE.
+//
+// Must be called BEFORE injectShareChrome flattens the layout into the
+// single-column share format used for per-section images.
+async function captureFullDigest(
+  page: Page,
+  dateStr: string,
+  gameCount: number,
+): Promise<RenderedImage | null> {
   await page.addStyleTag({
     content: `
       .site-header, .site-footer { display: none !important; }
-      body, .newspaper { background: #fff !important; }
+      .newspaper { padding-top: 0 !important; }
+      .full-share-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px 0 16px;
+        margin: 0 0 20px;
+        border-bottom: 2px solid #c4baa5;
+        font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
+      }
+      .full-share-header .brand-cell { display: flex; align-items: center; gap: 10px; }
+      .full-share-header .brand-cell img { width: 32px; height: 32px; border-radius: 5px; display: block; }
+      .full-share-header .brand { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; color: #161410; }
+      .full-share-header .share-date { font-size: 17px; font-style: italic; color: #6a6354; }
     `,
   });
-  // Drop to 1x DPR and snap viewport width so the captured page is tight
-  // around the centered 540px column. Triggers a relayout; small wait lets
-  // the column-flex reflow settle before screenshotting.
-  await page.setViewport({
-    width: FULL_CAPTURE_WIDTH,
-    height: 1024,
-    deviceScaleFactor: 1,
-  });
+  await page.evaluate((d: string) => {
+    const newspaper = document.querySelector(".newspaper");
+    if (!newspaper) return;
+    const header = document.createElement("div");
+    header.className = "full-share-header";
+    header.innerHTML = `
+      <div class="brand-cell">
+        <img src="/icon.png" alt="">
+        <span class="brand">boxscore</span>
+      </div>
+      <div class="share-date">${d}</div>`;
+    newspaper.insertBefore(header, newspaper.firstChild);
+  }, dateStr);
+
   await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
   await new Promise((r) => setTimeout(r, 300));
 
-  const dims = await page.evaluate(() => ({
-    width: document.documentElement.scrollWidth,
-    height: document.documentElement.scrollHeight,
-  }));
-  const png = (await page.screenshot({
-    fullPage: true,
-    type: "png",
-  })) as Uint8Array;
+  const newspaper = await page.$(".newspaper");
+  if (!newspaper) return null;
+
+  const png = (await newspaper.screenshot({ type: "png" })) as Uint8Array;
+  const box = await newspaper.boundingBox();
+  const width = box ? Math.round(box.width * 2) : 0;
+  const height = box ? Math.round(box.height * 2) : 0;
 
   return {
     entry: { file: "full.png", subId: "full", type: "full", gameCount },
     png,
     mime: "image/png",
-    width: dims.width,
-    height: dims.height,
+    width,
+    height,
   };
 }
