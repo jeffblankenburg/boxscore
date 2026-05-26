@@ -292,6 +292,35 @@ async function captureFullDigest(
       .full-share-header .share-date { font-size: 17px; font-style: italic; color: #6a6354; }
     `,
   });
+  // Defensive: in production we've observed the rendered DOM containing the
+  // digest wrapper twice — most likely an interaction between Next.js
+  // streaming RSC hydration and the headless Chromium runtime
+  // (@sparticuz/chromium-min) used in the Vercel function. The duplication
+  // doesn't reproduce locally against system Chrome but is consistent in the
+  // cron-rendered image. Counting `.dateline` is the cheap way to detect the
+  // duplicate, since the digest emits exactly one. If we see more than one,
+  // walk up to whichever .newspaper-level sibling contains the duplicate
+  // dateline and drop it before screenshotting.
+  await page.evaluate(() => {
+    const newspapers = document.querySelectorAll(".newspaper");
+    for (let i = 1; i < newspapers.length; i++) newspapers[i]?.remove();
+
+    const newspaper = document.querySelector(".newspaper");
+    if (!newspaper) return;
+    const datelines = newspaper.querySelectorAll(".dateline");
+    if (datelines.length > 1) {
+      for (let i = 1; i < datelines.length; i++) {
+        const start = datelines[i];
+        if (!start) continue;
+        let node: Element | null = start;
+        while (node && node.parentElement && node.parentElement !== newspaper) {
+          node = node.parentElement;
+        }
+        node?.remove();
+      }
+    }
+  });
+
   await page.evaluate((d: string) => {
     const newspaper = document.querySelector(".newspaper");
     if (!newspaper) return;
