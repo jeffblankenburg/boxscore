@@ -652,37 +652,40 @@ function inningCellWidth(innings: InningsArray): number {
   return w;
 }
 
-// U+2007 figure space is the same width as a digit in fonts with tabular
-// numerals — lets us pad/separate scores cleanly in the proportional body
-// font instead of falling back to a different (monospace) typeface.
-const FIG_SPACE = "\u2007";
-
-// Pad R/H/E to 2-char width so single- and double-digit values line up.
-const padRhe = (n: number | undefined) =>
-  n == null ? FIG_SPACE + "—" : String(n).padStart(2, FIG_SPACE);
-
 // Web caps inline display at 12 innings (vs email's 19) to fit the narrower
 // box-score column. Past 12, the "Extras: Game ended in the Nth" note + the
 // per-play Scoring section cover the detail.
 const MAX_INNINGS_INLINE = 12;
 const EXTRAS_THRESHOLD = 13;
 
-function inningGroups(innings: InningsArray, side: "away" | "home", width: number): string {
+// Each inning becomes its own CSS-grid cell so alignment no longer depends on
+// the body font's figure-space or "x" glyph advance widths (Source Sans 3 on
+// Mac/Chrome renders both narrower than tnum digits, drifting the scoreline
+// between rows). Groups of 3 wrap in .inn-grp so column-gap creates the
+// visual spacing between thirds.
+function inningGroups(innings: InningsArray, side: "away" | "home"): string {
   const digits = innings.slice(0, MAX_INNINGS_INLINE).map((inn) => {
     const v = side === "away" ? inn.away?.runs : inn.home?.runs;
-    const s = v == null ? "x" : String(v);
-    return s.padStart(width, FIG_SPACE);
+    return v == null ? "x" : String(v);
   });
-  // Pad to at least 9 cells, and round up to a multiple of 3 so every group
-  // has three cells. Extra-inning games yield 4 groups (10-12 innings) instead
-  // of the standard 3.
+  // Pad to >=9 cells and round up to a multiple of 3 so every group has 3.
   const padTo = Math.max(9, Math.ceil(digits.length / 3) * 3);
-  while (digits.length < padTo) digits.push(FIG_SPACE.repeat(width));
+  while (digits.length < padTo) digits.push("");
   const groups: string[] = [];
   for (let i = 0; i < digits.length; i += 3) {
-    groups.push(digits.slice(i, i + 3).join(" "));
+    const cells = digits.slice(i, i + 3)
+      .map((d) => `<span class="inn">${esc(d)}</span>`)
+      .join("");
+    groups.push(`<span class="inn-grp">${cells}</span>`);
   }
-  return groups.join("  ");
+  return groups.join("");
+}
+
+function rheCells(...vals: Array<number | undefined>): string {
+  const cells = vals
+    .map((v) => `<span class="rhe">${v == null ? "—" : esc(v)}</span>`)
+    .join("");
+  return `<span class="rhe-grp">${cells}</span>`;
 }
 
 function ordinal(n: number): string {
@@ -707,8 +710,13 @@ export function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbb
     : `${nicknameHtml(a.team.name)} ${aScore}, ${nicknameHtml(h.team.name)} ${hScore}`;
 
   const w = inningCellWidth(innings);
-  const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(ls?.away.runs)}  ${padRhe(ls?.away.hits)}  ${padRhe(ls?.away.errors)}`;
-  const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(ls?.home.runs)}  ${padRhe(ls?.home.hits)}  ${padRhe(ls?.home.errors)}`;
+  const extras = innings.length > 9;
+  // Grid scoreline. Class flags drive cell widths: .bigInning widens each
+  // inning cell to 2ch when any frame had 10+ runs; .has-extras adds one more
+  // inn-grp on either side without changing column widths.
+  const scoreClass = `team-score${w > 1 ? " bigInning" : ""}${extras ? " has-extras" : ""}`;
+  const aCells = `${inningGroups(innings, "away")}<span class="sep">—</span>${rheCells(ls?.away.runs, ls?.away.hits, ls?.away.errors)}`;
+  const hCells = `${inningGroups(innings, "home")}<span class="sep">—</span>${rheCells(ls?.home.runs, ls?.home.hits, ls?.home.errors)}`;
 
   const d = game.decisions;
   const decisionParts = [
@@ -728,11 +736,11 @@ export function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbb
   <div class="game-header">${winnerFirst}</div>
   <div class="team-line">
     <div class="team-name">${esc(tla(a.team.name, liveAbbrev))}</div>
-    <div class="team-score">${aLine}</div>
+    <div class="${scoreClass}">${aCells}</div>
   </div>
   <div class="team-line">
     <div class="team-name">${esc(tla(h.team.name, liveAbbrev))}</div>
-    <div class="team-score">${hLine}</div>
+    <div class="${scoreClass}">${hCells}</div>
   </div>
   ${innings.length >= EXTRAS_THRESHOLD ? `<div class="notes"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</div>` : ""}
   ${decisionParts ? `<div class="notes">${decisionParts}</div>` : ""}
