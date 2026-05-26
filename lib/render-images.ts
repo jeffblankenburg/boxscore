@@ -366,13 +366,70 @@ async function captureFullDigest(
   await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
   await new Promise((r) => setTimeout(r, 300));
 
+  // Pre-injection dedup found everything clean, but the final image still
+  // duplicates — which means the duplicate appears after dedup but before the
+  // screenshot, likely during the fonts/timeout wait above. Run a second pass
+  // immediately before screenshotting AND clip the capture to a single-digest
+  // height ceiling so even if a duplicate slips through, we only capture the
+  // top digest. Log what the second pass found so we can confirm the theory.
+  const lateDedup = await page.evaluate(() => {
+    function keepFirstWithinNewspaper(selector: string): number {
+      const newspaper = document.querySelector(".newspaper");
+      if (!newspaper) return 0;
+      const matches = newspaper.querySelectorAll(selector);
+      let removed = 0;
+      for (let i = 1; i < matches.length; i++) {
+        const start = matches[i];
+        if (!start) continue;
+        let node: Element | null = start;
+        while (node && node.parentElement && node.parentElement !== newspaper) {
+          node = node.parentElement;
+        }
+        if (node && node.parentElement === newspaper) {
+          node.remove();
+          removed++;
+        }
+      }
+      return removed;
+    }
+    const newspapers = document.querySelectorAll(".newspaper");
+    let removedNewspapers = 0;
+    for (let i = 1; i < newspapers.length; i++) {
+      newspapers[i]?.remove();
+      removedNewspapers++;
+    }
+    const newspaper = document.querySelector(".newspaper");
+    return {
+      removedNewspapers,
+      removedDuplicateDatelineBlocks: keepFirstWithinNewspaper(".dateline"),
+      removedDuplicateNoNextDay: keepFirstWithinNewspaper(".no-next-day"),
+      removedDuplicateBoxscoresContainer: keepFirstWithinNewspaper(".boxscores-container"),
+      removedDuplicateShareHeader: keepFirstWithinNewspaper(".full-share-header"),
+      newspaperHeight: newspaper ? (newspaper as HTMLElement).getBoundingClientRect().height : 0,
+    };
+  });
+  console.log(`[captureFullDigest] dedup pre-screenshot: ${JSON.stringify(lateDedup)}`);
+
   const newspaper = await page.$(".newspaper");
   if (!newspaper) return null;
-
-  const png = (await newspaper.screenshot({ type: "png" })) as Uint8Array;
   const box = await newspaper.boundingBox();
-  const width = box ? Math.round(box.width * 2) : 0;
-  const height = box ? Math.round(box.height * 2) : 0;
+  if (!box) return null;
+
+  // Defensive cap: a single MLB digest is reliably under 8500 CSS px tall
+  // (~7700 typical, ~8000 on a 16-game day). If the box reports more than that
+  // it's almost certainly because a duplicate digest got appended somewhere we
+  // didn't catch — clip to the safe ceiling so only the first digest is in the
+  // image. Use page.screenshot with explicit clip so we control coordinates.
+  const SINGLE_DIGEST_MAX_HEIGHT = 8500;
+  const captureHeight = Math.min(box.height, SINGLE_DIGEST_MAX_HEIGHT);
+  console.log(`[captureFullDigest] box.height=${box.height} captureHeight=${captureHeight}`);
+
+  const png = (await page.screenshot({
+    type: "png",
+    clip: { x: box.x, y: box.y, width: box.width, height: captureHeight },
+  })) as Uint8Array;
+  const width = Math.round(box.width * 2);
+  const height = Math.round(captureHeight * 2);
 
   return {
     entry: { file: "full.png", subId: "full", type: "full", gameCount },
