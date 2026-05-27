@@ -15,6 +15,7 @@ import {
   getSendCoverage,
   type Window,
   type SendCoverageRow,
+  type SubscriberSeries,
 } from "@/lib/dashboard";
 import {
   SubscriberGrowthChart,
@@ -225,6 +226,7 @@ export default async function AdminDashboard({
       <section>
         <h2>Subscriber growth ({w})</h2>
         <SubscriberGrowthChart series={subSeries} window={w} />
+        <SubscriberDailyTable series={subSeries} window={w} />
       </section>
 
       {/* 4. Cron contribution grid — sport × day, last 14d. Catches "WNBA
@@ -368,6 +370,66 @@ function CronRunsTable({ runs }: { runs: CronRun[] }) {
             </tr>
           );
         })}
+      </tbody>
+    </table>
+  );
+}
+
+// Daily subscribe/unsubscribe counts pulled from the same series the growth
+// chart renders. Newest day first. For sub-daily windows (24h, 3d) the series
+// has hourly/6-hourly buckets — we re-aggregate into days so this table always
+// reads as daily regardless of the chart's resolution.
+function SubscriberDailyTable({ series, window: w }: { series: SubscriberSeries; window: Window }) {
+  type Row = { date: string; newSubs: number; unsubs: number };
+  const byDay = new Map<string, Row>();
+  for (let i = 0; i < series.buckets.length; i++) {
+    const bucket = series.buckets[i]!;
+    const day = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(bucket);
+    const existing = byDay.get(day) ?? { date: day, newSubs: 0, unsubs: 0 };
+    existing.newSubs += series.newSubs[i] ?? 0;
+    existing.unsubs += series.unsubs[i] ?? 0;
+    byDay.set(day, existing);
+  }
+  const rows = [...byDay.values()].sort((a, b) => b.date.localeCompare(a.date));
+  void w;
+  if (rows.length === 0) {
+    return <p className="admin-meta">No subscribe activity in this window.</p>;
+  }
+  let totalNew = 0, totalUnsub = 0;
+  for (const r of rows) { totalNew += r.newSubs; totalUnsub += r.unsubs; }
+  return (
+    <table className="admin-cron-runs">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th style={{ textAlign: "right" }}>New</th>
+          <th style={{ textAlign: "right" }}>Unsubscribed</th>
+          <th style={{ textAlign: "right" }}>Net</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const net = r.newSubs - r.unsubs;
+          return (
+            <tr key={r.date}>
+              <td><code>{r.date}</code></td>
+              <td style={{ textAlign: "right" }}>{r.newSubs > 0 ? `+${r.newSubs}` : "0"}</td>
+              <td style={{ textAlign: "right" }}>{r.unsubs > 0 ? `−${r.unsubs}` : "0"}</td>
+              <td
+                style={{ textAlign: "right" }}
+                className={net > 0 ? "admin-kpi-delta-good" : net < 0 ? "admin-kpi-delta-bad" : undefined}
+              >{formatDelta(net)}</td>
+            </tr>
+          );
+        })}
+        <tr>
+          <td><strong>Total</strong></td>
+          <td style={{ textAlign: "right" }}><strong>+{totalNew}</strong></td>
+          <td style={{ textAlign: "right" }}><strong>−{totalUnsub}</strong></td>
+          <td style={{ textAlign: "right" }}><strong>{formatDelta(totalNew - totalUnsub)}</strong></td>
+        </tr>
       </tbody>
     </table>
   );
