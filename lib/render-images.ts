@@ -439,17 +439,22 @@ async function captureFullDigest(
   const captureHeight = Math.min(box.height, SINGLE_DIGEST_MAX_HEIGHT);
   console.log(`[captureFullDigest] box.height=${box.height} captureHeight=${captureHeight}`);
 
-  const png = (await page.screenshot({
-    type: "png",
+  // Encode as JPEG: at our typical ~1280×7700 native pixels with text-on-white
+  // content, PNG runs ~2.9MB which exceeds Bluesky's 2MB cap and likely trips
+  // Twitter's validation as well. JPEG q=92 drops to ~1.2-1.6MB with barely
+  // perceptible artifacts at this DPR. Per-section images stay PNG.
+  const bytes = (await page.screenshot({
+    type: "jpeg",
+    quality: 92,
     clip: { x: box.x, y: box.y, width: box.width, height: captureHeight },
   })) as Uint8Array;
   const width = Math.round(box.width * dpr);
   const height = Math.round(captureHeight * dpr);
 
   return {
-    entry: { file: "full.png", subId: "full", type: "full", gameCount },
-    png,
-    mime: "image/png",
+    entry: { file: "full.jpg", subId: "full", type: "full", gameCount },
+    png: bytes,
+    mime: "image/jpeg",
     width,
     height,
   };
