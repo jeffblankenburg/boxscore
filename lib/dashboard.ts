@@ -271,9 +271,11 @@ export async function getKpis(w: Window): Promise<DashboardKpis> {
 
 export type SubscriberSeries = {
   buckets: Date[];
-  active: number[];   // cumulative active count at end of each bucket
-  newSubs: number[];  // confirmed_at landing in each bucket
-  unsubs: number[];   // unsubscribed_at landing in each bucket
+  active: number[];     // cumulative active count at end of each bucket
+  newSubs: number[];    // confirmed_at landing in each bucket
+  unsubs: number[];     // unsubscribed_at landing in each bucket (total)
+  unsubsReal: number[]; // subset of unsubs: user-driven (reason=null or "user")
+  unsubsAuto: number[]; // subset of unsubs: bounce/complaint/manual (system-driven)
 };
 
 export async function getSubscriberSeries(w: Window): Promise<SubscriberSeries> {
@@ -282,12 +284,19 @@ export async function getSubscriberSeries(w: Window): Promise<SubscriberSeries> 
   const count = buckets.length;
   const newSubs = new Array<number>(count).fill(0);
   const unsubs = new Array<number>(count).fill(0);
+  const unsubsReal = new Array<number>(count).fill(0);
+  const unsubsAuto = new Array<number>(count).fill(0);
   const active = new Array<number>(count).fill(0);
 
-  const rows = await fetchAll<{ confirmed_at: string | null; unsubscribed_at: string | null }>(
+  type Row = {
+    confirmed_at: string | null;
+    unsubscribed_at: string | null;
+    unsubscribe_reason: string | null;
+  };
+  const rows = await fetchAll<Row>(
     () => supabaseAdmin()
       .from("subscribers")
-      .select("confirmed_at, unsubscribed_at") as unknown as QueryBuilder<{ confirmed_at: string | null; unsubscribed_at: string | null }>,
+      .select("confirmed_at, unsubscribed_at, unsubscribe_reason") as unknown as QueryBuilder<Row>,
     "getSubscriberSeries",
   );
 
@@ -307,7 +316,18 @@ export async function getSubscriberSeries(w: Window): Promise<SubscriberSeries> 
     }
     if (u !== null) {
       const idx = bucketIndex(buckets, sizeMs, new Date(u));
-      if (idx >= 0) unsubs[idx]!++;
+      if (idx >= 0) {
+        unsubs[idx]!++;
+        // "Real" = subscriber clicked unsubscribe (explicit user action).
+        // Everything else (bounce, complaint, manual=admin) is "auto" —
+        // system removed them, not them telling us they're out.
+        const reason = r.unsubscribe_reason;
+        if (reason === null || reason === "user") {
+          unsubsReal[idx]!++;
+        } else {
+          unsubsAuto[idx]!++;
+        }
+      }
     }
   }
 
@@ -325,7 +345,7 @@ export async function getSubscriberSeries(w: Window): Promise<SubscriberSeries> 
   // out of activeAtEnd later; currently we count from all-time correctly.
   void windowStartMs;
 
-  return { buckets, active, newSubs, unsubs };
+  return { buckets, active, newSubs, unsubs, unsubsReal, unsubsAuto };
 }
 
 // ---- Send health series ------------------------------------------------

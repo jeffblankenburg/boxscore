@@ -380,16 +380,17 @@ function CronRunsTable({ runs }: { runs: CronRun[] }) {
 // has hourly/6-hourly buckets — we re-aggregate into days so this table always
 // reads as daily regardless of the chart's resolution.
 function SubscriberDailyTable({ series, window: w }: { series: SubscriberSeries; window: Window }) {
-  type Row = { date: string; newSubs: number; unsubs: number };
+  type Row = { date: string; newSubs: number; unsubsReal: number; unsubsAuto: number };
   const byDay = new Map<string, Row>();
   for (let i = 0; i < series.buckets.length; i++) {
     const bucket = series.buckets[i]!;
     const day = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
     }).format(bucket);
-    const existing = byDay.get(day) ?? { date: day, newSubs: 0, unsubs: 0 };
+    const existing = byDay.get(day) ?? { date: day, newSubs: 0, unsubsReal: 0, unsubsAuto: 0 };
     existing.newSubs += series.newSubs[i] ?? 0;
-    existing.unsubs += series.unsubs[i] ?? 0;
+    existing.unsubsReal += series.unsubsReal[i] ?? 0;
+    existing.unsubsAuto += series.unsubsAuto[i] ?? 0;
     byDay.set(day, existing);
   }
   const rows = [...byDay.values()].sort((a, b) => b.date.localeCompare(a.date));
@@ -397,26 +398,32 @@ function SubscriberDailyTable({ series, window: w }: { series: SubscriberSeries;
   if (rows.length === 0) {
     return <p className="admin-meta">No subscribe activity in this window.</p>;
   }
-  let totalNew = 0, totalUnsub = 0;
-  for (const r of rows) { totalNew += r.newSubs; totalUnsub += r.unsubs; }
+  let totalNew = 0, totalReal = 0, totalAuto = 0;
+  for (const r of rows) {
+    totalNew += r.newSubs;
+    totalReal += r.unsubsReal;
+    totalAuto += r.unsubsAuto;
+  }
   return (
     <table className="admin-cron-runs">
       <thead>
         <tr>
           <th>Date</th>
           <th style={{ textAlign: "right" }}>New</th>
-          <th style={{ textAlign: "right" }}>Unsubscribed</th>
+          <th style={{ textAlign: "right" }}>Real unsub</th>
+          <th style={{ textAlign: "right" }}>Auto unsub</th>
           <th style={{ textAlign: "right" }}>Net</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((r) => {
-          const net = r.newSubs - r.unsubs;
+          const net = r.newSubs - (r.unsubsReal + r.unsubsAuto);
           return (
             <tr key={r.date}>
               <td><code>{r.date}</code></td>
               <td style={{ textAlign: "right" }}>{r.newSubs > 0 ? `+${r.newSubs}` : "0"}</td>
-              <td style={{ textAlign: "right" }}>{r.unsubs > 0 ? `−${r.unsubs}` : "0"}</td>
+              <td style={{ textAlign: "right" }}>{r.unsubsReal > 0 ? `−${r.unsubsReal}` : "0"}</td>
+              <td style={{ textAlign: "right" }}>{r.unsubsAuto > 0 ? `−${r.unsubsAuto}` : "0"}</td>
               <td
                 style={{ textAlign: "right" }}
                 className={net > 0 ? "admin-kpi-delta-good" : net < 0 ? "admin-kpi-delta-bad" : undefined}
@@ -427,8 +434,9 @@ function SubscriberDailyTable({ series, window: w }: { series: SubscriberSeries;
         <tr>
           <td><strong>Total</strong></td>
           <td style={{ textAlign: "right" }}><strong>+{totalNew}</strong></td>
-          <td style={{ textAlign: "right" }}><strong>−{totalUnsub}</strong></td>
-          <td style={{ textAlign: "right" }}><strong>{formatDelta(totalNew - totalUnsub)}</strong></td>
+          <td style={{ textAlign: "right" }}><strong>−{totalReal}</strong></td>
+          <td style={{ textAlign: "right" }}><strong>−{totalAuto}</strong></td>
+          <td style={{ textAlign: "right" }}><strong>{formatDelta(totalNew - totalReal - totalAuto)}</strong></td>
         </tr>
       </tbody>
     </table>
