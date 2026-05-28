@@ -109,8 +109,12 @@ export async function GET(req: Request) {
 
   try {
     // Stage 1: upload every image as unpublished, collecting media_fbids.
+    // Skip the full-day image: at the DPR=1 we have to use in chromium-min,
+    // it's unreadable when Facebook fits it to the feed preview. Still kept
+    // in storage for the admin gallery.
     const mediaFbids: string[] = [];
     for (const img of stored.entries) {
+      if (img.entry.type === "full") continue;
       const id = await uploadUnpublishedPhoto(img.url);
       mediaFbids.push(id);
     }

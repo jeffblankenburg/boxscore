@@ -88,6 +88,14 @@ export async function GET(req: Request) {
   const results: Array<{ subId: string; url?: string; error?: string }> = [];
 
   for (const { entry, png, mime, width, height } of images) {
+    // Skip the full-day image: same DPR=1 readability problem as Twitter,
+    // and 5+MB doesn't fit Bluesky's 2MB blob cap reliably. Still generated
+    // and stored for the admin gallery.
+    if (entry.type === "full") {
+      skipped++;
+      results.push({ subId: entry.subId, url: "(skipped: full image disabled)" });
+      continue;
+    }
     if (await hasAlreadyPosted("bluesky", sport, date, entry.subId)) {
       skipped++;
       results.push({ subId: entry.subId, url: "(already posted)" });

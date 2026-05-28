@@ -81,6 +81,15 @@ export async function GET(req: Request) {
     const results: Array<{ subId: string; url?: string; error?: string }> = [];
 
     for (const { entry, png, mime } of images) {
+      // Skip the full-day image: it's still generated and stored for the
+      // admin gallery, but DPR=1 (forced by chromium-min's tile-at-DPR=2 bug)
+      // makes it unreadable on Twitter's feed-fit crop. Per-section images
+      // post fine.
+      if (entry.type === "full") {
+        skipped++;
+        results.push({ subId: entry.subId, url: "(skipped: full image disabled)" });
+        continue;
+      }
       if (await hasAlreadyPosted("twitter", sport, date, entry.subId)) {
         skipped++;
         results.push({ subId: entry.subId, url: "(already posted)" });
