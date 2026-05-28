@@ -817,14 +817,23 @@ function renderBatting(team: BoxTeam, cityName: string): string {
 function hittingExtras(players: BoxPlayer[]): string {
   type Bucket = { last: string; season: number };
   const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[] };
+  // When a player does N of a thing in a game, emit N entries with consecutive
+  // season counts ending at the current season total. e.g. Alvarez hits 2 HRs
+  // and ends the night with 20 → `Alvarez (19), Alvarez (20)`. Otherwise the
+  // line silently undercounts and a reader counts the home runs themselves.
+  const push = (bucket: Bucket[], name: string, gameCount: number, seasonTotal: number) => {
+    for (let k = 0; k < gameCount; k++) {
+      bucket.push({ last: name, season: seasonTotal - gameCount + k + 1 });
+    }
+  };
   for (const p of players) {
     const b = p.stats.batting;
     const s = p.seasonStats.batting;
     const name = lastName(p.person.fullName);
-    if ((b.doubles ?? 0) > 0) cat["2B"].push({ last: name, season: s.doubles ?? 0 });
-    if ((b.triples ?? 0) > 0) cat["3B"].push({ last: name, season: s.triples ?? 0 });
-    if ((b.homeRuns ?? 0) > 0) cat.HR.push({ last: name, season: s.homeRuns ?? 0 });
-    if ((b.stolenBases ?? 0) > 0) cat.SB.push({ last: name, season: s.stolenBases ?? 0 });
+    push(cat["2B"], name, b.doubles ?? 0, s.doubles ?? 0);
+    push(cat["3B"], name, b.triples ?? 0, s.triples ?? 0);
+    push(cat.HR, name, b.homeRuns ?? 0, s.homeRuns ?? 0);
+    push(cat.SB, name, b.stolenBases ?? 0, s.stolenBases ?? 0);
   }
   const parts: string[] = [];
   for (const [label, list] of Object.entries(cat)) {
