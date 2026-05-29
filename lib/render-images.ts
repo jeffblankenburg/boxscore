@@ -181,6 +181,18 @@ export async function renderShareImages(args: {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
+    // Stub esbuild's __name helper in the page context. When this lib is
+    // imported by a tsx-run script (the share-image backfill, the various
+    // dev scripts), esbuild rewrites every arrow function with a __name(fn)
+    // wrapper. That helper exists in tsx's runtime but isn't transferred to
+    // the puppeteer page, so any page.evaluate call throws "__name is not
+    // defined". Defining it as identity here is a no-op for Next.js-compiled
+    // callers (whose page.evaluate code never references __name) and a fix
+    // for tsx callers. String form is required because if we passed an arrow
+    // function here, that arrow function itself would be wrapped in __name.
+    await page.evaluateOnNewDocument(
+      "globalThis.__name = globalThis.__name || (function(fn){ return fn; });",
+    );
     await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
     await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
     await new Promise((r) => setTimeout(r, 200));
