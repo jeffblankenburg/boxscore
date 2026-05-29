@@ -928,3 +928,143 @@ export async function getSendCoverage(): Promise<SendCoverageRow[]> {
   }
   return rows;
 }
+
+// ---- Storage stats -----------------------------------------------------
+
+export type BucketStats = { name: string; bytes: number; files: number };
+export type StorageStats = { buckets: BucketStats[]; totalBytes: number; totalFiles: number };
+
+// Buckets we own and want to monitor. Add to this list when we provision new
+// ones. Listed buckets that don't exist yet are silently skipped so we don't
+// pollute the dashboard with errors during a partial setup.
+const MONITORED_BUCKETS = ["share-images"] as const;
+
+export async function getStorageStats(): Promise<StorageStats> {
+  const supa = supabaseAdmin();
+  const buckets: BucketStats[] = [];
+  let totalBytes = 0;
+  let totalFiles = 0;
+  for (const name of MONITORED_BUCKETS) {
+    let bytes = 0;
+    let files = 0;
+    // Storage list maxes out at 1000 per request; paginate for buckets that
+    // accumulate past that (share-images grows ~18 files/day = 1000 in ~55d).
+    let offset = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data, error } = await supa.storage.from(name).list("", { limit: pageSize, offset });
+      if (error) {
+        // Missing bucket isn't fatal — skip it so the dashboard still renders.
+        console.warn(`getStorageStats: bucket "${name}" list error: ${error.message}`);
+        break;
+      }
+      const page = data ?? [];
+      if (page.length === 0) break;
+      for (const f of page) {
+        if (f.name === ".emptyFolderPlaceholder") continue;
+        const size = (f.metadata?.size as number | undefined) ?? 0;
+        bytes += size;
+        files++;
+      }
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    buckets.push({ name, bytes, files });
+    totalBytes += bytes;
+    totalFiles += files;
+  }
+  return { buckets, totalBytes, totalFiles };
+}
+
+// ---- RSS readership ----------------------------------------------------
+
+export type RssReadershipDay = {
+  date: string;           // YYYY-MM-DD in ET
+  polls: number;          // total poll count for the day
+  aggregatorSubs: number; // sum of MAX(subscribers) per aggregator that day
+  individuals: number;    // distinct individual-reader user-agent variants
+  estimatedReaders: number; // aggregatorSubs + individuals
+};
+
+// Daily breakdown of RSS polls, grouped in ET. Estimate of "readers" leans on
+// the user-agent pattern: aggregators (Feedly, Inoreader, etc.) advertise the
+// subscriber count they're polling on behalf of, so we take MAX(subscribers)
+// per (day, aggregator) to dedupe multiple polls. Everything else (no
+// reported count) is a one-human-each individual reader, counted by distinct
+// user-agent variants.
+export async function getRssReadership(
+  sport: string,
+  days: number,
+): Promise<RssReadershipDay[]> {
+  const sinceMs = Date.now() - days * 24 * 3600 * 1000;
+  const since = new Date(sinceMs).toISOString();
+  const rows = await fetchAll<{
+    polled_at: string;
+    user_agent: string | null;
+    aggregator: string | null;
+    subscribers: number | null;
+  }>(
+    () => supabaseAdmin()
+      .from("rss_polls")
+      .select("polled_at, user_agent, aggregator, subscribers")
+      .eq("sport", sport)
+      .gte("polled_at", since)
+      .order("polled_at", { ascending: true }) as unknown as QueryBuilder<{
+        polled_at: string;
+        user_agent: string | null;
+        aggregator: string | null;
+        subscribers: number | null;
+      }>,
+    "getRssReadership",
+  );
+
+  // Bucket by ET date.
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  type DayAccum = {
+    polls: number;
+    maxSubsByAggregator: Map<string, number>;
+    individualUAs: Set<string>;
+  };
+  const byDay = new Map<string, DayAccum>();
+  for (const r of rows) {
+    const date = fmt.format(new Date(r.polled_at));
+    const accum = byDay.get(date) ?? {
+      polls: 0,
+      maxSubsByAggregator: new Map<string, number>(),
+      individualUAs: new Set<string>(),
+    };
+    accum.polls++;
+    if (r.subscribers != null && r.aggregator) {
+      const prev = accum.maxSubsByAggregator.get(r.aggregator) ?? 0;
+      if (r.subscribers > prev) accum.maxSubsByAggregator.set(r.aggregator, r.subscribers);
+    } else if (r.user_agent) {
+      accum.individualUAs.add(r.user_agent);
+    }
+    byDay.set(date, accum);
+  }
+
+  const out: RssReadershipDay[] = [];
+  for (const [date, accum] of byDay) {
+    let aggregatorSubs = 0;
+    for (const n of accum.maxSubsByAggregator.values()) aggregatorSubs += n;
+    const individuals = accum.individualUAs.size;
+    out.push({
+      date,
+      polls: accum.polls,
+      aggregatorSubs,
+      individuals,
+      estimatedReaders: aggregatorSubs + individuals,
+    });
+  }
+  out.sort((a, b) => b.date.localeCompare(a.date));
+  return out;
+}
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}

@@ -13,6 +13,10 @@ import {
   getContentSnapshot,
   getDeliverabilityStats,
   getSendCoverage,
+  getStorageStats,
+  formatBytes,
+  getRssReadership,
+  type RssReadershipDay,
   type Window,
   type SendCoverageRow,
   type SubscriberSeries,
@@ -47,7 +51,7 @@ export default async function AdminDashboard({
   const w = parseWindow(windowParam);
   const date = yesterdayInET();
 
-  const [kpis, subSeries, sendSeries, watchwall, cronGrid, content, runs, deliverability, sendCoverage] = await Promise.all([
+  const [kpis, subSeries, sendSeries, watchwall, cronGrid, content, runs, deliverability, sendCoverage, storage, rssReadership] = await Promise.all([
     getKpis(w),
     getSubscriberSeries(w),
     getSendSeries(w),
@@ -57,6 +61,8 @@ export default async function AdminDashboard({
     recentCronRuns(20),
     getDeliverabilityStats(w),
     getSendCoverage(),
+    getStorageStats(),
+    getRssReadership("mlb", 30),
   ]);
 
   return (
@@ -109,6 +115,11 @@ export default async function AdminDashboard({
           label="Digests shipped"
           value={kpis.totalDigestsShipped.toLocaleString()}
           sub="all time"
+        />
+        <KpiCard
+          label="Storage used"
+          value={formatBytes(storage.totalBytes)}
+          sub={`${storage.totalFiles.toLocaleString()} files across ${storage.buckets.length} bucket${storage.buckets.length === 1 ? "" : "s"}`}
         />
         <KpiCard
           label="Active subscribers"
@@ -234,6 +245,18 @@ export default async function AdminDashboard({
       <section>
         <h2>Cron health by league · last {CRON_GRID_DAYS} days</h2>
         <CronGridBySportView grid={cronGrid} />
+      </section>
+
+      {/* RSS readership — feed-reader polls per day, estimated reader counts
+          by parsing aggregator subscriber counts out of the User-Agent. */}
+      <section>
+        <h2>RSS readership — last 30 days</h2>
+        <p className="admin-meta">
+          Aggregator subs come from MAX(subscribers) per aggregator per day
+          (Feedly &amp; co. advertise their count in the UA). Individuals are
+          distinct non-aggregator user agents — one human each.
+        </p>
+        <RssReadershipTable rows={rssReadership} />
       </section>
 
       {/* 5. Send health */}
@@ -438,6 +461,36 @@ function SubscriberDailyTable({ series, window: w }: { series: SubscriberSeries;
           <td style={{ textAlign: "right" }}><strong>−{totalAuto}</strong></td>
           <td style={{ textAlign: "right" }}><strong>{formatDelta(totalNew - totalReal - totalAuto)}</strong></td>
         </tr>
+      </tbody>
+    </table>
+  );
+}
+
+function RssReadershipTable({ rows }: { rows: RssReadershipDay[] }) {
+  if (rows.length === 0) {
+    return <p className="admin-meta">No RSS polls in window yet — likely the route hasn&apos;t been hit since the table came online, or the migration hasn&apos;t been applied.</p>;
+  }
+  return (
+    <table className="admin-cron-runs">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th style={{ textAlign: "right" }}>Polls</th>
+          <th style={{ textAlign: "right" }}>Aggregator subs</th>
+          <th style={{ textAlign: "right" }}>Individuals</th>
+          <th style={{ textAlign: "right" }}>Est. readers</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.date}>
+            <td><code>{r.date}</code></td>
+            <td style={{ textAlign: "right" }}>{r.polls.toLocaleString()}</td>
+            <td style={{ textAlign: "right" }}>{r.aggregatorSubs.toLocaleString()}</td>
+            <td style={{ textAlign: "right" }}>{r.individuals.toLocaleString()}</td>
+            <td style={{ textAlign: "right" }}><strong>{r.estimatedReaders.toLocaleString()}</strong></td>
+          </tr>
+        ))}
       </tbody>
     </table>
   );
