@@ -36,6 +36,7 @@ type DigestRow = {
   generated_at: string;
   game_count: number;
   html: string;
+  email_html: string | null;
 };
 
 function escapeXml(s: string): string {
@@ -60,7 +61,7 @@ function rfc822(isoEditionDate: string): string {
 export async function GET() {
   const { data, error } = await supabaseAdmin()
     .from("daily_digests")
-    .select("date, generated_at, game_count, html")
+    .select("date, generated_at, game_count, html, email_html")
     .eq("sport", SPORT)
     .in("mode", IN_SEASON_MODES)
     .order("date", { ascending: false })
@@ -80,13 +81,18 @@ export async function GET() {
     const editionDate = nextDay(r.date);
     const title = `${SPORT_LABEL} — ${prettyDate(editionDate)}`;
     const link = `${SITE_URL}/${SPORT}/${editionDate}`;
+    // Prefer email_html: it's table-based with inline styles and monospace
+    // fallbacks designed for email clients, which is the closest analog to
+    // how feed readers render (CSS-stripped, narrow viewport, table-friendly).
+    // Fall back to the web HTML if email wasn't generated for this row.
+    const body = r.email_html ?? r.html;
     return `
     <item>
       <title>${escapeXml(title)}</title>
       <link>${escapeXml(link)}</link>
       <guid isPermaLink="true">${escapeXml(link)}</guid>
       <pubDate>${rfc822(editionDate)}</pubDate>
-      <description><![CDATA[${r.html}]]></description>
+      <description><![CDATA[${body}]]></description>
     </item>`;
   }).join("");
 
