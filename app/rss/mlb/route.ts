@@ -6,6 +6,12 @@
 // writes `daily_digests`). `export const revalidate = 86400` lets Vercel cache
 // the response at the edge for 24 hours; the first request of the day rebuilds
 // the XML and everything after is a CDN hit.
+//
+// IMPORTANT: When a new sport goes public (NBA, WNBA, NFL, NHL, etc.), add
+// a parallel route at `app/rss/[sport]/route.ts` AND a new entry in
+// `app/layout.tsx`'s `alternates.types["application/rss+xml"]` array. The
+// footer "RSS" link in BRAND.footerLinks currently points at MLB; once a
+// second sport ships, consider a chooser page at `/rss` or per-sport links.
 
 import { supabaseAdmin } from "@/lib/supabase";
 import { nextDay, prettyDate } from "@/lib/dates";
