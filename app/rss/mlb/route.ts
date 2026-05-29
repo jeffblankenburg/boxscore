@@ -23,6 +23,11 @@ const SPORT_LABEL = "MLB";
 const FEED_LIMIT = 30;
 const FEED_URL = `${EMAIL_LINK_BASE}/rss/${SPORT}`;
 const SITE_URL = EMAIL_LINK_BASE;
+// Used for the channel-level <image> (the feed-list icon Feedly shows) and as
+// a per-item <media:thumbnail> placeholder. Once the per-section share-images
+// pipeline lands, item thumbnails should prefer that day's first share image.
+const LOGO_URL = `${EMAIL_LINK_BASE}/icon.png`;
+const LOGO_SIZE = 256;
 
 export const revalidate = 86400;
 
@@ -92,6 +97,7 @@ export async function GET() {
       <link>${escapeXml(link)}</link>
       <guid isPermaLink="true">${escapeXml(link)}</guid>
       <pubDate>${rfc822(editionDate)}</pubDate>
+      <media:thumbnail url="${escapeXml(LOGO_URL)}" width="${LOGO_SIZE}" height="${LOGO_SIZE}" />
       <description><![CDATA[${body}]]></description>
     </item>`;
   }).join("");
@@ -99,7 +105,9 @@ export async function GET() {
   const lastBuildDate = rows[0] ? rfc822(nextDay(rows[0].date)) : new Date().toUTCString();
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0"
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:media="http://search.yahoo.com/mrss/">
   <channel>
     <title>${escapeXml(`${BRAND.name} — ${SPORT_LABEL}`)}</title>
     <link>${escapeXml(`${SITE_URL}/${SPORT}`)}</link>
@@ -107,7 +115,12 @@ export async function GET() {
     <description>${escapeXml(`Daily ${SPORT_LABEL} box scores, standings, and leaders from ${BRAND.name}.`)}</description>
     <language>en-us</language>
     <lastBuildDate>${lastBuildDate}</lastBuildDate>
-    <ttl>1440</ttl>${items}
+    <ttl>1440</ttl>
+    <image>
+      <url>${escapeXml(LOGO_URL)}</url>
+      <title>${escapeXml(`${BRAND.name} — ${SPORT_LABEL}`)}</title>
+      <link>${escapeXml(`${SITE_URL}/${SPORT}`)}</link>
+    </image>${items}
   </channel>
 </rss>`;
 

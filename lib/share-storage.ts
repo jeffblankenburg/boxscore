@@ -48,7 +48,12 @@ export async function uploadShareImages(args: {
   prettyDate: string;
   images: RenderedImage[];
 }): Promise<StoredManifest> {
-  await clearShareImages();
+  // Historical accumulation: every date's images stay in the bucket so the
+  // RSS feed can embed them per-item. Each upload uses `upsert: true` so
+  // re-regenerating a date overwrites in place rather than appending. The
+  // manifest at _manifest.json still describes only the most recently
+  // generated date; per-date manifests aren't tracked because the
+  // YYYY-MM-DD_<file> prefix is enough to look up a date's set from storage.
   const supa = supabaseAdmin();
   const entries: ManifestImage[] = [];
   for (const { entry, png, mime } of args.images) {
