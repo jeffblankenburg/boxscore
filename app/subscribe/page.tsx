@@ -189,6 +189,9 @@ export default async function SubscribePage({
           Pick at least one newsletter or team to subscribe to.
         </p>
       )}
+      <p className="subscribe-fine">
+        Prefer a feed reader? Subscribe via RSS: <a href="/rss/mlb"><code>boxscore.email/rss/mlb</code></a>
+      </p>
     </section>
   );
 }

@@ -19,6 +19,16 @@ export const metadata = {
     icon: "/background_icon.png",
     apple: "/background_icon.png",
   },
+  // Auto-discovery for feed readers. Feedly / Inoreader / NetNewsWire pick this
+  // up when a user pastes any boxscore.email URL — they read the <head>, find
+  // the application/rss+xml alternate, and offer to subscribe.
+  alternates: {
+    types: {
+      "application/rss+xml": [
+        { title: "boxscore — MLB", url: "/rss/mlb" },
+      ],
+    },
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
