@@ -409,6 +409,8 @@ export type SendSearchRow = {
   subject: string;
   status: SendStatus;
   sentAt: string;
+  opened: boolean;
+  clicked: boolean;
 };
 
 export async function searchSends(query: string): Promise<SendSearchRow[]> {
@@ -487,6 +489,8 @@ export async function searchSends(query: string): Promise<SendSearchRow[]> {
       subject: `${s.digest_sport.toUpperCase()} - ${prettyDate(s.digest_date)}`,
       status,
       sentAt: s.sent_at,
+      opened: evts.has("email.opened"),
+      clicked: evts.has("email.clicked"),
     };
   });
 }

@@ -76,6 +76,7 @@ export function EmailSearch() {
             <tr>
               <th>To</th>
               <th>Status</th>
+              <th>Engagement</th>
               <th>Subject</th>
               <th>Sent</th>
             </tr>
@@ -85,6 +86,7 @@ export function EmailSearch() {
               <tr key={r.id}>
                 <td className="email-search-to"><code>{r.to}</code></td>
                 <td><StatusPill status={r.status} /></td>
+                <td><Engagement opened={r.opened} clicked={r.clicked} /></td>
                 <td>{r.subject}</td>
                 <td className="admin-meta">{relativeTime(r.sentAt)}</td>
               </tr>
@@ -108,6 +110,23 @@ const STATUS_LABEL: Record<SendStatus, string> = {
 function StatusPill({ status }: { status: SendStatus }) {
   return (
     <span className={`send-status send-status-${status}`}>{STATUS_LABEL[status]}</span>
+  );
+}
+
+// Opens are noisy (Apple MPP prefetches the pixel for most iOS/Mac users);
+// clicks are real intent. Render each as its own pill so a click without a
+// recorded open — possible if the client blocked the pixel but followed a
+// link — still shows. An em-dash placeholder keeps the column from looking
+// empty when nothing's fired yet.
+function Engagement({ opened, clicked }: { opened: boolean; clicked: boolean }) {
+  if (!opened && !clicked) {
+    return <span className="admin-meta">—</span>;
+  }
+  return (
+    <span className="send-engagement">
+      {opened && <span className="send-engagement-pill send-engagement-opened">Opened</span>}
+      {clicked && <span className="send-engagement-pill send-engagement-clicked">Clicked</span>}
+    </span>
   );
 }
 

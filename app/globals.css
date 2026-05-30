@@ -703,6 +703,18 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .send-status-pending    { background: #f3efe5; color: var(--text-muted); }
 .send-status-failed     { background: #ffe6e6; color: #a40000; }
 
+/* Engagement pills — opens (noisy due to Apple MPP) and clicks (real intent)
+   for each send. Smaller and less saturated than the status pill so the
+   delivery status stays the primary signal. */
+.send-engagement { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.send-engagement-pill {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+  font-family: ui-monospace, monospace;
+}
+.send-engagement-opened  { background: #eef3fb; color: #2a4d80; }
+.send-engagement-clicked { background: #e9f4ec; color: #1f5a1f; }
+
 /* Basketball digest — NBA + WNBA share the same renderer (lib/render-basketball.ts)
    and the same classes. Mirrored in BASKETBALL_EMAIL_STYLES for the email
    variant; keep these two stylesheets in sync. Design tokens match MLB's
@@ -1602,4 +1614,239 @@ body:has(.paper-mode) .paper-toggle {
   }
   .site-header .subscribe { padding: 4px 10px; font-size: 12px; }
   .site-header .support { padding: 3px 9px; font-size: 12px; }
+}
+
+/* ─── Ads (admin exploration) ────────────────────────────────────────── */
+/* Four formats designed to live INSIDE the default web digest — white
+   background, Source Sans 3 explicitly set (because /admin chrome wraps
+   the catalog in Georgia, so inheritance alone won't give us the digest
+   font), hairline rules using var(--border-strong) to match standings
+   and leaders tables. */
+.ad {
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  color: var(--text-primary);
+}
+/* Force the digest font on both the catalog swatches and the inline
+   preview so the .admin Georgia override doesn't bleed through. */
+.ad-catalog-sample-render,
+.ad-preview-frame .newspaper {
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+/* Format 1: Sponsor line — one italic line, em-dash framed. Echoes the
+   digest's italic dateline. Hairlines top + bottom. */
+.ad-sponsor-line {
+  text-align: center;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  margin: 16px 0 20px;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+.ad-sponsor-line b { font-style: normal; font-weight: 700; }
+
+/* Format 2: Classifieds — stacked text blocks under a centered bold
+   header. Two columns at desktop, one at narrow widths. Top/bottom
+   hairlines only. Header mirrors .boxscores-title styling. */
+.ad-classifieds-block {
+  margin: 24px 0;
+  padding: 12px 0 8px;
+}
+.ad-classifieds-header {
+  font-weight: 700;
+  font-size: 22px;
+  text-align: center;
+  margin: 0 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--border-strong);
+}
+.ad-classifieds-body {
+  column-count: 2;
+  column-gap: 32px;
+  column-rule: 1px solid var(--border-strong);
+}
+@media (max-width: 600px) {
+  .ad-classifieds-body { column-count: 1; }
+}
+.ad-classified {
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 6px 0 10px;
+  margin: 0;
+  break-inside: avoid;
+}
+.ad-classified-lead {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Format 3: Standings strip — thin horizontal band. Eyebrow left,
+   body fills the rest. Single hairline top + bottom. */
+.ad-standings-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 8px 4px;
+  margin: 18px 0;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.ad-strip-eyebrow {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-style: italic;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  align-self: center;
+}
+.ad-strip-body { flex: 1; }
+.ad-strip-body b { letter-spacing: 0.02em; }
+
+/* Format 4: Display box — bordered card. Single hairline border, centered
+   eyebrow + bold headline, hairline rule, left-aligned body, small uppercase
+   foot. Lives centered in-flow. */
+.ad-display-box {
+  display: block;
+  max-width: 340px;
+  margin: 24px auto;
+  padding: 16px 22px 14px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  text-align: center;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+/* Inside the multi-column boxscores grid, the display box fills its
+   column like a game tile rather than centering at its max-width. */
+.boxscores-container .ad-display-box {
+  max-width: none;
+  margin: 0 0 18px;
+}
+.ad-display-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.ad-display-headline {
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+  margin: 0 0 8px;
+}
+.ad-display-rule {
+  width: 56px;
+  height: 0;
+  border-top: 1px solid var(--border-strong);
+  margin: 6px auto 12px;
+}
+.ad-display-body {
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: left;
+  margin-bottom: 12px;
+}
+.ad-display-foot {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-strong);
+  padding-top: 7px;
+}
+
+/* ─── /admin/ads page chrome ────────────────────────────────────────── */
+/* Catalog tiles render each ad sample on a white swatch matching the
+   actual digest background so the preview is true. */
+.ad-catalog { display: flex; flex-direction: column; gap: 28px; }
+.ad-catalog-format {
+  border-top: 1px solid #ddd;
+  padding-top: 14px;
+}
+.ad-catalog-format-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.ad-catalog-format-head h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+.ad-catalog-format-one-liner {
+  font-style: italic;
+  color: #555;
+  font-size: 13px;
+}
+.ad-catalog-format-pitch {
+  margin: 6px 0 14px;
+  color: #444;
+  font-size: 13px;
+  max-width: 720px;
+}
+.ad-catalog-samples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.ad-catalog-sample {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ad-catalog-sample-render {
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 2px;
+  padding: 20px 22px;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Catalog tiles strip the outer block-level margins so each format sits
+   neatly centered inside its swatch regardless of the in-flow defaults. */
+.ad-catalog-sample-render .ad-display-box { margin: 0; }
+.ad-catalog-sample-render .ad-sponsor-line { margin: 0; width: 100%; }
+.ad-catalog-sample-render .ad-standings-strip { margin: 0; width: 100%; }
+.ad-catalog-sample-render .ad-classified { margin: 0; width: 100%; }
+.ad-catalog-sample-caption {
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+/* Inline preview frame — wraps the real renderer output (default web view)
+   so it sits in a bordered area on the admin page without inheriting the
+   admin's narrow column width. */
+.ad-preview-frame {
+  border: 1px solid #ddd;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #fff;
+  padding: 0;
+}
+.ad-preview-frame .newspaper {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 32px;
+  background: #fff;
+  box-shadow: none;
+}
+@media (max-width: 720px) {
+  .ad-preview-frame .newspaper { padding: 18px 16px; }
 }
