@@ -1616,6 +1616,80 @@ body:has(.paper-mode) .paper-toggle {
   .site-header .support { padding: 3px 9px; font-size: 12px; }
 }
 
+/* ─── Ad stats cards (top of /admin/ads) ─────────────────────────────── */
+.ad-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin: 12px 0;
+}
+.ad-stats-card {
+  border: 1px solid var(--border-light);
+  background: #fff;
+  border-radius: 4px;
+  padding: 16px 18px;
+}
+.ad-stats-card-eyebrow {
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 700;
+}
+.ad-stats-card-headline {
+  font-family: Georgia, serif; font-size: 20px; font-weight: 700;
+  margin: 2px 0 14px;
+}
+.ad-stats-card-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px;
+  margin: 0;
+}
+.ad-stats-stat dt {
+  font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 600;
+}
+.ad-stats-stat dd {
+  margin: 2px 0 0; font-family: ui-monospace, monospace; font-size: 18px;
+  font-weight: 700;
+}
+.ad-stats-breakdown { margin-top: 14px; }
+.ad-stats-breakdown summary {
+  cursor: pointer; font-size: 13px; color: var(--text-muted);
+  padding: 4px 0;
+}
+.ad-stats-breakdown summary:hover { color: var(--text-primary); }
+.ad-stats-breakdown-table {
+  width: 100%; border-collapse: collapse; margin-top: 8px;
+  font-size: 13px;
+}
+.ad-stats-breakdown-table th,
+.ad-stats-breakdown-table td {
+  padding: 6px 8px; border-bottom: 1px solid var(--border-light);
+}
+.ad-stats-breakdown-table th {
+  font-weight: 700; font-family: Georgia, serif; background: rgba(0,0,0,0.02);
+}
+.ad-stats-chart {
+  margin: 16px 0 8px;
+  border: 1px solid var(--border-light); background: #fff;
+  border-radius: 4px; padding: 12px 14px;
+}
+.ad-stats-chart svg { width: 100%; height: auto; display: block; }
+.ad-stats-chart-empty { margin: 16px 0; }
+.ad-stats-chart-legend {
+  display: flex; gap: 16px; align-items: center;
+  font-size: 12px; color: var(--text-muted); margin-bottom: 6px;
+}
+.ad-stats-chart-swatch {
+  display: inline-block; width: 18px; height: 3px;
+  margin-right: 6px; vertical-align: middle;
+}
+.ad-stats-chart-swatch-opens { background: #2a4d80; }
+.ad-stats-chart-swatch-clicks { background: #1f5a1f; }
+.ad-stats-chart-opens {
+  fill: none; stroke: #2a4d80; stroke-width: 2;
+}
+.ad-stats-chart-clicks {
+  fill: none; stroke: #1f5a1f; stroke-width: 2;
+}
+
 /* ─── Ads (admin exploration) ────────────────────────────────────────── */
 /* Four formats designed to live INSIDE the default web digest — white
    background, Source Sans 3 explicitly set (because /admin chrome wraps

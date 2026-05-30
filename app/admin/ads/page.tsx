@@ -3,6 +3,15 @@ import { AdminNav } from "../AdminNav";
 import { loadDailyData } from "@/lib/daily";
 import { renderContent } from "@/lib/render";
 import { MLB_PREVIEW_FIXTURES } from "@/lib/mlb-preview-fixtures";
+import { prettyDate } from "@/lib/dates";
+import {
+  getYesterdayAdStats,
+  getRollingAdStats,
+  type AdStatsBucket,
+  type AdStatsDailyPoint,
+  type RollingAdStats,
+  type YesterdayAdStats,
+} from "@/lib/dashboard";
 import {
   ALL_AD_SAMPLES,
   CLASSIFIEDS,
@@ -33,7 +42,11 @@ export default async function AdsPage() {
   // the default web view (not paper-mode) — same renderer call subscribers
   // hit at /mlb/[date].
   const gamesDate = MLB_PREVIEW_FIXTURES.regular;
-  const data = await loadDailyData(gamesDate);
+  const [data, yesterday, rolling] = await Promise.all([
+    loadDailyData(gamesDate),
+    getYesterdayAdStats(),
+    getRollingAdStats(30),
+  ]);
   const baseHtml = renderContent(data);
   const adInjectedHtml = spliceAdsInto(baseHtml);
 
@@ -48,6 +61,21 @@ export default async function AdsPage() {
         → most visually invasive. The preview at the bottom runs the <em>real</em>
         MLB renderer with ads spliced into the actual section anchors.
       </p>
+
+      <section>
+        <h2>Audience &amp; engagement</h2>
+        <p className="admin-meta">
+          What an advertiser would see in a pitch sheet. Sends + opens + clicks
+          are real production numbers from this site&apos;s digests. Open rate
+          is opens per delivered (Apple Mail Privacy Protection inflates this);
+          click rate is opens-or-not, the more honest engagement signal.
+        </p>
+        <div className="ad-stats-grid">
+          <YesterdayCard stats={yesterday} />
+          <RollingCard stats={rolling} />
+        </div>
+        <OpensClicksChart daily={rolling.daily} tracked={rolling.tracked} />
+      </section>
 
       <section>
         <h2>Catalog</h2>
@@ -204,4 +232,161 @@ function spliceAdsInto(html: string): string {
   );
 
   return out;
+}
+
+// ─── Stats cards + chart ─────────────────────────────────────────────────
+
+function YesterdayCard({ stats }: { stats: YesterdayAdStats }) {
+  const empty = stats.sends === 0;
+  return (
+    <div className="ad-stats-card">
+      <div className="ad-stats-card-eyebrow">Yesterday</div>
+      <div className="ad-stats-card-headline">{prettyDate(stats.date)}</div>
+      {empty ? (
+        <p className="admin-meta">No sends recorded.</p>
+      ) : (
+        <>
+          <dl className="ad-stats-card-grid">
+            <Stat label="Sends" value={stats.sends.toLocaleString()} />
+            <Stat label="Delivered" value={stats.delivered.toLocaleString()} />
+            <Stat label="Open rate" value={pct(stats.openRate, stats.tracked)} />
+            <Stat label="Click rate" value={pct(stats.clickRate, stats.tracked)} />
+          </dl>
+          {stats.breakdown.length > 1 && (
+            <details className="ad-stats-breakdown">
+              <summary>Break down by digest type</summary>
+              <table className="ad-stats-breakdown-table">
+                <thead>
+                  <tr>
+                    <th>Digest</th>
+                    <th style={{ textAlign: "right" }}>Sends</th>
+                    <th style={{ textAlign: "right" }}>Delivered</th>
+                    <th style={{ textAlign: "right" }}>Open rate</th>
+                    <th style={{ textAlign: "right" }}>Click rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.breakdown.map((b) => (
+                    <BreakdownRow key={`${b.sport}-${b.scope}`} bucket={b} tracked={stats.tracked} />
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function BreakdownRow({ bucket, tracked }: { bucket: AdStatsBucket; tracked: boolean }) {
+  const openRate = bucket.delivered === 0 ? 0 : bucket.opened / bucket.delivered;
+  const clickRate = bucket.delivered === 0 ? 0 : bucket.clicked / bucket.delivered;
+  const label = bucket.scope === "league"
+    ? `${bucket.sport.toUpperCase()} — league digest`
+    : `${bucket.sport.toUpperCase()} — team digests`;
+  return (
+    <tr>
+      <td>{label}</td>
+      <td style={{ textAlign: "right" }}>{bucket.sends.toLocaleString()}</td>
+      <td style={{ textAlign: "right" }}>{bucket.delivered.toLocaleString()}</td>
+      <td style={{ textAlign: "right" }}>{pct(openRate, tracked)}</td>
+      <td style={{ textAlign: "right" }}>{pct(clickRate, tracked)}</td>
+    </tr>
+  );
+}
+
+function RollingCard({ stats }: { stats: RollingAdStats }) {
+  const sendDays = stats.daily.filter((d) => d.opened > 0 || d.clicked > 0).length;
+  const avgDailyImpressions = sendDays === 0
+    ? 0
+    : Math.round(stats.delivered / Math.max(1, sendDays));
+  return (
+    <div className="ad-stats-card">
+      <div className="ad-stats-card-eyebrow">Rolling {stats.days} days</div>
+      <div className="ad-stats-card-headline">
+        {stats.activeSubscribers.toLocaleString()} active subscribers
+      </div>
+      <dl className="ad-stats-card-grid">
+        <Stat label="Avg daily impressions" value={avgDailyImpressions.toLocaleString()} />
+        <Stat label="Delivery rate" value={pct(stats.deliveryRate, true)} />
+        <Stat label="Open rate" value={pct(stats.openRate, stats.tracked)} />
+        <Stat label="Click rate" value={pct(stats.clickRate, stats.tracked)} />
+      </dl>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="ad-stats-stat">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function pct(n: number, tracked: boolean): string {
+  if (!tracked) return "—";
+  return `${(n * 100).toFixed(1)}%`;
+}
+
+// Two-line SVG chart: opens (blue) and clicks (green) per day for the rolling
+// window. No axis labels except the endpoints — this is a trend-shape card,
+// not a precision dashboard. The numeric totals are already in the cards
+// above; the chart's job is to show whether engagement is steady, growing,
+// or collapsing.
+function OpensClicksChart({
+  daily, tracked,
+}: { daily: AdStatsDailyPoint[]; tracked: boolean }) {
+  if (!tracked) {
+    return (
+      <p className="admin-meta ad-stats-chart-empty">
+        Open tracking hasn&apos;t recorded any events yet — chart will appear
+        once Resend starts injecting the pixel.
+      </p>
+    );
+  }
+  const opens = daily.map((d) => d.opened);
+  const clicks = daily.map((d) => d.clicked);
+  const max = Math.max(1, ...opens, ...clicks);
+  const W = 900, H = 200;
+  const padL = 32, padR = 12, padT = 12, padB = 24;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const xAt = (i: number) =>
+    daily.length === 1 ? padL + innerW / 2 : padL + (i / (daily.length - 1)) * innerW;
+  const yAt = (v: number) => padT + innerH - (v / max) * innerH;
+  const path = (vals: number[]) =>
+    vals.map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(" ");
+
+  const firstDate = daily[0]?.date ?? "";
+  const lastDate = daily[daily.length - 1]?.date ?? "";
+
+  return (
+    <div className="ad-stats-chart">
+      <div className="ad-stats-chart-legend">
+        <span className="ad-stats-chart-swatch ad-stats-chart-swatch-opens" /> Opens
+        <span className="ad-stats-chart-swatch ad-stats-chart-swatch-clicks" /> Clicks
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Daily opens and clicks over ${daily.length} days`}>
+        {[0, 0.5, 1].map((t, i) => {
+          const y = padT + innerH * t;
+          const v = max * (1 - t);
+          return (
+            <g key={i}>
+              <line x1={padL} x2={W - padR} y1={y} y2={y} className="admin-chart-grid" />
+              <text x={padL - 6} y={y + 4} textAnchor="end" className="admin-chart-axis">
+                {Math.round(v).toLocaleString()}
+              </text>
+            </g>
+          );
+        })}
+        <path d={path(opens)} className="ad-stats-chart-opens" />
+        <path d={path(clicks)} className="ad-stats-chart-clicks" />
+        <text x={padL} y={H - 6} textAnchor="start" className="admin-chart-axis">{firstDate.slice(5)}</text>
+        <text x={W - padR} y={H - 6} textAnchor="end" className="admin-chart-axis">{lastDate.slice(5)}</text>
+      </svg>
+    </div>
+  );
 }

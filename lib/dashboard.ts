@@ -1062,6 +1062,228 @@ export async function getRssReadership(
   return out;
 }
 
+// ---- Advertiser stats (for /admin/ads) ---------------------------------
+//
+// Two helpers feeding the prospective-advertiser pitch panel: yesterday's
+// numbers and a 30-day rolling view with a daily opens/clicks series. The
+// `tracked` flag mirrors getKpis().openRate.tracked — false when no open
+// event has ever landed, so the UI can render "—" instead of a misleading
+// "0.0%" before Resend's open-tracking pixel is verified.
+//
+// Yesterday is sliced by (sport, scope) where scope is "league" (sends.
+// team_id is null) or "team" (team_id is set). The page collapses team
+// rows into a single "Team digests" line for now — drilldown per team is
+// a future need; aggregating early would hide the fact that we still
+// have the raw row.
+
+export type AdStatsBucket = {
+  sport: string;
+  scope: "league" | "team";
+  sends: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+};
+
+export type YesterdayAdStats = {
+  date: string;
+  sends: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  openRate: number;
+  clickRate: number;
+  breakdown: AdStatsBucket[];
+  tracked: boolean;
+};
+
+export type AdStatsDailyPoint = { date: string; opened: number; clicked: number };
+
+export type RollingAdStats = {
+  days: number;
+  activeSubscribers: number;
+  sends: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  openRate: number;
+  clickRate: number;
+  deliveryRate: number;
+  daily: AdStatsDailyPoint[];
+  tracked: boolean;
+};
+
+// Map a set of resend_ids to per-id sets of event types. Returns events from
+// the bounded date range only — caller passes a wide enough range that late
+// opens still land.
+async function eventsByResendId(
+  resendIds: string[],
+  sinceIso: string,
+): Promise<Record<string, Set<string>>> {
+  if (resendIds.length === 0) return {};
+  const db = supabaseAdmin();
+  // .in() with a 32k limit is well under any realistic single-day or 30-day
+  // resend_id count for this list size. If we ever exceed it, switch to a
+  // date-only filter and discard non-matching ids in JS.
+  type Ev = { resend_id: string; event_type: string };
+  const events = await fetchAll<Ev>(
+    () => db.from("email_events")
+      .select("resend_id, event_type")
+      .gte("event_at", sinceIso)
+      .in("resend_id", resendIds) as unknown as QueryBuilder<Ev>,
+    "eventsByResendId",
+  );
+  const byId: Record<string, Set<string>> = {};
+  for (const e of events) (byId[e.resend_id] ??= new Set()).add(e.event_type);
+  return byId;
+}
+
+export async function getYesterdayAdStats(): Promise<YesterdayAdStats> {
+  const db = supabaseAdmin();
+  const date = yesterdayInET();
+
+  type SendRow = {
+    resend_id: string | null;
+    error: string | null;
+    digest_sport: string;
+    team_id: string | null;
+  };
+  const sends = await fetchAll<SendRow>(
+    () => db.from("sends")
+      .select("resend_id, error, digest_sport, team_id")
+      .eq("digest_date", date) as unknown as QueryBuilder<SendRow>,
+    "getYesterdayAdStats sends",
+  );
+
+  const liveIds = sends.filter((s) => !s.error && s.resend_id).map((s) => s.resend_id!);
+  // Window the events query to the last 7 days — late opens (MPP prefetch
+  // staggered, recipients who let mail sit) land well within that.
+  const sinceIso = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const byId = await eventsByResendId(liveIds, sinceIso);
+
+  // Aggregate per (sport, scope). Map key is `${sport}::${scope}`.
+  const buckets = new Map<string, AdStatsBucket>();
+  let totalDelivered = 0, totalOpened = 0, totalClicked = 0;
+  for (const s of sends) {
+    const scope: "league" | "team" = s.team_id ? "team" : "league";
+    const key = `${s.digest_sport}::${scope}`;
+    const b = buckets.get(key) ?? {
+      sport: s.digest_sport, scope, sends: 0, delivered: 0, opened: 0, clicked: 0,
+    };
+    b.sends++;
+    const evts = s.resend_id ? byId[s.resend_id] : undefined;
+    if (evts?.has("email.delivered")) { b.delivered++; totalDelivered++; }
+    if (evts?.has("email.opened")) { b.opened++; totalOpened++; }
+    if (evts?.has("email.clicked")) { b.clicked++; totalClicked++; }
+    buckets.set(key, b);
+  }
+
+  // Has open tracking ever fired at all? One global probe — if zero, we
+  // render "—" instead of "0%".
+  const { count: openEverCount } = await db
+    .from("email_events")
+    .select("id", { count: "exact", head: true })
+    .eq("event_type", "email.opened");
+
+  const breakdown = [...buckets.values()].sort((a, b) => {
+    if (a.sport !== b.sport) return a.sport.localeCompare(b.sport);
+    return a.scope.localeCompare(b.scope);
+  });
+
+  return {
+    date,
+    sends: sends.length,
+    delivered: totalDelivered,
+    opened: totalOpened,
+    clicked: totalClicked,
+    openRate: totalDelivered === 0 ? 0 : totalOpened / totalDelivered,
+    clickRate: totalDelivered === 0 ? 0 : totalClicked / totalDelivered,
+    breakdown,
+    tracked: (openEverCount ?? 0) > 0,
+  };
+}
+
+export async function getRollingAdStats(days: number): Promise<RollingAdStats> {
+  const db = supabaseAdmin();
+  const now = new Date();
+  const windowStartMs = now.getTime() - days * 86400_000;
+  const sinceIso = new Date(windowStartMs).toISOString();
+
+  // Build the chronological date axis up front so days with zero activity
+  // still appear in the chart (visible gaps matter).
+  const axis: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 86400_000);
+    // ET-based date label to match digest_date semantics elsewhere.
+    axis.push(new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(d));
+  }
+  const dailyMap = new Map<string, AdStatsDailyPoint>(
+    axis.map((date) => [date, { date, opened: 0, clicked: 0 }]),
+  );
+
+  type SendRow = {
+    resend_id: string | null;
+    error: string | null;
+    digest_date: string;
+  };
+  const sends = await fetchAll<SendRow>(
+    () => db.from("sends")
+      .select("resend_id, error, digest_date")
+      .gte("sent_at", sinceIso) as unknown as QueryBuilder<SendRow>,
+    "getRollingAdStats sends",
+  );
+
+  const dateByResendId = new Map<string, string>();
+  const liveIds: string[] = [];
+  let totalSends = 0;
+  for (const s of sends) {
+    totalSends++;
+    if (s.error || !s.resend_id) continue;
+    liveIds.push(s.resend_id);
+    dateByResendId.set(s.resend_id, s.digest_date);
+  }
+
+  const byId = await eventsByResendId(liveIds, sinceIso);
+  let totalDelivered = 0, totalOpened = 0, totalClicked = 0;
+  for (const id of liveIds) {
+    const evts = byId[id];
+    if (!evts) continue;
+    if (evts.has("email.delivered")) totalDelivered++;
+    const day = dateByResendId.get(id);
+    if (!day) continue;
+    const point = dailyMap.get(day);
+    if (!point) continue; // event outside the axis window
+    if (evts.has("email.opened")) { point.opened++; totalOpened++; }
+    if (evts.has("email.clicked")) { point.clicked++; totalClicked++; }
+  }
+
+  const { count: activeSubscribers } = await db
+    .from("subscribers")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "active");
+
+  const { count: openEverCount } = await db
+    .from("email_events")
+    .select("id", { count: "exact", head: true })
+    .eq("event_type", "email.opened");
+
+  return {
+    days,
+    activeSubscribers: activeSubscribers ?? 0,
+    sends: totalSends,
+    delivered: totalDelivered,
+    opened: totalOpened,
+    clicked: totalClicked,
+    openRate: totalDelivered === 0 ? 0 : totalOpened / totalDelivered,
+    clickRate: totalDelivered === 0 ? 0 : totalClicked / totalDelivered,
+    deliveryRate: totalSends === 0 ? 0 : totalDelivered / totalSends,
+    daily: axis.map((d) => dailyMap.get(d)!),
+    tracked: (openEverCount ?? 0) > 0,
+  };
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
