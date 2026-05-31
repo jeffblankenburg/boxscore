@@ -1116,25 +1116,33 @@ export type RollingAdStats = {
 // Map a set of resend_ids to per-id sets of event types. Returns events from
 // the bounded date range only — caller passes a wide enough range that late
 // opens still land.
+//
+// Implementation: we DO NOT pass the resend_id set through `.in()`. With
+// thousands of ids the URL exceeds PostgREST's length limit and the request
+// silently 414s. Instead we date-bound the query (cheap, index-friendly via
+// email_events_type_event_at_desc) and intersect against the caller's id set
+// in JS. The event_type filter keeps the row count down to opens + clicks +
+// deliveries — the only types either caller looks at.
 async function eventsByResendId(
   resendIds: string[],
   sinceIso: string,
 ): Promise<Record<string, Set<string>>> {
   if (resendIds.length === 0) return {};
   const db = supabaseAdmin();
-  // .in() with a 32k limit is well under any realistic single-day or 30-day
-  // resend_id count for this list size. If we ever exceed it, switch to a
-  // date-only filter and discard non-matching ids in JS.
   type Ev = { resend_id: string; event_type: string };
   const events = await fetchAll<Ev>(
     () => db.from("email_events")
       .select("resend_id, event_type")
       .gte("event_at", sinceIso)
-      .in("resend_id", resendIds) as unknown as QueryBuilder<Ev>,
+      .in("event_type", ["email.delivered", "email.opened", "email.clicked"]) as unknown as QueryBuilder<Ev>,
     "eventsByResendId",
   );
+  const idSet = new Set(resendIds);
   const byId: Record<string, Set<string>> = {};
-  for (const e of events) (byId[e.resend_id] ??= new Set()).add(e.event_type);
+  for (const e of events) {
+    if (!idSet.has(e.resend_id)) continue;
+    (byId[e.resend_id] ??= new Set()).add(e.event_type);
+  }
   return byId;
 }
 
