@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/send-team-email?sport=mlb",
       "schedule": "45 9 * * *"
+    },
+    {
+      "path": "/api/cron/supervise",
+      "schedule": "0 10 * * *"
     }
   ],
   "functions": {
