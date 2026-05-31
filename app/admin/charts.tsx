@@ -332,6 +332,22 @@ const WALL_STATUS_LABEL: Record<string, string> = {
   na: "",
 };
 
+// The legend doubles as a glossary for the two failure modes the dashboard
+// needs to distinguish: a route that ran and errored ("failed") vs a route
+// the platform never invoked at all ("missed"). They look visually similar
+// at a glance — different colors, different glyphs — but readers who don't
+// know the convention can't tell from the cell alone what each one means.
+function WatchwallLegend() {
+  return (
+    <div className="watchwall-legend">
+      <span className="watchwall-legend-item"><span className="watchwall-legend-swatch watchwall-pass">✓</span> passed</span>
+      <span className="watchwall-legend-item"><span className="watchwall-legend-swatch watchwall-fail">✗</span> failed (ran, errored)</span>
+      <span className="watchwall-legend-item"><span className="watchwall-legend-swatch watchwall-running">…</span> running</span>
+      <span className="watchwall-legend-item"><span className="watchwall-legend-swatch watchwall-missing">—</span> missed (scheduled, never ran)</span>
+    </div>
+  );
+}
+
 export function Watchwall({ rows }: { rows: WatchwallRow[] }) {
   if (rows.length === 0) {
     return <p className="admin-meta">No sports configured.</p>;
@@ -340,6 +356,7 @@ export function Watchwall({ rows }: { rows: WatchwallRow[] }) {
   // sports expect different subsets. Sports that don't expect a route get a
   // blank "n/a" cell so the eye doesn't read it as a failure.
   return (
+    <>
     <table className="watchwall">
       <thead>
         <tr>
@@ -365,7 +382,13 @@ export function Watchwall({ rows }: { rows: WatchwallRow[] }) {
                 const time = cell.startedAt
                   ? new Date(cell.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
                   : "not run";
-                const title = cell.error ?? `${cell.status} · ${time}`;
+                // "missing" semantically means "scheduled but the function was
+                // never invoked" — Vercel cron miss, not a route error. Spell
+                // that out in the tooltip so the operator doesn't read it as
+                // "the system forgot to expect this route."
+                const tooltipStatus = cell.status === "missing"
+                  ? "missed (scheduled, never ran)" : cell.status;
+                const title = cell.error ?? `${tooltipStatus} · ${time}`;
                 return (
                   <td
                     key={route}
@@ -382,6 +405,8 @@ export function Watchwall({ rows }: { rows: WatchwallRow[] }) {
         })}
       </tbody>
     </table>
+    <WatchwallLegend />
+    </>
   );
 }
 

@@ -42,9 +42,17 @@ function authorize(req: Request): boolean {
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
+// Why was this route on the heal list? Surface this in the alert email so a
+// 6am admin can tell at a glance whether Vercel dropped the invocation
+// ("never_ran") or the route ran and errored ("previously_failed"). The two
+// look identical from the dashboard's red-cell-vs-grey-cell distinction;
+// the email needs to spell it out.
+type MissCategory = "never_ran" | "previously_failed";
+
 type HealResult = {
   sport: string;
   route: string;
+  category: MissCategory;
   ok: boolean;
   error?: string;
   skipped?: string;
@@ -74,19 +82,37 @@ export async function GET(req: Request) {
     // Failed runs are intentionally NOT in this set — the supervisor's job is
     // to retry them. A run is identified per-route-per-sport for today's date.
     const handled = new Set<string>();
+    const failedKeys = new Set<string>();
     for (const r of (data ?? []) as Row[]) {
-      if (r.sport && (r.status === "ok" || r.status === "running")) {
-        handled.add(`${r.sport}::${r.route}`);
+      if (!r.sport) continue;
+      const key = `${r.sport}::${r.route}`;
+      if (r.status === "ok" || r.status === "running") {
+        handled.add(key);
+      } else if (r.status === "failed") {
+        failedKeys.add(key);
       }
     }
 
-    const missing = SUPERVISED.filter((s) => !handled.has(`${s.sport}::${s.route}`));
+    const missing: Array<Supervised & { category: MissCategory }> = SUPERVISED
+      .filter((s) => !handled.has(`${s.sport}::${s.route}`))
+      .map((s) => ({
+        ...s,
+        category: failedKeys.has(`${s.sport}::${s.route}`)
+          ? "previously_failed"
+          : "never_ran",
+      }));
 
     if (missing.length === 0) {
-      const result = { date, missing: 0, healed: 0, still_missing: 0 };
+      const result = {
+        date, missing: 0, healed: 0, still_missing: 0,
+        original: { never_ran: 0, previously_failed: 0 },
+      };
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });
     }
+
+    const originalNeverRan = missing.filter((m) => m.category === "never_ran").length;
+    const originalFailed = missing.filter((m) => m.category === "previously_failed").length;
 
     const origin = await siteOrigin();
     const headers: HeadersInit = {};
@@ -100,11 +126,11 @@ export async function GET(req: Request) {
     // fail again. The downstream rows stay "still missing" so the alert email
     // surfaces both the upstream failure and the cascade.
     const healed: HealResult[] = [];
-    for (const { sport, route } of missing) {
+    for (const { sport, route, category } of missing) {
       const upstreamFailed = (route === "send-email" || route === "send-team-email")
         && healed.some((h) => h.sport === sport && h.route === "generate" && !h.ok);
       if (upstreamFailed) {
-        healed.push({ sport, route, ok: false, skipped: "generate failed during heal" });
+        healed.push({ sport, route, category, ok: false, skipped: "generate failed during heal" });
         continue;
       }
 
@@ -114,12 +140,12 @@ export async function GET(req: Request) {
         const res = await fetch(`${origin}/api/cron/${route}?${params}`, { headers });
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         if (!res.ok || body.error) {
-          healed.push({ sport, route, ok: false, error: body.error ?? `HTTP ${res.status}` });
+          healed.push({ sport, route, category, ok: false, error: body.error ?? `HTTP ${res.status}` });
         } else {
-          healed.push({ sport, route, ok: true });
+          healed.push({ sport, route, category, ok: true });
         }
       } catch (e) {
-        healed.push({ sport, route, ok: false, error: (e as Error).message });
+        healed.push({ sport, route, category, ok: false, error: (e as Error).message });
       }
     }
 
@@ -130,17 +156,45 @@ export async function GET(req: Request) {
       missing: missing.length,
       healed: okCount,
       still_missing: failCount,
+      original: { never_ran: originalNeverRan, previously_failed: originalFailed },
       details: healed,
     };
 
     if (failCount > 0) {
-      const summary = healed
-        .filter((h) => !h.ok)
-        .map((h) => `${h.sport}/${h.route}: ${h.error ?? h.skipped ?? "unknown"}`)
-        .join("; ");
+      // Group still-failed items by their original category so the alert
+      // email's <pre> block shows missed-vs-failed as separate sections.
+      // Format:
+      //   Healed 1/3 missing runs.
+      //
+      //   Originally missed (Vercel didn't invoke):
+      //     - nba/generate (heal: ECONNRESET)
+      //
+      //   Originally failed (ran and errored):
+      //     - mlb/send-email (heal: ECONNRESET)
+      const stillFailed = healed.filter((h) => !h.ok);
+      const stillNeverRan = stillFailed.filter((h) => h.category === "never_ran");
+      const stillPrevFailed = stillFailed.filter((h) => h.category === "previously_failed");
+      const lines: string[] = [
+        `Supervisor healed ${okCount}/${missing.length} of today's missing runs.`,
+        `Original misses: ${originalNeverRan} never ran (Vercel didn't invoke), ${originalFailed} previously failed (ran and errored).`,
+        ``,
+      ];
+      if (stillNeverRan.length > 0) {
+        lines.push(`Still missing — originally never invoked by Vercel:`);
+        for (const h of stillNeverRan) {
+          lines.push(`  - ${h.sport}/${h.route} (heal attempt: ${h.error ?? h.skipped ?? "unknown"})`);
+        }
+        lines.push(``);
+      }
+      if (stillPrevFailed.length > 0) {
+        lines.push(`Still missing — originally failed (ran and errored):`);
+        for (const h of stillPrevFailed) {
+          lines.push(`  - ${h.sport}/${h.route} (heal attempt: ${h.error ?? h.skipped ?? "unknown"})`);
+        }
+      }
       await finishCronRun(runId, {
         status: "failed",
-        error: `Healed ${okCount}/${missing.length}; ${failCount} still missing — ${summary}`,
+        error: lines.join("\n").trimEnd(),
         result,
       });
     } else {
