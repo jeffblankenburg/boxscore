@@ -183,3 +183,5 @@ main().catch((e) => {
   console.error(`probe failed: ${(e as Error).message}`);
   process.exit(1);
 });
+
+export {};

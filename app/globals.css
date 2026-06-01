@@ -25,6 +25,7 @@ a { color: inherit; }
 .newspaper {
   max-width: 1280px; margin: 0 auto; padding: 20px;
   background-color: var(--bg-paper); box-shadow: 0 0 10px var(--shadow);
+  /* Override below on narrow viewports — see @media (max-width: 480px). */
 }
 
 .site-header {
@@ -85,17 +86,21 @@ a { color: inherit; }
   font-size: clamp(18px, 4.2vw, 28px);
   position: relative;
 }
-/* "Vol. X, Issue Y" overlays the band's bottom-right corner — same band
-   as the date, no extra vertical space consumed. */
+/* "Vol. X, Issue Y" overlays the band's bottom-right corner on wider
+   viewports — same band as the date, no extra vertical space consumed. On
+   narrow viewports (~480px and below) the overlay collides with the centered
+   date text, so we drop it to its own row beneath. */
 .dateline-issue-no {
   position: absolute; right: 8px; bottom: 4px;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--text-muted);
-}
-.dateline-issue-no {
   font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--text-muted);
-  margin-bottom: 2px;
+}
+@media (max-width: 520px) {
+  .dateline-issue-no {
+    position: static; right: auto; bottom: auto;
+    display: block; text-align: center;
+    margin-top: 4px;
+  }
 }
 /* Day-nav arrows in the dateline. Near-invisible by default (low opacity,
    not italic, lighter weight) — present for users who look for them,
@@ -303,6 +308,57 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .team-stat-table .player-col { width: auto; text-align: left; }
 .team-stat-table .jersey, .team-stat-table .pos { color: var(--text-muted); font-weight: 400; }
 
+/* Player profile page (/[sport]/player/[id]).
+   Header reuses .team-name-header. Sub-line carries position + current
+   team + record on one line, dimmed. Season totals and per-game log share
+   the same .gamelog-table geometry so stat columns line up vertically. */
+.player-sub {
+  text-align: center; font-size: 13px; margin: 2px 0 12px;
+  color: var(--text-muted);
+}
+.player-sub .pos { font-weight: 700; }
+.player-sub .player-team { color: inherit; }
+
+/* Game log mirrors .team-stat-table (auto layout) so columns size to their
+   actual content. Padding is left to the global table default (0 2px) for
+   exact parity with the team stat sheet — adding extra horizontal padding
+   here pushed 12 columns past the available 360px at 400px viewports. */
+.gamelog-table { font-size: 13px; margin: 2px 0 12px; table-layout: auto; width: 100%; }
+/* Keep all player-page tables on the same size at every breakpoint —
+   mismatched font sizes between Hitting / Advanced / Fielding read as a
+   bug at narrow widths. */
+@media (max-width: 480px) {
+  .gamelog-table,
+  .team-stat-table { font-size: 11px; }
+}
+.gamelog-table thead th {
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 700;
+}
+.gamelog-table tbody tr:nth-child(even) td { background-color: rgba(0, 0, 0, 0.025); }
+.gamelog-table .gl-date { text-align: left; color: var(--text-muted); }
+.gamelog-table .gl-opp { text-align: left; font-weight: 700; }
+.gamelog-table .gl-result { text-align: left; }
+.gamelog-table .gl-stat { text-align: right; }
+.gamelog-table .gl-rate { text-align: right; }
+.gamelog-table .gl-summary { text-align: left; font-weight: 700; }
+/* Season totals in tfoot — line ABOVE and below; slight vertical bump so
+   the row reads as its own section. Horizontal padding stays inherited so
+   columns still align with the per-game rows above. */
+.gamelog-table tfoot .gl-totals td {
+  font-weight: 700;
+  border-top: 2px solid var(--border-strong);
+  border-bottom: 2px solid var(--border-strong);
+  padding-top: 4px; padding-bottom: 4px;
+}
+/* Newspaper aesthetic: no color anywhere. Differentiate W vs L by typography
+   alone — bold W stays upright, L gets italic, score sits in the regular
+   text color. */
+.gamelog-table .gl-out { font-weight: 700; }
+.gamelog-table .gl-out-l { font-style: italic; }
+.gamelog-table .gl-score { font-weight: 400; }
+.gamelog-table .gl-dec { font-style: italic; font-weight: 400; }
+
 /* Upcoming-games block on the team page — one "row" per game, two lines:
    matchup metadata, then probable pitchers. */
 .upcoming-list { margin: 4px 0 12px; }
@@ -361,6 +417,25 @@ footer.site-footer a { color: var(--text-secondary); }
 .site-footer-legal { display: inline-flex; gap: 12px; font-style: normal; }
 .site-footer-legal a { color: var(--text-muted); text-decoration: none; }
 .site-footer-legal a:hover { text-decoration: underline; }
+/* On narrow viewports the 3-col grid squeezes the credit into a 4-line
+   vertical column. Stack instead — one child per row, each centered. */
+@media (max-width: 560px) {
+  footer.site-footer {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    text-align: center;
+  }
+  footer.site-footer > :first-child,
+  footer.site-footer > .site-footer-legal,
+  footer.site-footer > :last-child { justify-self: center; }
+}
+/* Shrink the page chrome on narrow viewports — 20px each side eats 40px
+   from a 400px screen and pushes wide tables (12-col game log) past the
+   edge. 8px each side keeps the masthead/footer comfortable while giving
+   the content row the breathing room it needs. */
+@media (max-width: 480px) {
+  .newspaper { padding: 12px 8px; }
+}
 
 .legal-page {
   max-width: 680px;

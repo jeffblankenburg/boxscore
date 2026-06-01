@@ -513,3 +513,175 @@ export async function getTeamScheduleRange(
 ): Promise<ScheduleGame[]> {
   return parseSchedule(await fetchTeamScheduleRangeRaw(teamId, startDate, endDate));
 }
+
+// ─── Person profile ───────────────────────────────────────────────────────
+// One person lookup with currentTeam hydrated. Used by player pages to fill
+// the header (name, primary position, current team).
+export type Person = {
+  id: number;
+  fullName: string;
+  primaryNumber?: string;
+  primaryPosition: { abbreviation: string; name: string };
+  batSide?: { code: string };
+  pitchHand?: { code: string };
+  active: boolean;
+  currentTeam?: { id: number; name: string };
+};
+
+export async function fetchPersonRaw(personId: number): Promise<unknown> {
+  return getRaw(`/v1/people/${personId}?hydrate=currentTeam`);
+}
+
+export function parsePerson(raw: unknown): Person | null {
+  const data = raw as { people?: Array<Partial<Person>> };
+  const p = data.people?.[0];
+  if (!p || typeof p.id !== "number" || typeof p.fullName !== "string") return null;
+  return {
+    id: p.id,
+    fullName: p.fullName,
+    primaryNumber: p.primaryNumber,
+    primaryPosition: p.primaryPosition ?? { abbreviation: "", name: "" },
+    batSide: p.batSide,
+    pitchHand: p.pitchHand,
+    active: p.active ?? false,
+    currentTeam: p.currentTeam,
+  };
+}
+
+// ─── Per-player season aggregate + per-game log ───────────────────────────
+// One call returns both the season totals and the per-game splits for the
+// player. group is "hitting" or "pitching" — call once for each since a
+// two-way player has both. parseSplitsBundle returns { season, gameLog } in
+// the same shape regardless of group; the caller decides how to render.
+
+export type GameLogEntry = {
+  date: string;          // YYYY-MM-DD
+  gamePk: number;
+  isHome: boolean;
+  isWin: boolean | null; // gameLog.isWin (decision for pitchers, team result for hitters per MLB)
+  isLoss: boolean | null;
+  team: { id: number; name: string };
+  opponent: { id: number; name: string };
+  stat: Record<string, unknown>;
+};
+
+export type SplitsBundle = {
+  season: Record<string, unknown> | null;
+  // Sabermetric/advanced flavor of the season aggregate. Pitcher BABIP, for
+  // instance, only lives here. Hitter stats overlap heavily with `season`
+  // but we keep both for parity with the team-digest stat sheet.
+  seasonAdvanced: Record<string, unknown> | null;
+  gameLog: GameLogEntry[];
+};
+
+export async function fetchPersonSplitsRaw(
+  personId: number,
+  season: number,
+  group: "hitting" | "pitching",
+): Promise<unknown> {
+  return getRaw(
+    `/v1/people/${personId}/stats?stats=season,seasonAdvanced,gameLog&group=${group}&season=${season}`,
+  );
+}
+
+type RawSplit = {
+  date?: string;
+  isHome?: boolean;
+  isWin?: boolean | null;
+  isLoss?: boolean | null;
+  team?: { id?: number; name?: string };
+  opponent?: { id?: number; name?: string };
+  stat?: Record<string, unknown>;
+  game?: { gamePk?: number };
+};
+
+export function parseSplitsBundle(raw: unknown): SplitsBundle {
+  const data = raw as { stats?: Array<{ type?: { displayName?: string }; splits?: RawSplit[] }> };
+  const groups = data.stats ?? [];
+  const seasonGroup = groups.find((g) => g.type?.displayName === "season");
+  const advancedGroup = groups.find((g) => g.type?.displayName === "seasonAdvanced");
+  const gameLogGroup = groups.find((g) => g.type?.displayName === "gameLog");
+  const season = seasonGroup?.splits?.[0]?.stat ?? null;
+  const seasonAdvanced = advancedGroup?.splits?.[0]?.stat ?? null;
+  const gameLog = (gameLogGroup?.splits ?? [])
+    .filter((s) => typeof s.date === "string" && typeof s.game?.gamePk === "number")
+    .map((s): GameLogEntry => ({
+      date: s.date as string,
+      gamePk: s.game?.gamePk as number,
+      isHome: !!s.isHome,
+      isWin: s.isWin ?? null,
+      isLoss: s.isLoss ?? null,
+      team: { id: s.team?.id ?? 0, name: s.team?.name ?? "" },
+      opponent: { id: s.opponent?.id ?? 0, name: s.opponent?.name ?? "" },
+      stat: s.stat ?? {},
+    }));
+  return { season, seasonAdvanced, gameLog };
+}
+
+// Sport-wide schedule for a date range. Same shape as fetchScheduleRaw but
+// across multiple days — used to join final scores to a player's game log
+// without firing one boxscore call per game.
+export async function fetchScheduleRangeRaw(
+  startDate: string,
+  endDate: string,
+): Promise<unknown> {
+  return getRaw(
+    `/v1/schedule?sportId=1&startDate=${startDate}&endDate=${endDate}&hydrate=linescore,team,decisions`,
+  );
+}
+
+// ─── Fielding stats ───────────────────────────────────────────────────────
+// MLB returns one split per position the player has actually appeared at,
+// each carrying its own games / innings / chances totals. A position-player
+// with no fielding work at a slot (e.g. Judge at DH) still gets a split
+// with innings = "0.0"; callers should filter those out.
+
+export type FieldingSplit = {
+  position: string;
+  games: number;
+  gamesStarted: number;
+  innings: string;
+  chances: number;
+  putOuts: number;
+  assists: number;
+  errors: number;
+  doublePlays: number;
+  triplePlays: number;
+  fielding: string;
+};
+
+export async function fetchPersonFieldingRaw(personId: number, season: number): Promise<unknown> {
+  return getRaw(
+    `/v1/people/${personId}/stats?stats=season&group=fielding&season=${season}`,
+  );
+}
+
+type RawFieldingSplit = {
+  position?: { abbreviation?: string };
+  stat?: Record<string, unknown>;
+};
+
+export function parseFielding(raw: unknown): FieldingSplit[] {
+  const data = raw as { stats?: Array<{ splits?: RawFieldingSplit[] }> };
+  const splits = data.stats?.[0]?.splits ?? [];
+  return splits
+    .map((sp): FieldingSplit => {
+      const s = sp.stat ?? {};
+      return {
+        position: sp.position?.abbreviation ?? "",
+        games: typeof s.games === "number" ? s.games : 0,
+        gamesStarted: typeof s.gamesStarted === "number" ? s.gamesStarted : 0,
+        innings: typeof s.innings === "string" ? s.innings : "0.0",
+        chances: typeof s.chances === "number" ? s.chances : 0,
+        putOuts: typeof s.putOuts === "number" ? s.putOuts : 0,
+        assists: typeof s.assists === "number" ? s.assists : 0,
+        errors: typeof s.errors === "number" ? s.errors : 0,
+        doublePlays: typeof s.doublePlays === "number" ? s.doublePlays : 0,
+        triplePlays: typeof s.triplePlays === "number" ? s.triplePlays : 0,
+        fielding: typeof s.fielding === "string" ? s.fielding : ".000",
+      };
+    })
+    // Drop DH and other slots where the player never actually fielded —
+    // those rows are noise.
+    .filter((sp) => parseFloat(sp.innings) > 0);
+}
