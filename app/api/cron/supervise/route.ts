@@ -1,14 +1,17 @@
-// Supervisor cron. Catches the "Vercel didn't invoke a scheduled cron at all"
-// failure mode — which doesn't trip the existing failure-alert email because
-// there's no failed run to alert on; there's nothing.
+// Supervisor cron. Catches two cron-level failure modes that the per-route
+// alert email can't catch on its own:
+//   1. Vercel never invoked a scheduled cron at all (no cron_runs row exists).
+//   2. The route was invoked but the function died mid-execution without
+//      reaching finishCronRun — leaves the row stuck status="running" forever.
+//      Most common cause: hitting Vercel's maxDuration ceiling; the runtime
+//      kills the process without giving cleanup blocks a chance to run.
 //
 // Runs once per morning, after every other scheduled cron has had a chance to
 // complete. For each (sport, route) pair we know is scheduled, queries
-// cron_runs for today's digest date. If there's no ok-or-running row, the
-// supervisor invokes the route to fill in the gap. Failures during the heal
-// pass mark this run as "failed", which routes through the existing admin-
-// notification email — so a missed cron escalates to an alert if it can't be
-// recovered automatically.
+// cron_runs for today's digest date. If there's no ok row, the supervisor
+// classifies the most recent attempt and invokes the route to fill the gap.
+// Stale-running rows are marked failed before re-invoking so the dashboard
+// reflects reality immediately.
 //
 // The SUPERVISED list mirrors vercel.json. Adding a new scheduled cron means
 // updating both.
@@ -35,6 +38,13 @@ const SUPERVISED: ReadonlyArray<Supervised> = [
   { route: "post-bluesky",    sport: "mlb"  },
 ];
 
+// A "running" row older than this is presumed dead. send-email at 5k+
+// subscribers takes ~5 min when healthy; send-team-email touches 30 teams and
+// can run longer. 30 min is conservative enough to never false-positive a
+// legitimately in-flight run, while still catching the maxDuration-kill case
+// that surfaced 2026-06-01 (function died at ~5 min, sat "running" for hours).
+const STALE_THRESHOLD_MINUTES = 30;
+
 function authorize(req: Request): boolean {
   if (process.env.NODE_ENV === "development") return true;
   const secret = process.env.CRON_SECRET;
@@ -42,12 +52,15 @@ function authorize(req: Request): boolean {
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
-// Why was this route on the heal list? Surface this in the alert email so a
-// 6am admin can tell at a glance whether Vercel dropped the invocation
-// ("never_ran") or the route ran and errored ("previously_failed"). The two
-// look identical from the dashboard's red-cell-vs-grey-cell distinction;
-// the email needs to spell it out.
-type MissCategory = "never_ran" | "previously_failed";
+// Why was this route on the heal list? Surface this in the alert email so the
+// admin can tell at a glance which failure mode hit:
+//   never_ran          — Vercel didn't invoke the cron at all
+//   previously_failed  — route ran, threw an error, was marked failed
+//   stale_running      — route ran, died without finishing (most often
+//                        maxDuration kill); row stuck "running" past threshold
+// The three look similar from cell-color-alone on the dashboard; the email
+// needs to spell them out.
+type MissCategory = "never_ran" | "previously_failed" | "stale_running";
 
 type HealResult = {
   sport: string;
@@ -57,6 +70,26 @@ type HealResult = {
   error?: string;
   skipped?: string;
 };
+
+// Mark a stale row as failed before re-invoking, so the dashboard reflects
+// reality and the cron history is honest. Best-effort: a failure here MUST
+// NOT block the heal pass — leaving a zombie row visible is far less bad
+// than skipping the heal.
+async function markStaleAsFailed(rowId: string, ageMinutes: number): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin()
+      .from("cron_runs")
+      .update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error: `Marked failed by supervisor: row stuck status=running for ${Math.round(ageMinutes)} min (>${STALE_THRESHOLD_MINUTES} min threshold). Function likely terminated by Vercel without reaching finishCronRun — typically maxDuration kill.`,
+      })
+      .eq("id", rowId);
+    if (error) console.warn(`supervise: mark-stale-failed for ${rowId} failed: ${error.message}`);
+  } catch (e) {
+    console.warn(`supervise: mark-stale-failed for ${rowId} threw: ${(e as Error).message}`);
+  }
+}
 
 export async function GET(req: Request) {
   if (!authorize(req)) {
@@ -71,48 +104,92 @@ export async function GET(req: Request) {
 
   try {
     const db = supabaseAdmin();
-    type Row = { route: string; sport: string | null; status: string };
+    type Row = {
+      id: string;
+      route: string;
+      sport: string | null;
+      status: string;
+      started_at: string;
+    };
     const { data, error } = await db
       .from("cron_runs")
-      .select("route, sport, status")
-      .eq("date", date);
+      .select("id, route, sport, status, started_at")
+      .eq("date", date)
+      .order("started_at", { ascending: true });
     if (error) throw new Error(`fetch cron_runs: ${error.message}`);
 
-    // Set of (sport::route) that already finished ok or are still in flight.
-    // Failed runs are intentionally NOT in this set — the supervisor's job is
-    // to retry them. A run is identified per-route-per-sport for today's date.
-    const handled = new Set<string>();
-    const failedKeys = new Set<string>();
+    // Group by (sport, route). For each pair we need to know:
+    //   - whether ANY run reached ok (then handled, no heal)
+    //   - the most recent non-ok row's classification (failed / running /
+    //     stale-running) so the heal call can carry the right category and
+    //     stash the row id for mark-stale-failed.
+    type GroupState = {
+      hasOk: boolean;
+      latestNonOk: Row | null;
+    };
+    const grouped = new Map<string, GroupState>();
     for (const r of (data ?? []) as Row[]) {
       if (!r.sport) continue;
       const key = `${r.sport}::${r.route}`;
-      if (r.status === "ok" || r.status === "running") {
-        handled.add(key);
-      } else if (r.status === "failed") {
-        failedKeys.add(key);
+      const g = grouped.get(key) ?? { hasOk: false, latestNonOk: null };
+      if (r.status === "ok") {
+        g.hasOk = true;
+      } else {
+        // started_at is asc; later iterations overwrite earlier, so latest wins
+        g.latestNonOk = r;
       }
+      grouped.set(key, g);
     }
 
-    const missing: Array<Supervised & { category: MissCategory }> = SUPERVISED
-      .filter((s) => !handled.has(`${s.sport}::${s.route}`))
-      .map((s) => ({
-        ...s,
-        category: failedKeys.has(`${s.sport}::${s.route}`)
-          ? "previously_failed"
-          : "never_ran",
-      }));
+    const nowMs = Date.now();
+    type MissingItem = Supervised & {
+      category: MissCategory;
+      staleRowId?: string;
+      staleAgeMinutes?: number;
+    };
+    const missing: MissingItem[] = [];
 
-    if (missing.length === 0) {
-      const result = {
-        date, missing: 0, healed: 0, still_missing: 0,
-        original: { never_ran: 0, previously_failed: 0 },
-      };
-      await finishCronRun(runId, { status: "ok", result });
-      return NextResponse.json({ ok: true, ...result });
+    for (const s of SUPERVISED) {
+      const key = `${s.sport}::${s.route}`;
+      const g = grouped.get(key);
+      // No row at all → Vercel never invoked.
+      if (!g) {
+        missing.push({ ...s, category: "never_ran" });
+        continue;
+      }
+      // Some row reached ok at some point today → handled, even if there's
+      // also a stuck zombie row from an earlier attempt (today's case).
+      if (g.hasOk) continue;
+      // Otherwise look at the most-recent non-ok row.
+      const row = g.latestNonOk!;
+      if (row.status === "failed") {
+        missing.push({ ...s, category: "previously_failed" });
+      } else if (row.status === "running") {
+        const ageMinutes = (nowMs - new Date(row.started_at).getTime()) / 60_000;
+        if (ageMinutes >= STALE_THRESHOLD_MINUTES) {
+          missing.push({
+            ...s,
+            category: "stale_running",
+            staleRowId: row.id,
+            staleAgeMinutes: ageMinutes,
+          });
+        }
+        // Fresh "running" → still in flight, leave it alone.
+      }
     }
 
     const originalNeverRan = missing.filter((m) => m.category === "never_ran").length;
     const originalFailed = missing.filter((m) => m.category === "previously_failed").length;
+    const originalStale = missing.filter((m) => m.category === "stale_running").length;
+
+    if (missing.length === 0) {
+      const result = {
+        date, missing: 0, healed: 0, still_missing: 0,
+        original: { never_ran: 0, previously_failed: 0, stale_running: 0 },
+      };
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
 
     const origin = await siteOrigin();
     const headers: HeadersInit = {};
@@ -126,7 +203,15 @@ export async function GET(req: Request) {
     // fail again. The downstream rows stay "still missing" so the alert email
     // surfaces both the upstream failure and the cascade.
     const healed: HealResult[] = [];
-    for (const { sport, route, category } of missing) {
+    for (const item of missing) {
+      const { sport, route, category } = item;
+
+      // Cleanup pass for stale-running rows: mark them failed BEFORE the heal
+      // attempt so the dashboard is honest even if the heal itself fails.
+      if (category === "stale_running" && item.staleRowId) {
+        await markStaleAsFailed(item.staleRowId, item.staleAgeMinutes ?? 0);
+      }
+
       const upstreamFailed = (route === "send-email" || route === "send-team-email")
         && healed.some((h) => h.sport === sport && h.route === "generate" && !h.ok);
       if (upstreamFailed) {
@@ -156,27 +241,24 @@ export async function GET(req: Request) {
       missing: missing.length,
       healed: okCount,
       still_missing: failCount,
-      original: { never_ran: originalNeverRan, previously_failed: originalFailed },
+      original: {
+        never_ran: originalNeverRan,
+        previously_failed: originalFailed,
+        stale_running: originalStale,
+      },
       details: healed,
     };
 
     if (failCount > 0) {
       // Group still-failed items by their original category so the alert
-      // email's <pre> block shows missed-vs-failed as separate sections.
-      // Format:
-      //   Healed 1/3 missing runs.
-      //
-      //   Originally missed (Vercel didn't invoke):
-      //     - nba/generate (heal: ECONNRESET)
-      //
-      //   Originally failed (ran and errored):
-      //     - mlb/send-email (heal: ECONNRESET)
+      // email's <pre> block shows each failure mode as a separate section.
       const stillFailed = healed.filter((h) => !h.ok);
       const stillNeverRan = stillFailed.filter((h) => h.category === "never_ran");
       const stillPrevFailed = stillFailed.filter((h) => h.category === "previously_failed");
+      const stillStale = stillFailed.filter((h) => h.category === "stale_running");
       const lines: string[] = [
         `Supervisor healed ${okCount}/${missing.length} of today's missing runs.`,
-        `Original misses: ${originalNeverRan} never ran (Vercel didn't invoke), ${originalFailed} previously failed (ran and errored).`,
+        `Original misses: ${originalNeverRan} never ran (Vercel didn't invoke), ${originalFailed} previously failed (ran and errored), ${originalStale} stale running (died mid-execution past ${STALE_THRESHOLD_MINUTES}-min threshold).`,
         ``,
       ];
       if (stillNeverRan.length > 0) {
@@ -189,6 +271,13 @@ export async function GET(req: Request) {
       if (stillPrevFailed.length > 0) {
         lines.push(`Still missing — originally failed (ran and errored):`);
         for (const h of stillPrevFailed) {
+          lines.push(`  - ${h.sport}/${h.route} (heal attempt: ${h.error ?? h.skipped ?? "unknown"})`);
+        }
+        lines.push(``);
+      }
+      if (stillStale.length > 0) {
+        lines.push(`Still missing — originally stale running (died mid-execution, marked failed by supervisor):`);
+        for (const h of stillStale) {
           lines.push(`  - ${h.sport}/${h.route} (heal attempt: ${h.error ?? h.skipped ?? "unknown"})`);
         }
       }

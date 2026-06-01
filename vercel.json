@@ -49,6 +49,15 @@
     "app/api/cron/post-facebook/route.ts": {
       "memory": 1024,
       "maxDuration": 120
+    },
+    "app/api/cron/send-email/route.ts": {
+      "maxDuration": 800
+    },
+    "app/api/cron/send-team-email/route.ts": {
+      "maxDuration": 800
+    },
+    "app/api/cron/supervise/route.ts": {
+      "maxDuration": 800
     }
   },
   "headers": [
