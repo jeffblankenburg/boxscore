@@ -27,6 +27,11 @@ import type { Transaction } from "./mlb";
 import { nextDay, prettyDate } from "./dates";
 import { findTeamByMlbApiId } from "./teams";
 import { EMAIL_LINK_BASE } from "./site";
+import { lastName } from "./names";
+
+// Re-exported for the basketball renderer, which imports lastName from here.
+// New code should import from "./names" directly.
+export { lastName };
 // EMAIL_STYLES is concatenated with the basketball renderer's class rules so
 // the same stylesheet is injected into every digest email regardless of
 // sport. Both stylesheets use disjoint class prefixes (es-* for MLB, bb-*
@@ -244,13 +249,6 @@ const fmtDiff = (scored: number | undefined, allowed: number | undefined) => {
   if (scored == null || allowed == null) return "—";
   const d = scored - allowed;
   return d > 0 ? `+${d}` : d < 0 ? String(d) : "0";
-};
-export const lastName = (full: string) => {
-  const parts = full.split(/\s+/);
-  const suf = new Set(["Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV"]);
-  let i = parts.length - 1;
-  while (i > 0 && suf.has(parts[i] ?? "")) i--;
-  return parts[i] ?? full;
 };
 
 // ─── building blocks ──────────────────────────────────────────────────────

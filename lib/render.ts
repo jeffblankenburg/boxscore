@@ -6,6 +6,11 @@ import type {
 import type { DigestMode } from "./digest-mode";
 import { findTeamByMlbApiId } from "./teams";
 import { prevDay, nextDay, prettyDate, issueNumber, volumeNumber } from "./dates";
+import { lastName } from "./names";
+
+// Re-exported for backwards compatibility with any caller that imports
+// lastName from "./render". New code should import from "./names" directly.
+export { lastName };
 
 export type GameDetail = {
   game: ScheduleGame;
@@ -185,13 +190,6 @@ const fmtDiff = (scored: number | undefined, allowed: number | undefined): strin
   return "0";
 };
 
-export const lastName = (full: string): string => {
-  const parts = full.split(/\s+/);
-  const suffixes = new Set(["Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV"]);
-  let i = parts.length - 1;
-  while (i > 0 && suffixes.has(parts[i] ?? "")) i--;
-  return parts[i] ?? full;
-};
 
 // team.id → "W-L" for the Today's Games matchup row. ID-keyed because the
 // schedule and standings endpoints don't always agree on team.name strings.
