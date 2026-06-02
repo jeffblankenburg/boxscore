@@ -853,6 +853,25 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .send-engagement-opened  { background: #eef3fb; color: #2a4d80; }
 .send-engagement-clicked { background: #e9f4ec; color: #1f5a1f; }
 
+/* Section header between subscriber matches and send history. */
+.email-search-section {
+  font: inherit; font-family: Georgia, serif; font-weight: 700;
+  font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 18px 0 6px;
+}
+
+/* Subscriber status pill — same shape as .send-status but a different
+   palette so the two columns stay visually distinct in a stacked result set. */
+.sub-status {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+  font-family: ui-monospace, monospace;
+}
+.sub-status-active       { background: #e6f7e6; color: #1f5a1f; }
+.sub-status-pending      { background: #fff2cc; color: #7a5a00; }
+.sub-status-unsubscribed { background: #ffe6e6; color: #a40000; }
+
 /* Basketball digest — NBA + WNBA share the same renderer (lib/render-basketball.ts)
    and the same classes. Mirrored in BASKETBALL_EMAIL_STYLES for the email
    variant; keep these two stylesheets in sync. Design tokens match MLB's

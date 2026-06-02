@@ -403,6 +403,8 @@ export async function regenerateShareImages(formData: FormData): Promise<void> {
 export type SendStatus =
   | "delivered" | "bounced" | "delayed" | "complained" | "pending" | "failed";
 
+export type SubscriberStatus = "pending" | "active" | "unsubscribed";
+
 export type SendSearchRow = {
   id: string;
   to: string;
@@ -413,26 +415,63 @@ export type SendSearchRow = {
   clicked: boolean;
 };
 
-export async function searchSends(query: string): Promise<SendSearchRow[]> {
+export type SubscriberSearchRow = {
+  id: string;
+  email: string;
+  status: SubscriberStatus;
+  createdAt: string;
+  confirmedAt: string | null;
+  unsubscribedAt: string | null;
+  unsubscribeReason: string | null;
+  isAdmin: boolean;
+};
+
+export type SearchResults = {
+  subscribers: SubscriberSearchRow[];
+  sends: SendSearchRow[];
+};
+
+export async function searchSends(query: string): Promise<SearchResults> {
   await requireAdmin();
+  const empty: SearchResults = { subscribers: [], sends: [] };
   const q = query.trim();
   // Substring search at <3 chars would page through too much of the table;
   // the input enforces this client-side but verify here too.
-  if (q.length < 3) return [];
+  if (q.length < 3) return empty;
 
   const db = supabaseAdmin();
 
   // 1. Subscribers matching the substring. Order by created_at desc so older
   // dormant accounts don't crowd out a recently active match.
+  type SubRow = {
+    id: string;
+    email: string;
+    status: SubscriberStatus;
+    created_at: string;
+    confirmed_at: string | null;
+    unsubscribed_at: string | null;
+    unsubscribe_reason: string | null;
+    is_admin: boolean;
+  };
   const { data: subs, error: subsErr } = await db
     .from("subscribers")
-    .select("id, email")
+    .select("id, email, status, created_at, confirmed_at, unsubscribed_at, unsubscribe_reason, is_admin")
     .ilike("email", `%${q}%`)
     .order("created_at", { ascending: false })
     .limit(50);
   if (subsErr) throw new Error(`searchSends subs: ${subsErr.message}`);
-  const subRows = (subs ?? []) as Array<{ id: string; email: string }>;
-  if (subRows.length === 0) return [];
+  const subRows = (subs ?? []) as SubRow[];
+  const subscribers: SubscriberSearchRow[] = subRows.map((s) => ({
+    id: s.id,
+    email: s.email,
+    status: s.status,
+    createdAt: s.created_at,
+    confirmedAt: s.confirmed_at,
+    unsubscribedAt: s.unsubscribed_at,
+    unsubscribeReason: s.unsubscribe_reason,
+    isAdmin: s.is_admin,
+  }));
+  if (subRows.length === 0) return empty;
   const emailById = new Map(subRows.map((s) => [s.id, s.email]));
 
   // 2. Their sends, most recent first.
@@ -453,7 +492,7 @@ export async function searchSends(query: string): Promise<SendSearchRow[]> {
     .limit(50);
   if (sendsErr) throw new Error(`searchSends sends: ${sendsErr.message}`);
   const sendRows = (sends ?? []) as SendRow[];
-  if (sendRows.length === 0) return [];
+  if (sendRows.length === 0) return { subscribers, sends: [] };
 
   // 3. Terminal/engagement events keyed by resend_id, so we can derive the
   // displayed status without a per-row query.
@@ -470,7 +509,7 @@ export async function searchSends(query: string): Promise<SendSearchRow[]> {
     }
   }
 
-  return sendRows.map<SendSearchRow>((s) => {
+  const sendsOut = sendRows.map<SendSearchRow>((s) => {
     const evts = s.resend_id ? eventsByResendId[s.resend_id] ?? new Set<string>() : new Set<string>();
     // Precedence puts hard signals before soft ones. complained beats
     // delivered (a complaint after delivery still indicates a problem);
@@ -493,4 +532,6 @@ export async function searchSends(query: string): Promise<SendSearchRow[]> {
       clicked: evts.has("email.clicked"),
     };
   });
+
+  return { subscribers, sends: sendsOut };
 }

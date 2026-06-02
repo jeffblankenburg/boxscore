@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { searchSends, type SendSearchRow, type SendStatus } from "./actions";
+import {
+  searchSends,
+  type SearchResults,
+  type SendStatus,
+  type SubscriberSearchRow,
+  type SubscriberStatus,
+} from "./actions";
 
 // Live recipient-email lookup for /admin. Debounces 250ms so a paste fires
-// one query, typing fires one per pause. Renders the result table inline
-// below the input — no modal, no navigation, no page reload.
+// one query, typing fires one per pause. Renders the result tables inline
+// below the input — subscriber matches first (so we can tell at a glance if
+// an address is in our DB even when it's never received a send), then the
+// per-send history.
 //
 // Empty state: prompt; <3 chars: prompt; pending: spinner; no matches: meta
 // message. The visible state changes are small, so we keep them all in one
@@ -14,9 +22,11 @@ import { searchSends, type SendSearchRow, type SendStatus } from "./actions";
 const MIN_QUERY = 3;
 const DEBOUNCE_MS = 250;
 
+const EMPTY_RESULTS: SearchResults = { subscribers: [], sends: [] };
+
 export function EmailSearch() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SendSearchRow[]>([]);
+  const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -24,17 +34,17 @@ export function EmailSearch() {
     setError(null);
     const q = query.trim();
     if (q.length < MIN_QUERY) {
-      setResults([]);
+      setResults(EMPTY_RESULTS);
       return;
     }
     const handle = setTimeout(() => {
       startTransition(async () => {
         try {
-          const rows = await searchSends(q);
-          setResults(rows);
+          const data = await searchSends(q);
+          setResults(data);
         } catch (e) {
           setError((e as Error).message);
-          setResults([]);
+          setResults(EMPTY_RESULTS);
         }
       });
     }, DEBOUNCE_MS);
@@ -43,8 +53,9 @@ export function EmailSearch() {
 
   const showEmptyHint = query.trim().length === 0;
   const showShortHint = query.trim().length > 0 && query.trim().length < MIN_QUERY;
+  const hasAny = results.subscribers.length > 0 || results.sends.length > 0;
   const showNoResults =
-    query.trim().length >= MIN_QUERY && !pending && results.length === 0 && !error;
+    query.trim().length >= MIN_QUERY && !pending && !hasAny && !error;
 
   return (
     <div className="email-search">
@@ -60,7 +71,7 @@ export function EmailSearch() {
       />
       {showEmptyHint && (
         <p className="admin-meta">
-          Searches every production send to a matching subscriber email
+          Searches subscribers and every production send by recipient email
           (substring match, case-insensitive).
         </p>
       )}
@@ -69,33 +80,93 @@ export function EmailSearch() {
       )}
       {pending && <p className="admin-meta">Searching…</p>}
       {error && <p className="admin-error">{error}</p>}
-      {showNoResults && <p className="admin-meta">No matching sends.</p>}
-      {results.length > 0 && (
-        <table className="email-search-results">
-          <thead>
-            <tr>
-              <th>To</th>
-              <th>Status</th>
-              <th>Engagement</th>
-              <th>Subject</th>
-              <th>Sent</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r) => (
-              <tr key={r.id}>
-                <td className="email-search-to"><code>{r.to}</code></td>
-                <td><StatusPill status={r.status} /></td>
-                <td><Engagement opened={r.opened} clicked={r.clicked} /></td>
-                <td>{r.subject}</td>
-                <td className="admin-meta">{relativeTime(r.sentAt)}</td>
+      {showNoResults && <p className="admin-meta">No matching subscribers or sends.</p>}
+      {results.subscribers.length > 0 && (
+        <>
+          <h3 className="email-search-section">Subscribers</h3>
+          <table className="email-search-results">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Signed up</th>
+                <th>Notes</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {results.subscribers.map((s) => (
+                <tr key={s.id}>
+                  <td className="email-search-to"><code>{s.email}</code></td>
+                  <td><SubscriberStatusPill status={s.status} /></td>
+                  <td className="admin-meta">{relativeTime(s.createdAt)}</td>
+                  <td className="admin-meta"><SubscriberNotes s={s} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {results.sends.length > 0 && (
+        <>
+          <h3 className="email-search-section">Sends</h3>
+          <table className="email-search-results">
+            <thead>
+              <tr>
+                <th>To</th>
+                <th>Status</th>
+                <th>Engagement</th>
+                <th>Subject</th>
+                <th>Sent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.sends.map((r) => (
+                <tr key={r.id}>
+                  <td className="email-search-to"><code>{r.to}</code></td>
+                  <td><StatusPill status={r.status} /></td>
+                  <td><Engagement opened={r.opened} clicked={r.clicked} /></td>
+                  <td>{r.subject}</td>
+                  <td className="admin-meta">{relativeTime(r.sentAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {results.subscribers.length > 0 && results.sends.length === 0 && !pending && (
+        <p className="admin-meta">No sends recorded for matching subscribers.</p>
       )}
     </div>
   );
+}
+
+const SUBSCRIBER_STATUS_LABEL: Record<SubscriberStatus, string> = {
+  pending: "Pending",
+  active: "Active",
+  unsubscribed: "Unsubscribed",
+};
+
+function SubscriberStatusPill({ status }: { status: SubscriberStatus }) {
+  return (
+    <span className={`sub-status sub-status-${status}`}>
+      {SUBSCRIBER_STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+function SubscriberNotes({ s }: { s: SubscriberSearchRow }) {
+  const bits: string[] = [];
+  if (s.isAdmin) bits.push("admin");
+  if (s.status === "unsubscribed" && s.unsubscribedAt) {
+    const reason = s.unsubscribeReason ?? "user";
+    bits.push(`unsubscribed ${relativeTime(s.unsubscribedAt)} (${reason})`);
+  } else if (s.status === "active" && s.confirmedAt) {
+    bits.push(`confirmed ${relativeTime(s.confirmedAt)}`);
+  } else if (s.status === "pending") {
+    bits.push("awaiting confirmation");
+  }
+  if (bits.length === 0) return <>—</>;
+  return <>{bits.join(", ")}</>;
 }
 
 const STATUS_LABEL: Record<SendStatus, string> = {
