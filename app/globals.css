@@ -645,6 +645,54 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
                        text-decoration: underline;
                        text-decoration-thickness: 2px;
                        text-underline-offset: 6px; }
+.admin-error { color: #8a1414; }
+
+/* Followers dashboard table (/admin/followers). One row per follower;
+   avatar+name on the left, bio takes the bulk of the row, platform tag and
+   a profile link on the right. Sticky header so long lists stay scannable. */
+.followers-filter { display: flex; gap: 14px; margin: 0 0 14px; font-size: 13px; }
+.followers-filter a { color: var(--text-secondary); text-decoration: none;
+                      padding: 4px 10px; border: 1px solid var(--border-strong);
+                      border-radius: 999px; }
+.followers-filter a.active { background: var(--text-primary); color: var(--bg-paper); }
+
+.followers-table { width: 100%; table-layout: fixed; font-size: 13px;
+                   border-collapse: collapse; }
+.followers-table thead th { text-align: left; font-weight: 700;
+                            padding: 6px 8px; border-bottom: 2px solid var(--border-strong);
+                            position: sticky; top: 0; background: var(--bg-paper); }
+.followers-table tbody td { padding: 8px; vertical-align: top;
+                            border-bottom: 1px solid var(--border-light, #ddd);
+                            /* Override the global td nowrap so long bios wrap
+                               instead of forcing the whole table wider than
+                               the page. */
+                            white-space: normal; word-wrap: break-word; }
+.followers-table tbody tr:hover td { background-color: rgba(0, 0, 0, 0.02); }
+
+/* Fixed widths so table-layout: fixed has something to distribute. Bio
+   gets whatever's left. */
+.followers-table .fl-avatar { width: 52px; }
+.followers-table .fl-avatar img { width: 40px; height: 40px; border-radius: 999px;
+                                   display: block; object-fit: cover; }
+.followers-table .fl-avatar-blank { width: 40px; height: 40px; border-radius: 999px;
+                                     background: rgba(0, 0, 0, 0.08); }
+.followers-table .fl-name { width: 180px; }
+.followers-table .fl-display { font-weight: 700; word-wrap: break-word; }
+.followers-table .fl-handle { font-size: 12px; color: var(--text-muted); word-wrap: break-word; }
+.followers-table .fl-bio { line-height: 1.4; color: var(--text-secondary); }
+.followers-table .fl-empty { color: var(--text-muted); }
+.followers-table .fl-platform { width: 70px; font-size: 12px;
+                                color: var(--text-muted); text-transform: uppercase;
+                                letter-spacing: 0.06em; white-space: nowrap; }
+.followers-table .fl-action { width: 112px; white-space: nowrap; text-align: right; }
+.followers-table .fl-action a { color: var(--text-secondary); text-decoration: none; }
+.followers-table .fl-action a:hover { text-decoration: underline; }
+@media (max-width: 720px) {
+  .followers-table { font-size: 12px; }
+  .followers-table .fl-platform { display: none; }
+  .followers-table .fl-name { width: 130px; }
+  .followers-table .fl-action { width: 90px; }
+}
 
 /* League switcher — strip of league badges under the main admin nav. */
 .league-switcher {
