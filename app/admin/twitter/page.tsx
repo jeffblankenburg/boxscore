@@ -23,8 +23,9 @@ export default async function AdminTwitterCompose() {
     );
   }
 
+  const dates = { edition: manifest.prettyDate, games: manifest.gamesPrettyDate };
   const posts = manifest.entries.map(({ entry, url }) => {
-    const { text } = imagePostContent(entry, manifest.prettyDate);
+    const { text } = imagePostContent(entry, dates);
     return { entry, url, text };
   });
 

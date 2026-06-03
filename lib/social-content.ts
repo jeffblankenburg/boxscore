@@ -86,9 +86,18 @@ const OFFICIAL_HASHTAG: Record<string, string> = {
   Nationals: "Natitude",
 };
 
+// Caption date convention: content-anchored images (scoreboard, box scores,
+// full digest) describe a specific day of games, so they use the GAMES date.
+// Morning-snapshot images (standings, leaders) describe what's true the day
+// the digest ships, so they use the EDITION date.
+export type CaptionDates = {
+  edition: string; // e.g. "Wednesday, June 3, 2026"
+  games: string;   // e.g. "Tuesday, June 2, 2026"
+};
+
 export function imagePostContent(
   entry: ManifestEntry,
-  prettyDate: string,
+  dates: CaptionDates,
   digestUrl?: string,
 ): { text: string; alt: string } {
   // Twitter charges $0.20/post when a URL is present (vs $0.015 without), so
@@ -98,30 +107,30 @@ export function imagePostContent(
     const games = entry.gameCount;
     const gamesLabel = games === 1 ? "1 game" : `${games} games`;
     return {
-      text: `⚾ MLB box scores · ${prettyDate} · ${gamesLabel}\n\n#MLB${tail}`,
-      alt: `Full MLB digest for ${prettyDate}: standings, leaders, and box scores for all ${gamesLabel}.`,
+      text: `⚾ MLB box scores · ${dates.games} · ${gamesLabel}\n\n#MLB${tail}`,
+      alt: `Full MLB digest for ${dates.games}: standings, leaders, and box scores for all ${gamesLabel}.`,
     };
   }
   if (entry.type === "scoreboard") {
     const games = entry.gameCount;
     const gamesLabel = games === 1 ? "1 game" : `${games} games`;
     return {
-      text: `⚾ MLB Scoreboard · ${prettyDate} · ${gamesLabel}\n\n#MLB${tail}`,
-      alt: `MLB scoreboard for ${prettyDate}: final scores from ${gamesLabel}.`,
+      text: `⚾ MLB Scoreboard · ${dates.games} · ${gamesLabel}\n\n#MLB${tail}`,
+      alt: `MLB scoreboard for ${dates.games}: final scores from ${gamesLabel}.`,
     };
   }
   if (entry.type === "standings") {
     const name = entry.league === "AL" ? "American League" : "National League";
     return {
-      text: `${name} Standings · ${prettyDate}\n\n#MLB${tail}`,
-      alt: `${name} Standings for ${prettyDate}.`,
+      text: `${name} Standings · ${dates.edition}\n\n#MLB${tail}`,
+      alt: `${name} Standings for ${dates.edition}.`,
     };
   }
   if (entry.type === "leaders") {
     const name = entry.league === "AL" ? "American League" : "National League";
     return {
-      text: `${name} Leaders · ${prettyDate}\n\n#MLB${tail}`,
-      alt: `${name} Leaders as of ${prettyDate}.`,
+      text: `${name} Leaders · ${dates.edition}\n\n#MLB${tail}`,
+      alt: `${name} Leaders as of ${dates.edition}.`,
     };
   }
   const validTeams = entry.teams.filter((t) => t.length > 0);
@@ -137,7 +146,7 @@ export function imagePostContent(
   // Dedupe — for some teams the nickname IS the official tag (#Cubs, #Dodgers).
   const tags = Array.from(new Set([...nameTags, ...tricodeTags, ...officialTags])).join(" ");
   return {
-    text: `${entry.title} · ${prettyDate}\n\n${tags} #MLB${tail}`.trim(),
-    alt: `Box score: ${entry.title} on ${prettyDate}.`,
+    text: `${entry.title} · ${dates.games}\n\n${tags} #MLB${tail}`.trim(),
+    alt: `Box score: ${entry.title} on ${dates.games}.`,
   };
 }

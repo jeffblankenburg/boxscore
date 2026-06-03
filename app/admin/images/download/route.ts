@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import JSZip from "jszip";
 import { ADMIN_SESSION_COOKIE, validateSession } from "@/lib/admin-auth";
 import { listStoredImages } from "@/lib/share-storage";
+import { isValidIsoDate } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,12 +17,14 @@ async function isAdmin(): Promise<boolean> {
   return Boolean(secret && legacy === secret);
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { date, images } = await listStoredImages();
+  const rawDate = req.nextUrl.searchParams.get("date");
+  const requestedDate = rawDate && isValidIsoDate(rawDate) ? rawDate : undefined;
+  const { date, images } = await listStoredImages(requestedDate);
   if (images.length === 0) {
     return NextResponse.json({ error: "no images" }, { status: 404 });
   }

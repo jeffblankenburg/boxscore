@@ -16,7 +16,7 @@
 import { supabaseAdmin } from "../lib/supabase";
 import { renderShareImages } from "../lib/render-images";
 import { uploadShareImages } from "../lib/share-storage";
-import { prettyDate } from "../lib/dates";
+import { nextDay, prettyDate } from "../lib/dates";
 import { EMAIL_LINK_BASE } from "../lib/site";
 
 const IN_SEASON_MODES = ["regular", "no-games", "all-star", "postseason"];
@@ -88,7 +88,8 @@ async function main() {
       const t0 = Date.now();
       const images = await renderShareImages({ date, baseUrl: EMAIL_LINK_BASE });
       const renderMs = Date.now() - t0;
-      await uploadShareImages({ date, prettyDate: prettyDate(date), images });
+      const editionDate = nextDay(date);
+      await uploadShareImages({ editionDate, images });
       console.log(`${tag} ✓ ${images.length} images in ${renderMs}ms`);
       ok++;
     } catch (e) {

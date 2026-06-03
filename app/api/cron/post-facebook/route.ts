@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
+import { isValidIsoDate, nextDay, yesterdayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
 import {
   deleteFacebookPost,
@@ -76,8 +76,8 @@ export async function GET(req: Request) {
   // Puppeteer's baseUrl needs the reachable host; the digestUrl embedded
   // in the public post text always uses the canonical email/social origin.
   const origin = await siteOrigin();
-  const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${nextDay(date)}`;
-  const pretty = prettyDate(date);
+  const editionDate = nextDay(date);
+  const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${editionDate}`;
 
   // Render share images in-memory using the same renderer as the other crons.
   let images: Awaited<ReturnType<typeof renderShareImages>>;
@@ -91,9 +91,11 @@ export async function GET(req: Request) {
   }
 
   // Upload to storage so we have public URLs FB Graph can fetch by URL.
+  // Storage key is the EDITION date — matches og:image and
+  // `/mlb/[editionDate]`.
   let stored: Awaited<ReturnType<typeof uploadShareImages>>;
   try {
-    stored = await uploadShareImages({ date, prettyDate: pretty, images });
+    stored = await uploadShareImages({ editionDate, images });
   } catch (err) {
     return NextResponse.json(
       { error: `share-storage upload failed: ${(err as Error).message}` },
@@ -102,8 +104,10 @@ export async function GET(req: Request) {
   }
 
   const boxscoreCount = stored.entries.filter((e) => e.entry.type === "boxscore").length;
+  // Album message describes the games (yesterday's recap), so use the games
+  // date rather than the edition date.
   const message =
-    `MLB box scores · ${pretty}\n` +
+    `MLB box scores · ${stored.gamesPrettyDate}\n` +
     `${boxscoreCount} games. Standings, leaders, and every line score.\n\n` +
     `Full digest → ${digestUrl}`;
 

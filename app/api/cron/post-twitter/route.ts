@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { EUploadMimeType } from "twitter-api-v2";
-import { isValidIsoDate, prettyDate, yesterdayInET } from "@/lib/dates";
+import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
 import { deleteTweet, postTweetWithImage } from "@/lib/twitter";
 import { siteOrigin } from "@/lib/site";
@@ -60,7 +60,11 @@ export async function GET(req: Request) {
     }
 
     const origin = await siteOrigin();
-    const pretty = prettyDate(date);
+    const editionDate = nextDay(date);
+    const captionDates = {
+      edition: prettyDate(editionDate),
+      games: prettyDate(date),
+    };
 
     let images: Awaited<ReturnType<typeof renderShareImages>>;
     try {
@@ -70,9 +74,10 @@ export async function GET(req: Request) {
     }
 
     // Mirror to Supabase Storage so the admin gallery + compose pages can
-    // serve the latest set. Failure here doesn't block posting.
+    // serve the latest set. Failure here doesn't block posting. Storage key
+    // is the EDITION date — matches og:image and `/mlb/[editionDate]`.
     try {
-      await uploadShareImages({ date, prettyDate: pretty, images });
+      await uploadShareImages({ editionDate, images });
     } catch (err) {
       console.error(`share-storage upload failed: ${(err as Error).message}`);
     }
@@ -98,7 +103,7 @@ export async function GET(req: Request) {
 
       // No digestUrl for Twitter: URL-bearing posts cost $0.20 vs $0.015
       // without. The bio link covers click-through.
-      const { text, alt } = imagePostContent(entry, pretty);
+      const { text, alt } = imagePostContent(entry, captionDates);
       const mimeType = mime === "image/jpeg" ? EUploadMimeType.Jpeg : EUploadMimeType.Png;
 
       try {

@@ -1,13 +1,18 @@
 import { supabaseAdmin } from "./supabase";
 import type { ManifestEntry, RenderedImage } from "./render-images";
+import { prettyDate as formatPrettyDate, prevDay } from "./dates";
 
 // Storage strategy for share images:
-//   - One set of images in the bucket at a time. No history.
-//   - Images: "2026-05-14_al-standings.png" at bucket root.
+//   - Images accumulate per date so RSS items can embed their own day's images.
+//     Files live at bucket root keyed by `{date}_{file}`, e.g.
+//     "2026-05-14_al-standings.png".
+//   - Each generate `upsert`s its set — re-running a date overwrites in place.
+//     `clearShareImages` exists for an explicit wipe but the normal cron path
+//     doesn't call it.
 //   - Manifest: "_manifest.json" — full entry metadata (titles, teams, league)
 //     for downstream consumers like the admin Twitter page that need to
-//     compose post text without re-rendering.
-//   - Each generate clears the bucket first, then uploads the new set.
+//     compose post text without re-rendering. Tracks only the most recently
+//     generated date.
 //   - Public bucket → <img> tags work without auth.
 
 const BUCKET = "share-images";
@@ -25,8 +30,14 @@ export type ManifestImage = {
 };
 
 export type StoredManifest = {
+  // EDITION date (matches the bucket file prefix and og:image URL).
   date: string;
+  // Edition date in human form — used for standings/leaders captions where
+  // the content is a "morning of" snapshot.
   prettyDate: string;
+  // Games date in human form — used for scoreboard/box-score captions where
+  // the content describes games actually played that day.
+  gamesPrettyDate: string;
   entries: ManifestImage[];
 };
 
@@ -44,20 +55,25 @@ export async function clearShareImages(): Promise<number> {
 }
 
 export async function uploadShareImages(args: {
-  date: string;
-  prettyDate: string;
+  editionDate: string;
   images: RenderedImage[];
 }): Promise<StoredManifest> {
-  // Historical accumulation: every date's images stay in the bucket so the
+  // Historical accumulation: every edition's images stay in the bucket so the
   // RSS feed can embed them per-item. Each upload uses `upsert: true` so
-  // re-regenerating a date overwrites in place rather than appending. The
+  // re-regenerating an edition overwrites in place rather than appending. The
   // manifest at _manifest.json still describes only the most recently
-  // generated date; per-date manifests aren't tracked because the
-  // YYYY-MM-DD_<file> prefix is enough to look up a date's set from storage.
+  // generated edition; per-edition manifests aren't tracked because the
+  // {editionDate}_<file> prefix is enough to look up an edition's set from
+  // storage.
+  //
+  // Keyed by EDITION date to match `uploadScoreboardShareImage`, the og:image
+  // URL convention on /mlb/[editionDate], and the backfill script. The
+  // per-image CONTENT date (e.g. box-score images showing the games date) is
+  // handled at render time and is independent of the storage key.
   const supa = supabaseAdmin();
   const entries: ManifestImage[] = [];
   for (const { entry, png, mime } of args.images) {
-    const path = `${args.date}_${entry.file}`;
+    const path = `${args.editionDate}_${entry.file}`;
     const { error } = await supa.storage.from(BUCKET).upload(path, png, {
       contentType: mime,
       upsert: true,
@@ -68,8 +84,9 @@ export async function uploadShareImages(args: {
   }
 
   const manifest: StoredManifest = {
-    date: args.date,
-    prettyDate: args.prettyDate,
+    date: args.editionDate,
+    prettyDate: formatPrettyDate(args.editionDate),
+    gamesPrettyDate: formatPrettyDate(prevDay(args.editionDate)),
     entries,
   };
   const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
@@ -94,24 +111,59 @@ export async function getStoredManifest(): Promise<StoredManifest | null> {
   }
 }
 
-export async function listStoredImages(): Promise<{ date: string | null; images: StoredImage[] }> {
+// List images for a single date. When `date` is omitted, the latest date
+// present in the bucket is used so the caller doesn't need to guess. Returns
+// the date that was actually used (null only when the bucket is empty), which
+// lets the admin view label the grid correctly even when defaulting.
+export async function listStoredImages(
+  date?: string,
+): Promise<{ date: string | null; images: StoredImage[] }> {
   const supa = supabaseAdmin();
-  const { data, error } = await supa.storage.from(BUCKET).list("", { limit: 100 });
+  // 10k cap — well above any per-date set size and roughly two seasons of
+  // accumulated daily images. Bump if we ever ship sports with much larger
+  // image sets per date.
+  const { data, error } = await supa.storage.from(BUCKET).list("", { limit: 10_000 });
   if (error) throw new Error(`storage list: ${error.message}`);
 
-  let date: string | null = null;
-  const images: StoredImage[] = [];
+  type FileEntry = { date: string; file: string; updatedAt: string | null };
+  const allFiles: FileEntry[] = [];
   for (const f of data ?? []) {
     if (f.name === ".emptyFolderPlaceholder") continue;
     const m = f.name.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
     if (!m) continue;
-    if (!date) date = m[1]!;
-    const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(f.name);
-    images.push({ file: m[2]!, url: urlData.publicUrl, updatedAt: f.updated_at ?? null });
+    allFiles.push({ date: m[1]!, file: m[2]!, updatedAt: f.updated_at ?? null });
+  }
+
+  if (allFiles.length === 0) return { date: null, images: [] };
+
+  // Default to the most recent date present in storage (lexical sort works for
+  // ISO YYYY-MM-DD).
+  const targetDate =
+    date ?? allFiles.map((f) => f.date).sort().at(-1)!;
+
+  const images: StoredImage[] = [];
+  for (const f of allFiles) {
+    if (f.date !== targetDate) continue;
+    const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(`${f.date}_${f.file}`);
+    images.push({ file: f.file, url: urlData.publicUrl, updatedAt: f.updatedAt });
   }
 
   images.sort((a, b) => imagePriority(a.file) - imagePriority(b.file));
-  return { date, images };
+  return { date: targetDate, images };
+}
+
+// All distinct dates present in the bucket, newest first. Used by the admin
+// images view to populate a date selector.
+export async function listStoredDates(): Promise<string[]> {
+  const supa = supabaseAdmin();
+  const { data, error } = await supa.storage.from(BUCKET).list("", { limit: 10_000 });
+  if (error) throw new Error(`storage list: ${error.message}`);
+  const dates = new Set<string>();
+  for (const f of data ?? []) {
+    const m = f.name.match(/^(\d{4}-\d{2}-\d{2})_/);
+    if (m) dates.add(m[1]!);
+  }
+  return Array.from(dates).sort().reverse();
 }
 
 function imagePriority(file: string): number {

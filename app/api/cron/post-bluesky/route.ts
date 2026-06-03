@@ -63,8 +63,12 @@ export async function GET(req: Request) {
   // boxscore.email, preview → vercel.app); the digestUrl embedded in the
   // public post text always uses the canonical email/social origin.
   const origin = await siteOrigin();
-  const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${nextDay(date)}`;
-  const pretty = prettyDate(date);
+  const editionDate = nextDay(date);
+  const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${editionDate}`;
+  const captionDates = {
+    edition: prettyDate(editionDate),
+    games: prettyDate(date),
+  };
 
   // Render share images in-memory using the same renderer as the local script.
   // On Vercel this uses @sparticuz/chromium-min; locally it uses system Chrome.
@@ -77,9 +81,10 @@ export async function GET(req: Request) {
 
   // Mirror to Supabase Storage so the admin gallery + Twitter compose page
   // can show + serve the latest set. Failure here doesn't block posting —
-  // BlueSky uploads use the in-memory PNGs directly.
+  // BlueSky uploads use the in-memory PNGs directly. Storage key is the
+  // EDITION date — matches og:image and `/mlb/[editionDate]`.
   try {
-    await uploadShareImages({ date, prettyDate: pretty, images });
+    await uploadShareImages({ editionDate, images });
   } catch (err) {
     console.error(`share-storage upload failed: ${(err as Error).message}`);
   }
@@ -102,7 +107,7 @@ export async function GET(req: Request) {
       continue;
     }
 
-    const { text, alt } = imagePostContent(entry, pretty, digestUrl);
+    const { text, alt } = imagePostContent(entry, captionDates, digestUrl);
     const dims = width > 0 && height > 0 ? { width, height } : undefined;
 
     try {

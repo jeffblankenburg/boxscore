@@ -403,31 +403,35 @@ export async function renderScoreboardImage(formData: FormData): Promise<void> {
 }
 
 export async function regenerateShareImages(formData: FormData): Promise<void> {
+  // Form passes games_date (page form converts edition→games at submit). We
+  // need games_date for renderShareImages (its URL is /mlb/${nextDay(date)}),
+  // and edition_date for uploadShareImages (storage key + manifest).
   const raw = formData.get("date");
-  const date = typeof raw === "string" && raw ? raw : yesterdayInET();
+  const gamesDate = typeof raw === "string" && raw ? raw : yesterdayInET();
 
   let target: string;
   try {
-    if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
+    if (!isValidIsoDate(gamesDate)) throw new Error(`Bad date: ${gamesDate}`);
+    const editionDate = nextDay(gamesDate);
 
     const origin = await siteOrigin();
-    console.log(`[regen] start ${date} origin=${origin}`);
+    console.log(`[regen] start games=${gamesDate} edition=${editionDate} origin=${origin}`);
 
     const t0 = Date.now();
-    const images = await renderShareImages({ date, baseUrl: origin });
+    const images = await renderShareImages({ date: gamesDate, baseUrl: origin });
     console.log(`[regen] rendered ${images.length} images in ${Date.now() - t0}ms`);
 
     const t1 = Date.now();
-    await uploadShareImages({ date, prettyDate: prettyDate(date), images });
+    await uploadShareImages({ editionDate, images });
     console.log(`[regen] uploaded in ${Date.now() - t1}ms`);
 
     revalidatePath("/admin/images");
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-    target = `/admin/images?ok=${encodeURIComponent(`Generated ${images.length} images for ${date} in ${elapsed}s.`)}`;
+    target = `/admin/images?date=${editionDate}&ok=${encodeURIComponent(`Generated ${images.length} images for ${editionDate} in ${elapsed}s.`)}`;
   } catch (err) {
     const msg = (err as Error).message;
     const stack = (err as Error).stack ?? "";
-    console.error(`[regen] FAILED for ${date}: ${msg}\n${stack}`);
+    console.error(`[regen] FAILED for ${gamesDate}: ${msg}\n${stack}`);
     target = `/admin/images?error=${encodeURIComponent(msg)}`;
   }
   redirect(target);
