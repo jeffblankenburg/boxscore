@@ -1448,6 +1448,55 @@ async function getEngagementRates(
   };
 }
 
+// Daily cron writes this; /advertise reads it instead of recomputing the slow
+// dedup-by-resend_id stats on every cache revalidation. Falls back to live
+// compute when missing or older than STALE_AFTER_MS.
+export type PublicAdStatsWithGeneratedAt = PublicAdStats & {
+  generatedAt: string; // ISO timestamp of the underlying compute
+};
+
+export async function writeAdStatsSnapshot(stats: PublicAdStats): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("ad_stats_snapshot")
+    .upsert({
+      id: 1,
+      generated_at: new Date().toISOString(),
+      sport: stats.sport,
+      window_days: stats.windowDays,
+      active_subscribers: stats.activeSubscribers,
+      sends: stats.sends,
+      delivered: stats.delivered,
+      open_rate: stats.openRate,
+      click_rate: stats.clickRate,
+      delivery_rate: stats.deliveryRate,
+      engagement_since: stats.engagementSince,
+      tracked: stats.tracked,
+    });
+  if (error) throw new Error(`writeAdStatsSnapshot: ${error.message}`);
+}
+
+export async function readAdStatsSnapshot(): Promise<PublicAdStatsWithGeneratedAt | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("ad_stats_snapshot")
+    .select("*")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    sport: data.sport,
+    activeSubscribers: data.active_subscribers,
+    windowDays: data.window_days,
+    sends: data.sends,
+    delivered: data.delivered,
+    openRate: Number(data.open_rate),
+    clickRate: Number(data.click_rate),
+    deliveryRate: Number(data.delivery_rate),
+    engagementSince: data.engagement_since,
+    tracked: data.tracked,
+    generatedAt: data.generated_at,
+  };
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;

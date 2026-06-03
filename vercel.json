@@ -37,6 +37,10 @@
       "schedule": "45 9 * * *"
     },
     {
+      "path": "/api/cron/ad-stats-snapshot?sport=mlb",
+      "schedule": "50 9 * * *"
+    },
+    {
       "path": "/api/cron/supervise",
       "schedule": "0 10 * * *"
     }

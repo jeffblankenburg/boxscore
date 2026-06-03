@@ -1,5 +1,9 @@
 import { prettyDate, yesterdayInET } from "@/lib/dates";
-import { getPublicAdStatsSnapshot } from "@/lib/dashboard";
+import {
+  getPublicAdStatsSnapshot,
+  readAdStatsSnapshot,
+  type PublicAdStats,
+} from "@/lib/dashboard";
 import {
   CLASSIFIEDS,
   DISPLAY_BOXES,
@@ -11,15 +15,34 @@ import {
 } from "@/lib/ads-samples";
 import { InquiryForm } from "./InquiryForm";
 
-// Public advertiser-facing page. Stats are LIVE but cached: pulled from the
-// lightweight count-only snapshot helper (not the admin page's full join,
-// which materializes ~150k rows and takes a minute). Page revalidates
-// every hour. The page deliberately reads like a section of the newspaper:
+// Public advertiser-facing page. Stats normally come from the daily
+// ad_stats_snapshot table (written by /api/cron/ad-stats-snapshot) — reading
+// one row keeps the first render fast as the engagement window grows. If the
+// snapshot is missing or older than SNAPSHOT_STALE_AFTER_MS, the page falls
+// back to live compute via getPublicAdStatsSnapshot so a broken cron doesn't
+// silently show week-old numbers to advertisers. Page revalidates every hour
+// on top of that. The page deliberately reads like a section of the newspaper:
 // bold sectional masthead, italic lede, stat slab below the fold,
 // classified-style rate card, "letters to the editor" inquiry coupon.
 // Tone is stats-forward, no marketing voice.
 
 export const revalidate = 3600;
+
+// 48h covers a single missed daily cron plus the next supervisor pass without
+// triggering fallback. If the snapshot is older than this, recompute live.
+const SNAPSHOT_STALE_AFTER_MS = 48 * 60 * 60 * 1000;
+
+async function loadAdStats(): Promise<PublicAdStats> {
+  const snapshot = await readAdStatsSnapshot();
+  if (snapshot) {
+    const ageMs = Date.now() - new Date(snapshot.generatedAt).getTime();
+    if (ageMs < SNAPSHOT_STALE_AFTER_MS) return snapshot;
+    console.warn(
+      `[advertise] snapshot stale (${Math.round(ageMs / 3_600_000)}h old), recomputing live`,
+    );
+  }
+  return getPublicAdStatsSnapshot("mlb", 30);
+}
 
 // 2026 industry benchmarks we compare against in the stats slab. Sources:
 // Letterhead, Brevo, beehiiv (open + click); Validity, Cleanlist (delivery).
@@ -49,8 +72,9 @@ export default async function AdvertisePage() {
   const today = yesterdayInET();
   // Stats are scoped to the MLB LEAGUE digest specifically (the product an
   // advertiser would be sponsoring placements in via this page). Team
-  // digests are a separate inventory called out further down.
-  const rolling = await getPublicAdStatsSnapshot("mlb", 30);
+  // digests are a separate inventory called out further down. Snapshot read
+  // with live-compute fallback — see loadAdStats above.
+  const rolling = await loadAdStats();
 
   // Forward-looking "what an advertiser actually sees per send" — current
   // opt-in count discounted by delivery rate, then by open rate. Matches

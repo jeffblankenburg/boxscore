@@ -36,6 +36,7 @@ const SUPERVISED: ReadonlyArray<Supervised> = [
   { route: "send-team-email", sport: "mlb"  },
   { route: "post-twitter",    sport: "mlb"  },
   { route: "post-bluesky",    sport: "mlb"  },
+  { route: "ad-stats-snapshot", sport: "mlb" },
 ];
 
 // A "running" row older than this is presumed dead. send-email at 5k+
