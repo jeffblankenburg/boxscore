@@ -360,7 +360,7 @@ export default function WkbrPage() {
             site. We broadcast a clean 1,000-watt signal from the river
             tower — clear within forty miles.
           </p>
-          <a href="https://example.com" onClick={(e) => e.preventDefault()}>Stream Live →</a>
+          <a href="#">Stream Live →</a>
         </section>
 
         <div className="wkbr-foot">
