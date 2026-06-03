@@ -1864,6 +1864,20 @@ body:has(.paper-mode) .paper-toggle {
   font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
 }
 
+/* Every ad is rendered as an <a> so the whole tile is the click target.
+   Strip the default anchor underline/color so the visual matches what the
+   ad would look like if it were a plain div. Subtle hover signals click-
+   ability without yanking the eye away from the surrounding text. */
+.ad, a.ad {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.ad:hover { background-color: rgba(0,0,0,0.025); }
+.ad:focus-visible { outline: 2px solid var(--border-strong); outline-offset: 2px; }
+
 /* Format 1: Sponsor line — one italic line, em-dash framed. Echoes the
    digest's italic dateline. Hairlines top + bottom. */
 .ad-sponsor-line {
@@ -2080,4 +2094,559 @@ body:has(.paper-mode) .paper-toggle {
 }
 @media (max-width: 720px) {
   .ad-preview-frame .newspaper { padding: 18px 16px; }
+}
+
+/* ─── /advertise (public media kit) ────────────────────────────────────── */
+/* The page reads like a newspaper section: bold masthead, lede, a stat
+   slab below the fold, four-column "why advertise" block, format catalog
+   typeset to look like the real digest, a classified rate card, and a
+   "letters to the editor" inquiry form. Uses the site-wide Source Sans 3
+   font throughout — no serif headlines. */
+
+/* Hide the global Tip Jar header CTA on /advertise. Advertisers landing
+   here shouldn't be invited to drop coins in a jar — the room they're in
+   is the sales conversation. Uses :has() to reach UP from the article
+   into the layout-level header. */
+body:has(.advertise-page) .site-header .support { display: none; }
+
+/* Fake-sponsor landing pages totally abandon the boxscore chrome. The
+   root layout still wraps every page in <div class="newspaper"> with the
+   shared header/footer, so we hide all of that and reset the wrapper to
+   transparent full-bleed. Each individual sponsor page then declares its
+   own background, fonts, and layout. */
+body:has(.sponsor-page) .site-header,
+body:has(.sponsor-page) .site-footer { display: none; }
+body:has(.sponsor-page) .newspaper {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body:has(.sponsor-page) { background: transparent; }
+
+.advertise-page {
+  /* Fill the parent .newspaper container — no inner max-width. */
+  margin: 24px 0 48px;
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+@media (max-width: 720px) {
+  .advertise-page { margin: 16px 0 36px; }
+}
+
+/* Sectional masthead — "ADVERTISE" big bold on left, edition info on right.
+   Same anatomy as .paper-masthead but standalone (paper-mode isn't on this
+   page) so the styling lives here too. */
+.advertise-masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 2px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  padding: 6px 0 8px;
+  margin: 0 0 24px;
+  gap: 16px;
+}
+.advertise-masthead-section {
+  font-size: clamp(36px, 7vw, 56px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+.advertise-masthead-edition {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-align: right;
+}
+/* On narrow viewports the long edition string would either crash into the
+   ADVERTISE wordmark or shrink to unreadable. Stack it underneath instead. */
+@media (max-width: 520px) {
+  .advertise-masthead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .advertise-masthead-edition { text-align: left; }
+}
+
+/* Lede — bold headline that fills the page width, with a narrower deck
+   underneath capped at a comfortable reading measure. */
+.advertise-lede {
+  margin: 0 0 36px;
+}
+.advertise-lede h1 {
+  font-size: clamp(32px, 5.5vw, 56px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  margin: 0 0 16px;
+}
+.advertise-lede p {
+  font-size: 17px;
+  line-height: 1.55;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* Section anatomy — small uppercase eyebrow over a bold sectional title,
+   single black rule above. Mirrors the .legal-page h2 vocabulary but
+   bigger for a marketing-shape page. */
+.advertise-section {
+  margin: 40px 0;
+  padding-top: 22px;
+  border-top: 1px solid var(--border-strong);
+}
+.advertise-section-head { margin: 0 0 14px; }
+.advertise-section-eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.advertise-section-title {
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 900;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+.advertise-meta {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0 0 18px;
+}
+.advertise-meta a { color: var(--text-secondary); }
+
+/* Stat slab — big numbers in a grid. Hairline rules between cells so it
+   reads as one tabular block, not isolated cards. */
+.advertise-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+}
+.advertise-stat {
+  padding: 16px 18px 14px;
+  border-right: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+  margin: 0;
+}
+.advertise-stat:last-child { border-right: none; }
+.advertise-stat dt {
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.advertise-stat dd {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin: 0;
+}
+.advertise-stat-note {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* "Why advertise here" — four-column newspaper layout that collapses
+   gracefully on narrow viewports. Each column is a mini editorial. */
+.advertise-why {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0;
+  column-gap: 28px;
+  margin: 0;
+}
+.advertise-column { padding: 4px 0 8px; }
+.advertise-column + .advertise-column {
+  border-left: 1px solid var(--border-light);
+  padding-left: 28px;
+}
+@media (max-width: 720px) {
+  .advertise-column + .advertise-column {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--border-light);
+    padding-top: 16px;
+    margin-top: 8px;
+  }
+}
+.advertise-column h3 {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.005em;
+  margin: 0 0 6px;
+}
+.advertise-column p {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* Format catalog — each format is a card with: heading, pitch, two-row
+   meta table (inventory + placement), then the sample renders. Renders
+   reuse the .ad-* primitives from the digest itself. */
+.advertise-formats {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.advertise-format {
+  padding: 18px 20px;
+  border: 1px solid var(--border-light);
+  background: #fff;
+}
+.advertise-format-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.advertise-format-head h3 {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+.advertise-format-one-liner {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+.advertise-format-pitch {
+  margin: 4px 0 14px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  max-width: 720px;
+}
+.advertise-format-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 4px 24px;
+  margin: 0 0 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+}
+.advertise-format-meta > div { margin: 0; }
+.advertise-format-meta dt {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-right: 6px;
+}
+.advertise-format-meta dd {
+  display: inline;
+  font-size: 13.5px;
+  margin: 0;
+}
+.advertise-format-samples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.advertise-format-sample { margin: 0; }
+.advertise-format-sample-render {
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  padding: 18px 20px;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.advertise-format-sample-render .ad-sponsor-line,
+.advertise-format-sample-render .ad-standings-strip,
+.advertise-format-sample-render .ad-classified { margin: 0; width: 100%; max-width: 100%; }
+/* Display box renders at digest dimensions — square-ish single column,
+   centered in the sample tile rather than stretched to fill it. Aspect
+   ratio matches what an advertiser actually gets in the boxscores grid. */
+.advertise-format-sample-render .ad-display-box {
+  margin: 0;
+  width: 280px;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.advertise-format-sample figcaption {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 6px;
+}
+
+/* Rate card — classified-looking table. Three commitment columns,
+   format rows, dedicated-send row spans the price columns. */
+.advertise-rates {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: auto;
+}
+.advertise-rates th,
+.advertise-rates td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  text-align: left;
+  vertical-align: top;
+}
+.advertise-rates thead th {
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 2px solid var(--border-strong);
+}
+.advertise-rates tbody td:first-child { font-weight: 700; }
+.advertise-rates tbody td:not(:first-child) {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.advertise-rate-note {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-left: 6px;
+}
+.advertise-rate-emphasis td { background: #faf6ec; }
+.advertise-rate-fineprint { margin-top: 12px; }
+
+/* Narrow viewport: collapse the rate card to stacked per-format cards.
+   Header row hides; each price cell shows its column name inline via
+   data-label so the four columns become four labeled lines per format. */
+@media (max-width: 640px) {
+  .advertise-rates { border: 1px solid var(--border-strong); }
+  .advertise-rates thead { display: none; }
+  .advertise-rates, .advertise-rates tbody, .advertise-rates tr { display: block; }
+  .advertise-rates tr {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .advertise-rates tr:last-child { border-bottom: none; }
+  .advertise-rates td { display: block; padding: 0; border: none; }
+  .advertise-rates td:first-child {
+    font-size: 16px;
+    font-weight: 700;
+    padding-bottom: 10px;
+    margin-bottom: 8px;
+    border-bottom: 1px dotted var(--border-light);
+  }
+  .advertise-rates td:not(:first-child) {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 5px 0;
+  }
+  .advertise-rates td:not(:first-child)::before {
+    content: attr(data-label);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 700;
+    font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  /* Dedicated-send row keeps its highlight as a card-wide background. */
+  .advertise-rate-emphasis { background: #faf6ec; }
+  .advertise-rate-emphasis td { background: transparent; }
+}
+
+/* Team-digest sales section — three-up grid of why-local pitches. Same
+   typography family as .advertise-column, but with a hairline-bordered
+   card treatment so it reads as a distinct sub-product, not part of the
+   main MLB-league pitch above. */
+.advertise-team-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin: 0;
+}
+@media (max-width: 760px) { .advertise-team-cards { grid-template-columns: 1fr; } }
+.advertise-team-card {
+  padding: 20px 22px;
+  border: 1px solid var(--border-light);
+  background: #fff;
+}
+.advertise-team-card h3 {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.005em;
+  margin: 0 0 6px;
+}
+.advertise-team-card p {
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* "House rules" — what we will and won't run. Two columns side by side. */
+.advertise-rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 28px;
+}
+.advertise-rules h3 {
+  font-size: 16px;
+  font-weight: 900;
+  margin: 0 0 8px;
+}
+.advertise-rules ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.advertise-rules li { margin-bottom: 4px; }
+.advertise-rules > div:first-child h3 { border-bottom: 1px solid var(--border-light); padding-bottom: 4px; }
+.advertise-rules > div:last-child h3 { border-bottom: 1px solid var(--border-strong); padding-bottom: 4px; }
+
+/* Inquiry form — looks like a "letters to the editor" coupon. Tight
+   typography, hairline-ruled inputs, single dark submit pill. */
+.advertise-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+  padding: 20px 22px 22px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+}
+.advertise-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 540px) {
+  .advertise-form-row { grid-template-columns: 1fr; }
+}
+.advertise-form-field { display: flex; flex-direction: column; gap: 4px; }
+.advertise-form-field > span,
+.advertise-form-field > legend {
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 0;
+}
+.advertise-form-field > span em {
+  font-style: italic;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+.advertise-form-field input[type="text"],
+.advertise-form-field input[type="email"],
+.advertise-form-field select,
+.advertise-form-field textarea {
+  font: inherit;
+  font-size: 15px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--text-primary);
+}
+.advertise-form-field input:focus,
+.advertise-form-field select:focus,
+.advertise-form-field textarea:focus {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 1px;
+}
+.advertise-form-field textarea {
+  resize: vertical;
+  min-height: 96px;
+  font-family: inherit;
+}
+.advertise-form-formats { border: none; padding: 0; margin: 0; }
+.advertise-form-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 4px 14px;
+  margin-top: 4px;
+}
+.advertise-form-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.advertise-form-check input { margin: 0; }
+
+.advertise-form-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.advertise-form-submit {
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 22px;
+  cursor: pointer;
+}
+.advertise-form-submit:hover { background: #333; }
+.advertise-form-submit:disabled {
+  background: #888;
+  cursor: not-allowed;
+}
+.advertise-form-ok {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f5a1f;
+}
+.advertise-form-error {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #8a1414;
+}
+
+/* Honeypot — visually hidden, accessible-hidden, off-screen. Bots see the
+   field in the DOM and fill it; humans never see or focus it. */
+.advertise-form-trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px; height: 1px;
+  overflow: hidden;
 }

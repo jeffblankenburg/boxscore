@@ -121,8 +121,8 @@ export default async function AdsPage() {
           <tbody>
             <tr>
               <td>Sponsor line</td>
-              <td style={{ textAlign: "right" }}>1–2</td>
-              <td>One top, one bottom. Single advertiser per send.</td>
+              <td style={{ textAlign: "right" }}>1</td>
+              <td>Under the dateline. Exclusive — one advertiser per send.</td>
             </tr>
             <tr>
               <td>Standings strip</td>

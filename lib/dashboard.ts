@@ -1292,6 +1292,162 @@ export async function getRollingAdStats(days: number): Promise<RollingAdStats> {
   };
 }
 
+// Lightweight stats snapshot for the public /advertise page. The
+// getRollingAdStats() above is correct but slow — it materializes every send
+// in the window and joins them in JS against email_events.
+//
+// This version splits the work:
+//   - Impressions / sends / delivery rate use cheap count queries over the
+//     full 30-day window.
+//   - Open + click rates use the same dedup-by-resend_id join the admin page
+//     uses, but only over the engagement window (sends since May 30, when
+//     open tracking turned on). That keeps the materialized event set small
+//     enough to finish in a few seconds. Without the dedup, MPP / multi-open
+//     pixel fires inflate the rate by ~20%.
+
+const OPEN_TRACKING_START_ISO = "2026-05-30T00:00:00Z";
+
+export type PublicAdStats = {
+  /** Sport this snapshot covers (e.g., "mlb"). */
+  sport: string;
+  /** Subscribers opted into the league digest for this sport. */
+  activeSubscribers: number;
+  windowDays: number;
+  sends: number;
+  delivered: number;
+  openRate: number;
+  clickRate: number;
+  deliveryRate: number;
+  /** First date opens were tracked. Used so the UI can label the rate honestly. */
+  engagementSince: string;
+  tracked: boolean;
+};
+
+/**
+ * Public-facing ad stats scoped to ONE product: a single sport's league digest.
+ * Filters every count (sends, delivered, engagement) by (digest_sport, team_id
+ * IS NULL) so the page selling a sponsor placement in the MLB league digest
+ * shows the audience that placement actually reaches — not the pooled total
+ * across league + team + other-sport sends.
+ *
+ * Active-subscriber count comes from the email_subscriptions opt-in table for
+ * (sport, scope='league', active=true). Slight over-count vs. the
+ * subscribers.status='active' intersection, but accurate enough for the
+ * "people signed up to receive this digest" stat.
+ */
+export async function getPublicAdStatsSnapshot(
+  sport: string,
+  days: number,
+): Promise<PublicAdStats> {
+  const db = supabaseAdmin();
+  const sinceIso = new Date(Date.now() - days * 86_400_000).toISOString();
+  const engagementSinceIso = sinceIso > OPEN_TRACKING_START_ISO
+    ? sinceIso
+    : OPEN_TRACKING_START_ISO;
+
+  const [
+    { count: activeSubscribers },
+    { count: sendsCount },
+    { count: deliveredCount },
+    { count: bouncedCount },
+    engagement,
+    { count: openEverCount },
+  ] = await Promise.all([
+    db.from("email_subscriptions").select("id", { count: "exact", head: true })
+      .eq("sport", sport).eq("scope", "league").eq("active", true),
+    db.from("sends").select("id", { count: "exact", head: true })
+      .gte("sent_at", sinceIso).eq("digest_sport", sport).is("team_id", null),
+    db.from("sends").select("id", { count: "exact", head: true })
+      .gte("sent_at", sinceIso).eq("digest_sport", sport).is("team_id", null).is("error", null),
+    db.from("email_events").select("id", { count: "exact", head: true })
+      .gte("event_at", sinceIso).eq("event_type", "email.bounced"),
+    getEngagementRates(engagementSinceIso, sport),
+    db.from("email_events").select("id", { count: "exact", head: true }).eq("event_type", "email.opened"),
+  ]);
+
+  const sends = sendsCount ?? 0;
+  // Bounce events table doesn't carry digest_sport, so this approximate
+  // delivered count uses all bounces in the window. Cross-sport bleed is
+  // small at our scale (NBA/WNBA traffic is admin-only). Good enough for a
+  // marketing stat; the exact figure comes from joining resend_ids.
+  const delivered = Math.max(0, (deliveredCount ?? 0) - (bouncedCount ?? 0));
+
+  return {
+    sport,
+    activeSubscribers: activeSubscribers ?? 0,
+    windowDays: days,
+    sends,
+    delivered,
+    openRate: engagement.delivered === 0 ? 0 : engagement.opened / engagement.delivered,
+    clickRate: engagement.delivered === 0 ? 0 : engagement.clicked / engagement.delivered,
+    deliveryRate: sends === 0 ? 0 : delivered / sends,
+    engagementSince: OPEN_TRACKING_START_ISO.slice(0, 10),
+    tracked: (openEverCount ?? 0) > 0,
+  };
+}
+
+// Dedup-by-resend_id engagement rates, scoped to one sport's league digest.
+// Same algorithm as getRollingAdStats (count of distinct sends that received
+// each event type) so the public page's open/click rates match what
+// /admin/ads reports — within their shared time window. Materializes the
+// engagement-window events AND the in-window league sends so we can
+// intersect resend_ids and exclude team/cross-sport activity.
+async function getEngagementRates(
+  sinceIso: string,
+  sport: string,
+): Promise<{ delivered: number; opened: number; clicked: number }> {
+  const db = supabaseAdmin();
+
+  // Pull the set of resend_ids representing in-window league sends for this
+  // sport. The engagement window is short (since OPEN_TRACKING_START_ISO),
+  // so this is bounded — a few thousand rows.
+  type SendRow = { resend_id: string | null };
+  const sendRows = await fetchAll<SendRow>(
+    () => db.from("sends")
+      .select("resend_id")
+      .gte("sent_at", sinceIso)
+      .eq("digest_sport", sport)
+      .is("team_id", null)
+      .is("error", null) as unknown as QueryBuilder<SendRow>,
+    "getEngagementRates sends",
+  );
+  const inScope = new Set<string>();
+  for (const r of sendRows) if (r.resend_id) inScope.add(r.resend_id);
+  if (inScope.size === 0) return { delivered: 0, opened: 0, clicked: 0 };
+
+  type Ev = { resend_id: string | null; event_type: string };
+  const events = await fetchAll<Ev>(
+    () => db.from("email_events")
+      .select("resend_id, event_type")
+      .gte("event_at", sinceIso)
+      .in("event_type", ["email.delivered", "email.opened", "email.clicked"]) as unknown as QueryBuilder<Ev>,
+    "getEngagementRates events",
+  );
+
+  const delivered = new Set<string>();
+  const opened = new Set<string>();
+  const clicked = new Set<string>();
+  for (const e of events) {
+    if (!e.resend_id || !inScope.has(e.resend_id)) continue;
+    if (e.event_type === "email.delivered") delivered.add(e.resend_id);
+    else if (e.event_type === "email.opened") opened.add(e.resend_id);
+    else if (e.event_type === "email.clicked") clicked.add(e.resend_id);
+  }
+
+  let openedAndDelivered = 0;
+  let clickedAndDelivered = 0;
+  for (const id of delivered) {
+    if (opened.has(id)) openedAndDelivered++;
+    if (clicked.has(id)) clickedAndDelivered++;
+  }
+
+  return {
+    delivered: delivered.size,
+    opened: openedAndDelivered,
+    clicked: clickedAndDelivered,
+  };
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;

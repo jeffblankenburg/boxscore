@@ -15,6 +15,9 @@ export const BRAND = {
   // Tip Jar opens in a new tab; the rest are in-app navigation.
   footerLinks: [
     { label: "About", href: "/about", external: false },
+    // Advertise link hidden while the page is only being shared privately
+    // with a broker. Restore once we're ready for public discovery.
+    // { label: "Advertise", href: "/advertise", external: false },
     { label: "RSS", href: "/rss/mlb", external: false },
     { label: "Privacy", href: "/privacy", external: false },
     { label: "Terms", href: "/terms", external: false },
