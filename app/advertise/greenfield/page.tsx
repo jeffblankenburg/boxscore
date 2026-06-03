@@ -199,10 +199,22 @@ export default function GreenfieldPage() {
       <div className="greenfield-shell">
         <header className="greenfield-hero">
           <svg width="170" height="170" viewBox="0 0 170 170" role="img" aria-label="Greenfield emblem — a tomato on the vine">
+            <defs>
+              {/* Text arcs centered on (85, 85) at r=58. Top arc bulges up
+                  through (85, 27) so EST·1971 hugs the inner rim; bottom arc
+                  bulges down through (85, 143) so GREENFIELD·CO hugs the
+                  lower rim. Both texts read right-side up to a viewer. */}
+              <path id="greenfield-top-arc" d="M 37.5 51.7 A 58 58 0 0 1 132.5 51.7" fill="none" />
+              <path id="greenfield-bottom-arc" d="M 37.5 118.3 A 58 58 0 0 0 132.5 118.3" fill="none" />
+            </defs>
             <circle cx="85" cy="85" r="80" fill="#fff" stroke="#284a2a" strokeWidth="2.5" />
             <circle cx="85" cy="85" r="72" fill="none" stroke="#284a2a" strokeWidth="0.8" />
-            <text x="85" y="34" textAnchor="middle" fontFamily="Georgia, serif" fontSize="10" letterSpacing="3" fill="#284a2a">EST · 1971</text>
-            <text x="85" y="150" textAnchor="middle" fontFamily="Georgia, serif" fontSize="9" letterSpacing="3" fill="#284a2a">GREENFIELD · CO</text>
+            <text fontFamily="Georgia, serif" fontSize="10" letterSpacing="3" fill="#284a2a" textAnchor="middle">
+              <textPath href="#greenfield-top-arc" startOffset="50%">EST · 1971</textPath>
+            </text>
+            <text fontFamily="Georgia, serif" fontSize="9" letterSpacing="2" fill="#284a2a" textAnchor="middle">
+              <textPath href="#greenfield-bottom-arc" startOffset="50%">GREENFIELD · CO</textPath>
+            </text>
             {/* vine + tomatoes */}
             <g>
               <path d="M85 60 Q88 78 78 90 Q66 100 72 116" stroke="#5a3d24" strokeWidth="2" fill="none" />
