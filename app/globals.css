@@ -2125,6 +2125,31 @@ body:has(.sponsor-page) .newspaper {
 }
 body:has(.sponsor-page) { background: transparent; }
 
+/* /share/mlb/[date] is the 1200×630 canvas Puppeteer screenshots for the
+   daily share image. Strip all chrome so the viewport contains nothing
+   but the scoreboard image; lock body margins/padding to zero so the
+   capture aligns at (0,0). */
+body:has(.share-image-canvas) .site-header,
+body:has(.share-image-canvas) .site-footer { display: none; }
+body:has(.share-image-canvas) .newspaper {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body:has(.share-image-canvas) {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+/* The Next.js dev indicator (a floating <nextjs-portal> web component) is
+   injected in dev only and would otherwise show up in Puppeteer screenshots
+   taken against localhost. No-op in production. */
+body:has(.share-image-canvas) nextjs-portal,
+body:has(.share-image-canvas) [data-nextjs-toast],
+body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !important; }
+
 .advertise-page {
   /* Fill the parent .newspaper container — no inner max-width. */
   margin: 24px 0 48px;

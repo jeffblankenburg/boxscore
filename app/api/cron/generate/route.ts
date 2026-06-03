@@ -13,8 +13,11 @@ import {
   renderBasketballContent,
   renderBasketballEmailContent,
 } from "@/lib/render-basketball";
-import { yesterdayInET, isValidIsoDate } from "@/lib/dates";
+import { yesterdayInET, isValidIsoDate, nextDay } from "@/lib/dates";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
+import { renderScoreboardShareImage } from "@/lib/render-images";
+import { uploadScoreboardShareImage } from "@/lib/share-storage";
+import { siteOrigin } from "@/lib/site";
 
 export const runtime = "nodejs";
 // Team-digest generation extends the wall-clock; MLB v1 has 30 teams,
@@ -105,6 +108,34 @@ export async function GET(req: Request) {
         }
       }
 
+      // Daily scoreboard share-image — the 1200×630 PNG used as the og:image
+      // on /mlb/[editionDate] link previews and the lead image on the daily
+      // Twitter/Bluesky/Facebook posts. Render failures are recorded in the
+      // result but do NOT fail the cron — the digest itself is the critical
+      // product. Skipped during bulk regenerate (skip_teams=1) since launching
+      // Puppeteer per date would blow the function timeout; backfill is a
+      // separate flow.
+      let scoreboard_image_url: string | null = null;
+      let scoreboard_image_error: string | null = null;
+      if (!skipTeams) {
+        try {
+          const editionDate = nextDay(date);
+          const origin = await siteOrigin();
+          const tImg = Date.now();
+          const { png, width, height } = await renderScoreboardShareImage({
+            editionDate, baseUrl: origin,
+          });
+          const { publicUrl } = await uploadScoreboardShareImage({
+            editionDate, png,
+          });
+          scoreboard_image_url = publicUrl;
+          console.log(`[generate] scoreboard ${editionDate} ${width}×${height} (${png.length} bytes) in ${Date.now() - tImg}ms`);
+        } catch (err) {
+          scoreboard_image_error = (err as Error).message;
+          console.error(`[generate] scoreboard render failed: ${scoreboard_image_error}`);
+        }
+      }
+
       const result = {
         sport, date,
         mode: data.mode,
@@ -114,6 +145,8 @@ export async function GET(req: Request) {
         teams_generated: teamOk,
         teams_failed: teamFails.length,
         ...(teamFails.length > 0 ? { team_failures: teamFails.slice(0, 5) } : {}),
+        ...(scoreboard_image_url ? { scoreboard_image_url } : {}),
+        ...(scoreboard_image_error ? { scoreboard_image_error } : {}),
       };
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });

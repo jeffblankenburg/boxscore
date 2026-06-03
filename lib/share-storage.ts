@@ -115,6 +115,7 @@ export async function listStoredImages(): Promise<{ date: string | null; images:
 }
 
 function imagePriority(file: string): number {
+  if (file === "scoreboard.png") return -1;
   if (file === "full.jpg" || file === "full.png") return 0;
   if (file === "al-standings.png") return 1;
   if (file === "al-leaders.png") return 2;
@@ -123,4 +124,39 @@ function imagePriority(file: string): number {
   const m = file.match(/^boxscore-(\d+)\.png$/);
   if (m) return 100 + Number(m[1]);
   return 999;
+}
+
+// Upload the 1200×630 scoreboard share-image. Lives at the bucket root with
+// the same `{date}_<file>` naming convention as the other share images, so it
+// participates in listings and storage stats. Keyed by EDITION date so the URL
+// matches what /mlb/[editionDate] would use as its og:image. Upsert: true so
+// re-rendering replaces in place.
+export async function uploadScoreboardShareImage(args: {
+  editionDate: string;
+  png: Uint8Array;
+}): Promise<{ path: string; publicUrl: string }> {
+  const supa = supabaseAdmin();
+  const path = `${args.editionDate}_scoreboard.png`;
+  const { error } = await supa.storage.from(BUCKET).upload(path, args.png, {
+    contentType: "image/png",
+    upsert: true,
+    cacheControl: "31536000",
+  });
+  if (error) throw new Error(`uploadScoreboardShareImage ${path}: ${error.message}`);
+  const { data } = supa.storage.from(BUCKET).getPublicUrl(path);
+  return { path, publicUrl: data.publicUrl };
+}
+
+// Look up an already-uploaded scoreboard image for an edition date. Returns
+// null when the file doesn't exist. Used by /mlb/[editionDate]'s
+// generateMetadata to set og:image when we've already rendered the image.
+export async function getScoreboardShareImageUrl(editionDate: string): Promise<string | null> {
+  const supa = supabaseAdmin();
+  const path = `${editionDate}_scoreboard.png`;
+  // list with a tight prefix filter is cheaper than HEAD or download.
+  const { data, error } = await supa.storage.from(BUCKET).list("", { search: path, limit: 1 });
+  if (error) return null;
+  if (!data?.some((f) => f.name === path)) return null;
+  const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(path);
+  return urlData.publicUrl;
 }

@@ -16,7 +16,8 @@ export type ManifestEntry =
   | { file: string; subId: string; type: "standings"; league: "AL" | "NL" }
   | { file: string; subId: string; type: "leaders"; league: "AL" | "NL" }
   | { file: string; subId: string; type: "boxscore"; title: string; teams: [string, string] }
-  | { file: string; subId: string; type: "full"; gameCount: number };
+  | { file: string; subId: string; type: "full"; gameCount: number }
+  | { file: string; subId: string; type: "scoreboard"; gameCount: number };
 
 export type ImageMime = "image/png" | "image/jpeg";
 
@@ -166,6 +167,67 @@ async function injectShareChrome(page: Page, dateStr: string): Promise<void> {
   }, dateStr);
 }
 
+// Capture the scoreboard share-image using an already-launched browser.
+// Used by both the single-shot renderScoreboardShareImage (which boots its
+// own browser) and renderShareImages (which reuses the same browser to
+// capture multiple images per cron invocation).
+async function captureScoreboardOnBrowser(
+  browser: Browser,
+  args: { editionDate: string; baseUrl: string },
+): Promise<{ png: Uint8Array; width: number; height: number; gameCount: number }> {
+  const url = `${args.baseUrl}/share/mlb/${args.editionDate}`;
+  const page = await browser.newPage();
+  try {
+    await page.evaluateOnNewDocument(
+      "globalThis.__name = globalThis.__name || (function(fn){ return fn; });",
+    );
+    await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 2 });
+    await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
+    await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Count rendered game tiles for use in social-post captions ("15 games")
+    // and the manifest entry. Marker attribute set on each <Tile> in
+    // lib/scoreboard-image.tsx.
+    const gameCount = await page.$$eval(
+      "[data-share-tile]",
+      (els) => els.length,
+    );
+
+    const buffer = await page.screenshot({
+      type: "png",
+      clip: { x: 0, y: 0, width: 1200, height: 630 },
+    });
+    const dpr = await page.evaluate(() => window.devicePixelRatio || 1);
+    return {
+      png: new Uint8Array(buffer),
+      width: 1200 * dpr,
+      height: 630 * dpr,
+      gameCount,
+    };
+  } finally {
+    await page.close();
+  }
+}
+
+// Render the 1200×630 scoreboard share-image — the OG-image for
+// /mlb/[editionDate] link previews and the lead image on the daily Twitter,
+// Bluesky, and Facebook posts. Single-shot version (boots + closes its own
+// browser); inside renderShareImages, captureScoreboardOnBrowser is used
+// directly to share one launch across multiple captures.
+export async function renderScoreboardShareImage(args: {
+  editionDate: string;
+  baseUrl: string;
+}): Promise<{ png: Uint8Array; width: number; height: number }> {
+  const browser = await launchBrowser();
+  try {
+    const { png, width, height } = await captureScoreboardOnBrowser(browser, args);
+    return { png, width, height };
+  } finally {
+    await browser.close();
+  }
+}
+
 export async function renderShareImages(args: {
   date: string;
   baseUrl: string; // e.g. "https://boxscore.email" or "http://localhost:3001"
@@ -180,6 +242,33 @@ export async function renderShareImages(args: {
 
   const browser = await launchBrowser();
   try {
+    const results: RenderedImage[] = [];
+
+    // FIRST capture: the 1200×630 scoreboard share-image from /share/mlb/[date].
+    // Goes at index 0 so the post-* crons (which loop and post one image per
+    // platform call) put the scoreboard at the top of the daily Twitter,
+    // Bluesky, and Facebook series. Render failures are caught — losing the
+    // scoreboard shouldn't block the rest of the per-section captures.
+    try {
+      const sb = await captureScoreboardOnBrowser(browser, {
+        editionDate: nextDay(date), baseUrl,
+      });
+      results.push({
+        entry: {
+          file: "scoreboard.png",
+          subId: "scoreboard",
+          type: "scoreboard",
+          gameCount: sb.gameCount,
+        },
+        png: sb.png,
+        mime: "image/png",
+        width: sb.width,
+        height: sb.height,
+      });
+    } catch (err) {
+      console.error(`scoreboard capture failed: ${(err as Error).message}`);
+    }
+
     const page = await browser.newPage();
     // Stub esbuild's __name helper in the page context. When this lib is
     // imported by a tsx-run script (the share-image backfill, the various
@@ -203,8 +292,6 @@ export async function renderShareImages(args: {
     // dimensions for RenderedImage.width/height so the downstream Bluesky
     // aspectRatio is correct in both environments.
     const dpr = await page.evaluate(() => window.devicePixelRatio || 1);
-
-    const results: RenderedImage[] = [];
 
     // Capture the full-day image FIRST, against the natural web layout —
     // two-up standings/leaders, three-column boxscores. Doing this before

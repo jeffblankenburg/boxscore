@@ -102,6 +102,14 @@ export function imagePostContent(
       alt: `Full MLB digest for ${prettyDate}: standings, leaders, and box scores for all ${gamesLabel}.`,
     };
   }
+  if (entry.type === "scoreboard") {
+    const games = entry.gameCount;
+    const gamesLabel = games === 1 ? "1 game" : `${games} games`;
+    return {
+      text: `⚾ MLB Scoreboard · ${prettyDate} · ${gamesLabel}\n\n#MLB${tail}`,
+      alt: `MLB scoreboard for ${prettyDate}: final scores from ${gamesLabel}.`,
+    };
+  }
   if (entry.type === "standings") {
     const name = entry.league === "AL" ? "American League" : "National League";
     return {

@@ -6,8 +6,8 @@ import { getDigest } from "@/lib/digests";
 import { sendEmail } from "@/lib/email";
 import { dailyEmail, teamDailyEmail } from "@/lib/emails/templates";
 import { nextDay, prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates";
-import { renderShareImages } from "@/lib/render-images";
-import { uploadShareImages } from "@/lib/share-storage";
+import { renderScoreboardShareImage, renderShareImages } from "@/lib/render-images";
+import { uploadScoreboardShareImage, uploadShareImages } from "@/lib/share-storage";
 import { EMAIL_LINK_BASE, siteOrigin } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
 import { findTeam, type Sport } from "@/lib/teams";
@@ -356,6 +356,48 @@ export async function regenerateAllDigests(formData: FormData): Promise<void> {
       : `${returnTo}?error=${encodeURIComponent(msg)}`;
   } catch (err) {
     target = `${returnTo}?error=${encodeURIComponent(`regenerate-all: ${(err as Error).message}`)}`;
+  }
+  redirect(target);
+}
+
+// Manual render+upload of the daily scoreboard share-image. Reuses the same
+// Puppeteer launch path as regenerateShareImages but only captures the one
+// 1200×630 OG-image from /share/mlb/[editionDate]. Once the daily cron picks
+// this up automatically, this action stays around for re-renders on demand.
+export async function renderScoreboardImage(formData: FormData): Promise<void> {
+  const raw = formData.get("editionDate");
+  // Default to TODAY's edition (today in ET) — that's the digest covering
+  // yesterday's games, which is what most operators will want to re-render.
+  const editionDate = typeof raw === "string" && raw
+    ? raw
+    : nextDay(yesterdayInET());
+
+  let target: string;
+  try {
+    if (!isValidIsoDate(editionDate)) throw new Error(`Bad date: ${editionDate}`);
+
+    const origin = await siteOrigin();
+    console.log(`[scoreboard-image] start ${editionDate} origin=${origin}`);
+
+    const t0 = Date.now();
+    const { png, width, height } = await renderScoreboardShareImage({
+      editionDate,
+      baseUrl: origin,
+    });
+    console.log(`[scoreboard-image] rendered ${width}×${height} (${png.length} bytes) in ${Date.now() - t0}ms`);
+
+    const t1 = Date.now();
+    const { publicUrl } = await uploadScoreboardShareImage({ editionDate, png });
+    console.log(`[scoreboard-image] uploaded ${publicUrl} in ${Date.now() - t1}ms`);
+
+    revalidatePath("/admin/share-preview");
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    target = `/admin/share-preview?ok=${encodeURIComponent(`Scoreboard for ${editionDate} (${width}×${height}, ${(png.length / 1024).toFixed(0)} KB) in ${elapsed}s. URL: ${publicUrl}`)}`;
+  } catch (err) {
+    const msg = (err as Error).message;
+    const stack = (err as Error).stack ?? "";
+    console.error(`[scoreboard-image] FAILED for ${editionDate}: ${msg}\n${stack}`);
+    target = `/admin/share-preview?error=${encodeURIComponent(msg)}`;
   }
   redirect(target);
 }

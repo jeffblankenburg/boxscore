@@ -4,6 +4,8 @@ import { getDigest, hasInSeasonDigest } from "@/lib/digests";
 import { getLatestTeamDigest, hasInSeasonTeamDigest } from "@/lib/team-digests";
 import { getSportById, isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
+import { getScoreboardShareImageUrl } from "@/lib/share-storage";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { PaperMasthead } from "@/app/PaperMasthead";
 
 export const dynamicParams = true;
@@ -21,9 +23,46 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
   if (isValidIsoDate(date)) {
     // URL date IS the edition date now (the day labeled on the masthead).
     // Storage and metadata both use that string directly.
+    const editionDate = date;
+    const title = `${row.name} — ${prettyDate(editionDate)} | boxscore`;
+    const description = `Daily ${row.name} digest for ${prettyDate(editionDate)}.`;
+
+    // OpenGraph + Twitter share-image. Only MLB renders a daily image right
+    // now (via the cron in step 3). Other sports return null and fall through
+    // to plain title+description; link previews on those URLs use the site's
+    // favicon as today. When NBA/WNBA go public, each gets its own renderer
+    // and the lookup widens.
+    const shareImageUrl = sport === "mlb"
+      ? await getScoreboardShareImageUrl(editionDate)
+      : null;
+
+    if (!shareImageUrl) return { title, description };
+
+    const ogTitle = `${row.name} — ${prettyDate(editionDate)}`;
     return {
-      title: `${row.name} — ${prettyDate(date)} | boxscore`,
-      description: `Daily ${row.name} digest for ${prettyDate(date)}.`,
+      title, description,
+      openGraph: {
+        title: ogTitle,
+        description,
+        url: `${EMAIL_LINK_BASE}/${sport}/${editionDate}`,
+        siteName: "boxscore",
+        type: "article",
+        // Declared dimensions are the design size (1200×630) per the OG spec
+        // convention; the actual file is 2x retina (2400×1260) but social
+        // platforms downscale on display. Aspect ratio is what matters.
+        images: [{
+          url: shareImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${row.name} scoreboard for ${prettyDate(editionDate)}`,
+        }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: ogTitle,
+        description,
+        images: [shareImageUrl],
+      },
     };
   }
   const team = findTeam(sport as Sport, date);

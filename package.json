@@ -9,6 +9,7 @@
     "generate": "tsx scripts/generate.ts",
     "store": "tsx --env-file=.env.local scripts/generate-and-store.ts",
     "backfill": "tsx --env-file=.env.local scripts/backfill.ts",
+    "backfill-shares": "tsx --env-file=.env.local scripts/backfill-scoreboard-images.ts",
     "screenshot": "tsx scripts/screenshot-sections.ts",
     "typecheck": "tsc --noEmit"
   },
