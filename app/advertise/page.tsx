@@ -306,8 +306,8 @@ export default async function AdvertisePage() {
           <div>
             <h3>We won't run</h3>
             <ul>
-              <li>Sportsbooks or DFS without a regulator disclosure</li>
               <li>Political or issue advocacy</li>
+              <li>Hate-driven content of any kind</li>
               <li>Anything that requires deceptive copy or fake urgency</li>
               <li>Crypto / NFT speculation</li>
               <li>Ads inside a box score itself — the data is the product</li>
