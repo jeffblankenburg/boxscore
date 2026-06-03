@@ -135,12 +135,14 @@ const SHARE_CSS = `
   }
 `;
 
-async function injectShareChrome(page: Page, dateStr: string): Promise<void> {
+async function injectShareChrome(
+  page: Page,
+  editionDateStr: string,
+  gamesDateStr: string,
+): Promise<void> {
   await page.addStyleTag({ content: SHARE_CSS });
-  await page.evaluate((d: string) => {
-    const FOOTER_HTML = "";
-    void FOOTER_HTML;
-    const HEADER_HTML = `
+  await page.evaluate((dates: { edition: string; games: string }) => {
+    const header = (d: string) => `
       <div class="share-header">
         <div class="brand-cell">
           <img src="/icon.png" alt="">
@@ -148,23 +150,27 @@ async function injectShareChrome(page: Page, dateStr: string): Promise<void> {
         </div>
         <div class="share-date">${d}</div>
       </div>`;
+    // Standings + leaders are a snapshot of the morning the digest ships, so
+    // they get stamped with the edition date.
     const standings = Array.from(document.querySelectorAll(".col-standings"));
     standings.forEach((el, i) => {
       const league = i === 0 ? "American League" : "National League";
       const title = el.querySelector(".boxscores-title");
       if (title) title.textContent = `${league} Standings`;
-      el.insertAdjacentHTML("afterbegin", HEADER_HTML);
+      el.insertAdjacentHTML("afterbegin", header(dates.edition));
     });
     const leaders = Array.from(document.querySelectorAll(".col-leaders"));
     leaders.forEach((el, i) => {
       const league = i === 0 ? "American League" : "National League";
       const title = el.querySelector(".boxscores-title");
       if (title) title.textContent = `${league} Leaders`;
-      el.insertAdjacentHTML("afterbegin", HEADER_HTML);
+      el.insertAdjacentHTML("afterbegin", header(dates.edition));
     });
+    // Box scores describe one game played on a specific day, so they get
+    // stamped with the games date — not the day the digest happens to ship.
     const games = Array.from(document.querySelectorAll(".game-container"));
-    games.forEach((el) => el.insertAdjacentHTML("afterbegin", HEADER_HTML));
-  }, dateStr);
+    games.forEach((el) => el.insertAdjacentHTML("afterbegin", header(dates.games)));
+  }, { edition: editionDateStr, games: gamesDateStr });
 }
 
 // Capture the scoreboard share-image using an already-launched browser.
@@ -235,10 +241,13 @@ export async function renderShareImages(args: {
   const { date, baseUrl } = args;
   // Caller passes games_date; the public page now lives at edition_date.
   const url = `${baseUrl}/mlb/${nextDay(date)}`;
-  // Date stamp on the share images is the EDITION date — the day the digest
-  // ships, not the day the games happened (since the image is shared on the
-  // edition day and any reader sees it as "today's edition").
-  const dateStr = prettyDate(nextDay(date));
+  // Per-section captures use two different date stamps:
+  //   - standings + leaders: edition date (a "this morning" snapshot)
+  //   - box scores: games date (anchored to when the game was actually played)
+  // The full-day capture stays on edition date — it's the whole digest, not
+  // a single game.
+  const editionDateStr = prettyDate(nextDay(date));
+  const gamesDateStr = prettyDate(date);
 
   const browser = await launchBrowser();
   try {
@@ -298,11 +307,11 @@ export async function renderShareImages(args: {
     // injectShareChrome avoids the single-column flattening that the
     // per-section CSS imposes.
     const gameCount = (await page.$$(".game-container")).length;
-    const fullImage = await captureFullDigest(page, dateStr, gameCount, dpr);
+    const fullImage = await captureFullDigest(page, editionDateStr, gameCount, dpr);
     if (fullImage) results.push(fullImage);
 
     // Now flatten the page for per-section captures.
-    await injectShareChrome(page, dateStr);
+    await injectShareChrome(page, editionDateStr, gamesDateStr);
     await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
     await new Promise((r) => setTimeout(r, 200));
 
