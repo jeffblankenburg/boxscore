@@ -1497,6 +1497,228 @@ export async function readAdStatsSnapshot(): Promise<PublicAdStatsWithGeneratedA
   };
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// Dashboard hero queries — the four blocks on /admin.
+//
+// Each function is intentionally LEAN so the dashboard can stream blocks
+// independently via Suspense. Count queries use head:true so no rows
+// materialise; everything inside a function runs in Promise.all parallel.
+// ────────────────────────────────────────────────────────────────────────
+
+export type TodaysSendSummary = {
+  sport: string;
+  sportName: string;
+  date: string; // ET digest_date the send was for
+  leagueSent: number; // count of league sends written
+  teamSent: number;   // count of team sends written
+  failed: number;     // sends with error set (league + team)
+  lastSentAt: string | null; // most recent sent_at across this sport's rows
+  hasSendRoute: boolean;     // does this sport have send-email at all?
+  hasTeamSendRoute: boolean; // and team-email?
+};
+
+// Per-sport summary of yesterday's-edition sends. The hero "did it work?" line.
+// Fast: a handful of count queries per sport, all parallel.
+export async function getTodaysSendSummaries(): Promise<TodaysSendSummary[]> {
+  const date = yesterdayInET();
+  const sports = await getVisibleSports({ includeAdminOnly: true });
+  const db = supabaseAdmin();
+
+  const summaries = await Promise.all(
+    sports.map(async (sport): Promise<TodaysSendSummary> => {
+      const features = featuresFor(sport.id);
+      const hasSendRoute = features.expectedRoutes.includes("send-email");
+      const hasTeamSendRoute = features.expectedRoutes.includes("send-team-email");
+
+      // Four parallel count queries + one last-sent timestamp probe.
+      const [leagueSentRes, teamSentRes, failedRes, lastSentRes] = await Promise.all([
+        hasSendRoute
+          ? db.from("sends")
+              .select("id", { count: "exact", head: true })
+              .eq("digest_sport", sport.id)
+              .eq("digest_date", date)
+              .is("team_id", null)
+              .is("error", null)
+          : Promise.resolve({ count: 0, error: null }),
+        hasTeamSendRoute
+          ? db.from("sends")
+              .select("id", { count: "exact", head: true })
+              .eq("digest_sport", sport.id)
+              .eq("digest_date", date)
+              .not("team_id", "is", null)
+              .is("error", null)
+          : Promise.resolve({ count: 0, error: null }),
+        db.from("sends")
+          .select("id", { count: "exact", head: true })
+          .eq("digest_sport", sport.id)
+          .eq("digest_date", date)
+          .not("error", "is", null),
+        db.from("sends")
+          .select("sent_at")
+          .eq("digest_sport", sport.id)
+          .eq("digest_date", date)
+          .order("sent_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      return {
+        sport: sport.id,
+        sportName: sport.name,
+        date,
+        leagueSent: leagueSentRes.count ?? 0,
+        teamSent: teamSentRes.count ?? 0,
+        failed: failedRes.count ?? 0,
+        lastSentAt: (lastSentRes.data as { sent_at: string | null } | null)?.sent_at ?? null,
+        hasSendRoute,
+        hasTeamSendRoute,
+      };
+    }),
+  );
+
+  return summaries;
+}
+
+export type Last24hPulse = {
+  newSubs: number;
+  newSubsPrior: number;        // for delta
+  unsubs: number;
+  unsubsPrior: number;         // for delta
+  opens: number;
+  opensPrior: number;
+  bounces: number;
+  pendingTotal: number;        // total pending right now
+};
+
+// Subscribers in, subscribers out, opens, bounces — last 24h with a delta
+// against the prior 24h so the dashboard can show "+12 vs yesterday" style.
+// All 8 count queries fire in parallel.
+export async function getLast24hPulse(): Promise<Last24hPulse> {
+  const db = supabaseAdmin();
+  const nowMs = Date.now();
+  const last24hIso = new Date(nowMs - 24 * 3600_000).toISOString();
+  const prior24hIso = new Date(nowMs - 48 * 3600_000).toISOString();
+
+  const [
+    newSubsRes,
+    newSubsPriorRes,
+    unsubsRes,
+    unsubsPriorRes,
+    opensRes,
+    opensPriorRes,
+    bouncesRes,
+    pendingRes,
+  ] = await Promise.all([
+    db.from("subscribers")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", last24hIso),
+    db.from("subscribers")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", prior24hIso)
+      .lt("created_at", last24hIso),
+    db.from("subscribers")
+      .select("id", { count: "exact", head: true })
+      .gte("unsubscribed_at", last24hIso),
+    db.from("subscribers")
+      .select("id", { count: "exact", head: true })
+      .gte("unsubscribed_at", prior24hIso)
+      .lt("unsubscribed_at", last24hIso),
+    db.from("email_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "email.opened")
+      .gte("event_at", last24hIso),
+    db.from("email_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "email.opened")
+      .gte("event_at", prior24hIso)
+      .lt("event_at", last24hIso),
+    db.from("email_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "email.bounced")
+      .gte("event_at", last24hIso),
+    db.from("subscribers")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+  ]);
+
+  return {
+    newSubs: newSubsRes.count ?? 0,
+    newSubsPrior: newSubsPriorRes.count ?? 0,
+    unsubs: unsubsRes.count ?? 0,
+    unsubsPrior: unsubsPriorRes.count ?? 0,
+    opens: opensRes.count ?? 0,
+    opensPrior: opensPriorRes.count ?? 0,
+    bounces: bouncesRes.count ?? 0,
+    pendingTotal: pendingRes.count ?? 0,
+  };
+}
+
+export type ActionQueueItem = {
+  key: string;
+  count: number;
+  label: string;
+  href: string;
+};
+
+// Things waiting for admin attention. Returns ALL items, even at count=0,
+// so the dashboard can render them with neutral styling rather than hide
+// them entirely — the empty state is itself useful ("no campaigns waiting").
+const STALE_PENDING_DAYS = 7;
+
+export async function getAdminActionQueue(): Promise<ActionQueueItem[]> {
+  const db = supabaseAdmin();
+  const stalePendingCutoff = new Date(
+    Date.now() - STALE_PENDING_DAYS * 86_400_000,
+  ).toISOString();
+  const yesterday = yesterdayInET();
+
+  const [pendingCampaignsRes, unpaidApprovedRes, stalePendingSubsRes, failedCronsRes] =
+    await Promise.all([
+      db.from("ad_campaigns")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      db.from("ad_campaigns")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "approved")
+        .is("paid_at", null),
+      db.from("subscribers")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .lt("created_at", stalePendingCutoff),
+      db.from("cron_runs")
+        .select("id", { count: "exact", head: true })
+        .eq("date", yesterday)
+        .eq("status", "failed"),
+    ]);
+
+  return [
+    {
+      key: "pending-campaigns",
+      count: pendingCampaignsRes.count ?? 0,
+      label: "Ad campaigns awaiting approval",
+      href: "/admin/ads",
+    },
+    {
+      key: "unpaid-approved",
+      count: unpaidApprovedRes.count ?? 0,
+      label: "Approved campaigns awaiting payment",
+      href: "/admin/ads",
+    },
+    {
+      key: "stale-pending-subs",
+      count: stalePendingSubsRes.count ?? 0,
+      label: `Pending subscribers older than ${STALE_PENDING_DAYS} days`,
+      href: "/admin/operations/email-lookup",
+    },
+    {
+      key: "failed-crons",
+      count: failedCronsRes.count ?? 0,
+      label: "Failed cron runs yesterday",
+      href: "/admin/operations/crons",
+    },
+  ];
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;

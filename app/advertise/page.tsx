@@ -127,17 +127,10 @@ export default async function AdvertisePage() {
                 : `since ${prettyDate(rolling.engagementSince)}`
             }
           />
-          <Stat
-            value={rolling.tracked ? pct(rolling.clickRate) : "—"}
-            label="Click rate"
-            note={
-              !rolling.tracked
-                ? "tracking pending"
-                : rolling.clickRate > INDUSTRY.clickRateThreshold
-                ? `industry avg ${INDUSTRY.clickRateLabel}`
-                : `since ${prettyDate(rolling.engagementSince)}`
-            }
-          />
+          {/* Click rate hidden until the in-house link tracker ships
+              (issue TBD). Resend click tracking has been disabled to fix
+              activation-link breakage, so the prior click rate signal is
+              gone and would read "—" until we wire the new tracker. */}
           <Stat
             value={pct(rolling.deliveryRate)}
             label="Delivery rate"

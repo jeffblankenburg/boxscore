@@ -1,5 +1,4 @@
 import { requireAdmin } from "../require-admin";
-import { AdminNav } from "../AdminNav";
 import { getSupportClicksSummary } from "@/lib/click-tracking";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +10,6 @@ export default async function AdminClicksView() {
 
   return (
     <main className="admin">
-      <AdminNav active="clicks" />
       <h1>Click tracking</h1>
 
       <section>

@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { BRAND } from "@/lib/brand";
@@ -31,15 +31,27 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Middleware sets `x-admin: 1` on admin requests so the admin shell
+  // (app/admin/layout.tsx) can take over the full viewport. Skip the
+  // `.newspaper` wrapper + SiteHeader + SiteFooter for those requests so
+  // the admin layout isn't centered in a 1280px column or topped with the
+  // public site's brand bar.
+  const h = await headers();
+  const isAdmin = h.get("x-admin") === "1";
+
   return (
     <html lang="en">
       <body>
-        <div className="newspaper">
-          <SiteHeader />
-          {children}
-          <SiteFooter />
-        </div>
+        {isAdmin ? (
+          children
+        ) : (
+          <div className="newspaper">
+            <SiteHeader />
+            {children}
+            <SiteFooter />
+          </div>
+        )}
         <Analytics />
         <SpeedInsights />
         <Suspense fallback={null}>

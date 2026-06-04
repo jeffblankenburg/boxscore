@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { requireAdmin } from "../require-admin";
-import { AdminNav } from "../AdminNav";
 import { SubmitButton } from "../SubmitButton";
 import { renderScoreboardImage } from "../actions";
 import { ScoreboardImage, type ScoreTile } from "@/lib/scoreboard-image";
@@ -53,7 +52,6 @@ export default async function ShareImagePreviewPage({
 
   return (
     <main className="admin admin-wide">
-      <AdminNav active="ads" />
       <h1>Share-image preview</h1>
       <p className="admin-meta">
         The 1200×630 image rendered at <code>/share/mlb/[editionDate]</code>{" "}

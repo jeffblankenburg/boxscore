@@ -1,0 +1,1631 @@
+TableID,TableName,Name,DataType,Size,Nullable,Description,IsInCSV,Scrambled
+2001000,Team,TeamID,integer,32,False,The team's unique TeamID as assigned by SportsDataIO,False,False
+2001000,Team,[Key],string,10,False,Abbreviation of the team (e.g. LAD; PHI; BOS; CHC; etc.),True,False
+2001000,Team,Active,boolean,,False,Whether or not this team is active,False,False
+2001000,Team,City,string,50,True,The city/location of the team (e.g. Los Angeles; Philadelphia; Boston; Chicago; etc.),True,False
+2001000,Team,Name,string,50,True,The mascot of the team (e.g. Dodgers; Phillies; Red Sox; Cubs; etc.),True,False
+2001000,Team,StadiumID,integer,32,True,The unique ID of the team's current home stadium,False,False
+2001000,Team,League,string,10,True,The league of the team (possible values: AL; NL),True,False
+2001000,Team,Division,string,10,True,The division of the team (e.g. East; Central; West),False,False
+2001000,Team,PrimaryColor,string,6,True,The team's primary color. (This is not licensed for public or commercial use),True,False
+2001000,Team,SecondaryColor,string,6,True,The team's secondary color. (This is not licensed for public or commercial use),True,False
+2001000,Team,TertiaryColor,string,6,True,The team's tertiary color. (This is not licensed for public or commercial use),True,False
+2001000,Team,QuaternaryColor,string,6,True,The team's quaternary color. (This is not licensed for public or commercial use),True,False
+2001000,Team,WikipediaLogoUrl,string,250,True,The link to the team's logo hosted on Wikipedia. (This is not licensed for public or commercial use),True,False
+2001000,Team,WikipediaWordMarkUrl,string,250,True,The link to the team's wordmark logo hosted on Wikipedia. (This is not licensed for public or commercial use),True,False
+2001000,Team,GlobalTeamID,integer,32,False,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2001000,Team,HeadCoach,string,50,True,The current head coach (manager) of the team,False,False
+2001000,Team,HittingCoach,string,50,True,The current hitting coach of the team. Note: some teams may have multiple or no hitting coaches,False,False
+2001000,Team,PitchingCoach,string,50,True,The current pitching coach of the team. Note: some teams may have multiple or no pitching coaches,False,False
+2002000,Stadium,StadiumID,integer,32,False,The unique ID of the stadium,True,False
+2002000,Stadium,Active,boolean,,False,Whether or not this stadium is active,False,False
+2002000,Stadium,Name,string,100,False,The full name of the stadium,True,False
+2002000,Stadium,City,string,50,True,The city where the stadium is located,True,False
+2002000,Stadium,State,string,10,True,The state where the stadium is located (only US and Canadian stadiums will have values),False,False
+2002000,Stadium,Country,string,10,True,The 3-digit country code where the stadium is located,False,False
+2002000,Stadium,Capacity,integer,32,True,The estimated seating capacity of the stadium,True,False
+2002000,Stadium,Surface,string,50,True,The playing surface of the stadium (Grass; Artificial or Dome),True,False
+2002000,Stadium,LeftField,integer,32,True,The estimated distance between home plate and the left field wall,False,False
+2002000,Stadium,MidLeftField,integer,32,True,The estimated distance between home plate and the mid left field wall,False,False
+2002000,Stadium,LeftCenterField,integer,32,True,The estimated distance between home plate and the left center field wall,False,False
+2002000,Stadium,MidLeftCenterField,integer,32,True,The estimated distance between home plate and the mid left center field wall,False,False
+2002000,Stadium,CenterField,integer,32,True,The estimated distance between home plate and the center field wall,False,False
+2002000,Stadium,MidRightCenterField,integer,32,True,The estimated distance between home plate and the mid right center field wall,False,False
+2002000,Stadium,RightCenterField,integer,32,True,The estimated distance between home plate and the right center field wall,False,False
+2002000,Stadium,MidRightField,integer,32,True,The estimated distance between home plate and the mid right field wall,False,False
+2002000,Stadium,RightField,integer,32,True,The estimated distance between home plate and the right field wall,False,False
+2002000,Stadium,GeoLat,decimal,32,True,The geographic latitude coordinate of this venue,False,False
+2002000,Stadium,GeoLong,decimal,32,True,The geographic longitude coordinate of this venue,False,False
+2002000,Stadium,Altitude,integer,32,True,The altitude of the stadium in feet,False,False
+2002000,Stadium,HomePlateDirection,integer,32,True,The direction that the batter is facing while looking at the pitcher's mound. If the home plate is at the north of the stadium; the batter is facing south; so the value is given as 180 degrees. If home plate is at the east the batter faces west; so it's 270 degrees. If the home plate is at the south the batter faces north; so it's 0 degrees. If the home plate is at the west the batter faces east; so it's 90 degrees.,True,False
+2002000,Stadium,Type,string,50,True,The type of the stadium (possible values: Outdoor; Dome; RetractableDome),True,False
+2003000,Game,GameID,integer,32,False,The unique ID of this game,True,False
+2003000,Game,Season,integer,32,False,The MLB season of the game,True,False
+2003000,Game,SeasonType,integer,32,False,The type of season stage the game belongs to; e.g. Regular season; Post-season. For a description of possible values and how they work; see <a href="https://support.sportsdata.io/hc/en-us/articles/15196612633623-Process-Guide-Season-Types-and-Parameters" target="_blank">here.,True,False
+2003000,Game,Status,string,20,True,The status of the game. For a description of possible values; see <a href="https://support.sportsdata.io/hc/en-us/articles/14287629964567-Process-Guide-Game-Status" target="_blank">here.</a> For how suspended and postponed games are handled specifically; see <a href="https://support.sportsdata.io/hc/en-us/articles/4404845580567-Postponed-and-Rescheduled-Games" target="_blank">here</a>.,True,False
+2003000,Game,Day,date,,True,The date of the game,True,False
+2003000,Game,DateTime,datetime,,True,The date and time of the game (in US Eastern Time),False,False
+2003000,Game,AwayTeam,string,10,False,The abbreviation [Key] of the away team,False,False
+2003000,Game,HomeTeam,string,10,False,The abbreviation [Key] of the home team,False,False
+2003000,Game,AwayTeamID,integer,32,False,The unique TeamID of the away team,False,False
+2003000,Game,HomeTeamID,integer,32,False,The unique ID of the home team,False,False
+2003000,Game,RescheduledGameID,integer,32,True,The GameID of the game that was rescheduled from this game. This only pertains to postponed games that require rescheduling.,True,False
+2003000,Game,StadiumID,integer,32,True,The unique ID of the stadium,True,False
+2003000,Game,Channel,string,50,True,The television station broadcasting the game,True,False
+2003000,Game,Inning,integer,32,True,The inning that the game is currently in; or the inning in which the game ended. Possible values include: NULL; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; etc),True,False
+2003000,Game,InningHalf,string,1,True,The inning half that the game is currently in; or the inning half in which the game ended (possible values: T; B; E: M: NULL),False,False
+2003000,Game,AwayTeamRuns,integer,32,True,Number of runs scored by the away team in the game,False,True
+2003000,Game,HomeTeamRuns,integer,32,True,Number of runs scored by the home team in the game,False,True
+2003000,Game,AwayTeamHits,integer,32,True,Total hits by the away team in the game,False,True
+2003000,Game,HomeTeamHits,integer,32,True,Total hits by the home team in the game,False,True
+2003000,Game,AwayTeamErrors,integer,32,True,Total errors committed by the away team in the game,False,True
+2003000,Game,HomeTeamErrors,integer,32,True,Total errors committed by the home team in the game,False,True
+2003000,Game,WinningPitcherID,integer,32,True,The PlayerID of the pitcher who recorded the win in the game,False,False
+2003000,Game,LosingPitcherID,integer,32,True,The PlayerID of the losing pitcher in the game,False,False
+2003000,Game,SavingPitcherID,integer,32,True,The PlayerID of the pitcher who recorded the save in the game,False,False
+2003000,Game,Attendance,integer,32,True,Total number of people who attended the game,False,False
+2003000,Game,AwayTeamProbablePitcherID,integer,32,True,The PlayerID of the away team's probable pitcher,True,False
+2003000,Game,HomeTeamProbablePitcherID,integer,32,True,The PlayerID of the home team's probable pitcher,True,False
+2003000,Game,Outs,integer,32,True,The number of outs recorded in the current inning of the game,False,False
+2003000,Game,Balls,integer,32,True,The number of balls thrown for the current at bat,True,False
+2003000,Game,Strikes,integer,32,True,The number of strikes thrown for the current at bat,True,False
+2003000,Game,CurrentPitcherID,integer,32,True,The PlayerID of the current pitcher,True,False
+2003000,Game,CurrentHitterID,integer,32,True,The PlayerID of the current hitter,True,False
+2003000,Game,AwayTeamStartingPitcherID,integer,32,True,The PlayerID of the away team's starting pitcher,False,False
+2003000,Game,HomeTeamStartingPitcherID,integer,32,True,The PlayerID of the home team starting pitcher in the game,False,False
+2003000,Game,CurrentPitchingTeamID,integer,32,True,The TeamID of the current pitcher's team,True,False
+2003000,Game,CurrentHittingTeamID,integer,32,True,The TeamID of the current hitter's team,True,False
+2003000,Game,PointSpread,decimal,32,True,The consensus Run Line at game start from the perspective of the HomeTeam (in the Game table; the PointSpread field's negative numbers indicate the HomeTeam is favored; positive numbers indicate the AwayTeam is favored. Note that this rule does not hold in betting-related tables; where the run line is contingent on the bet line). Note: In MLB; Point Spread may also be referred to as Run Line,False,True
+2003000,Game,OverUnder,decimal,32,True,The oddsmaker total points line at game start,False,True
+2003000,Game,AwayTeamMoneyLine,integer,32,True,Moneyline from the perspective of the away team,False,True
+2003000,Game,HomeTeamMoneyLine,integer,32,True,Moneyline from the perspective of the home team,False,True
+2003000,Game,ForecastTempLow,integer,32,True,The forecasted low temperature on game day at this venue (in Fahrenheit),False,True
+2003000,Game,ForecastTempHigh,integer,32,True,The forecasted high temperature on game day at this venue (in Fahrenheit),False,True
+2003000,Game,ForecastDescription,string,50,True,The description of the weather forecast. Posible values include: Broken Clouds; Clear Sky; Few Clouds; Heavy Intensity Rain; Light Rain; Moderate Rain; Mostly Cloudy; Mostly Sunny; Overcast Clouds; Partly Cloudy; Scattered Clouds; Showers; Thunderstorms,True,True
+2003000,Game,ForecastWindChill,integer,32,True,The forecasted wind chill on game day at this venue.,True,True
+2003000,Game,ForecastWindSpeed,integer,32,True,The forecasted wind speed on game day at this venue.,True,True
+2003000,Game,ForecastWindDirection,integer,32,True,The wind direction isn't baseball specific.  It refers to the direction that the wind is coming from.  90 would be wind coming from the east.  180 is wind from the south.  270 is a wind from the west ... and so on.,True,True
+2003000,Game,RescheduledFromGameID,integer,32,True,The GameID of the originally scheduled; postponed game; that this game was rescheduled from. This only pertains to games that are scheduled as "make up" games.,True,True
+2003000,Game,RunnerOnFirst,boolean,,True,Indicates if there is a runner on first base,False,True
+2003000,Game,RunnerOnSecond,boolean,,True,Indicates if there is a runner on second base,False,True
+2003000,Game,RunnerOnThird,boolean,,True,Indicates if there is a runner on third base,False,True
+2003000,Game,AwayTeamStartingPitcher,string,50,True,The first and last name of the away team's starting pitcher for the game,False,True
+2003000,Game,HomeTeamStartingPitcher,string,50,True,The first and last name of the home team starting pitcher for the game,False,True
+2003000,Game,CurrentPitcher,string,50,True,Indicates the current pitcher's name,True,True
+2003000,Game,CurrentHitter,string,50,True,Indicates the current hitter's name,True,True
+2003000,Game,WinningPitcher,string,50,True,The name of the pitcher who recorded the win in the game,False,True
+2003000,Game,LosingPitcher,string,50,True,The first and last name of the losing pitcher in the game,False,True
+2003000,Game,SavingPitcher,string,50,True,The name of the pitcher who recorded the save in the game,False,True
+2003000,Game,DueUpHitterID1,integer,32,True,The PlayerID of the hitter due up first from the current hitter,False,True
+2003000,Game,DueUpHitterID2,integer,32,True,The PlayerID of the hitter due up second from the current hitter,False,True
+2003000,Game,DueUpHitterID3,integer,32,True,The PlayerID of the hitter due up third from the current hitter,False,True
+2003000,Game,GlobalGameID,integer,32,False,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues,False,False
+2003000,Game,GlobalAwayTeamID,integer,32,False,A globally unique ID for the away team. This value is guaranteed to be unique across all sports/leagues,False,False
+2003000,Game,GlobalHomeTeamID,integer,32,False,A globally unique ID for the home team. This value is guaranteed to be unique across all sports/leagues.,False,False
+2003000,Game,PointSpreadAwayTeamMoneyLine,integer,32,True,The moneyline payout odds when betting on the away team with the run line,False,True
+2003000,Game,PointSpreadHomeTeamMoneyLine,integer,32,True,The moneyline payout odds when betting on the home team with the run line,False,True
+2003000,Game,LastPlay,string,250,True,The description of the most recent play/event of the game. This is for display purposes and does not include corresponding data points.,True,True
+2003000,Game,IsClosed,boolean,,False,Indicates whether the game is over and the final score has been verified and closed out. Note: it is recommend for bet resulting to use IsClosed = True rather than simply Final game status,False,False
+2003000,Game,Updated,datetime,,True,The date and time of the late update made to this record (in US Eastern Time),False,False
+2003000,Game,Innings,Inning[],,True,The inning details associated with the game,False,False
+2003000,Game,GameEndDateTime,datetime,,True,The date and time that the game ended in US Eastern Time,True,False
+2003000,Game,HomeRotationNumber,integer,32,True,Rotation number of home team for this game,True,True
+2003000,Game,AwayRotationNumber,integer,32,True,Rotation number of away team for this game,True,True
+2003000,Game,NeutralVenue,boolean,,True,Indicates whether this game is played in a neutral venue. Note: Neutral = True; not neutral = False,False,False
+2003000,Game,InningDescription,string,50,True,The current status of the inning for display purposes (possible values: Top 2; Mid 2; Bot 2; End 2; etc),True,False
+2003000,Game,OverPayout,integer,32,True,The sportsbook's payout for the over,False,True
+2003000,Game,UnderPayout,integer,32,True,The sportsbook's payout for the under,False,True
+2003000,Game,SeriesInfo,Series,32,True,Contains relevant series data for postseason series only - HomeTeamWins; AwayTeamWins; GameNumber; and MaxLength,False,False
+2003000,Game,DateTimeUTC,datetime,,True,The date and time of the game in UTC,False,False
+2003000,Game,HomeTeamOpener,boolean,,True,Indicates whether the home team will use an opener as the starting pitcher. NOTE: An opener is a pitcher (typically a relief pitcher) that is only scheduled to pitch the first 1-3 innings of the game,False,False
+2003000,Game,AwayTeamOpener,boolean,,True,Indicates whether the away team will use an opener as the starting pitcher.. NOTE: An opener is a pitcher (typically a relief pitcher) that is only scheduled to pitch the first 1-3 innings of the game,False,False
+2003000,Game,SuspensionResumeDay,date,,True,The date a game that was suspended in play will be resumed for play. Useful for tracking when a Suspended game will return to an InProgress status.,False,False
+2003000,Game,SuspensionResumeDateTime,datetime,,True,The date and start-time that the suspended in play game will be resumed for play. Useful for tracking when a Suspended game will return to an InProgress status.,False,False
+2053000,ScheduleBasic,GameID,integer,32,True,The unique ID of this game,False,False
+2053000,ScheduleBasic,Season,integer,32,False,The MLB season of the game,True,False
+2053000,ScheduleBasic,SeasonType,integer,32,False,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2053000,ScheduleBasic,Status,string,20,True,Indicates the game's status. Possible values include: Scheduled; InProgress; Final; Suspended; Delayed; Postponed; Canceled; Forfeit; NotNecessary,False,False
+2053000,ScheduleBasic,Day,date,,True,The date of the game,False,False
+2053000,ScheduleBasic,DateTime,datetime,,True,The date and time of the game in US Eastern Time,False,False
+2053000,ScheduleBasic,AwayTeam,string,50,True,The abbreviation [Key] of the away team,False,False
+2053000,ScheduleBasic,HomeTeam,string,50,True,The abbreviation [Key] of the Home Team,False,False
+2053000,ScheduleBasic,AwayTeamID,integer,32,True,The unique TeamID of the away team,False,False
+2053000,ScheduleBasic,HomeTeamID,integer,32,True,The unique ID of the home team,False,False
+2053000,ScheduleBasic,RescheduledGameID,integer,32,True,The GameID of the game that was rescheduled from this game. This only pertains to postponed games that require rescheduling.,True,False
+2053000,ScheduleBasic,StadiumID,integer,32,True,The unique ID of the stadium,True,False
+2053000,ScheduleBasic,IsClosed,boolean,,False,Indicates whether the game is over and the final score has been verified and closed out. Note: it is recommend for bet resulting to use IsClosed = True rather than simply Final game status.,False,False
+2053000,ScheduleBasic,Updated,datetime,,True,The date and time of the late update made to this record (in US Eastern Time),False,False
+2053000,ScheduleBasic,GameEndDateTime,datetime,,True,The date and time that the game ended in US Eastern Time,True,False
+2053000,ScheduleBasic,DateTimeUTC,datetime,,True,The date and time of the game in UTC,False,False
+2053000,ScheduleBasic,SeriesInfo,Series,32,True,Contains relevant series data for postseason series only - HomeTeamWins; AwayTeamWins; GameNumber; and MaxLength,False,False
+2053000,ScheduleBasic,RescheduledFromGameID,integer,32,True,The GameID of the originally scheduled; postponed game; that this game was rescheduled from. This only pertains to games that are scheduled as "make up" games.,True,True
+2053000,ScheduleBasic,SuspensionResumeDay,date,,True,The date a game that was suspended in play will be resumed for play. Useful for tracking when a Suspended game will return to an InProgress status.,False,False
+2053000,ScheduleBasic,SuspensionResumeDateTime,datetime,,True,The date and start-time that the suspended in play game will be resumed for play. Useful for tracking when a Suspended game will return to an InProgress status.,False,False
+2061000,FantasyGame,GameID,integer,32,False,The unique ID of this game,True,False
+2061000,FantasyGame,PlayerID,integer,32,False,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2061000,FantasyGame,SeasonType,integer,32,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar).,False,False
+2061000,FantasyGame,Season,integer,32,True,The MLB season of the game,True,False
+2061000,FantasyGame,Day,date,,True,The date of the game,True,False
+2061000,FantasyGame,DateTime,datetime,,True,The date and time of the game in US Eastern Time,False,False
+2061000,FantasyGame,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2061000,FantasyGame,Opponent,string,10,True,The name [Key] of the player's opponent in the game,False,False
+2061000,FantasyGame,HomeOrAway,string,4,True,Whether the team is home or away,True,False
+2061000,FantasyGame,Jersey,integer,32,True,The player's jersey number.,True,False
+2061000,FantasyGame,Name,string,50,True,Player's full name,False,False
+2061000,FantasyGame,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS,True,False
+2061000,FantasyGame,PositionCategory,string,10,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR,False,False
+2061000,FantasyGame,Games,integer,32,True,The number of games played by the player. Note: for game feeds this will always = 1,False,False
+2061000,FantasyGame,Started,integer,32,True,Whether the player started in the game. Note: started = 1 and not starting = 0,False,False
+2061000,FantasyGame,FantasyPoints,decimal,32,True,Total fantasy points by the player during the game,False,False
+2061000,FantasyGame,FantasyPointsBatting,decimal,32,True,Total batting fantasy points by the player in the game,False,False
+2061000,FantasyGame,FantasyPointsPitching,decimal,32,True,Total pitching fantasy points by the player in the game,False,False
+2061000,FantasyGame,IsGameOver,boolean,,True,Whether or not the game is over (returns ture/false),False,False
+2061000,FantasyGame,FantasyPointsFanDuel,decimal,32,True,Total FanDuel fantasy points by the player in the game,False,False
+2061000,FantasyGame,FantasyPointsYahoo,decimal,32,True,Total Yahoo fantasy points by the player in the game,False,False
+2061000,FantasyGame,FantasyPointsDraftKings,decimal,32,True,Total DraftKings fantasy points by the player in the game,False,False
+2061000,FantasyGame,FanDuelPosition,string,10,True,The player's eligible position in FanDuel's daily fantasy sports platform.,True,False
+2061000,FantasyGame,DraftKingsPosition,string,10,True,The player's eligible position in DraftKings' daily fantasy sports platform.,True,False
+2061000,FantasyGame,YahooPosition,string,10,True,The player's eligible position in Yahoo's daily fantasy sports platform,False,False
+2061000,FantasyGame,OpponentRank,integer,32,True,The ranking of the player's opponent with regards to fantasy points allowed,False,False
+2061000,FantasyGame,OppositionPositionRank,integer,32,True,The ranking of the player's opponent by position with regards to fantasy points allowed,False,False
+2061000,FantasyGame,GlobalGameID,integer,32,True,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues.,False,False
+2061000,FantasyGame,Updated,datetime,,True,The date and time of the late update made to this record (in US Eastern Time),False,False
+2054000,ScoreBasic,AwayTeamRuns,integer,32,True,Number of runs scored by the away team in the game,False,True
+2054000,ScoreBasic,HomeTeamRuns,integer,32,True,Number of runs scored by the home team in the game,False,True
+2054000,ScoreBasic,AwayTeamHits,integer,32,True,Total hits by the away team in the game,False,True
+2054000,ScoreBasic,HomeTeamHits,integer,32,True,Total hits by the home team in the game,False,True
+2054000,ScoreBasic,AwayTeamErrors,integer,32,True,Total errors committed by the away team in the game,False,True
+2054000,ScoreBasic,HomeTeamErrors,integer,32,True,Total errors committed by the home team in the game,False,True
+2054000,ScoreBasic,Attendance,integer,32,True,Total number of people who attended the game,True,False
+2054000,ScoreBasic,GlobalGameID,integer,32,False,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues.,False,False
+2054000,ScoreBasic,GlobalAwayTeamID,integer,32,False,A globally unique ID for the away team. This value is guaranteed to be unique across all sports/leagues.,False,False
+2054000,ScoreBasic,GlobalHomeTeamID,integer,32,False,A globally unique ID for the home team. This value is guaranteed to be unique across all sports/leagues.,False,False
+2054000,ScoreBasic,NeutralVenue,boolean,,True,Indicates whether this game is played in a neutral venue,True,False
+2054000,ScoreBasic,Inning,integer,32,True,The inning that the game is currently in; or the inning in which the game ended. Possible values include: NULL; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; etc),True,False
+2054000,ScoreBasic,InningHalf,string,1,True,The inning half that the game is currently in; or the inning half in which the game ended (possible values: T; B; E: M: NULL),False,False
+2054000,ScoreBasic,GameID,integer,32,True,The unique ID of this game,False,False
+2054000,ScoreBasic,Season,integer,32,False,The MLB season of the game,True,False
+2054000,ScoreBasic,SeasonType,integer,32,False,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2054000,ScoreBasic,Status,string,20,True,Indicates the game's status. Possible values include: Scheduled; InProgress; Final; Suspended; Delayed; Postponed; Canceled; Forfeit; NotNecessary,False,False
+2054000,ScoreBasic,Day,date,,True,The date of the game,False,False
+2054000,ScoreBasic,DateTime,datetime,,True,The date and time of the game in US Eastern Time,False,False
+2054000,ScoreBasic,AwayTeam,string,50,True,The abbreviation [Key] of the away team,False,False
+2054000,ScoreBasic,HomeTeam,string,50,True,The abbreviation [Key] of the Home Team,False,False
+2054000,ScoreBasic,AwayTeamID,integer,32,True,The unique TeamID of the away team,False,False
+2054000,ScoreBasic,HomeTeamID,integer,32,True,The unique ID of the home team,False,False
+2054000,ScoreBasic,RescheduledGameID,integer,32,True,The GameID of the game that was rescheduled from this game. This only pertains to postponed games that require rescheduling.,True,False
+2054000,ScoreBasic,StadiumID,integer,32,True,The unique ID of the stadium,True,False
+2054000,ScoreBasic,IsClosed,boolean,,False,Indicates whether the game is over and the final score has been verified and closed out. Note: it is recommend for bet resulting to use IsClosed = True rather than simply Final game status.,False,False
+2054000,ScoreBasic,Updated,datetime,,True,The date and time of the late update made to this record (in US Eastern Time),False,False
+2054000,ScoreBasic,GameEndDateTime,datetime,,True,The date and time that the game ended in US Eastern Time,True,False
+2054000,ScoreBasic,DateTimeUTC,datetime,,True,The date and time of the game in UTC,False,False
+2054000,ScoreBasic,SeriesInfo,Series,32,True,Contains relevant series data for postseason series only - HomeTeamWins; AwayTeamWins; GameNumber; and MaxLength,False,False
+2054000,ScoreBasic,RescheduledFromGameID,integer,32,True,The GameID of the originally scheduled; postponed game; that this game was rescheduled from. This only pertains to games that are scheduled as "make up" games.,True,True
+2054000,ScoreBasic,SuspensionResumeDay,date,,True,The date a game that was suspended in play will be resumed for play. Useful for tracking when a Suspended game will return to an InProgress status.,False,False
+2054000,ScoreBasic,SuspensionResumeDateTime,datetime,,True,The date and start-time that the suspended in play game will be resumed for play. Useful for tracking when a Suspended game will return to an InProgress status.,False,False
+2004000,Inning,InningID,integer,32,False,The unique ID of this specific inning,False,False
+2004000,Inning,GameID,integer,32,False,The unique ID of the game tied to this Inning,False,False
+2004000,Inning,InningNumber,integer,32,False,The current inning number of the game,False,False
+2004000,Inning,AwayTeamRuns,integer,32,True,Number of runs scored by the away team in the specific inning,False,True
+2004000,Inning,HomeTeamRuns,integer,32,True,Number of runs scored by the home team in the specific inning,False,True
+2005000,Player,PlayerID,integer,32,False,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2005000,Player,SportsDataID,string,50,True,Deprecated. Use SportRadarPlayerID instead.,True,False
+2005000,Player,Status,string,50,True,Indicates the player's status of being on an Major League Active Roster. Possible values include: Active; 40 Man Active; Non-Roster Invitee; Minors; Inactive; 7 Day Injury List; 10 Day Injury List; 15 Day Injury List; 60 Day Injury List; Restricted List; Paternity List; Bereavement List; Military List,True,False
+2005000,Player,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2005000,Player,Team,string,10,True,The abbreviation [Key] of the team that the player belongs to,False,False
+2005000,Player,Jersey,integer,32,True,The player's jersey number.,True,False
+2005000,Player,PositionCategory,string,10,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR,True,False
+2005000,Player,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS,False,False
+2005000,Player,MLBAMID,integer,32,True,The player's unique PlayerID for cross reference use with MLB AM,False,False
+2005000,Player,FirstName,string,50,True,The player's first name,False,False
+2005000,Player,LastName,string,50,True,The player's last name,False,False
+2005000,Player,BatHand,string,1,True,The player's batting hand. Possible values: R; L; S,True,False
+2005000,Player,ThrowHand,string,1,True,The player's throwing hand. Possible values: R; L; S,True,False
+2005000,Player,Height,integer,32,True,The player's height in inches,False,False
+2005000,Player,Weight,integer,32,True,The weight of the player in pounds (lbs).,False,False
+2005000,Player,BirthDate,datetime,,True,The player's date of birth,False,False
+2005000,Player,BirthCity,string,50,True,The city in which the player was born,False,False
+2005000,Player,BirthState,string,50,True,The state in which the player was born. Note: State will be NULL for all countries outside of North America and Australia,False,False
+2005000,Player,BirthCountry,string,50,True,The country in which the player was born,False,False
+2005000,Player,HighSchool,string,50,True,The high school that the player attended. Note: If the player attended a college; this field will be NULL,False,False
+2005000,Player,College,string,50,True,The college that the player attended. Note: If player did not attend college this field will contain "None" and a high school will be added if applicable,False,False
+2005000,Player,ProDebut,date,,True,The date that this player made his MLB debut.,True,False
+2005000,Player,Salary,integer,32,True,Field is expected to be NULL,False,False
+2005000,Player,PhotoUrl,string,250,True,Field is expected to be NULL,False,False
+2005000,Player,SportRadarPlayerID,string,50,True,The player's unique PlayerID for cross reference use with Stats Player,False,False
+2005000,Player,RotoworldPlayerID,integer,32,True,The player's unique PlayerID for cross reference use with Rotoworld.,True,False
+2005000,Player,RotoWirePlayerID,integer,32,True,The player's unique PlayerID for cross reference use with RotoWire.,True,False
+2005000,Player,FantasyAlarmPlayerID,integer,32,True,The player's unique PlayerID for cross reference use with FantasyAlarm,False,False
+2005000,Player,StatsPlayerID,integer,32,True,The player's unique PlayerID for cross reference use with Stats Player.,True,False
+2005000,Player,SportsDirectPlayerID,integer,32,True,The player's cross reference PlayerID to the SportsDirect data feeds; now part of Nielsen GraceNote.,True,False
+2005000,Player,XmlTeamPlayerID,integer,32,True,The player's unique PlayerID for cross reference use with Xml Team,False,False
+2005000,Player,InjuryStatus,string,50,True,The player's current injury status; in the form of likelihood that player plays. Possible values: Probable; Questionable; Doubtful; Out,False,True
+2005000,Player,InjuryBodyPart,string,50,True,Indicates the player's injured body part. (e.g. ankle; knee; elbow; etc.),False,True
+2005000,Player,InjuryStartDate,date,,True,The day that the injury started or first discovered.,False,False
+2005000,Player,InjuryNotes,string,250,True,Brief description of the player's injury and expected availability,False,True
+2005000,Player,FanDuelPlayerID,integer,32,True,The player's unique PlayerID for cross reference use with FanDuel,False,False
+2005000,Player,DraftKingsPlayerID,integer,32,True,The player's unique PlayerID for cross reference use with DraftKings.,True,False
+2005000,Player,YahooPlayerID,integer,32,True,The player's unique PlayerID for cross reference use with Yahoo,False,False
+2005000,Player,UpcomingGameID,integer,32,True,The unique ID of a player's next upcoming game,False,False
+2005000,Player,FanDuelName,string,50,True,The player's name on FanDuel,False,False
+2005000,Player,DraftKingsName,string,50,True,The player's name on DraftKings,False,False
+2005000,Player,YahooName,string,50,True,The player's name as displayed on/by Yahoo,False,False
+2005000,Player,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2005000,Player,FantasyDraftName,string,50,True,The player's name on Fantasy Draft,False,False
+2005000,Player,FantasyDraftPlayerID,integer,32,True,The player's unique PlayerID for cross reference use with Fantasy Draft,False,False
+2005000,Player,Experience,string,20,True,The player's years of experience,True,False
+2005000,Player,UsaTodayPlayerID,integer,32,True,The player's cross reference PlayerID to USA Today headshot data feeds.,True,False
+2005000,Player,UsaTodayHeadshotUrl,string,100,True,The player's headshot URL as provided by USA Today. License from USA Today is required.,True,False
+2005000,Player,UsaTodayHeadshotNoBackgroundUrl,string,100,True,The player's transparent background headshot URL as provided by USA Today. License from USA Today is required.,True,False
+2005000,Player,UsaTodayHeadshotUpdated,datetime,,True,The last updated date of the player's headshot as provided by USA Today. License from USA Today is required.,True,False
+2005000,Player,UsaTodayHeadshotNoBackgroundUpdated,datetime,,True,The last updated date of the player's transparent background headshot as provided by USA Today. License from USA Today is required.,True,False
+2055000,PlayerBasic,PlayerID,integer,32,False,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2055000,PlayerBasic,SportsDataID,string,50,True,Deprecated. Use SportRadarPlayerID instead.,True,False
+2055000,PlayerBasic,Status,string,50,True,Indicates the player's status of being on an Major League Active Roster. Possible values include: Active; 40 Man Active; Non-Roster Invitee; Minors; Inactive; 7 Day Injury List; 10 Day Injury List; 15 Day Injury List; 60 Day Injury List; Restricted List; Paternity List; Bereavement List; Military List,True,False
+2055000,PlayerBasic,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2055000,PlayerBasic,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2055000,PlayerBasic,Jersey,integer,32,True,The player's jersey number,False,False
+2055000,PlayerBasic,PositionCategory,string,10,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR,True,False
+2055000,PlayerBasic,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS,False,False
+2055000,PlayerBasic,FirstName,string,50,True,The player's first name,False,False
+2055000,PlayerBasic,LastName,string,50,True,The player's last name,False,False
+2055000,PlayerBasic,BirthDate,datetime,,True,The player's date of birth,False,False
+2055000,PlayerBasic,BirthCity,string,50,True,The city in which the player was born,False,False
+2055000,PlayerBasic,BirthState,string,50,True,The state in which the player was born. Note: State will be NULL for all countries outside of North America and Australia,False,False
+2055000,PlayerBasic,BirthCountry,string,50,True,The country in which the player was born,False,False
+2055000,PlayerBasic,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2055000,PlayerBasic,BatHand,string,1,True,The player's batting hand. Possible values: R; L; S,True,False
+2055000,PlayerBasic,ThrowHand,string,1,True,The player's throwing hand. Possible values: R; L; S,True,False
+2055000,PlayerBasic,Height,integer,32,True,The player's height in inches,False,False
+2055000,PlayerBasic,Weight,integer,32,True,The weight of the player in pounds (lbs.),False,False
+2008000,PlayerGame,StatID,integer,32,False,The unique ID of the stat,True,False
+2008000,PlayerGame,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2008000,PlayerGame,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2008000,PlayerGame,SeasonType,integer,32,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2008000,PlayerGame,Season,integer,32,True,The MLB season of the game,True,False
+2008000,PlayerGame,Name,string,50,True,Player's full name,False,False
+2008000,PlayerGame,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2008000,PlayerGame,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS,True,False
+2008000,PlayerGame,PositionCategory,string,10,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR,False,False
+2008000,PlayerGame,Started,integer,32,True,Whether the player started in the game. Note: started = 1 and not starting = 0,False,False
+2008000,PlayerGame,BattingOrder,integer,32,True,Where the player batted in the lineup for the game (1;2;3; etc.),False,True
+2008000,PlayerGame,FanDuelSalary,integer,32,True,The player's salary for FanDuel daily fantasy contests.,True,True
+2008000,PlayerGame,DraftKingsSalary,integer,32,True,The player's salary for DraftKings daily fantasy contests.,True,True
+2008000,PlayerGame,FantasyDataSalary,integer,32,True,The player's salary as calculated by SportsDataIO (formerly known as FantasyData). Based on the same salary cap as DraftKings contests ($50;000),False,True
+2008000,PlayerGame,YahooSalary,integer,32,True,The player's salary for Yahoo daily fantasy contests,False,True
+2008000,PlayerGame,InjuryStatus,string,50,True,The player's current injury status; in the form of likelihood that player plays. Possible values: Probable; Questionable; Doubtful; Out,False,True
+2008000,PlayerGame,InjuryBodyPart,string,50,True,Indicates the player's injured body part. (e.g. ankle; knee; elbow; etc.),False,True
+2008000,PlayerGame,InjuryStartDate,date,,True,The day that the injury started or first discovered.,True,False
+2008000,PlayerGame,InjuryNotes,string,250,True,Brief description of the player's injury and expected availability,False,True
+2008000,PlayerGame,FanDuelPosition,string,10,True,The player's eligible position in FanDuel's daily fantasy sports platform.,True,False
+2008000,PlayerGame,DraftKingsPosition,string,10,True,The player's eligible position in DraftKings' daily fantasy sports platform.,True,False
+2008000,PlayerGame,YahooPosition,string,10,True,The player's eligible position in Yahoo's daily fantasy sports platform,False,False
+2008000,PlayerGame,OpponentRank,integer,32,True,The ranking of the player's opponent with regards to fantasy points allowed,False,True
+2008000,PlayerGame,OpponentPositionRank,integer,32,True,The ranking of the player's opponent by position with regards to fantasy points allowed,False,True
+2008000,PlayerGame,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2008000,PlayerGame,FantasyDraftSalary,integer,32,True,The player's salary for Fantasy Draft daily fantasy contests.,True,True
+2008000,PlayerGame,FantasyDraftPosition,string,10,True,The player's eligible position in Fantasy Drafts daily fantasy sports platform.,True,False
+2008000,PlayerGame,GameID,integer,32,True,The unique ID of this game,True,False
+2008000,PlayerGame,OpponentID,integer,32,True,The unique ID of the team's opponent,True,False
+2008000,PlayerGame,Opponent,string,10,True,The name of the opponent ,True,False
+2008000,PlayerGame,Day,date,,True,The day of the game,True,False
+2008000,PlayerGame,DateTime,datetime,,True,The date and time of the game,True,False
+2008000,PlayerGame,HomeOrAway,string,4,True,Whether the team is home or away,True,False
+2008000,PlayerGame,IsGameOver,boolean,,False,Whether the game is over (true/false),True,False
+2008000,PlayerGame,GlobalGameID,integer,32,True,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues.,False,False
+2008000,PlayerGame,GlobalOpponentID,integer,32,True,A globally unique ID for this opponent. This value is guaranteed to be unique across all sports/leagues.,True,False
+2008000,PlayerGame,Updated,datetime,,True,The timestamp of when the record was last updated (US Eastern Time).,True,False
+2008000,PlayerGame,Games,integer,32,True,The number of games played.,True,False
+2008000,PlayerGame,FantasyPoints,decimal,32,True,Total fantasy points,True,True
+2008000,PlayerGame,AtBats,decimal,32,True,At bats while hitting,True,True
+2008000,PlayerGame,Runs,decimal,32,True,Total runs scored.,True,True
+2008000,PlayerGame,Hits,decimal,32,True,Total hits,True,True
+2008000,PlayerGame,Singles,decimal,32,True,Total singles,True,True
+2008000,PlayerGame,Doubles,decimal,32,True,Total doubles,True,True
+2008000,PlayerGame,Triples,decimal,32,True,Total triples,True,True
+2008000,PlayerGame,HomeRuns,decimal,32,True,Total home runs,True,True
+2008000,PlayerGame,RunsBattedIn,decimal,32,True,Total runs batted in,True,True
+2008000,PlayerGame,BattingAverage,decimal,32,True,Total batting average,True,True
+2008000,PlayerGame,Outs,decimal,32,True,Total outs,True,True
+2008000,PlayerGame,Strikeouts,decimal,32,True,Total strikeouts,True,True
+2008000,PlayerGame,Walks,decimal,32,True,Total walks,True,True
+2008000,PlayerGame,HitByPitch,decimal,32,True,Total times hit by pitch,True,True
+2008000,PlayerGame,Sacrifices,decimal,32,True,Total sacrifices,True,True
+2008000,PlayerGame,SacrificeFlies,decimal,32,True,Total sacrifice flies,True,True
+2008000,PlayerGame,GroundIntoDoublePlay,decimal,32,True,Total times grounded into double play,True,True
+2008000,PlayerGame,StolenBases,decimal,32,True,Total stolen bases,True,True
+2008000,PlayerGame,CaughtStealing,decimal,32,True,Total caught stealing,True,True
+2008000,PlayerGame,PitchesSeen,decimal,32,True,Total pitches seen,True,True
+2008000,PlayerGame,OnBasePercentage,decimal,32,True,Total on base percentage,True,True
+2008000,PlayerGame,SluggingPercentage,decimal,32,True,Total slugging percentage,True,True
+2008000,PlayerGame,OnBasePlusSlugging,decimal,32,True,Total on base plus percentage ,True,True
+2008000,PlayerGame,Errors,decimal,32,True,Total errors,True,True
+2008000,PlayerGame,Wins,decimal,32,True,Total wins by the team/player,True,True
+2008000,PlayerGame,Losses,decimal,32,True,Total losses by the team/player,True,True
+2008000,PlayerGame,Saves,decimal,32,True,Total saves by team/player,True,True
+2008000,PlayerGame,InningsPitchedDecimal,decimal,32,True,Decimal representation of total innings pitched (e.g. 1.33; 7.66; etc),True,True
+2008000,PlayerGame,TotalOutsPitched,decimal,32,True,Total outs pitched by team/player,True,True
+2008000,PlayerGame,InningsPitchedFull,decimal,32,True,Total full innings pitched (e.g. 6; 71; 89; etc),True,True
+2008000,PlayerGame,InningsPitchedOuts,decimal,32,True,Outs pitched beyond InningsPitchedFull (possible values: 0; 1; 2),True,True
+2008000,PlayerGame,EarnedRunAverage,decimal,32,True,Total earned run average by team/player,True,True
+2008000,PlayerGame,PitchingHits,decimal,32,True,Hits allowed while pitching,True,True
+2008000,PlayerGame,PitchingRuns,decimal,32,True,Runs allowed while pitching,True,True
+2008000,PlayerGame,PitchingEarnedRuns,decimal,32,True,Earned runs allowed while pitching,True,True
+2008000,PlayerGame,PitchingWalks,decimal,32,True,Walks allowed while pitching,True,True
+2008000,PlayerGame,PitchingStrikeouts,decimal,32,True,Strikeouts allowed while pitching,True,True
+2008000,PlayerGame,PitchingHomeRuns,decimal,32,True,Home runs allowed while pitching,True,True
+2008000,PlayerGame,PitchesThrown,decimal,32,True,Total pitches thrown while pitching,True,True
+2008000,PlayerGame,PitchesThrownStrikes,decimal,32,True,Total pitches thrown for strikes while pitching,True,True
+2008000,PlayerGame,WalksHitsPerInningsPitched,decimal,32,True,Walks plus hits per innings pitched (WHIP) while pitching,True,True
+2008000,PlayerGame,PitchingBattingAverageAgainst,decimal,32,True,Total batting average against (BAA) while pitching,True,True
+2008000,PlayerGame,GrandSlams,decimal,32,True,Total grand slams,True,True
+2008000,PlayerGame,FantasyPointsFanDuel,decimal,32,True,Total FanDuel fantasy points,True,True
+2008000,PlayerGame,FantasyPointsDraftKings,decimal,32,True,Total DraftKings fantasy points,True,True
+2008000,PlayerGame,FantasyPointsYahoo,decimal,32,True,Total Yahoo fantasy points,True,True
+2008000,PlayerGame,PlateAppearances,decimal,32,True,Total plate appearances,True,True
+2008000,PlayerGame,TotalBases,decimal,32,True,Number of total bases,True,True
+2008000,PlayerGame,FlyOuts,decimal,32,True,Total fly outs,True,True
+2008000,PlayerGame,GroundOuts,decimal,32,True,Total ground outs,True,True
+2008000,PlayerGame,LineOuts,decimal,32,True,Total line outs,True,True
+2008000,PlayerGame,PopOuts,decimal,32,True,Total pop outs,True,True
+2008000,PlayerGame,IntentionalWalks,decimal,32,True,Total intentional walks,True,True
+2008000,PlayerGame,ReachedOnError,decimal,32,True,Total times reached on error,True,True
+2008000,PlayerGame,BallsInPlay,decimal,32,True,Total balls in play,True,True
+2008000,PlayerGame,BattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP),True,True
+2008000,PlayerGame,WeightedOnBasePercentage,decimal,32,True,Total weight on base percentage,True,True
+2008000,PlayerGame,PitchingSingles,decimal,32,True,Total singles allowed while pitching,True,True
+2008000,PlayerGame,PitchingDoubles,decimal,32,True,Total doubles allowed while pitching,True,True
+2008000,PlayerGame,PitchingTriples,decimal,32,True,Total triples allowed while pitching,True,True
+2008000,PlayerGame,PitchingGrandSlams,decimal,32,True,Total grand slams allowed while pitching,True,True
+2008000,PlayerGame,PitchingHitByPitch,decimal,32,True,Total batters hit by pitch while pitching,True,True
+2008000,PlayerGame,PitchingSacrifices,decimal,32,True,Total sacrifices while pitching,True,True
+2008000,PlayerGame,PitchingSacrificeFlies,decimal,32,True,Total sacrifice flies while pitching,True,True
+2008000,PlayerGame,PitchingGroundIntoDoublePlay,decimal,32,True,Total grounded into double plays while pitching,True,True
+2008000,PlayerGame,PitchingCompleteGames,decimal,32,True,Total complete games while pitching,True,True
+2008000,PlayerGame,PitchingShutOuts,decimal,32,True,Total shuouts while pitching,True,True
+2008000,PlayerGame,PitchingNoHitters,decimal,32,True,Total no hitters while pitching,True,True
+2008000,PlayerGame,PitchingPerfectGames,decimal,32,True,Total perfect games while pitching,True,True
+2008000,PlayerGame,PitchingPlateAppearances,decimal,32,True,Total plate appearances while pitching,True,True
+2008000,PlayerGame,PitchingTotalBases,decimal,32,True,Total bases while pitching,True,True
+2008000,PlayerGame,PitchingFlyOuts,decimal,32,True,Total fly outs while pitching,True,True
+2008000,PlayerGame,PitchingGroundOuts,decimal,32,True,Total ground outs while pitching,True,True
+2008000,PlayerGame,PitchingLineOuts,decimal,32,True,Total line outs while pitching,True,True
+2008000,PlayerGame,PitchingPopOuts,decimal,32,True,Total pop outs while pitching,True,True
+2008000,PlayerGame,PitchingIntentionalWalks,decimal,32,True,Total intentional walks while pitching,True,True
+2008000,PlayerGame,PitchingReachedOnError,decimal,32,True,Total times reached on error while pitching,True,True
+2008000,PlayerGame,PitchingCatchersInterference,decimal,32,True,Total catchers interference while pitching,True,True
+2008000,PlayerGame,PitchingBallsInPlay,decimal,32,True,Total balls in play while pitching,True,True
+2008000,PlayerGame,PitchingOnBasePercentage,decimal,32,True,Total on base percentage (OBP) while pitching,True,True
+2008000,PlayerGame,PitchingSluggingPercentage,decimal,32,True,Total slugging percentage (SLG) while pitching,True,True
+2008000,PlayerGame,PitchingOnBasePlusSlugging,decimal,32,True,Total on base plus slugging (OPS) while pitching,True,True
+2008000,PlayerGame,PitchingStrikeoutsPerNineInnings,decimal,32,True,Total strikeouts per nine innings (K/9) while pitching,True,True
+2008000,PlayerGame,PitchingWalksPerNineInnings,decimal,32,True,Total walks per nine innings (BB/9) while pitching,True,True
+2008000,PlayerGame,PitchingBattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP) while pitching,True,True
+2008000,PlayerGame,PitchingWeightedOnBasePercentage,decimal,32,True,Total weighted on base percentage while pitching ,True,True
+2008000,PlayerGame,DoublePlays,decimal,32,True,Total double plays; defined as one of: Bunted into Double Play; Fly into Double Play; Fouled into Double Play; Ground into Double Pla;y Line into Double Play; Popped into Double Play,True,True
+2008000,PlayerGame,PitchingDoublePlays,decimal,32,True,Total double plays while pitching,True,True
+2008000,PlayerGame,BattingOrderConfirmed,boolean,,True,Whether the batting order is confirmed (true/false),True,True
+2008000,PlayerGame,IsolatedPower,decimal,32,True,Total isolated power (ISO),True,True
+2008000,PlayerGame,FieldingIndependentPitching,decimal,32,True,Total fielding independent pitching (FIP),True,True
+2008000,PlayerGame,PitchingQualityStarts,decimal,32,True,Total quality starts pitched,True,True
+2008000,PlayerGame,PitchingInningStarted,integer,32,True,The inning that the pitcher entered the game (if any).,True,True
+2008000,PlayerGame,LeftOnBase,decimal,32,True,Total left on base percentage ,True,True
+2008000,PlayerGame,PitchingHolds,decimal,32,True,Total holds pitched,True,True
+2008000,PlayerGame,PitchingBlownSaves,decimal,32,True,Total blown saves pitched,True,True
+2008000,PlayerGame,SubstituteBattingOrder,integer,32,True,The position in the batting order where this player was substituted into the game (does not include players in the starting lineup),True,True
+2008000,PlayerGame,SubstituteBattingOrderSequence,integer,32,True,The sequence in which this player was substituted into the game; within the particular batting order,True,True
+2008000,PlayerGame,FantasyPointsFantasyDraft,decimal,32,True,Total FantasyDraft fantasy points,True,True
+2008000,PlayerGame,FantasyPointsBatting,decimal,32,True,Total batting fantasy points,True,
+2008000,PlayerGame,FantasyPointsPitching,decimal,32,True,Total pitching fantasy points,True,
+2056000,PlayerGameBasic,Updated,datetime,,True,The date and time of the late update made to this record (in US Eastern Time),False,False
+2056000,PlayerGameBasic,Games,integer,32,True,The number of games played by the player. Note: for game feeds this will always = 1.,False,False
+2056000,PlayerGameBasic,AtBats,decimal,32,True,Total at bats by the player in the game,False,True
+2056000,PlayerGameBasic,Runs,decimal,32,True,Total runs scored by the player in the game,False,True
+2056000,PlayerGameBasic,Hits,decimal,32,True,Total hits by the player in the game,False,True
+2056000,PlayerGameBasic,Singles,decimal,32,True,Total singles by the player in the game,False,True
+2056000,PlayerGameBasic,Doubles,decimal,32,True,Total double plays by the player in the game. Note: includes all types of double plays. Ex: ground into double play; fly into double play; popped out into double play; etc.,False,True
+2056000,PlayerGameBasic,Triples,decimal,32,True,Total triples by the player in the game,False,True
+2056000,PlayerGameBasic,HomeRuns,decimal,32,True,Total home runs by the player in the game,False,True
+2056000,PlayerGameBasic,RunsBattedIn,decimal,32,True,Total runs batted in by the player in the game,False,True
+2056000,PlayerGameBasic,BattingAverage,decimal,32,True,Total batting average by the player in the game,False,True
+2056000,PlayerGameBasic,Outs,decimal,32,True,Total batting outs by the player in the game,False,True
+2056000,PlayerGameBasic,Strikeouts,decimal,32,True,Total strikeouts while batting by the player in the game,False,True
+2056000,PlayerGameBasic,Walks,decimal,32,True,Total walks recorded by the player in the game,False,True
+2056000,PlayerGameBasic,HitByPitch,decimal,32,True,Total times the player was hit by a pitch in the game,False,True
+2056000,PlayerGameBasic,Sacrifices,decimal,32,True,Total sacrifices by the player in the game,False,True
+2056000,PlayerGameBasic,SacrificeFlies,decimal,32,True,Total sacrifice flies by the player in the game,False,True
+2056000,PlayerGameBasic,GroundIntoDoublePlay,decimal,32,True,Total times the player grounded into double play (GIDP) in the game,False,True
+2056000,PlayerGameBasic,StolenBases,decimal,32,True,Total stolen bases by the player in the game,False,True
+2056000,PlayerGameBasic,CaughtStealing,decimal,32,True,Total times the player was caught stealing in the game,False,True
+2056000,PlayerGameBasic,PitchesSeen,decimal,32,True,Total pitches seen by the player in the game,False,True
+2056000,PlayerGameBasic,OnBasePercentage,decimal,32,True,Total on base percentage (OBP) by the player in the game,False,True
+2056000,PlayerGameBasic,SluggingPercentage,decimal,32,True,Total slugging percentage (SLG) of the player in the game.,False,True
+2056000,PlayerGameBasic,OnBasePlusSlugging,decimal,32,True,Total on base plus slugging percentage (OPS) by the player in the game,False,True
+2056000,PlayerGameBasic,Errors,decimal,32,True,Total errors committed by the player in the game,False,True
+2056000,PlayerGameBasic,Wins,decimal,32,True,Total wins recorded by the pitcher in the game,False,True
+2056000,PlayerGameBasic,Losses,decimal,32,True,Total pitching losses by the player in the game. Note: this can be either 0 or 1 for single game (non-projected) fields.,False,True
+2056000,PlayerGameBasic,Saves,decimal,32,True,Total saves by the player in the game,False,True
+2056000,PlayerGameBasic,InningsPitchedDecimal,decimal,32,True,Decimal representation of total innings pitched by the player in the game. Note: 1 out in an inning would be .33. 2 outs would be .66. Ex: 5 full innings and 1 out would be 5.33.,False,True
+2056000,PlayerGameBasic,TotalOutsPitched,decimal,32,True,The total number of outs recorded by the player in the game,False,True
+2056000,PlayerGameBasic,InningsPitchedFull,decimal,32,True,Total full innings pitched by the player in the game. Note: if the player has pitched 5.33 innings; this will be 5 as the 6th inning was not "full" yet.,False,True
+2056000,PlayerGameBasic,InningsPitchedOuts,decimal,32,True,Outs pitched beyond InningsPitchedFull by the player in the game (possible values: 0; 1; 2),False,True
+2056000,PlayerGameBasic,EarnedRunAverage,decimal,32,True,Total earned run average by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingHits,decimal,32,True,Total hits allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingRuns,decimal,32,True,Total runs allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingEarnedRuns,decimal,32,True,Total earned runs allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingWalks,decimal,32,True,Total walks allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingStrikeouts,decimal,32,True,Total strikeouts while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingHomeRuns,decimal,32,True,Total home runs allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchesThrown,decimal,32,True,Total pitches thrown by the player in the game,False,True
+2056000,PlayerGameBasic,PitchesThrownStrikes,decimal,32,True,Total pitches thrown for strikes by the player in the game,False,True
+2056000,PlayerGameBasic,WalksHitsPerInningsPitched,decimal,32,True,Total walks and hits allowed by a player divided by innings pitched (WHIP) in the game,False,True
+2056000,PlayerGameBasic,PitchingBattingAverageAgainst,decimal,32,True,Total batting average against (BAA) while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,GrandSlams,decimal,32,True,Total grand slams by the player in the game,False,True
+2056000,PlayerGameBasic,PlateAppearances,decimal,32,True,Total plate appearances by the player in the game,False,True
+2056000,PlayerGameBasic,TotalBases,decimal,32,True,The total number of bases recorded by the player in the game,False,True
+2056000,PlayerGameBasic,FlyOuts,decimal,32,True,Total fly outs by the player in the game,False,True
+2056000,PlayerGameBasic,GroundOuts,decimal,32,True,Total ground outs by the player in the game,False,True
+2056000,PlayerGameBasic,LineOuts,decimal,32,True,Total lineouts by the player in the game,False,True
+2056000,PlayerGameBasic,PopOuts,decimal,32,True,Total pop outs by the player in the game,False,True
+2056000,PlayerGameBasic,IntentionalWalks,decimal,32,True,Total intentional walks by the player in the game,False,True
+2056000,PlayerGameBasic,ReachedOnError,decimal,32,True,Total times the player reached base on an error in the game,False,True
+2056000,PlayerGameBasic,BallsInPlay,decimal,32,True,Total balls in play by the player in the game,False,True
+2056000,PlayerGameBasic,BattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP),True,True
+2056000,PlayerGameBasic,WeightedOnBasePercentage,decimal,32,True,Total weighted on base percentage (wOBA) by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingSingles,decimal,32,True,Total singles allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingDoubles,decimal,32,True,Total doubles allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingTriples,decimal,32,True,Total triples allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingGrandSlams,decimal,32,True,Total grand slams allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingHitByPitch,decimal,32,True,Total batters hit by pitch while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingSacrifices,decimal,32,True,Total sacrifices while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingSacrificeFlies,decimal,32,True,Total sacrifice flies while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingGroundIntoDoublePlay,decimal,32,True,Total grounded into double plays while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingCompleteGames,decimal,32,True,Total complete games while pitching by the player in the game. Note: there can only be maximum one complete game pitched per game.,False,True
+2056000,PlayerGameBasic,PitchingShutOuts,decimal,32,True,Total shutouts while pitching by the player in the game. Note: a player can have a maximum of one shutout in a single game.,False,True
+2056000,PlayerGameBasic,PitchingNoHitters,decimal,32,True,Total no hitters while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingPerfectGames,decimal,32,True,Total perfect games while pitching by the player in the game. Note: there can be a maximum of one perfect game in a single game.,False,True
+2056000,PlayerGameBasic,PitchingPlateAppearances,decimal,32,True,Total plate appearances while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingTotalBases,decimal,32,True,Total bases allowed while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingFlyOuts,decimal,32,True,Total fly outs while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingGroundOuts,decimal,32,True,Total ground outs while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingLineOuts,decimal,32,True,Total line outs while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingPopOuts,decimal,32,True,Total pop outs while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingIntentionalWalks,decimal,32,True,Total intentional walks while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingReachedOnError,decimal,32,True,Total times reached on error occurred while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingCatchersInterference,decimal,32,True,Total catchers interference while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingBallsInPlay,decimal,32,True,Total balls in play while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingOnBasePercentage,decimal,32,True,Total on base percentage (OBP) while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingSluggingPercentage,decimal,32,True,Total slugging percentage (SLG) while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingOnBasePlusSlugging,decimal,32,True,Total on base plus slugging (OPS) while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingStrikeoutsPerNineInnings,decimal,32,True,Total strikeouts per nine innings (K/9) while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingWalksPerNineInnings,decimal,32,True,Total walks per nine innings (BB/9) while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingBattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP) while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingWeightedOnBasePercentage,decimal,32,True,Total weighted on base percentage (wOBA) while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,DoublePlays,decimal,32,True,Total double plays; defined as one of: Bunted into Double Play; Fly into Double Play; Fouled into Double Play; Ground into Double Pla;y Line into Double Play; Popped into Double Play,True,True
+2056000,PlayerGameBasic,PitchingDoublePlays,decimal,32,True,Total double plays while pitching by the player in the game,False,True
+2056000,PlayerGameBasic,BattingOrderConfirmed,boolean,,True,Whether the batting order is confirmed (true/false),True,True
+2056000,PlayerGameBasic,IsolatedPower,decimal,32,True,Total isolated power (ISO) by the player in the game,False,True
+2056000,PlayerGameBasic,FieldingIndependentPitching,decimal,32,True,Total fielding independent pitching (FIP) by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingQualityStarts,decimal,32,True,Total quality starts (QS) pitched by the player in the game. Note: a player can have a maximum of one quality start in a single game.,False,True
+2056000,PlayerGameBasic,PitchingInningStarted,integer,32,True,The inning that the pitcher entered the game (if any),False,True
+2056000,PlayerGameBasic,LeftOnBase,decimal,32,True,Total runners left on base by the player in the game,False,True
+2056000,PlayerGameBasic,PitchingHolds,decimal,32,True,Total holds pitched by the player in the game. Note: a player can have maximum one hold in a single game.,False,True
+2056000,PlayerGameBasic,PitchingBlownSaves,decimal,32,True,Total blown saves by the player in the game. Note: a player can have a maximum of one blown save in a single game.,False,True
+2056000,PlayerGameBasic,SubstituteBattingOrder,integer,32,True,The position in the batting order where this player was substituted into the game (does not include players in the starting lineup),True,True
+2056000,PlayerGameBasic,SubstituteBattingOrderSequence,integer,32,True,The sequence in which this player was substituted into the game; within the particular batting order,True,True
+2056000,PlayerGameBasic,GameID,integer,32,True,The unique ID of the game tied to this PlayerGame record,False,False
+2056000,PlayerGameBasic,OpponentID,integer,32,True,The TeamID of the opposing team in the game,False,False
+2056000,PlayerGameBasic,Opponent,string,10,True,The name [Key] of the player's opponent in the game,False,False
+2056000,PlayerGameBasic,Day,date,,True,The day of the game,True,False
+2056000,PlayerGameBasic,DateTime,datetime,,True,The date and time of the game in US Eastern Time,False,False
+2056000,PlayerGameBasic,HomeOrAway,string,4,True,Whether the team is home or away,False,False
+2056000,PlayerGameBasic,IsGameOver,boolean,,False,Whether or not the player's game is over (returns true/false),False,False
+2056000,PlayerGameBasic,GlobalGameID,integer,32,True,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues.,False,False
+2056000,PlayerGameBasic,GlobalOpponentID,integer,32,True,A globally unique ID for this team's opponent. This value is guaranteed to be unique across all sports/leagues.,False,False
+2056000,PlayerGameBasic,StatID,integer,32,False,The unique ID of the stat,True,False
+2056000,PlayerGameBasic,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2056000,PlayerGameBasic,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career.,False,False
+2056000,PlayerGameBasic,SeasonType,integer,32,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2056000,PlayerGameBasic,Season,integer,32,True,The MLB season of the game,True,False
+2056000,PlayerGameBasic,Name,string,50,True,Player's full name,False,False
+2056000,PlayerGameBasic,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2056000,PlayerGameBasic,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS.,False,False
+2056000,PlayerGameBasic,PositionCategory,string,10,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR.,False,False
+2056000,PlayerGameBasic,Started,integer,32,True,Whether the player started in the game. Note: started = 1 and not starting = 0.,False,False
+2056000,PlayerGameBasic,BattingOrder,integer,32,True,Where the player batted in the lineup for the game (1;2;3; etc.),False,True
+2056000,PlayerGameBasic,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues.,False,False
+2009000,TeamGame,StatID,integer,32,False,The unique ID of the stat,False,False
+2009000,TeamGame,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2009000,TeamGame,SeasonType,integer,32,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2009000,TeamGame,Season,integer,32,True,The MLB season of the game,True,False
+2009000,TeamGame,Name,string,50,True,Team's full name (city and mascot),False,False
+2009000,TeamGame,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2009000,TeamGame,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2009000,TeamGame,GameID,integer,32,True,The unique ID of this game,True,False
+2009000,TeamGame,OpponentID,integer,32,True,The unique ID of the team's opponent,True,False
+2009000,TeamGame,Opponent,string,10,True,The name of the opponent ,True,False
+2009000,TeamGame,Day,date,,True,The day of the game,True,False
+2009000,TeamGame,DateTime,datetime,,True,The date and time of the game,True,False
+2009000,TeamGame,HomeOrAway,string,4,True,Whether the team is home or away,True,False
+2009000,TeamGame,IsGameOver,boolean,,False,Whether the game is over (true/false),True,False
+2009000,TeamGame,GlobalGameID,integer,32,True,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues.,False,False
+2009000,TeamGame,GlobalOpponentID,integer,32,True,A globally unique ID for this opponent. This value is guaranteed to be unique across all sports/leagues.,True,False
+2009000,TeamGame,Updated,datetime,,True,The timestamp of when the record was last updated (US Eastern Time).,True,False
+2009000,TeamGame,Games,integer,32,True,The number of games played.,True,False
+2009000,TeamGame,FantasyPoints,decimal,32,True,Total fantasy points,True,True
+2009000,TeamGame,AtBats,decimal,32,True,At bats while hitting,True,True
+2009000,TeamGame,Runs,decimal,32,True,Total runs scored.,True,True
+2009000,TeamGame,Hits,decimal,32,True,Total hits,True,True
+2009000,TeamGame,Singles,decimal,32,True,Total singles,True,True
+2009000,TeamGame,Doubles,decimal,32,True,Total doubles,True,True
+2009000,TeamGame,Triples,decimal,32,True,Total triples,True,True
+2009000,TeamGame,HomeRuns,decimal,32,True,Total home runs,True,True
+2009000,TeamGame,RunsBattedIn,decimal,32,True,Total runs batted in,True,True
+2009000,TeamGame,BattingAverage,decimal,32,True,Total batting average,True,True
+2009000,TeamGame,Outs,decimal,32,True,Total outs,True,True
+2009000,TeamGame,Strikeouts,decimal,32,True,Total strikeouts,True,True
+2009000,TeamGame,Walks,decimal,32,True,Total walks,True,True
+2009000,TeamGame,HitByPitch,decimal,32,True,Total times hit by pitch,True,True
+2009000,TeamGame,Sacrifices,decimal,32,True,Total sacrifices,True,True
+2009000,TeamGame,SacrificeFlies,decimal,32,True,Total sacrifice flies,True,True
+2009000,TeamGame,GroundIntoDoublePlay,decimal,32,True,Total times grounded into double play,True,True
+2009000,TeamGame,StolenBases,decimal,32,True,Total stolen bases,True,True
+2009000,TeamGame,CaughtStealing,decimal,32,True,Total caught stealing,True,True
+2009000,TeamGame,PitchesSeen,decimal,32,True,Total pitches seen,True,True
+2009000,TeamGame,OnBasePercentage,decimal,32,True,Total on base percentage,True,True
+2009000,TeamGame,SluggingPercentage,decimal,32,True,Total slugging percentage,True,True
+2009000,TeamGame,OnBasePlusSlugging,decimal,32,True,Total on base plus percentage ,True,True
+2009000,TeamGame,Errors,decimal,32,True,Total errors,True,True
+2009000,TeamGame,Wins,decimal,32,True,Total wins by the team/player,True,True
+2009000,TeamGame,Losses,decimal,32,True,Total losses by the team/player,True,True
+2009000,TeamGame,Saves,decimal,32,True,Total saves by team/player,True,True
+2009000,TeamGame,InningsPitchedDecimal,decimal,32,True,Decimal representation of total innings pitched (e.g. 1.33; 7.66; etc),True,True
+2009000,TeamGame,TotalOutsPitched,decimal,32,True,Total outs pitched by team/player,True,True
+2009000,TeamGame,InningsPitchedFull,decimal,32,True,Total full innings pitched (e.g. 6; 71; 89; etc),True,True
+2009000,TeamGame,InningsPitchedOuts,decimal,32,True,Outs pitched beyond InningsPitchedFull (possible values: 0; 1; 2),True,True
+2009000,TeamGame,EarnedRunAverage,decimal,32,True,Total earned run average by team/player,True,True
+2009000,TeamGame,PitchingHits,decimal,32,True,Hits allowed while pitching,True,True
+2009000,TeamGame,PitchingRuns,decimal,32,True,Runs allowed while pitching,True,True
+2009000,TeamGame,PitchingEarnedRuns,decimal,32,True,Earned runs allowed while pitching,True,True
+2009000,TeamGame,PitchingWalks,decimal,32,True,Walks allowed while pitching,True,True
+2009000,TeamGame,PitchingStrikeouts,decimal,32,True,Strikeouts allowed while pitching,True,True
+2009000,TeamGame,PitchingHomeRuns,decimal,32,True,Home runs allowed while pitching,True,True
+2009000,TeamGame,PitchesThrown,decimal,32,True,Total pitches thrown while pitching,True,True
+2009000,TeamGame,PitchesThrownStrikes,decimal,32,True,Total pitches thrown for strikes while pitching,True,True
+2009000,TeamGame,WalksHitsPerInningsPitched,decimal,32,True,Walks plus hits per innings pitched (WHIP) while pitching,True,True
+2009000,TeamGame,PitchingBattingAverageAgainst,decimal,32,True,Total batting average against (BAA) while pitching,True,True
+2009000,TeamGame,GrandSlams,decimal,32,True,Total grand slams,True,True
+2009000,TeamGame,FantasyPointsFanDuel,decimal,32,True,Total FanDuel fantasy points,True,True
+2009000,TeamGame,FantasyPointsDraftKings,decimal,32,True,Total DraftKings fantasy points,True,True
+2009000,TeamGame,FantasyPointsYahoo,decimal,32,True,Total Yahoo fantasy points,True,True
+2009000,TeamGame,PlateAppearances,decimal,32,True,Total plate appearances,True,True
+2009000,TeamGame,TotalBases,decimal,32,True,Number of total bases,True,True
+2009000,TeamGame,FlyOuts,decimal,32,True,Total fly outs,True,True
+2009000,TeamGame,GroundOuts,decimal,32,True,Total ground outs,True,True
+2009000,TeamGame,LineOuts,decimal,32,True,Total line outs,True,True
+2009000,TeamGame,PopOuts,decimal,32,True,Total pop outs,True,True
+2009000,TeamGame,IntentionalWalks,decimal,32,True,Total intentional walks,True,True
+2009000,TeamGame,ReachedOnError,decimal,32,True,Total times reached on error,True,True
+2009000,TeamGame,BallsInPlay,decimal,32,True,Total balls in play,True,True
+2009000,TeamGame,BattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP),True,True
+2009000,TeamGame,WeightedOnBasePercentage,decimal,32,True,Total weight on base percentage,True,True
+2009000,TeamGame,PitchingSingles,decimal,32,True,Total singles allowed while pitching,True,True
+2009000,TeamGame,PitchingDoubles,decimal,32,True,Total doubles allowed while pitching,True,True
+2009000,TeamGame,PitchingTriples,decimal,32,True,Total triples allowed while pitching,True,True
+2009000,TeamGame,PitchingGrandSlams,decimal,32,True,Total grand slams allowed while pitching,True,True
+2009000,TeamGame,PitchingHitByPitch,decimal,32,True,Total batters hit by pitch while pitching,True,True
+2009000,TeamGame,PitchingSacrifices,decimal,32,True,Total sacrifices while pitching,True,True
+2009000,TeamGame,PitchingSacrificeFlies,decimal,32,True,Total sacrifice flies while pitching,True,True
+2009000,TeamGame,PitchingGroundIntoDoublePlay,decimal,32,True,Total grounded into double plays while pitching,True,True
+2009000,TeamGame,PitchingCompleteGames,decimal,32,True,Total complete games while pitching,True,True
+2009000,TeamGame,PitchingShutOuts,decimal,32,True,Total shuouts while pitching,True,True
+2009000,TeamGame,PitchingNoHitters,decimal,32,True,Total no hitters while pitching,True,True
+2009000,TeamGame,PitchingPerfectGames,decimal,32,True,Total perfect games while pitching,True,True
+2009000,TeamGame,PitchingPlateAppearances,decimal,32,True,Total plate appearances while pitching,True,True
+2009000,TeamGame,PitchingTotalBases,decimal,32,True,Total bases while pitching,True,True
+2009000,TeamGame,PitchingFlyOuts,decimal,32,True,Total fly outs while pitching,True,True
+2009000,TeamGame,PitchingGroundOuts,decimal,32,True,Total ground outs while pitching,True,True
+2009000,TeamGame,PitchingLineOuts,decimal,32,True,Total line outs while pitching,True,True
+2009000,TeamGame,PitchingPopOuts,decimal,32,True,Total pop outs while pitching,True,True
+2009000,TeamGame,PitchingIntentionalWalks,decimal,32,True,Total intentional walks while pitching,True,True
+2009000,TeamGame,PitchingReachedOnError,decimal,32,True,Total times reached on error while pitching,True,True
+2009000,TeamGame,PitchingCatchersInterference,decimal,32,True,Total catchers interference while pitching,True,True
+2009000,TeamGame,PitchingBallsInPlay,decimal,32,True,Total balls in play while pitching,True,True
+2009000,TeamGame,PitchingOnBasePercentage,decimal,32,True,Total on base percentage (OBP) while pitching,True,True
+2009000,TeamGame,PitchingSluggingPercentage,decimal,32,True,Total slugging percentage (SLG) while pitching,True,True
+2009000,TeamGame,PitchingOnBasePlusSlugging,decimal,32,True,Total on base plus slugging (OPS) while pitching,True,True
+2009000,TeamGame,PitchingStrikeoutsPerNineInnings,decimal,32,True,Total strikeouts per nine innings (K/9) while pitching,True,True
+2009000,TeamGame,PitchingWalksPerNineInnings,decimal,32,True,Total walks per nine innings (BB/9) while pitching,True,True
+2009000,TeamGame,PitchingBattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP) while pitching,True,True
+2009000,TeamGame,PitchingWeightedOnBasePercentage,decimal,32,True,Total weighted on base percentage while pitching ,True,True
+2009000,TeamGame,DoublePlays,decimal,32,True,Total double plays; defined as one of: Bunted into Double Play; Fly into Double Play; Fouled into Double Play; Ground into Double Pla;y Line into Double Play; Popped into Double Play,True,True
+2009000,TeamGame,PitchingDoublePlays,decimal,32,True,Total double plays while pitching,True,True
+2009000,TeamGame,BattingOrderConfirmed,boolean,,True,Whether the batting order is confirmed (true/false),True,True
+2009000,TeamGame,IsolatedPower,decimal,32,True,Total isolated power (ISO),True,True
+2009000,TeamGame,FieldingIndependentPitching,decimal,32,True,Total fielding independent pitching (FIP),True,True
+2009000,TeamGame,PitchingQualityStarts,decimal,32,True,Total quality starts pitched,True,True
+2009000,TeamGame,PitchingInningStarted,integer,32,True,The inning that the pitcher entered the game (if any).,True,True
+2009000,TeamGame,LeftOnBase,decimal,32,True,Total left on base percentage ,True,True
+2009000,TeamGame,PitchingHolds,decimal,32,True,Total holds pitched,True,True
+2009000,TeamGame,PitchingBlownSaves,decimal,32,True,Total blown saves pitched,True,True
+2009000,TeamGame,SubstituteBattingOrder,integer,32,True,The position in the batting order where this player was substituted into the game (does not include players in the starting lineup),True,True
+2009000,TeamGame,SubstituteBattingOrderSequence,integer,32,True,The sequence in which this player was substituted into the game; within the particular batting order,True,True
+2009000,TeamGame,FantasyPointsFantasyDraft,decimal,32,True,Total FantasyDraft fantasy points,True,True
+2009000,TeamGame,FantasyPointsBatting,decimal,32,True,Total batting fantasy points,True,
+2009000,TeamGame,FantasyPointsPitching,decimal,32,True,Total pitching fantasy points,True,
+2010000,PlayerSeason,StatID,integer,32,False,The unique ID of the stat,False,False
+2010000,PlayerSeason,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2010000,PlayerSeason,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2010000,PlayerSeason,SeasonType,integer,32,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2010000,PlayerSeason,Season,integer,32,True,The MLB season for which these totals apply,False,False
+2010000,PlayerSeason,Name,string,50,True,Player's full name,False,False
+2010000,PlayerSeason,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2010000,PlayerSeason,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS,False,False
+2010000,PlayerSeason,PositionCategory,string,10,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR,False,False
+2010000,PlayerSeason,Started,integer,32,True,Number of games started in the season,False,False
+2010000,PlayerSeason,BattingOrder,integer,32,True,This field is expected to be NULL,False,False
+2010000,PlayerSeason,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2010000,PlayerSeason,AverageDraftPosition,decimal,32,True,The auction value for this player as it pertains to auction-style drafts for season-long fantasy baseball,False,True
+2010000,PlayerSeason,AuctionValue,integer,32,True,The auction value for this player as it pertains to auction-style drafts for season-long fantasy baseball,False,True
+2010000,PlayerSeason,Updated,datetime,,True,The timestamp of when the record was last updated (US Eastern Time).,True,False
+2010000,PlayerSeason,Games,integer,32,True,The number of games played.,True,False
+2010000,PlayerSeason,FantasyPoints,decimal,32,True,Total fantasy points,True,True
+2010000,PlayerSeason,AtBats,decimal,32,True,At bats while hitting,True,True
+2010000,PlayerSeason,Runs,decimal,32,True,Total runs scored.,True,True
+2010000,PlayerSeason,Hits,decimal,32,True,Total hits,True,True
+2010000,PlayerSeason,Singles,decimal,32,True,Total singles,True,True
+2010000,PlayerSeason,Doubles,decimal,32,True,Total doubles,True,True
+2010000,PlayerSeason,Triples,decimal,32,True,Total triples,True,True
+2010000,PlayerSeason,HomeRuns,decimal,32,True,Total home runs,True,True
+2010000,PlayerSeason,RunsBattedIn,decimal,32,True,Total runs batted in,True,True
+2010000,PlayerSeason,BattingAverage,decimal,32,True,Total batting average,True,True
+2010000,PlayerSeason,Outs,decimal,32,True,Total outs,True,True
+2010000,PlayerSeason,Strikeouts,decimal,32,True,Total strikeouts,True,True
+2010000,PlayerSeason,Walks,decimal,32,True,Total walks,True,True
+2010000,PlayerSeason,HitByPitch,decimal,32,True,Total times hit by pitch,True,True
+2010000,PlayerSeason,Sacrifices,decimal,32,True,Total sacrifices,True,True
+2010000,PlayerSeason,SacrificeFlies,decimal,32,True,Total sacrifice flies,True,True
+2010000,PlayerSeason,GroundIntoDoublePlay,decimal,32,True,Total times grounded into double play,True,True
+2010000,PlayerSeason,StolenBases,decimal,32,True,Total stolen bases,True,True
+2010000,PlayerSeason,CaughtStealing,decimal,32,True,Total caught stealing,True,True
+2010000,PlayerSeason,PitchesSeen,decimal,32,True,Total pitches seen,True,True
+2010000,PlayerSeason,OnBasePercentage,decimal,32,True,Total on base percentage,True,True
+2010000,PlayerSeason,SluggingPercentage,decimal,32,True,Total slugging percentage,True,True
+2010000,PlayerSeason,OnBasePlusSlugging,decimal,32,True,Total on base plus percentage ,True,True
+2010000,PlayerSeason,Errors,decimal,32,True,Total errors,True,True
+2010000,PlayerSeason,Wins,decimal,32,True,Total wins by the team/player,True,True
+2010000,PlayerSeason,Losses,decimal,32,True,Total losses by the team/player,True,True
+2010000,PlayerSeason,Saves,decimal,32,True,Total saves by team/player,True,True
+2010000,PlayerSeason,InningsPitchedDecimal,decimal,32,True,Decimal representation of total innings pitched (e.g. 1.33; 7.66; etc),True,True
+2010000,PlayerSeason,TotalOutsPitched,decimal,32,True,Total outs pitched by team/player,True,True
+2010000,PlayerSeason,InningsPitchedFull,decimal,32,True,Total full innings pitched (e.g. 6; 71; 89; etc),True,True
+2010000,PlayerSeason,InningsPitchedOuts,decimal,32,True,Outs pitched beyond InningsPitchedFull (possible values: 0; 1; 2),True,True
+2010000,PlayerSeason,EarnedRunAverage,decimal,32,True,Total earned run average by team/player,True,True
+2010000,PlayerSeason,PitchingHits,decimal,32,True,Hits allowed while pitching,True,True
+2010000,PlayerSeason,PitchingRuns,decimal,32,True,Runs allowed while pitching,True,True
+2010000,PlayerSeason,PitchingEarnedRuns,decimal,32,True,Earned runs allowed while pitching,True,True
+2010000,PlayerSeason,PitchingWalks,decimal,32,True,Walks allowed while pitching,True,True
+2010000,PlayerSeason,PitchingStrikeouts,decimal,32,True,Strikeouts allowed while pitching,True,True
+2010000,PlayerSeason,PitchingHomeRuns,decimal,32,True,Home runs allowed while pitching,True,True
+2010000,PlayerSeason,PitchesThrown,decimal,32,True,Total pitches thrown while pitching,True,True
+2010000,PlayerSeason,PitchesThrownStrikes,decimal,32,True,Total pitches thrown for strikes while pitching,True,True
+2010000,PlayerSeason,WalksHitsPerInningsPitched,decimal,32,True,Walks plus hits per innings pitched (WHIP) while pitching,True,True
+2010000,PlayerSeason,PitchingBattingAverageAgainst,decimal,32,True,Total batting average against (BAA) while pitching,True,True
+2010000,PlayerSeason,GrandSlams,decimal,32,True,Total grand slams,True,True
+2010000,PlayerSeason,FantasyPointsFanDuel,decimal,32,True,Total FanDuel fantasy points,True,True
+2010000,PlayerSeason,FantasyPointsDraftKings,decimal,32,True,Total DraftKings fantasy points,True,True
+2010000,PlayerSeason,FantasyPointsYahoo,decimal,32,True,Total Yahoo fantasy points,True,True
+2010000,PlayerSeason,PlateAppearances,decimal,32,True,Total plate appearances,True,True
+2010000,PlayerSeason,TotalBases,decimal,32,True,Number of total bases,True,True
+2010000,PlayerSeason,FlyOuts,decimal,32,True,Total fly outs,True,True
+2010000,PlayerSeason,GroundOuts,decimal,32,True,Total ground outs,True,True
+2010000,PlayerSeason,LineOuts,decimal,32,True,Total line outs,True,True
+2010000,PlayerSeason,PopOuts,decimal,32,True,Total pop outs,True,True
+2010000,PlayerSeason,IntentionalWalks,decimal,32,True,Total intentional walks,True,True
+2010000,PlayerSeason,ReachedOnError,decimal,32,True,Total times reached on error,True,True
+2010000,PlayerSeason,BallsInPlay,decimal,32,True,Total balls in play,True,True
+2010000,PlayerSeason,BattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP),True,True
+2010000,PlayerSeason,WeightedOnBasePercentage,decimal,32,True,Total weight on base percentage,True,True
+2010000,PlayerSeason,PitchingSingles,decimal,32,True,Total singles allowed while pitching,True,True
+2010000,PlayerSeason,PitchingDoubles,decimal,32,True,Total doubles allowed while pitching,True,True
+2010000,PlayerSeason,PitchingTriples,decimal,32,True,Total triples allowed while pitching,True,True
+2010000,PlayerSeason,PitchingGrandSlams,decimal,32,True,Total grand slams allowed while pitching,True,True
+2010000,PlayerSeason,PitchingHitByPitch,decimal,32,True,Total batters hit by pitch while pitching,True,True
+2010000,PlayerSeason,PitchingSacrifices,decimal,32,True,Total sacrifices while pitching,True,True
+2010000,PlayerSeason,PitchingSacrificeFlies,decimal,32,True,Total sacrifice flies while pitching,True,True
+2010000,PlayerSeason,PitchingGroundIntoDoublePlay,decimal,32,True,Total grounded into double plays while pitching,True,True
+2010000,PlayerSeason,PitchingCompleteGames,decimal,32,True,Total complete games while pitching,True,True
+2010000,PlayerSeason,PitchingShutOuts,decimal,32,True,Total shuouts while pitching,True,True
+2010000,PlayerSeason,PitchingNoHitters,decimal,32,True,Total no hitters while pitching,True,True
+2010000,PlayerSeason,PitchingPerfectGames,decimal,32,True,Total perfect games while pitching,True,True
+2010000,PlayerSeason,PitchingPlateAppearances,decimal,32,True,Total plate appearances while pitching,True,True
+2010000,PlayerSeason,PitchingTotalBases,decimal,32,True,Total bases while pitching,True,True
+2010000,PlayerSeason,PitchingFlyOuts,decimal,32,True,Total fly outs while pitching,True,True
+2010000,PlayerSeason,PitchingGroundOuts,decimal,32,True,Total ground outs while pitching,True,True
+2010000,PlayerSeason,PitchingLineOuts,decimal,32,True,Total line outs while pitching,True,True
+2010000,PlayerSeason,PitchingPopOuts,decimal,32,True,Total pop outs while pitching,True,True
+2010000,PlayerSeason,PitchingIntentionalWalks,decimal,32,True,Total intentional walks while pitching,True,True
+2010000,PlayerSeason,PitchingReachedOnError,decimal,32,True,Total times reached on error while pitching,True,True
+2010000,PlayerSeason,PitchingCatchersInterference,decimal,32,True,Total catchers interference while pitching,True,True
+2010000,PlayerSeason,PitchingBallsInPlay,decimal,32,True,Total balls in play while pitching,True,True
+2010000,PlayerSeason,PitchingOnBasePercentage,decimal,32,True,Total on base percentage (OBP) while pitching,True,True
+2010000,PlayerSeason,PitchingSluggingPercentage,decimal,32,True,Total slugging percentage (SLG) while pitching,True,True
+2010000,PlayerSeason,PitchingOnBasePlusSlugging,decimal,32,True,Total on base plus slugging (OPS) while pitching,True,True
+2010000,PlayerSeason,PitchingStrikeoutsPerNineInnings,decimal,32,True,Total strikeouts per nine innings (K/9) while pitching,True,True
+2010000,PlayerSeason,PitchingWalksPerNineInnings,decimal,32,True,Total walks per nine innings (BB/9) while pitching,True,True
+2010000,PlayerSeason,PitchingBattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP) while pitching,True,True
+2010000,PlayerSeason,PitchingWeightedOnBasePercentage,decimal,32,True,Total weighted on base percentage while pitching ,True,True
+2010000,PlayerSeason,DoublePlays,decimal,32,True,Total double plays; defined as one of: Bunted into Double Play; Fly into Double Play; Fouled into Double Play; Ground into Double Pla;y Line into Double Play; Popped into Double Play,True,True
+2010000,PlayerSeason,PitchingDoublePlays,decimal,32,True,Total double plays while pitching,True,True
+2010000,PlayerSeason,BattingOrderConfirmed,boolean,,True,Whether the batting order is confirmed (true/false),True,True
+2010000,PlayerSeason,IsolatedPower,decimal,32,True,Total isolated power (ISO),True,True
+2010000,PlayerSeason,FieldingIndependentPitching,decimal,32,True,Total fielding independent pitching (FIP),True,True
+2010000,PlayerSeason,PitchingQualityStarts,decimal,32,True,Total quality starts pitched,True,True
+2010000,PlayerSeason,PitchingInningStarted,integer,32,True,The inning that the pitcher entered the game (if any).,True,True
+2010000,PlayerSeason,LeftOnBase,decimal,32,True,Total left on base percentage ,True,True
+2010000,PlayerSeason,PitchingHolds,decimal,32,True,Total holds pitched,True,True
+2010000,PlayerSeason,PitchingBlownSaves,decimal,32,True,Total blown saves pitched,True,True
+2010000,PlayerSeason,SubstituteBattingOrder,integer,32,True,The position in the batting order where this player was substituted into the game (does not include players in the starting lineup),True,True
+2010000,PlayerSeason,SubstituteBattingOrderSequence,integer,32,True,The sequence in which this player was substituted into the game; within the particular batting order,True,True
+2010000,PlayerSeason,FantasyPointsFantasyDraft,decimal,32,True,Total FantasyDraft fantasy points,True,True
+2010000,PlayerSeason,FantasyPointsBatting,decimal,32,True,Total batting fantasy points,True,
+2010000,PlayerSeason,FantasyPointsPitching,decimal,32,True,Total pitching fantasy points,True,
+2011000,TeamSeason,StatID,integer,32,False,The unique ID of the stat,False,False
+2011000,TeamSeason,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2011000,TeamSeason,SeasonType,integer,32,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2011000,TeamSeason,Season,integer,32,True,The MLB season for which these totals apply,False,False
+2011000,TeamSeason,Name,string,50,True,Team's full name (city and mascot),False,False
+2011000,TeamSeason,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2011000,TeamSeason,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2011000,TeamSeason,Updated,datetime,,True,The timestamp of when the record was last updated (US Eastern Time).,True,False
+2011000,TeamSeason,Games,integer,32,True,The number of games played.,True,False
+2011000,TeamSeason,FantasyPoints,decimal,32,True,Total fantasy points,True,True
+2011000,TeamSeason,AtBats,decimal,32,True,At bats while hitting,True,True
+2011000,TeamSeason,Runs,decimal,32,True,Total runs scored.,True,True
+2011000,TeamSeason,Hits,decimal,32,True,Total hits,True,True
+2011000,TeamSeason,Singles,decimal,32,True,Total singles,True,True
+2011000,TeamSeason,Doubles,decimal,32,True,Total doubles,True,True
+2011000,TeamSeason,Triples,decimal,32,True,Total triples,True,True
+2011000,TeamSeason,HomeRuns,decimal,32,True,Total home runs,True,True
+2011000,TeamSeason,RunsBattedIn,decimal,32,True,Total runs batted in,True,True
+2011000,TeamSeason,BattingAverage,decimal,32,True,Total batting average,True,True
+2011000,TeamSeason,Outs,decimal,32,True,Total outs,True,True
+2011000,TeamSeason,Strikeouts,decimal,32,True,Total strikeouts,True,True
+2011000,TeamSeason,Walks,decimal,32,True,Total walks,True,True
+2011000,TeamSeason,HitByPitch,decimal,32,True,Total times hit by pitch,True,True
+2011000,TeamSeason,Sacrifices,decimal,32,True,Total sacrifices,True,True
+2011000,TeamSeason,SacrificeFlies,decimal,32,True,Total sacrifice flies,True,True
+2011000,TeamSeason,GroundIntoDoublePlay,decimal,32,True,Total times grounded into double play,True,True
+2011000,TeamSeason,StolenBases,decimal,32,True,Total stolen bases,True,True
+2011000,TeamSeason,CaughtStealing,decimal,32,True,Total caught stealing,True,True
+2011000,TeamSeason,PitchesSeen,decimal,32,True,Total pitches seen,True,True
+2011000,TeamSeason,OnBasePercentage,decimal,32,True,Total on base percentage,True,True
+2011000,TeamSeason,SluggingPercentage,decimal,32,True,Total slugging percentage,True,True
+2011000,TeamSeason,OnBasePlusSlugging,decimal,32,True,Total on base plus percentage ,True,True
+2011000,TeamSeason,Errors,decimal,32,True,Total errors,True,True
+2011000,TeamSeason,Wins,decimal,32,True,Total wins by the team/player,True,True
+2011000,TeamSeason,Losses,decimal,32,True,Total losses by the team/player,True,True
+2011000,TeamSeason,Saves,decimal,32,True,Total saves by team/player,True,True
+2011000,TeamSeason,InningsPitchedDecimal,decimal,32,True,Decimal representation of total innings pitched (e.g. 1.33; 7.66; etc),True,True
+2011000,TeamSeason,TotalOutsPitched,decimal,32,True,Total outs pitched by team/player,True,True
+2011000,TeamSeason,InningsPitchedFull,decimal,32,True,Total full innings pitched (e.g. 6; 71; 89; etc),True,True
+2011000,TeamSeason,InningsPitchedOuts,decimal,32,True,Outs pitched beyond InningsPitchedFull (possible values: 0; 1; 2),True,True
+2011000,TeamSeason,EarnedRunAverage,decimal,32,True,Total earned run average by team/player,True,True
+2011000,TeamSeason,PitchingHits,decimal,32,True,Hits allowed while pitching,True,True
+2011000,TeamSeason,PitchingRuns,decimal,32,True,Runs allowed while pitching,True,True
+2011000,TeamSeason,PitchingEarnedRuns,decimal,32,True,Earned runs allowed while pitching,True,True
+2011000,TeamSeason,PitchingWalks,decimal,32,True,Walks allowed while pitching,True,True
+2011000,TeamSeason,PitchingStrikeouts,decimal,32,True,Strikeouts allowed while pitching,True,True
+2011000,TeamSeason,PitchingHomeRuns,decimal,32,True,Home runs allowed while pitching,True,True
+2011000,TeamSeason,PitchesThrown,decimal,32,True,Total pitches thrown while pitching,True,True
+2011000,TeamSeason,PitchesThrownStrikes,decimal,32,True,Total pitches thrown for strikes while pitching,True,True
+2011000,TeamSeason,WalksHitsPerInningsPitched,decimal,32,True,Walks plus hits per innings pitched (WHIP) while pitching,True,True
+2011000,TeamSeason,PitchingBattingAverageAgainst,decimal,32,True,Total batting average against (BAA) while pitching,True,True
+2011000,TeamSeason,GrandSlams,decimal,32,True,Total grand slams,True,True
+2011000,TeamSeason,FantasyPointsFanDuel,decimal,32,True,Total FanDuel fantasy points,True,True
+2011000,TeamSeason,FantasyPointsDraftKings,decimal,32,True,Total DraftKings fantasy points,True,True
+2011000,TeamSeason,FantasyPointsYahoo,decimal,32,True,Total Yahoo fantasy points,True,True
+2011000,TeamSeason,PlateAppearances,decimal,32,True,Total plate appearances,True,True
+2011000,TeamSeason,TotalBases,decimal,32,True,Number of total bases,True,True
+2011000,TeamSeason,FlyOuts,decimal,32,True,Total fly outs,True,True
+2011000,TeamSeason,GroundOuts,decimal,32,True,Total ground outs,True,True
+2011000,TeamSeason,LineOuts,decimal,32,True,Total line outs,True,True
+2011000,TeamSeason,PopOuts,decimal,32,True,Total pop outs,True,True
+2011000,TeamSeason,IntentionalWalks,decimal,32,True,Total intentional walks,True,True
+2011000,TeamSeason,ReachedOnError,decimal,32,True,Total times reached on error,True,True
+2011000,TeamSeason,BallsInPlay,decimal,32,True,Total balls in play,True,True
+2011000,TeamSeason,BattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP),True,True
+2011000,TeamSeason,WeightedOnBasePercentage,decimal,32,True,Total weight on base percentage,True,True
+2011000,TeamSeason,PitchingSingles,decimal,32,True,Total singles allowed while pitching,True,True
+2011000,TeamSeason,PitchingDoubles,decimal,32,True,Total doubles allowed while pitching,True,True
+2011000,TeamSeason,PitchingTriples,decimal,32,True,Total triples allowed while pitching,True,True
+2011000,TeamSeason,PitchingGrandSlams,decimal,32,True,Total grand slams allowed while pitching,True,True
+2011000,TeamSeason,PitchingHitByPitch,decimal,32,True,Total batters hit by pitch while pitching,True,True
+2011000,TeamSeason,PitchingSacrifices,decimal,32,True,Total sacrifices while pitching,True,True
+2011000,TeamSeason,PitchingSacrificeFlies,decimal,32,True,Total sacrifice flies while pitching,True,True
+2011000,TeamSeason,PitchingGroundIntoDoublePlay,decimal,32,True,Total grounded into double plays while pitching,True,True
+2011000,TeamSeason,PitchingCompleteGames,decimal,32,True,Total complete games while pitching,True,True
+2011000,TeamSeason,PitchingShutOuts,decimal,32,True,Total shuouts while pitching,True,True
+2011000,TeamSeason,PitchingNoHitters,decimal,32,True,Total no hitters while pitching,True,True
+2011000,TeamSeason,PitchingPerfectGames,decimal,32,True,Total perfect games while pitching,True,True
+2011000,TeamSeason,PitchingPlateAppearances,decimal,32,True,Total plate appearances while pitching,True,True
+2011000,TeamSeason,PitchingTotalBases,decimal,32,True,Total bases while pitching,True,True
+2011000,TeamSeason,PitchingFlyOuts,decimal,32,True,Total fly outs while pitching,True,True
+2011000,TeamSeason,PitchingGroundOuts,decimal,32,True,Total ground outs while pitching,True,True
+2011000,TeamSeason,PitchingLineOuts,decimal,32,True,Total line outs while pitching,True,True
+2011000,TeamSeason,PitchingPopOuts,decimal,32,True,Total pop outs while pitching,True,True
+2011000,TeamSeason,PitchingIntentionalWalks,decimal,32,True,Total intentional walks while pitching,True,True
+2011000,TeamSeason,PitchingReachedOnError,decimal,32,True,Total times reached on error while pitching,True,True
+2011000,TeamSeason,PitchingCatchersInterference,decimal,32,True,Total catchers interference while pitching,True,True
+2011000,TeamSeason,PitchingBallsInPlay,decimal,32,True,Total balls in play while pitching,True,True
+2011000,TeamSeason,PitchingOnBasePercentage,decimal,32,True,Total on base percentage (OBP) while pitching,True,True
+2011000,TeamSeason,PitchingSluggingPercentage,decimal,32,True,Total slugging percentage (SLG) while pitching,True,True
+2011000,TeamSeason,PitchingOnBasePlusSlugging,decimal,32,True,Total on base plus slugging (OPS) while pitching,True,True
+2011000,TeamSeason,PitchingStrikeoutsPerNineInnings,decimal,32,True,Total strikeouts per nine innings (K/9) while pitching,True,True
+2011000,TeamSeason,PitchingWalksPerNineInnings,decimal,32,True,Total walks per nine innings (BB/9) while pitching,True,True
+2011000,TeamSeason,PitchingBattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP) while pitching,True,True
+2011000,TeamSeason,PitchingWeightedOnBasePercentage,decimal,32,True,Total weighted on base percentage while pitching ,True,True
+2011000,TeamSeason,DoublePlays,decimal,32,True,Total double plays; defined as one of: Bunted into Double Play; Fly into Double Play; Fouled into Double Play; Ground into Double Pla;y Line into Double Play; Popped into Double Play,True,True
+2011000,TeamSeason,PitchingDoublePlays,decimal,32,True,Total double plays while pitching,True,True
+2011000,TeamSeason,BattingOrderConfirmed,boolean,,True,Whether the batting order is confirmed (true/false),True,True
+2011000,TeamSeason,IsolatedPower,decimal,32,True,Total isolated power (ISO),True,True
+2011000,TeamSeason,FieldingIndependentPitching,decimal,32,True,Total fielding independent pitching (FIP),True,True
+2011000,TeamSeason,PitchingQualityStarts,decimal,32,True,Total quality starts pitched,True,True
+2011000,TeamSeason,PitchingInningStarted,integer,32,True,The inning that the pitcher entered the game (if any).,True,True
+2011000,TeamSeason,LeftOnBase,decimal,32,True,Total left on base percentage ,True,True
+2011000,TeamSeason,PitchingHolds,decimal,32,True,Total holds pitched,True,True
+2011000,TeamSeason,PitchingBlownSaves,decimal,32,True,Total blown saves pitched,True,True
+2011000,TeamSeason,SubstituteBattingOrder,integer,32,True,The position in the batting order where this player was substituted into the game (does not include players in the starting lineup),True,True
+2011000,TeamSeason,SubstituteBattingOrderSequence,integer,32,True,The sequence in which this player was substituted into the game; within the particular batting order,True,True
+2011000,TeamSeason,FantasyPointsFantasyDraft,decimal,32,True,Total FantasyDraft fantasy points,True,True
+2011000,TeamSeason,FantasyPointsBatting,decimal,32,True,Total batting fantasy points,True,
+2011000,TeamSeason,FantasyPointsPitching,decimal,32,True,Total pitching fantasy points,True,
+2012000,News,NewsID,integer,32,False,The unique ID assigned to this news story,False,False
+2012000,News,Source,string,50,True,The source of the story (RotoBaller; NBCSports.com; etc.),True,False
+2012000,News,Updated,datetime,,False,The timestamp of when this news story was published,False,False
+2012000,News,TimeAgo,string,50,True,A description of how long ago this content was published,True,False
+2012000,News,Title,string,100,True,The brief title of the news story (typically less than 100 characters),False,False
+2012000,News,Content,string,5000,True,The entirety of the content of the news story,False,False
+2012000,News,Url,string,250,True,The website URL of the full news story,False,False
+2012000,News,TermsOfUse,string,500,True,The terms of use with using this news item; credit must be given to the originator of the story when specified in the terms of use,True,False
+2012000,News,Author,string,50,True,The author of the content,True,False
+2012000,News,Categories,string,100,True,Comma delimited meta tags describing the categories of this content. Possible tags include: Top Headlines; Breaking News; Injury; Sit/Start; Waiver Wire; Risers; Fallers; Lineups; Transactions; Free Agents; Prospects/Rookies; Game Recap; Matchup Outlook,True,False
+2012000,News,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2012000,News,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2012000,News,Team,string,10,True,The abbreviation [Key] of the team that relates to this story,False,False
+2012000,News,PlayerID2,integer,32,True,The PlayerID of the player who relates to this story,True,False
+2012000,News,TeamID2,integer,32,True,The TeamID of the second team that relates to this story,False,False
+2012000,News,Team2,string,10,True,The abbreviation [Key] of the second team that relates to this story,False,False
+2012000,News,OriginalSource,string,100,True,The original source who broke this news (before it was picked up by the publisher of this story),False,False
+2012000,News,OriginalSourceUrl,string,1000,True,The URL of the original source who broke this news story,False,False
+2013000,Play,PlayID,integer,32,False,The unique ID of the play assigned by SportsDataIO,False,False
+2013000,Play,InningID,integer,32,False,The unique ID associated with this specific inning in which the play occurred,False,False
+2013000,Play,InningNumber,integer,32,True,The inning number in which the particular play occurred,False,False
+2013000,Play,InningHalf,string,1,True,The inning half that the game is currently in; or the inning half in which the game ended (possible values: T; B; E: M: NULL),False,False
+2013000,Play,PlayNumber,integer,32,True,The order in which plays occurred in a game,False,True
+2013000,Play,InningBatterNumber,integer,32,True,The batter number in the inning where the play occurred.,False,True
+2013000,Play,AwayTeamRuns,integer,32,True,Number of runs scored by the away team on this specific play,False,True
+2013000,Play,HomeTeamRuns,integer,32,True,Number of runs scored by the home team on this specific play,False,True
+2013000,Play,HitterID,integer,32,True,The unique PlayerID of the hitter involved with the play,False,False
+2013000,Play,PitcherID,integer,32,True,The PlayerID of the pitcher involved in the play,False,False
+2013000,Play,HitterTeamID,integer,32,True,The TeamID of the hitter's team.,False,False
+2013000,Play,PitcherTeamID,integer,32,True,The ID of the pitcher's team,False,False
+2013000,Play,HitterName,string,50,True,The first and last name of the hitter involved in the play,False,False
+2013000,Play,PitcherName,string,50,True,The full name of the pitcher involved in the play,False,False
+2013000,Play,PitcherThrowHand,string,1,True,The throwing hand of the pitcher in which the play occurred. (right or left),False,False
+2013000,Play,HitterBatHand,string,1,True,The batter's handedness for which the play occurred. (R; L; S),False,False
+2013000,Play,HitterPosition,string,10,True,TheÂ position of the player in which the play occrred. (e.g. P;C;1B; SS; OF),False,False
+2013000,Play,Outs,integer,32,True,The number of outs in which the play occurred,False,True
+2013000,Play,Balls,integer,32,True,The number of balls in the count in which the play occurred,False,True
+2013000,Play,Strikes,integer,32,True,The number of strikes in the count in which the play occurred,False,True
+2013000,Play,PitchNumberThisAtBat,integer,32,True,The number of pitches in the at bat in which the play occurred,False,True
+2013000,Play,Result,string,50,True,The result of the play. Possible values include: Batter's Interference; Bunted into Double Play; Catcher's Interference; Double; Error; Fielder's Choice; Fly into Double Play; Fly Out; Foul Out; Fouled into Double Play; Ground into Double Play; Ground Out; Hit by Pitch; Home Run; Infield Fly Out; Intentional Walk; Line into Double Play; Lineout; Pop Out; Popped into Double Play; Sacrifice; Sacrifice Fly; Single; Strikeout Bunting; Strikeout Looking; Strikeout Swinging; Triple; Triple Play; Walk; Stolen Base; Caught Stealing; Passed Ball; Wild Pitch; Pick Off; Balk; Error; Fielders Indifference,True,True
+2013000,Play,NumberOfOutsOnPlay,integer,32,True,The number of outs recorded on the play,False,True
+2013000,Play,RunsBattedIn,integer,32,True,The number of runs batted in on the play,False,True
+2013000,Play,AtBat,boolean,,True,Whether this plate appearance resulted in an at bat,False,False
+2013000,Play,Strikeout,boolean,,True,Whether the play resulted with a strikeout (returns true/false),False,False
+2013000,Play,Walk,boolean,,True,Indicates whether the play resulted in a walk for the hitter (returns true/false),False,False
+2013000,Play,Hit,boolean,,True,Whether this play resulted in a hit (true/false),False,False
+2013000,Play,Out,boolean,,True,Whether this play resutled in an out (true/false),False,False
+2013000,Play,Sacrifice,boolean,,True,Whether the play resulted in a sacrifice (returns true/false),False,False
+2013000,Play,Error,boolean,,True,Whether this play resulted in an error (true/false),False,False
+2013000,Play,Updated,date,,True,The database generated timestamp of when this record was last updated (in US Eastern Time),False,False
+2013000,Play,Description,string,250,True,The description of the play for display purposes,True,True
+2013000,Play,Pitches,Pitch[],,True,The details of the pitches associated with this play,False,False
+2013000,Play,Runner1ID,integer,32,True,The PlayerID of the player on first as a result of the play (post-play),False,False
+2013000,Play,Runner2ID,integer,32,True,The PlayerID of the player on second as a result of the play (post-play),False,False
+2013000,Play,Runner3ID,integer,32,True,The PlayerID of the player on third as a result of the play (post-play),False,False
+2014000,Pitch,PitchID,integer,32,False,The unique ID of the pitch,False,False
+2014000,Pitch,PlayID,integer,32,False,The unique ID of the play assigned by SportsDataIO,False,False
+2014000,Pitch,PitchNumberThisAtBat,integer,32,True,The number of pitches in the at bat in which the pitch occurred.,False,True
+2014000,Pitch,PitcherID,integer,32,True,The PlayerID of the pitcher who threw the pitch,False,False
+2014000,Pitch,HitterID,integer,32,True,The unique PlayerID of the hitter who represents the play,False,False
+2014000,Pitch,Outs,integer,32,True,The number of outs when the pitch occurred,False,True
+2014000,Pitch,BallsBeforePitch,integer,32,True,The number of balls the pitcher has thrown before the current pitch,False,True
+2014000,Pitch,StrikesBeforePitch,integer,32,True,The number of strikes the pitcher has thrown before the current pitch,False,True
+2014000,Pitch,Strike,boolean,,True,Whether the pitch was a strike (true/false),False,True
+2014000,Pitch,Ball,boolean,,True,Whether the pitch was a ball (true/false),False,True
+2014000,Pitch,Foul,boolean,,True,Whether the pitch was hit foul (true/false),False,True
+2014000,Pitch,Swinging,boolean,,True,Whether the hitter struck out swinging (true/false),False,True
+2014000,Pitch,Looking,boolean,,True,Whether or not the hitter struck out looking (returns true/false),False,True
+2015000,PlayerGameProjection,StatID,integer,32,False,The unique ID of the stat,True,False
+2015000,PlayerGameProjection,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2015000,PlayerGameProjection,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2015000,PlayerGameProjection,SeasonType,integer,32,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2015000,PlayerGameProjection,Season,integer,32,True,The MLB season of the game,True,False
+2015000,PlayerGameProjection,Name,string,50,True,Player's full name,False,False
+2015000,PlayerGameProjection,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2015000,PlayerGameProjection,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS,True,False
+2015000,PlayerGameProjection,PositionCategory,string,10,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR,False,False
+2015000,PlayerGameProjection,Started,integer,32,True,Whether the player started in the game. Note: started = 1 and not starting = 0,False,False
+2015000,PlayerGameProjection,BattingOrder,integer,32,True,Where the player batted in the lineup for the game (1;2;3; etc.),False,True
+2015000,PlayerGameProjection,FanDuelSalary,integer,32,True,The player's salary for FanDuel daily fantasy contests.,True,True
+2015000,PlayerGameProjection,DraftKingsSalary,integer,32,True,The player's salary for DraftKings daily fantasy contests.,True,True
+2015000,PlayerGameProjection,FantasyDataSalary,integer,32,True,The player's salary as calculated by SportsDataIO (formerly known as FantasyData). Based on the same salary cap as DraftKings contests ($50;000),False,True
+2015000,PlayerGameProjection,YahooSalary,integer,32,True,The player's salary for Yahoo daily fantasy contests,False,True
+2015000,PlayerGameProjection,InjuryStatus,string,50,True,The player's current injury status; in the form of likelihood that player plays. Possible values: Probable; Questionable; Doubtful; Out,False,True
+2015000,PlayerGameProjection,InjuryBodyPart,string,50,True,Indicates the player's injured body part. (e.g. ankle; knee; elbow; etc.),False,True
+2015000,PlayerGameProjection,InjuryStartDate,date,,True,The day that the injury started or first discovered.,True,False
+2015000,PlayerGameProjection,InjuryNotes,string,250,True,Brief description of the player's injury and expected availability,False,True
+2015000,PlayerGameProjection,FanDuelPosition,string,10,True,The player's eligible position in FanDuel's daily fantasy sports platform.,True,False
+2015000,PlayerGameProjection,DraftKingsPosition,string,10,True,The player's eligible position in DraftKings' daily fantasy sports platform.,True,False
+2015000,PlayerGameProjection,YahooPosition,string,10,True,The player's eligible position in Yahoo's daily fantasy sports platform,False,False
+2015000,PlayerGameProjection,OpponentRank,integer,32,True,The ranking of the player's opponent with regards to fantasy points allowed,False,True
+2015000,PlayerGameProjection,OpponentPositionRank,integer,32,True,The ranking of the player's opponent by position with regards to fantasy points allowed,False,True
+2015000,PlayerGameProjection,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2015000,PlayerGameProjection,FantasyDraftSalary,integer,32,True,The player's salary for Fantasy Draft daily fantasy contests.,True,True
+2015000,PlayerGameProjection,FantasyDraftPosition,string,10,True,The player's eligible position in Fantasy Drafts daily fantasy sports platform.,True,False
+2015000,PlayerGameProjection,GameID,integer,32,True,The unique ID of this game,True,False
+2015000,PlayerGameProjection,OpponentID,integer,32,True,The unique ID of the team's opponent,True,False
+2015000,PlayerGameProjection,Opponent,string,10,True,The name of the opponent ,True,False
+2015000,PlayerGameProjection,Day,date,,True,The day of the game,True,False
+2015000,PlayerGameProjection,DateTime,datetime,,True,The date and time of the game,True,False
+2015000,PlayerGameProjection,HomeOrAway,string,4,True,Whether the team is home or away,True,False
+2015000,PlayerGameProjection,IsGameOver,boolean,,False,Whether the game is over (true/false),True,False
+2015000,PlayerGameProjection,GlobalGameID,integer,32,True,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues.,False,False
+2015000,PlayerGameProjection,GlobalOpponentID,integer,32,True,A globally unique ID for this opponent. This value is guaranteed to be unique across all sports/leagues.,True,False
+2015000,PlayerGameProjection,Updated,datetime,,True,The timestamp of when the record was last updated (US Eastern Time).,True,False
+2015000,PlayerGameProjection,Games,integer,32,True,The number of games played.,True,False
+2015000,PlayerGameProjection,FantasyPoints,decimal,32,True,Total fantasy points,True,True
+2015000,PlayerGameProjection,AtBats,decimal,32,True,At bats while hitting,True,True
+2015000,PlayerGameProjection,Runs,decimal,32,True,Total runs scored.,True,True
+2015000,PlayerGameProjection,Hits,decimal,32,True,Total hits,True,True
+2015000,PlayerGameProjection,Singles,decimal,32,True,Total singles,True,True
+2015000,PlayerGameProjection,Doubles,decimal,32,True,Total doubles,True,True
+2015000,PlayerGameProjection,Triples,decimal,32,True,Total triples,True,True
+2015000,PlayerGameProjection,HomeRuns,decimal,32,True,Total home runs,True,True
+2015000,PlayerGameProjection,RunsBattedIn,decimal,32,True,Total runs batted in,True,True
+2015000,PlayerGameProjection,BattingAverage,decimal,32,True,Total batting average,True,True
+2015000,PlayerGameProjection,Outs,decimal,32,True,Total outs,True,True
+2015000,PlayerGameProjection,Strikeouts,decimal,32,True,Total strikeouts,True,True
+2015000,PlayerGameProjection,Walks,decimal,32,True,Total walks,True,True
+2015000,PlayerGameProjection,HitByPitch,decimal,32,True,Total times hit by pitch,True,True
+2015000,PlayerGameProjection,Sacrifices,decimal,32,True,Total sacrifices,True,True
+2015000,PlayerGameProjection,SacrificeFlies,decimal,32,True,Total sacrifice flies,True,True
+2015000,PlayerGameProjection,GroundIntoDoublePlay,decimal,32,True,Total times grounded into double play,True,True
+2015000,PlayerGameProjection,StolenBases,decimal,32,True,Total stolen bases,True,True
+2015000,PlayerGameProjection,CaughtStealing,decimal,32,True,Total caught stealing,True,True
+2015000,PlayerGameProjection,PitchesSeen,decimal,32,True,Total pitches seen,True,True
+2015000,PlayerGameProjection,OnBasePercentage,decimal,32,True,Total on base percentage,True,True
+2015000,PlayerGameProjection,SluggingPercentage,decimal,32,True,Total slugging percentage,True,True
+2015000,PlayerGameProjection,OnBasePlusSlugging,decimal,32,True,Total on base plus percentage ,True,True
+2015000,PlayerGameProjection,Errors,decimal,32,True,Total errors,True,True
+2015000,PlayerGameProjection,Wins,decimal,32,True,Total wins by the team/player,True,True
+2015000,PlayerGameProjection,Losses,decimal,32,True,Total losses by the team/player,True,True
+2015000,PlayerGameProjection,Saves,decimal,32,True,Total saves by team/player,True,True
+2015000,PlayerGameProjection,InningsPitchedDecimal,decimal,32,True,Decimal representation of total innings pitched (e.g. 1.33; 7.66; etc),True,True
+2015000,PlayerGameProjection,TotalOutsPitched,decimal,32,True,Total outs pitched by team/player,True,True
+2015000,PlayerGameProjection,InningsPitchedFull,decimal,32,True,Total full innings pitched (e.g. 6; 71; 89; etc),True,True
+2015000,PlayerGameProjection,InningsPitchedOuts,decimal,32,True,Outs pitched beyond InningsPitchedFull (possible values: 0; 1; 2),True,True
+2015000,PlayerGameProjection,EarnedRunAverage,decimal,32,True,Total earned run average by team/player,True,True
+2015000,PlayerGameProjection,PitchingHits,decimal,32,True,Hits allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingRuns,decimal,32,True,Runs allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingEarnedRuns,decimal,32,True,Earned runs allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingWalks,decimal,32,True,Walks allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingStrikeouts,decimal,32,True,Strikeouts allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingHomeRuns,decimal,32,True,Home runs allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchesThrown,decimal,32,True,Total pitches thrown while pitching,True,True
+2015000,PlayerGameProjection,PitchesThrownStrikes,decimal,32,True,Total pitches thrown for strikes while pitching,True,True
+2015000,PlayerGameProjection,WalksHitsPerInningsPitched,decimal,32,True,Walks plus hits per innings pitched (WHIP) while pitching,True,True
+2015000,PlayerGameProjection,PitchingBattingAverageAgainst,decimal,32,True,Total batting average against (BAA) while pitching,True,True
+2015000,PlayerGameProjection,GrandSlams,decimal,32,True,Total grand slams,True,True
+2015000,PlayerGameProjection,FantasyPointsFanDuel,decimal,32,True,Total FanDuel fantasy points,True,True
+2015000,PlayerGameProjection,FantasyPointsDraftKings,decimal,32,True,Total DraftKings fantasy points,True,True
+2015000,PlayerGameProjection,FantasyPointsYahoo,decimal,32,True,Total Yahoo fantasy points,True,True
+2015000,PlayerGameProjection,PlateAppearances,decimal,32,True,Total plate appearances,True,True
+2015000,PlayerGameProjection,TotalBases,decimal,32,True,Number of total bases,True,True
+2015000,PlayerGameProjection,FlyOuts,decimal,32,True,Total fly outs,True,True
+2015000,PlayerGameProjection,GroundOuts,decimal,32,True,Total ground outs,True,True
+2015000,PlayerGameProjection,LineOuts,decimal,32,True,Total line outs,True,True
+2015000,PlayerGameProjection,PopOuts,decimal,32,True,Total pop outs,True,True
+2015000,PlayerGameProjection,IntentionalWalks,decimal,32,True,Total intentional walks,True,True
+2015000,PlayerGameProjection,ReachedOnError,decimal,32,True,Total times reached on error,True,True
+2015000,PlayerGameProjection,BallsInPlay,decimal,32,True,Total balls in play,True,True
+2015000,PlayerGameProjection,BattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP),True,True
+2015000,PlayerGameProjection,WeightedOnBasePercentage,decimal,32,True,Total weight on base percentage,True,True
+2015000,PlayerGameProjection,PitchingSingles,decimal,32,True,Total singles allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingDoubles,decimal,32,True,Total doubles allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingTriples,decimal,32,True,Total triples allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingGrandSlams,decimal,32,True,Total grand slams allowed while pitching,True,True
+2015000,PlayerGameProjection,PitchingHitByPitch,decimal,32,True,Total batters hit by pitch while pitching,True,True
+2015000,PlayerGameProjection,PitchingSacrifices,decimal,32,True,Total sacrifices while pitching,True,True
+2015000,PlayerGameProjection,PitchingSacrificeFlies,decimal,32,True,Total sacrifice flies while pitching,True,True
+2015000,PlayerGameProjection,PitchingGroundIntoDoublePlay,decimal,32,True,Total grounded into double plays while pitching,True,True
+2015000,PlayerGameProjection,PitchingCompleteGames,decimal,32,True,Total complete games while pitching,True,True
+2015000,PlayerGameProjection,PitchingShutOuts,decimal,32,True,Total shuouts while pitching,True,True
+2015000,PlayerGameProjection,PitchingNoHitters,decimal,32,True,Total no hitters while pitching,True,True
+2015000,PlayerGameProjection,PitchingPerfectGames,decimal,32,True,Total perfect games while pitching,True,True
+2015000,PlayerGameProjection,PitchingPlateAppearances,decimal,32,True,Total plate appearances while pitching,True,True
+2015000,PlayerGameProjection,PitchingTotalBases,decimal,32,True,Total bases while pitching,True,True
+2015000,PlayerGameProjection,PitchingFlyOuts,decimal,32,True,Total fly outs while pitching,True,True
+2015000,PlayerGameProjection,PitchingGroundOuts,decimal,32,True,Total ground outs while pitching,True,True
+2015000,PlayerGameProjection,PitchingLineOuts,decimal,32,True,Total line outs while pitching,True,True
+2015000,PlayerGameProjection,PitchingPopOuts,decimal,32,True,Total pop outs while pitching,True,True
+2015000,PlayerGameProjection,PitchingIntentionalWalks,decimal,32,True,Total intentional walks while pitching,True,True
+2015000,PlayerGameProjection,PitchingReachedOnError,decimal,32,True,Total times reached on error while pitching,True,True
+2015000,PlayerGameProjection,PitchingCatchersInterference,decimal,32,True,Total catchers interference while pitching,True,True
+2015000,PlayerGameProjection,PitchingBallsInPlay,decimal,32,True,Total balls in play while pitching,True,True
+2015000,PlayerGameProjection,PitchingOnBasePercentage,decimal,32,True,Total on base percentage (OBP) while pitching,True,True
+2015000,PlayerGameProjection,PitchingSluggingPercentage,decimal,32,True,Total slugging percentage (SLG) while pitching,True,True
+2015000,PlayerGameProjection,PitchingOnBasePlusSlugging,decimal,32,True,Total on base plus slugging (OPS) while pitching,True,True
+2015000,PlayerGameProjection,PitchingStrikeoutsPerNineInnings,decimal,32,True,Total strikeouts per nine innings (K/9) while pitching,True,True
+2015000,PlayerGameProjection,PitchingWalksPerNineInnings,decimal,32,True,Total walks per nine innings (BB/9) while pitching,True,True
+2015000,PlayerGameProjection,PitchingBattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP) while pitching,True,True
+2015000,PlayerGameProjection,PitchingWeightedOnBasePercentage,decimal,32,True,Total weighted on base percentage while pitching ,True,True
+2015000,PlayerGameProjection,DoublePlays,decimal,32,True,Total double plays; defined as one of: Bunted into Double Play; Fly into Double Play; Fouled into Double Play; Ground into Double Pla;y Line into Double Play; Popped into Double Play,True,True
+2015000,PlayerGameProjection,PitchingDoublePlays,decimal,32,True,Total double plays while pitching,True,True
+2015000,PlayerGameProjection,BattingOrderConfirmed,boolean,,True,Whether the batting order is confirmed (true/false),True,True
+2015000,PlayerGameProjection,IsolatedPower,decimal,32,True,Total isolated power (ISO),True,True
+2015000,PlayerGameProjection,FieldingIndependentPitching,decimal,32,True,Total fielding independent pitching (FIP),True,True
+2015000,PlayerGameProjection,PitchingQualityStarts,decimal,32,True,Total quality starts pitched,True,True
+2015000,PlayerGameProjection,PitchingInningStarted,integer,32,True,The inning that the pitcher entered the game (if any).,True,True
+2015000,PlayerGameProjection,LeftOnBase,decimal,32,True,Total left on base percentage ,True,True
+2015000,PlayerGameProjection,PitchingHolds,decimal,32,True,Total holds pitched,True,True
+2015000,PlayerGameProjection,PitchingBlownSaves,decimal,32,True,Total blown saves pitched,True,True
+2015000,PlayerGameProjection,SubstituteBattingOrder,integer,32,True,The position in the batting order where this player was substituted into the game (does not include players in the starting lineup),True,True
+2015000,PlayerGameProjection,SubstituteBattingOrderSequence,integer,32,True,The sequence in which this player was substituted into the game; within the particular batting order,True,True
+2015000,PlayerGameProjection,FantasyPointsFantasyDraft,decimal,32,True,Total FantasyDraft fantasy points,True,True
+2015000,PlayerGameProjection,FantasyPointsBatting,decimal,32,True,Total batting fantasy points,True,
+2015000,PlayerGameProjection,FantasyPointsPitching,decimal,32,True,Total pitching fantasy points,True,
+2016000,PlayerSeasonProjection,StatID,integer,32,False,The unique ID of the stat,False,False
+2016000,PlayerSeasonProjection,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2016000,PlayerSeasonProjection,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2016000,PlayerSeasonProjection,SeasonType,integer,32,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2016000,PlayerSeasonProjection,Season,integer,32,True,The MLB season for which these totals apply,False,False
+2016000,PlayerSeasonProjection,Name,string,50,True,Player's full name,False,False
+2016000,PlayerSeasonProjection,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2016000,PlayerSeasonProjection,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS,False,False
+2016000,PlayerSeasonProjection,PositionCategory,string,10,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR,False,False
+2016000,PlayerSeasonProjection,Started,integer,32,True,Number of games started in the season,False,False
+2016000,PlayerSeasonProjection,BattingOrder,integer,32,True,This field is expected to be NULL,False,False
+2016000,PlayerSeasonProjection,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues,False,False
+2016000,PlayerSeasonProjection,AverageDraftPosition,decimal,32,True,The auction value for this player as it pertains to auction-style drafts for season-long fantasy baseball,False,True
+2016000,PlayerSeasonProjection,AuctionValue,integer,32,True,The auction value for this player as it pertains to auction-style drafts for season-long fantasy baseball,False,True
+2016000,PlayerSeasonProjection,Updated,datetime,,True,The timestamp of when the record was last updated (US Eastern Time).,True,False
+2016000,PlayerSeasonProjection,Games,integer,32,True,The number of games played.,True,False
+2016000,PlayerSeasonProjection,FantasyPoints,decimal,32,True,Total fantasy points,True,True
+2016000,PlayerSeasonProjection,AtBats,decimal,32,True,At bats while hitting,True,True
+2016000,PlayerSeasonProjection,Runs,decimal,32,True,Total runs scored.,True,True
+2016000,PlayerSeasonProjection,Hits,decimal,32,True,Total hits,True,True
+2016000,PlayerSeasonProjection,Singles,decimal,32,True,Total singles,True,True
+2016000,PlayerSeasonProjection,Doubles,decimal,32,True,Total doubles,True,True
+2016000,PlayerSeasonProjection,Triples,decimal,32,True,Total triples,True,True
+2016000,PlayerSeasonProjection,HomeRuns,decimal,32,True,Total home runs,True,True
+2016000,PlayerSeasonProjection,RunsBattedIn,decimal,32,True,Total runs batted in,True,True
+2016000,PlayerSeasonProjection,BattingAverage,decimal,32,True,Total batting average,True,True
+2016000,PlayerSeasonProjection,Outs,decimal,32,True,Total outs,True,True
+2016000,PlayerSeasonProjection,Strikeouts,decimal,32,True,Total strikeouts,True,True
+2016000,PlayerSeasonProjection,Walks,decimal,32,True,Total walks,True,True
+2016000,PlayerSeasonProjection,HitByPitch,decimal,32,True,Total times hit by pitch,True,True
+2016000,PlayerSeasonProjection,Sacrifices,decimal,32,True,Total sacrifices,True,True
+2016000,PlayerSeasonProjection,SacrificeFlies,decimal,32,True,Total sacrifice flies,True,True
+2016000,PlayerSeasonProjection,GroundIntoDoublePlay,decimal,32,True,Total times grounded into double play,True,True
+2016000,PlayerSeasonProjection,StolenBases,decimal,32,True,Total stolen bases,True,True
+2016000,PlayerSeasonProjection,CaughtStealing,decimal,32,True,Total caught stealing,True,True
+2016000,PlayerSeasonProjection,PitchesSeen,decimal,32,True,Total pitches seen,True,True
+2016000,PlayerSeasonProjection,OnBasePercentage,decimal,32,True,Total on base percentage,True,True
+2016000,PlayerSeasonProjection,SluggingPercentage,decimal,32,True,Total slugging percentage,True,True
+2016000,PlayerSeasonProjection,OnBasePlusSlugging,decimal,32,True,Total on base plus percentage ,True,True
+2016000,PlayerSeasonProjection,Errors,decimal,32,True,Total errors,True,True
+2016000,PlayerSeasonProjection,Wins,decimal,32,True,Total wins by the team/player,True,True
+2016000,PlayerSeasonProjection,Losses,decimal,32,True,Total losses by the team/player,True,True
+2016000,PlayerSeasonProjection,Saves,decimal,32,True,Total saves by team/player,True,True
+2016000,PlayerSeasonProjection,InningsPitchedDecimal,decimal,32,True,Decimal representation of total innings pitched (e.g. 1.33; 7.66; etc),True,True
+2016000,PlayerSeasonProjection,TotalOutsPitched,decimal,32,True,Total outs pitched by team/player,True,True
+2016000,PlayerSeasonProjection,InningsPitchedFull,decimal,32,True,Total full innings pitched (e.g. 6; 71; 89; etc),True,True
+2016000,PlayerSeasonProjection,InningsPitchedOuts,decimal,32,True,Outs pitched beyond InningsPitchedFull (possible values: 0; 1; 2),True,True
+2016000,PlayerSeasonProjection,EarnedRunAverage,decimal,32,True,Total earned run average by team/player,True,True
+2016000,PlayerSeasonProjection,PitchingHits,decimal,32,True,Hits allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingRuns,decimal,32,True,Runs allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingEarnedRuns,decimal,32,True,Earned runs allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingWalks,decimal,32,True,Walks allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingStrikeouts,decimal,32,True,Strikeouts allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingHomeRuns,decimal,32,True,Home runs allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchesThrown,decimal,32,True,Total pitches thrown while pitching,True,True
+2016000,PlayerSeasonProjection,PitchesThrownStrikes,decimal,32,True,Total pitches thrown for strikes while pitching,True,True
+2016000,PlayerSeasonProjection,WalksHitsPerInningsPitched,decimal,32,True,Walks plus hits per innings pitched (WHIP) while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingBattingAverageAgainst,decimal,32,True,Total batting average against (BAA) while pitching,True,True
+2016000,PlayerSeasonProjection,GrandSlams,decimal,32,True,Total grand slams,True,True
+2016000,PlayerSeasonProjection,FantasyPointsFanDuel,decimal,32,True,Total FanDuel fantasy points,True,True
+2016000,PlayerSeasonProjection,FantasyPointsDraftKings,decimal,32,True,Total DraftKings fantasy points,True,True
+2016000,PlayerSeasonProjection,FantasyPointsYahoo,decimal,32,True,Total Yahoo fantasy points,True,True
+2016000,PlayerSeasonProjection,PlateAppearances,decimal,32,True,Total plate appearances,True,True
+2016000,PlayerSeasonProjection,TotalBases,decimal,32,True,Number of total bases,True,True
+2016000,PlayerSeasonProjection,FlyOuts,decimal,32,True,Total fly outs,True,True
+2016000,PlayerSeasonProjection,GroundOuts,decimal,32,True,Total ground outs,True,True
+2016000,PlayerSeasonProjection,LineOuts,decimal,32,True,Total line outs,True,True
+2016000,PlayerSeasonProjection,PopOuts,decimal,32,True,Total pop outs,True,True
+2016000,PlayerSeasonProjection,IntentionalWalks,decimal,32,True,Total intentional walks,True,True
+2016000,PlayerSeasonProjection,ReachedOnError,decimal,32,True,Total times reached on error,True,True
+2016000,PlayerSeasonProjection,BallsInPlay,decimal,32,True,Total balls in play,True,True
+2016000,PlayerSeasonProjection,BattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP),True,True
+2016000,PlayerSeasonProjection,WeightedOnBasePercentage,decimal,32,True,Total weight on base percentage,True,True
+2016000,PlayerSeasonProjection,PitchingSingles,decimal,32,True,Total singles allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingDoubles,decimal,32,True,Total doubles allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingTriples,decimal,32,True,Total triples allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingGrandSlams,decimal,32,True,Total grand slams allowed while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingHitByPitch,decimal,32,True,Total batters hit by pitch while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingSacrifices,decimal,32,True,Total sacrifices while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingSacrificeFlies,decimal,32,True,Total sacrifice flies while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingGroundIntoDoublePlay,decimal,32,True,Total grounded into double plays while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingCompleteGames,decimal,32,True,Total complete games while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingShutOuts,decimal,32,True,Total shuouts while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingNoHitters,decimal,32,True,Total no hitters while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingPerfectGames,decimal,32,True,Total perfect games while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingPlateAppearances,decimal,32,True,Total plate appearances while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingTotalBases,decimal,32,True,Total bases while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingFlyOuts,decimal,32,True,Total fly outs while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingGroundOuts,decimal,32,True,Total ground outs while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingLineOuts,decimal,32,True,Total line outs while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingPopOuts,decimal,32,True,Total pop outs while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingIntentionalWalks,decimal,32,True,Total intentional walks while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingReachedOnError,decimal,32,True,Total times reached on error while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingCatchersInterference,decimal,32,True,Total catchers interference while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingBallsInPlay,decimal,32,True,Total balls in play while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingOnBasePercentage,decimal,32,True,Total on base percentage (OBP) while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingSluggingPercentage,decimal,32,True,Total slugging percentage (SLG) while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingOnBasePlusSlugging,decimal,32,True,Total on base plus slugging (OPS) while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingStrikeoutsPerNineInnings,decimal,32,True,Total strikeouts per nine innings (K/9) while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingWalksPerNineInnings,decimal,32,True,Total walks per nine innings (BB/9) while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingBattingAverageOnBallsInPlay,decimal,32,True,Total batting average on balls in play (BABIP) while pitching,True,True
+2016000,PlayerSeasonProjection,PitchingWeightedOnBasePercentage,decimal,32,True,Total weighted on base percentage while pitching ,True,True
+2016000,PlayerSeasonProjection,DoublePlays,decimal,32,True,Total double plays; defined as one of: Bunted into Double Play; Fly into Double Play; Fouled into Double Play; Ground into Double Pla;y Line into Double Play; Popped into Double Play,True,True
+2016000,PlayerSeasonProjection,PitchingDoublePlays,decimal,32,True,Total double plays while pitching,True,True
+2016000,PlayerSeasonProjection,BattingOrderConfirmed,boolean,,True,Whether the batting order is confirmed (true/false),True,True
+2016000,PlayerSeasonProjection,IsolatedPower,decimal,32,True,Total isolated power (ISO),True,True
+2016000,PlayerSeasonProjection,FieldingIndependentPitching,decimal,32,True,Total fielding independent pitching (FIP),True,True
+2016000,PlayerSeasonProjection,PitchingQualityStarts,decimal,32,True,Total quality starts pitched,True,True
+2016000,PlayerSeasonProjection,PitchingInningStarted,integer,32,True,The inning that the pitcher entered the game (if any).,True,True
+2016000,PlayerSeasonProjection,LeftOnBase,decimal,32,True,Total left on base percentage ,True,True
+2016000,PlayerSeasonProjection,PitchingHolds,decimal,32,True,Total holds pitched,True,True
+2016000,PlayerSeasonProjection,PitchingBlownSaves,decimal,32,True,Total blown saves pitched,True,True
+2016000,PlayerSeasonProjection,SubstituteBattingOrder,integer,32,True,The position in the batting order where this player was substituted into the game (does not include players in the starting lineup),True,True
+2016000,PlayerSeasonProjection,SubstituteBattingOrderSequence,integer,32,True,The sequence in which this player was substituted into the game; within the particular batting order,True,True
+2016000,PlayerSeasonProjection,FantasyPointsFantasyDraft,decimal,32,True,Total FantasyDraft fantasy points,True,True
+2016000,PlayerSeasonProjection,FantasyPointsBatting,decimal,32,True,Total batting fantasy points,True,
+2016000,PlayerSeasonProjection,FantasyPointsPitching,decimal,32,True,Total pitching fantasy points,True,
+2017000,Standing,Season,integer,32,False,The MLB season for which these totals apply,False,False
+2017000,Standing,SeasonType,integer,32,False,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2017000,Standing,TeamID,Integer,32,False,The team's unique TeamID as assigned by SportsDataIO,False,False
+2017000,Standing,Key,string,10,False,Abbreviation of the team (e.g. LAD; PHI; BOS; CHC; etc.),False,False
+2017000,Standing,City,string,50,True,The city/location of the team (e.g. Los Angeles; Philadelphia; Boston; Chicago; etc.),False,False
+2017000,Standing,Name,string,50,True,Team's full name (city and mascot),False,False
+2017000,Standing,League,string,20,True,The league of the team (possible values: AL; NL),False,False
+2017000,Standing,Division,string,20,True,The division of the team (e.g. East; Central; West),True,False
+2017000,Standing,Wins,integer,32,True,The total number of wins by a team in the season,False,False
+2017000,Standing,Losses,integer,32,True,Total number of losses by the team in the season,False,False
+2017000,Standing,Percentage,decimal,32,True,Winning percentage of a team,False,False
+2017000,Standing,DivisionWins,integer,32,True,Total number of division wins in the season,False,False
+2017000,Standing,DivisionLosses,integer,32,True,Total number of division losses in a season,False,False
+2017000,Standing,GamesBehind,decimal,32,True,Number of games behind the first place team,False,False
+2017000,Standing,LastTenGamesWins,integer,32,True,Total number of wins in the last ten games,False,False
+2017000,Standing,LastTenGamesLosses,integer,32,True,Total number of losses in the last ten games,False,False
+2017000,Standing,Streak,string,10,True,Current streak the team is on (e.g. Win 3; Lost 3),True,False
+2017000,Standing,LeagueRank,integer,32,True,The ranking in the league,True,False
+2017000,Standing,DivisionRank,integer,32,True,The ranking in the division (e.g. 1; 2; 3; 4; 5),False,False
+2017000,Standing,WildCardRank,integer,32,True,The rank of the team in terms of Wild Card standings only,False,False
+2017000,Standing,WildCardGamesBehind,decimal,32,True,The number of games behind a team is of the final Wild Card spot,False,False
+2017000,Standing,HomeWins,integer,32,True,Total number of home wins in the season,False,False
+2017000,Standing,HomeLosses,integer,32,True,Total number of home losses in the season,False,False
+2017000,Standing,AwayWins,integer,32,True,Total number of away wins in the season,False,False
+2017000,Standing,AwayLosses,integer,32,True,Total number of away losses in the season,False,False
+2017000,Standing,DayWins,integer,32,True,Total number of wins in daytime games,False,False
+2017000,Standing,DayLosses,integer,32,True,Total number of losses in daytime games,False,False
+2017000,Standing,NightWins,integer,32,True,Total number of wins in nighttime games,False,False
+2017000,Standing,NightLosses,integer,32,True,Total number of losses in nighttime games,False,False
+2017000,Standing,RunsScored,integer,32,True,Total runs scored by the team in the season,False,False
+2017000,Standing,RunsAgainst,integer,32,True,Total number of runs scored by the opponents of a specified team,False,False
+2017000,Standing,GlobalTeamID,integer,32,True,A globally unique ID for this team. This value is guaranteed to be unique across all sports/leagues.,False,False
+2017000,Standing,ClinchedBestLeagueRecord,boolean,,True,Returns TRUE if team has clinched the best record in their respective league; FALSE if not,False,False
+2017000,Standing,ClinchedWildCard,boolean,,True,Returns TRUE if team has clinched Wild Card spot; FALSE if not,False,False
+2017000,Standing,ClinchedDivision,boolean,,True,Returns TRUE if team has clinched their division; FALSE if not,False,False
+2017000,Standing,EliminatedFromPlayoffContention,boolean,,True,Returns TRUE if team has been eliminated from playoff contention; FALSE if not,False,False
+2018000,Season,Season,integer,32,False,The MLB season for which these totals apply,False,False
+2018000,Season,RegularSeasonStartDate,date,,True,The start date of the regular season,True,False
+2018000,Season,PostSeasonStartDate,date,,True,The start date of the postseason,True,False
+2018000,Season,SeasonType,string,10,True,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar).,True,False
+2018000,Season,ApiSeason,string,10,True,The string to pass into subsequent API calls in the season parameter (e.g. 2025REG; 2025POST; etc.).,False,False
+2019000,DfsSlate,SlateID,integer,32,False,The SlateID that this SlateGame refers to,False,False
+2019000,DfsSlate,Operator,string,20,True,The name of the operator who is running contests for this slate Possible values: FanDuel; DraftKings; Yahoo; FantasyDraft; etc.,False,False
+2019000,DfsSlate,OperatorSlateID,integer,32,True,Unique ID of a slate (assigned by the operator).,True,False
+2019000,DfsSlate,OperatorName,string,50,True,The name of the slate (assigned by the operator). Possible values: Main; Express; Arcade; Late Night; etc.,True,False
+2019000,DfsSlate,OperatorDay,date,,True,The day (in EST/EDT) that the slate begins (assigned by the operator),False,False
+2019000,DfsSlate,OperatorStartTime,datetime,,True,The date/time (in EST/EDT) that the slate begins (assigned by the operator).,True,False
+2019000,DfsSlate,NumberOfGames,integer,32,True,The number of actual games that this slate covers,False,False
+2019000,DfsSlate,IsMultiDaySlate,boolean,,True,Whether or not this slate uses games that take place on different days (true/false),False,False
+2019000,DfsSlate,RemovedByOperator,boolean,,True,Indicates whether this slate was removed/deleted by the operator.,True,False
+2019000,DfsSlate,OperatorGameType,string,50,True,The game type of the slate. Note: Will often be null as most operators only have one game type,False,False
+2019000,DfsSlate,DfsSlateGames,DfsSlateGame[],,True,The games that are included in this slate,True,False
+2019000,DfsSlate,DfsSlatePlayers,DfsSlatePlayer[],,True,The players that are included in this slate,True,False
+2019000,DfsSlate,SlateRosterSlots,string[],,True,The positions that need to be filled for this particular slate,True,False
+2019000,DfsSlate,SalaryCap,integer,,True,The salary cap for the current slate (is null for slates with no salary cap such a Tiers gametypes),True,False
+2020000,DfsSlateGame,SlateGameID,integer,32,False,The SlateGameID that this SlatePlayer refers to,False,False
+2020000,DfsSlateGame,SlateID,integer,32,False,The SlateID that this SlateGame refers to,False,False
+2020000,DfsSlateGame,GameID,integer,32,True,The unique ID of the game tied to this SlateGame,False,False
+2020000,DfsSlateGame,Game,Game,,True,The details of the Game that this SlateGame refers to,False,False
+2020000,DfsSlateGame,OperatorGameID,integer,32,True,Unique ID of a SlateGame (assigned by the operator),False,False
+2020000,DfsSlateGame,RemovedByOperator,boolean,,True,Indicates whether this game was removed/deleted by the operator.,False,True
+2021000,DfsSlatePlayer,SlatePlayerID,integer,32,False,Unique ID of a SlatePlayer (assigned by SportsDataIO),False,False
+2021000,DfsSlatePlayer,SlateID,integer,32,False,The SlateID that this SlatePlayer refers to,False,False
+2021000,DfsSlatePlayer,SlateGameID,integer,32,True,The SlateGameID that this SlatePlayer refers to,False,False
+2021000,DfsSlatePlayer,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2021000,DfsSlatePlayer,PlayerGameProjectionStatID,integer,32,True,The SportsDataIO StatID that this SlatePlayer refers to. This points to data in the respective sports' projected player game stats feeds.,True,False
+2021000,DfsSlatePlayer,OperatorPlayerID,string,25,True,Unique ID of the Player (assigned by the operator),False,False
+2021000,DfsSlatePlayer,OperatorSlatePlayerID,string,50,True,Unique ID of the SlatePlayer (assigned by the operator),False,False
+2021000,DfsSlatePlayer,OperatorPlayerName,string,50,True,The player's name (assigned by the operator),False,False
+2021000,DfsSlatePlayer,OperatorPosition,string,10,True,The player's eligible positions for the contest (assigned by the operator),False,False
+2021000,DfsSlatePlayer,OperatorSalary,integer,32,True,The player's salary for the contest (assigned by the operator),False,False
+2021000,DfsSlatePlayer,OperatorRosterSlots,string[],,True,The player's eligible positions to be played in the contest (assigned by the operator).  Note: this would include UTIL; etc plays for those that are eligible.,False,False
+2021000,DfsSlatePlayer,RemovedByOperator,boolean,,True,Indicates whether this player was removed/deleted by the operator,False,True
+2021000,DfsSlatePlayer,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2021000,DfsSlatePlayer,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2023000,PlayerInfo,PlayerID,integer,32,False,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career.,False,False
+2023000,PlayerInfo,Name,string,50,True,Player's full name,False,False
+2023000,PlayerInfo,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2023000,PlayerInfo,Team,string,50,True,The abbreviation [Key] of the team,False,False
+2023000,PlayerInfo,Position,string,50,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS.,False,False
+2024000,BoxScore,Game,Game,,True,The details of the game associated with this box score,True,False
+2024000,BoxScore,Innings,Inning[],,True,The inning details associated with the box score,False,False
+2024000,BoxScore,TeamGames,TeamGame[],,True,The team game stats associated with this box score,True,False
+2024000,BoxScore,PlayerGames,PlayerGame[],,True,The player game stats associated with this box score,True,False
+2025000,PlayByPlay,Game,Game,,True,The details of the game associated with this play-by-play,True,False
+2025000,PlayByPlay,Plays,Play[],,True,The details of the plays associated with this play-by-play,True,False
+2026000,GameInfo,GameId,integer,32,False,The unique ID of this game,False,False
+2026000,GameInfo,Season,integer,32,False,The MLB season of the game,False,False
+2026000,GameInfo,SeasonType,integer,32,False,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar).,True,False
+2026000,GameInfo,Day,date,,True,The day of the game,False,False
+2026000,GameInfo,DateTime,datetime,,True,The date and time of the game in US Eastern Time,False,False
+2026000,GameInfo,Status,string,20,True,Indicates the game's status. Possible values include: Scheduled; InProgress; Final; Suspended; Delayed; Postponed; Canceled; Forfeit; NotNecessary,False,False
+2026000,GameInfo,AwayTeamId,integer,32,True,The unique TeamID of the away team,False,False
+2026000,GameInfo,HomeTeamId,integer,32,True,The unique ID of the home team,False,False
+2026000,GameInfo,AwayTeamName,string,50,True,The abbreviation [Key] of the away team,False,False
+2026000,GameInfo,HomeTeamName,string,50,True,The abbreviation [Key] of the home team,False,False
+2026000,GameInfo,GlobalGameId,integer,32,False,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues.,False,False
+2026000,GameInfo,GlobalAwayTeamId,integer,32,True,A globally unique ID for the away team. This value is guaranteed to be unique across all sports/leagues,False,False
+2026000,GameInfo,GlobalHomeTeamId,integer,32,True,A globally unique ID for the home team. This value is guaranteed to be unique across all sports/leagues.,False,False
+2026000,GameInfo,PregameOdds,GameOdd[],,True,List of Pregame GameOdds from different sportsbooks,True,False
+2026000,GameInfo,LiveOdds,GameOdd[],,True,Shows a list of live odds from different sportsbooks,False,False
+2026000,GameInfo,HomeTeamScore,integer,,True,Score of the home team (updated after game ends to allow for resolving bets),True,True
+2026000,GameInfo,AwayTeamScore,integer,,True,Score of the away team (updated after game ends to allow for resolving bets),True,True
+2026000,GameInfo,TotalScore,integer,,True,The combined scores of the home and away team of the game tied to this event (post-game),False,True
+2026000,GameInfo,HomeRotationNumber,integer,32,True,Rotation number of home team for this game,True,True
+2026000,GameInfo,AwayRotationNumber,integer,32,True,Rotation number of away team for this game,True,True
+2026000,GameInfo,AlternateMarketPregameOdds,GameOdd[],,True,List of Alternate Market Game Odds from different sportsbooks.,True,False
+2058000,GameOddOutcome,GameOddId,integer,32,True,Unique ID of this odd,True,False
+2058000,GameOddOutcome,GameOddResultTypeId,integer,32,True,The unique ID of this GameOddResultType,False,False
+2058000,GameOddOutcome,GameOddResultType,string,100,True,The result/outcome of a bet (e.g. Won; Lost; Push; Not Resulted; Incomplete),False,False
+2058000,GameOddOutcome,OddType,string,500,True,The market type of the odd (ex: live; pregame; 1st inning; etc),False,False
+2058000,GameOddOutcome,GameOddType,string,100,True,The GameOddResultType of an outcome in the form of a string,False,False
+2058000,GameOddOutcome,BetValue,decimal,32,True,The offered betting line from a sportsbook for a game (i.e. If a team won a game by 2 and the run line was -1.5; the actual value would be 2 and the bet value would be -1.5),False,False
+2058000,GameOddOutcome,ActualValue,decimal,32,True,The value of the actual result that occured in game (i.e. If a team won a game by 2 and the spread was -1.5; the actual value would be 2 and the bet value would be -1.5),False,False
+2059000,GameOddResult,GameOddID,integer,32,False,Unique ID of this odd,True,False
+2059000,GameOddResult,Sportsbook,string,25,False,Name of sportsbook,True,True
+2059000,GameOddResult,GameID,integer,32,False,The unique ID of this game,False,False
+2059000,GameOddResult,Created,datetime,,False,The date and time when these odds were first created in US Eastern Time,False,False
+2059000,GameOddResult,Updated,datetime,,False,The date and time of when these odds were last updated (in US Eatern Time). If these are the latest odds for this game; and they have not been updated within the last few minutes; then it indicates that there were problems connecting to the sportsbook.,False,False
+2059000,GameOddResult,HomeMoneyLine,integer,32,True,The sportsbook's moneyline for the home team,False,True
+2059000,GameOddResult,AwayMoneyLine,integer,32,True,The sportsbook's moneyline for the away team,False,True
+2059000,GameOddResult,HomePointSpread,decimal,32,True,The sportsbook's run line for the home team,False,True
+2059000,GameOddResult,AwayPointSpread,decimal,32,True,The sportsbook's run line for the away team,False,True
+2059000,GameOddResult,HomePointSpreadPayout,integer,32,True,The sportsbook's run line payout for the home team,False,True
+2059000,GameOddResult,AwayPointSpreadPayout,integer,32,True,The sportsbook's run line payout for the away team,False,True
+2059000,GameOddResult,OverUnder,decimal,32,True,The total points line as given by the sportsbook,False,True
+2059000,GameOddResult,OverPayout,integer,32,True,The sportsbook's payout for the over,True,True
+2059000,GameOddResult,UnderPayout,integer,32,True,The sportsbook's payout for the under,True,True
+2059000,GameOddResult,SportsbookID,integer,32,True,Unique ID of the sportsbook,True,False
+2059000,GameOddResult,SportsbookUrl,string,500,True,The URL for sportsbook event,False,False
+2059000,GameOddResult,OddType,string,500,True,The market type of the odd (ex: live; pregame; 1st inning; etc),False,False
+2059000,GameOddResult,GameOddOutcomeResults,GameOddOutcome[],,True,List of outcomes showing results of betting markets that were bet on for the given game,False,False
+2060000,GameInfoResult,GameID,integer,32,False,The unique ID of this game,False,False
+2060000,GameInfoResult,Season,integer,32,False,The MLB season of the game,False,False
+2060000,GameInfoResult,SeasonType,integer,32,False,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar).,True,False
+2060000,GameInfoResult,Day,date,,True,The day of the game,False,False
+2060000,GameInfoResult,DateTime,datetime,,True,The date and time of the game in US Eastern Time,False,False
+2060000,GameInfoResult,Status,string,20,True,Indicates the game's status. Possible values include: Scheduled; InProgress; Final; Suspended; Delayed; Postponed; Canceled; Forfeit; NotNecessary,False,False
+2060000,GameInfoResult,AwayTeamID,integer,32,True,The unique TeamID of the away team,False,False
+2060000,GameInfoResult,HomeTeamID,integer,32,True,The unique TeamID of the home team,False,False
+2060000,GameInfoResult,AwayTeamName,string,50,True,The abbreviation [Key] of the away team,False,False
+2060000,GameInfoResult,HomeTeamName,string,50,True,The abbreviation [Key] of the home team,False,False
+2060000,GameInfoResult,GlobalGameID,integer,32,False,A globally unique ID for this game. This value is guaranteed to be unique across all sports/leagues.,False,False
+2060000,GameInfoResult,GlobalAwayTeamID,integer,32,True,A globally unique ID for the away team. This value is guaranteed to be unique across all sports/leagues,False,False
+2060000,GameInfoResult,GlobalHomeTeamID,integer,32,True,A globally unique ID for the home team. This value is guaranteed to be unique across all sports/leagues.,False,False
+2060000,GameInfoResult,PregameOdds,GameOddResult[],,True,List of Pregame GameOdds from different sportsbooks with results,False,False
+2060000,GameInfoResult,HomeTeamScore,integer,32,True,Score of the home team (updated after game ends to allow for resolving bets),True,True
+2060000,GameInfoResult,AwayTeamScore,integer,32,True,Score of the away team (updated after game ends to allow for resolving bets),True,True
+2060000,GameInfoResult,TotalScore,integer,32,True,The combined scores of the home and away team of the game tied to this event (post-game),False,True
+2060000,GameInfoResult,HomeRotationNumber,integer,32,True,Rotation number of home team for this game,True,True
+2060000,GameInfoResult,AwayRotationNumber,integer,32,True,Rotation number of away team for this game,True,True
+2060000,GameInfoResult,AlternateMarketPregameOdds,GameOddResult[],,True,List of Alternate Market Game Odds from different sportsbooks with results,True,False
+2060000,GameInfoResult,Inning,integer,32,True,The inning that the game is currently in; or the inning in which the game ended. Possible values include: NULL; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; etc),True,False
+2060000,GameInfoResult,InningHalf,string,1,True,The inning half that the game is currently in; or the inning half in which the game ended (possible values: T; B; E: M: NULL),False,False
+2060000,GameInfoResult,IsClosed,boolean,,False,Indicates whether the game is over and the final score has been verified and closed out. Note: it is recommend for bet resulting to use IsClosed = True rather than simply Final game status,False,False
+2060000,GameInfoResult,Innings,Inning[],,True,The inning details associated with the game,False,False
+2060000,GameInfoResult,LiveOdds,GameOddResult[],,True,Shows a list of live odds from different sportsbooks with results,False,False
+2062000,DfsSlateWithOwnershipProjection,SlateID,integer,32,False,Unique ID of a Slate (assigned by SportsDataIO).,False,False
+2062000,DfsSlateWithOwnershipProjection,Operator,string,20,True,The name of the operator who is running contests for this slate. Possible values: FanDuel; DraftKings; Yahoo; FantasyDraft; etc.,False,False
+2062000,DfsSlateWithOwnershipProjection,OperatorSlateID,integer,32,True,Unique ID of a slate (assigned by the operator).,False,False
+2062000,DfsSlateWithOwnershipProjection,OperatorName,string,50,True,The name of the slate (assigned by the operator). Possible values: Main; Express; Arcade; Late Night; etc.,False,False
+2062000,DfsSlateWithOwnershipProjection,OperatorDay,date,,True,The day (in EST/EDT) that the slate begins (assigned by the operator).,False,False
+2062000,DfsSlateWithOwnershipProjection,OperatorStartTime,datetime,,True,The date/time (in EST/EDT) that the slate begins (assigned by the operator).,False,False
+2062000,DfsSlateWithOwnershipProjection,SlateOwnershipProjections,DfsSlatePlayerOwnershipProjection[],,True,The list of projected ownership,False,False
+2063000,DfsSlatePlayerOwnershipProjection,SlateID,integer,32,False,Unique ID of a Slate (assigned by SportsDataIO).,False,False
+2063000,DfsSlatePlayerOwnershipProjection,PlayerID,integer,32,False,Unique ID of the Associated Player.,False,False
+2063000,DfsSlatePlayerOwnershipProjection,ProjectedOwnershipPercentage,decimal,32,False,Projected Ownership Percentage (0-100),False,False
+2063000,DfsSlatePlayerOwnershipProjection,IsCaptain,boolean,32,False,Indicates if this is the MVP/Captain slot for single game slates,False,False
+2027000,GameOdd,GameOddId,integer,32,False,Unique ID of this odd,True,False
+2027000,GameOdd,Sportsbook,string,25,False,Name of sportsbook,True,True
+2027000,GameOdd,GameId,integer,32,False,The unique ID of this game,False,False
+2027000,GameOdd,Created,datetime,,False,The date and time when these odds were first created in US Eastern Time,False,False
+2027000,GameOdd,Updated,datetime,,False,The date and time of when these odds were last updated (in US Eatern Time) If these are the latest odds for this game; and they have not been updated within the last few minutes; then it indicates that there were problems connecting to the sportsbook.,False,False
+2027000,GameOdd,HomeMoneyLine,integer,32,True,The sportsbook's moneyline for the home team,False,True
+2027000,GameOdd,AwayMoneyLine,integer,32,True,The sportsbook's moneyline for the away team,False,True
+2027000,GameOdd,HomePointSpread,decimal,32,True,The sportsbook's run line for the home team,False,True
+2027000,GameOdd,AwayPointSpread,decimal,32,True,The sportsbook's run line for the away team,False,True
+2027000,GameOdd,HomePointSpreadPayout,integer,32,True,The sportsbook's run line payout for the home team,False,True
+2027000,GameOdd,AwayPointSpreadPayout,integer,32,True,The sportsbook's run line payout for the away team,False,True
+2027000,GameOdd,OverUnder,decimal,32,True,The total points line as given by the sportsbook,False,True
+2027000,GameOdd,OverPayout,integer,32,True,The sportsbook's payout for the over,True,True
+2027000,GameOdd,UnderPayout,integer,32,True,The sportsbook's payout for the under,True,True
+2027000,GameOdd,SportsbookId,integer,32,True,Unique ID of the sportsbook,True,False
+2027000,GameOdd,SportsbookUrl,string,500,True,The URL for sportsbook event,False,False
+2027000,GameOdd,OddType,string,500,True,The market type of the odd (ex: live; pregame; 1st inning; etc),False,False
+2027000,GameOdd,Unlisted,datetime,,True,The timestamp of when these odds were first made unavailable to be bet on any further (In US Eastern Time),False,False
+2029000,Headshot,PlayerID,integer,32,False,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2029000,Headshot,Name,string,100,True,Player's full name,False,False
+2029000,Headshot,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2029000,Headshot,Team,string,10,True,The abbreviation [Key] of the team,False,False
+2029000,Headshot,Position,string,10,True,The player's position associated with the given game or season. Possible values: 1B; 2B; 3B; C; CF; DH; IF; LF; OF; P; PH; PR; RF; RP; SP; SS,False,False
+2029000,Headshot,PreferredHostedHeadshotUrl,string,500,True,The player's preferred hosted headshot URL. This returns the headshot with transparent background; if available.,False,True
+2029000,Headshot,PreferredHostedHeadshotUpdated,datetime,,True,The last updated date of the player's preferred hosted headshot.,True,False
+2029000,Headshot,HostedHeadshotWithBackgroundUrl,string,500,True,The player's hosted headshot URL,False,True
+2029000,Headshot,HostedHeadshotWithBackgroundUpdated,datetime,,True,The last date and time the player's hosted headshot was updated in US Eastern Time,False,False
+2029000,Headshot,HostedHeadshotNoBackgroundUrl,string,500,True,The player's transparent background hosted headshot URL,False,True
+2029000,Headshot,HostedHeadshotNoBackgroundUpdated,datetime,,True,The last date and time the player's transparent background hosted headshot was updated in US Eastern Time,False,False
+2030000,TeamTrends,Team,string,50,True,The abbreviation [Key] of the team,False,False
+2030000,TeamTrends,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2030000,TeamTrends,UpcomingGame,Game,,True,Next scheduled game for the team,False,False
+2030000,TeamTrends,TeamGameTrends,TeamGameTrends[],,True,The collection of Game Trends for this team,True,False
+2031000,TeamGameTrends,Scope,string,50,False,The type of trend (e.g. Last 5 games; Last 10 games; Last 5 home games; etc.),False,False
+2031000,TeamGameTrends,TeamID,integer,32,False,The team's unique TeamID as assigned by SportsDataIO,False,False
+2031000,TeamGameTrends,Team,string,50,False,The abbreviation [Key] of the team,False,False
+2031000,TeamGameTrends,OpponentID,integer,32,True,The TeamID of the opposing team related to the scop of the search,False,False
+2031000,TeamGameTrends,Opponent,string,50,True,The name [Key] of the team's opponent related to the scop of the search,False,False
+2031000,TeamGameTrends,Wins,integer,32,False,The total number of wins by the team relating to the scope,False,True
+2031000,TeamGameTrends,Losses,integer,32,False,Team losses relating to the scope,False,True
+2031000,TeamGameTrends,Ties,integer,32,False,Ties by a team relating to the scope of the search,False,True
+2031000,TeamGameTrends,WinsAgainstTheSpread,integer,32,True,Total number of wins against the run line relating to the scope,False,True
+2031000,TeamGameTrends,LossesAgainstTheSpread,integer,32,True,Team losses against the run line relating to the scope,False,True
+2031000,TeamGameTrends,PushesAgainstTheSpread,integer,32,True,The amount of times a given team's final score of their game has pushed the run line (a push is neither a win nor a loss),False,True
+2031000,TeamGameTrends,Overs,integer,32,True,Amount of times the total score goes over the OverUnder,False,True
+2031000,TeamGameTrends,Unders,integer,32,True,Amount of times the total score goes under the OverUnder,False,True
+2031000,TeamGameTrends,OverUnderPushes,integer,32,True,The amount of times a given team's final score of their game has pushed the point total (a push is neither a win nor a loss),False,True
+2031000,TeamGameTrends,AverageScore,decimal,32,True,Average score of team,True,True
+2031000,TeamGameTrends,AverageOpponentScore,decimal,32,True,Average score of the opposing team,False,True
+2032000,MatchupTrends,UpcomingGame,Game,,True,Next scheduled game for the team with a specified opposing team,False,False
+2032000,MatchupTrends,TeamTrends,TeamTrends[],,True,The collection of team trends between each team,True,False
+2032000,MatchupTrends,TeamMatchupTrends,TeamGameTrends[],,True,The collection of team game trends against opponent,True,False
+2032000,MatchupTrends,OpponentMatchupTrends,TeamGameTrends[],,True,The collection of opponent game trends against the team,False,False
+2032000,MatchupTrends,PreviousGames,Game[],,True,The collection of last 10 game scores between each team,True,False
+2033000,BettingEvent,BettingEventID,int,32,False,The unique ID assocated with the betting event,False,False
+2033000,BettingEvent,Name,string,32,True,The name of this betting event,True,False
+2033000,BettingEvent,Season,int,32,True,The MLB season of the betting event,False,False
+2033000,BettingEvent,BettingEventTypeID,int,32,False,The ID associated with the type of betting event,False,False
+2033000,BettingEvent,BettingEventType,string,32,False,Indicates the type of betting event - Game or Future,False,False
+2033000,BettingEvent,StartDate,datetime,,True,The furthest forward time any book has a market set to close for this betting event,True,False
+2033000,BettingEvent,Created,datetime,,True,The date and time when this betting event was created in US Eastern Time,False,False
+2033000,BettingEvent,Updated,datetime,,True,The date and time of the last update made to this betting event (in US Eastern Time),False,False
+2033000,BettingEvent,GameID,int,32,True,The unique ID of the game tied to this BettingEvent,False,False
+2033000,BettingEvent,GlobalGameID,int,32,True,A globally unique ID for the game tied to this BettingEvent. This value is guaranteed to be unique across all sports/leagues.,False,False
+2033000,BettingEvent,GameStatus,string,32,True,The status of the game in tied to this event,False,True
+2033000,BettingEvent,Quarter,string,32,True,The quarter of the game tied to this event,True,True
+2033000,BettingEvent,AwayTeam,string,32,True,The abbreviation [Key] of the away team,False,False
+2033000,BettingEvent,HomeTeam,string,32,True,The abbreviation [Key] of the Home Team,False,False
+2033000,BettingEvent,AwayTeamID,int,32,True,The unique TeamID of the away team in the game tied to this BettingEvent,False,False
+2033000,BettingEvent,HomeTeamID,int,32,True,The unique ID of the home team tied to this BettingEvent,False,False
+2033000,BettingEvent,GlobalAwayTeamID,int,32,True,A globally unique ID for the away team tied to this BettingEvent This value is guaranteed to be unique across all sports/leagues,False,False
+2033000,BettingEvent,GlobalHomeTeamID,int,32,True,A globally unique ID for the home team tied to this BettingEvent. This value is guaranteed to be unique across all sports/leagues.,False,False
+2033000,BettingEvent,AwayTeamScore,int,32,True,Score of the away team tied to this betting event (updated after game ends to allow for resolving bets),False,True
+2033000,BettingEvent,HomeTeamScore,int,32,True,Score of the home team tied to this betting event (updated after game ends to allow for resolving bets),False,True
+2033000,BettingEvent,TotalScore,int,32,True,The combined scores of the home and away team of the game tied to this event (post-game),True,True
+2033000,BettingEvent,AwayRotationNumber,int,32,True,Rotation number of away team for this game,False,False
+2033000,BettingEvent,HomeRotationNumber,int,32,True,Rotation number of home team for this game,False,False
+2033000,BettingEvent,BettingMarkets,BettingMarket[],32,True,The list of betting markets for this event,True,False
+2033000,BettingEvent,GameStartTime,datetime,32,True,The date and time the game starts,False,False
+2034000,BettingMarket,BettingMarketID,int,32,False,The unique ID associated with the betting market,False,False
+2034000,BettingMarket,BettingEventID,int,32,False,The unique ID assocated with the betting event,False,False
+2034000,BettingMarket,BettingMarketTypeID,int,32,True,The unique ID associated with the market type of the betting market,False,True
+2034000,BettingMarket,BettingMarketType,string,32,True,The name of the market type within a market (e.g. Player Prop; Team Prop; Game Prop; etc.),False,True
+2034000,BettingMarket,BettingBetTypeID,int,32,True,The ID associated with the name of the bet type within a market,False,True
+2034000,BettingMarket,BettingBetType,string,32,True,The name of the bet type within a market (e.g. Total Runs; Moneyline; Run Line; etc.),False,True
+2034000,BettingMarket,BettingPeriodTypeID,int,32,True,The BettingPeriodTypeID of this market,True,True
+2034000,BettingMarket,BettingPeriodType,string,32,True,The BettingPeriodType of this market (e.g. Full Game; 1st-5th Inning; 2nd Inning; Regular Season),False,True
+2034000,BettingMarket,Name,string,32,True,The generic name of this market,True,False
+2034000,BettingMarket,TeamID,int,32,True,The team's unique TeamID as assigned by SportsDataIO tied this market (if applicable),False,True
+2034000,BettingMarket,TeamKey,string,32,True,The abbreviation [Key] of the team tied to this market (if applicable),False,True
+2034000,BettingMarket,PlayerID,int,32,True,The player's unique PlayerID as assigned by SportsDataIO tied to this market (if applicable) Note: this ID will stay with the player throughout their MLB career,False,True
+2034000,BettingMarket,PlayerName,string,32,True,The full name of the player associated with this market,False,True
+2034000,BettingMarket,Created,datetime,32,True,The date and time when this betting market was created in US Eastern Time,False,False
+2034000,BettingMarket,Updated,datetime,32,True,The date and time of the last update made to this betting market (in US Eastern Time),False,False
+2034000,BettingMarket,AvailableSportsbooks,Sportsbook[],32,True,The sportsbooks that have had odds in this market,True,False
+2034000,BettingMarket,AnyBetsAvailable,bool,32,True,A field that returns "True" if there are any available bets to make within the market in question. If there are no bets available to make; the field returns "False",False,False
+2034000,BettingMarket,BettingOutcomes,BettingOutcome[],32,True,The list of betting outcomes from each sportsbook in this market,True,False
+2034000,BettingMarket,ConsensusOutcomes,ConsensusOutcome[],32,True,The single set of consensus outcomes of this market,False,False
+2034000,BettingMarket,IsArchived,bool,,False,Indicates whether a BettingOutcome has been archived or not (true/false),False,False
+2034000,BettingMarket,ArchiveLocation,string,,False,If IsArchived is true; this returns the URL that can be used to retrieve the archived BettingOutcomes. An API Key and Sportsbook Grouping will be required to retrieve this information. If IsArchived is false; this returns an emtpy string,False,False
+2035000,BettingOutcome,BettingOutcomeID,int,32,True,The unique ID associated with the betting outcome,False,False
+2035000,BettingOutcome,BettingMarketID,int,32,True,The unique ID associated with the betting market,False,False
+2035000,BettingOutcome,SportsBook,Sportsbook,32,True,Name of sportsbook,False,False
+2035000,BettingOutcome,BettingOutcomeTypeID,int,32,True,The unique ID associated with this BettingOutcomeType,False,True
+2035000,BettingOutcome,BettingOutcomeType,string,32,True,The name of BettingOutcomeType (e.g. Home; Away; Under; Over),False,True
+2035000,BettingOutcome,PayoutAmerican,int,32,True,The payout of the bet; shown in American odds format,False,True
+2035000,BettingOutcome,PayoutDecimal,decimal,32,True,The payout of the bet; shown in decimal odds format,False,True
+2035000,BettingOutcome,Value,decimal,32,True,The number associated with the outcome of a market (e.g. the run line; game total; etc.),False,True
+2035000,BettingOutcome,Participant,string,32,True,The name of the participant (typically team or player) associated with the outcome. NOTE: This is provided by the sportsbook. In the case of Player odds; we highly recommend using PlayerID as names of players can be inconsistent between sportsbooks.,True,False
+2035000,BettingOutcome,IsAvailable,bool,32,True,Indicates whether a BettingOutcome is available for betting or not (true/false),False,False
+2035000,BettingOutcome,IsAlternate,bool,32,True,Indicates whether this is an alternate value or the core value (true/false),False,False
+2035000,BettingOutcome,Created,datetime,32,True,The date and time when this betting outcome was created in US Eastern Time.,False,False
+2035000,BettingOutcome,Updated,datetime,32,True,The date and time of the last update made to this betting outcome (in US Eastern Time),False,False
+2035000,BettingOutcome,Unlisted,datetime,32,True,The timestamp of when these odds were first made unavailable to be bet on any further (In US Eastern Time),False,False
+2035000,BettingOutcome,TeamID,int,32,True,The team's unique TeamID as assigned by SportsDataIO tied this outcome (if applicable),False,True
+2035000,BettingOutcome,PlayerID,int,32,True,The player's unique PlayerID as assigned by SportsDataIO tied to this outcome (if applicable) Note: this ID will stay with the player throughout their MLB career,False,True
+2035000,BettingOutcome,GlobalTeamID,int,32,True,A globally unique ID for this team tied to this outcome. This value is guaranteed to be unique across all sports/leagues (where applicable),False,True
+2035000,BettingOutcome,SportsbookUrl,string,500,True,The URL for sportsbook event,False,True
+2035000,BettingOutcome,IsInPlay,bool,1,True,Was this outcome created after the start time of the game (only applies when the betting event is of type game; true/false),False,False
+2035000,BettingOutcome,SportsbookMarketID,string,100,True,The market ID on the given sportsbook for deeplinking (when available),False,True
+2035000,BettingOutcome,SportsbookOutcomeID,string,100,True,The outcome ID on the given sportsbook for deeplinking (when available),False,True
+2036000,Sportsbook,SportsbookID,int,32,False,Unique ID of the sportsbook,False,False
+2036000,Sportsbook,Name,string,32,False,The name of the sportsbook(s),False,True
+2037000,ConsensusOutcome,NumberOfSportsbooks,int,32,False,The number of sportsbooks odds that went into creating this consensus outcome,True,True
+2037000,ConsensusOutcome,BettingOutcomeID,int,32,True,The unique ID associated with the betting outcome,False,False
+2037000,ConsensusOutcome,BettingMarketID,int,32,True,The unique ID associated with the betting market,False,False
+2037000,ConsensusOutcome,SportsBook,Sportsbook,32,True,Name of sportsbook,False,False
+2037000,ConsensusOutcome,BettingOutcomeTypeID,int,32,True,The unique ID associated with this BettingOutcomeType,False,True
+2037000,ConsensusOutcome,BettingOutcomeType,string,32,True,The name of BettingOutcomeType (e.g. Home; Away; Under; Over),False,True
+2037000,ConsensusOutcome,PayoutAmerican,int,32,True,The payout of the bet; shown in American odds format,False,True
+2037000,ConsensusOutcome,PayoutDecimal,decimal,32,True,The payout of the bet; shown in decimal odds format,False,True
+2037000,ConsensusOutcome,Value,decimal,32,True,The number associated with the outcome of a market (e.g. the run line; game total; etc.),False,True
+2037000,ConsensusOutcome,Participant,string,32,True,The name of the participant (typically team or player) associated with the outcome. NOTE: This is provided by the sportsbook. In the case of Player odds; we highly recommend using PlayerID as names of players can be inconsistent between sportsbooks.,True,False
+2037000,ConsensusOutcome,IsAvailable,bool,32,True,Indicates whether a BettingOutcome is available for betting or not (true/false),False,False
+2037000,ConsensusOutcome,IsAlternate,bool,32,True,Indicates whether this is an alternate value or the core value (true/false),False,False
+2037000,ConsensusOutcome,Created,datetime,32,True,The date and time when this betting outcome was created in US Eastern Time.,False,False
+2037000,ConsensusOutcome,Updated,datetime,32,True,The date and time of the last update made to this betting outcome (in US Eastern Time),False,False
+2037000,ConsensusOutcome,Unlisted,datetime,32,True,The timestamp of when these odds were first made unavailable to be bet on any further (In US Eastern Time),False,False
+2037000,ConsensusOutcome,TeamID,int,32,True,The team's unique TeamID as assigned by SportsDataIO tied this outcome (if applicable),False,True
+2037000,ConsensusOutcome,PlayerID,int,32,True,The player's unique PlayerID as assigned by SportsDataIO tied to this outcome (if applicable) Note: this ID will stay with the player throughout their MLB career,False,True
+2037000,ConsensusOutcome,GlobalTeamID,int,32,True,A globally unique ID for this team tied to this outcome. This value is guaranteed to be unique across all sports/leagues (where applicable),False,True
+2037000,ConsensusOutcome,SportsbookUrl,string,500,True,The URL for sportsbook event,False,True
+2037000,ConsensusOutcome,IsInPlay,bool,1,True,Was this outcome created after the start time of the game (only applies when the betting event is of type game; true/false),False,False
+2037000,ConsensusOutcome,SportsbookMarketID,string,100,True,The market ID on the given sportsbook for deeplinking (when available),False,True
+2037000,ConsensusOutcome,SportsbookOutcomeID,string,100,True,The outcome ID on the given sportsbook for deeplinking (when available),False,True
+2038000,BettingEntityMetadata,RecordId,integer,32,False,The ID of the record; unique only within the same entity type (i.e. BettingMarketType IDs overlap with BettingBetType IDs),False,False
+2038000,BettingEntityMetadata,Name,string,100,False,Denotes the name of the Type  (e.g. Betting Market Type; Betting Event Type; Betting Period Type),False,False
+2038000,BettingEntityMetadata,Active,bool,32,True,Whether or not this betting entity is active,False,False
+2039000,BettingEntityMetadataCollection,BettingBetTypes,BettingEntityMetadata[],,True,The list of the bet types that can be found within a market,False,False
+2039000,BettingEntityMetadataCollection,BettingMarketTypes,BettingEntityMetadata[],,True,A list of the possible Market Types within a Betting Event (e.g. Game Line; Team prop; Player Future; etc.),False,False
+2039000,BettingEntityMetadataCollection,BettingPeriodTypes,BettingEntityMetadata[],,True,A list of the possible BettingPeriodTypes (e.g. Full Game; 1st-5th Inning; 1st Inning),False,False
+2039000,BettingEntityMetadataCollection,BettingEventTypes,BettingEntityMetadata[],,True,A list of the possible BettingEventTypes (e.g. Game; Future),True,False
+2039000,BettingEntityMetadataCollection,BettingOutcomeTypes,BettingEntityMetadata[],,True,A list of the possible BettingOutcomeTypes (e.g. Home; Away; Under; Over),False,False
+2039000,BettingEntityMetadataCollection,ResultedMarketMetaData,BettingResultingMetadata[],32,True,A list of the combinations of MarketType; BetType; & PeriodType which we willl provide automated resulting for,True,False
+2039000,BettingEntityMetadataCollection,BettingResultTypes,BettingEntityMetadata[],,True,A list of the possible BettingResultTypes (e.g. Win; Loss; Push; Not Resulted; Incomplete),False,False
+2040000,BettingMarketResult,BettingMarketID,integer,32,False,The unique ID associated with the betting market,False,False
+2040000,BettingMarketResult,BettingMarketTypeID,integer,32,False,The unique ID associated with the market type of the betting market,False,False
+2040000,BettingMarketResult,BettingMarketType,string,100,False,The name of the market type within a market (e.g. Player Prop; Team Prop; Game Prop; etc.),False,False
+2040000,BettingMarketResult,BettingBetTypeID,integer,32,False,The ID associated with the name of the bet type within a market,False,False
+2040000,BettingMarketResult,BettingBetType,string,100,False,The name of the bet type within a market (e.g. Total Runs; Moneyline; Run Line; etc.),False,False
+2040000,BettingMarketResult,BettingPeriodTypeID,integer,32,False,The BettingPeriodTypeID of this market,True,False
+2040000,BettingMarketResult,BettingPeriodType,string,100,False,The BettingPeriodType of this market (e.g. Full Game; 1st-5th Inning; 2nd Inning; Regular Season),False,False
+2040000,BettingMarketResult,Name,string,100,True,The generic name of this market,True,False
+2040000,BettingMarketResult,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO tied this market (if applicable),False,False
+2040000,BettingMarketResult,TeamKey,string,10,True,The abbreviation [Key]  of the team tied to this market (if applicable),False,False
+2040000,BettingMarketResult,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO tied to this result (if applicable) Note: this ID will stay with the player throughout their MLB career,False,False
+2040000,BettingMarketResult,PlayerName,string,100,True,The full name of the player associated with this market,False,False
+2040000,BettingMarketResult,BettingOutcomeResults,BettingOutcomeResult[],,True,The list of outcomes under this market with results,True,False
+2040000,BettingMarketResult,IsMarketResultingSupported,bool,32,False,Indicates whether resulting is supported for this kind of BettingMarket  (true/false),False,False
+2041000,BettingOutcomeResult,BettingOutcomeID,integer,32,False,The unique ID associated with the betting outcome,False,False
+2041000,BettingOutcomeResult,BettingResultTypeID,integer,32,True,The BettingResultTypeID of this outcome,False,True
+2041000,BettingOutcomeResult,BettingResultType,string,100,True,The string identifier of the BettingResultType of this outcome (e.g. Win; Loss; Push; Not Resulted; Incomplete),False,True
+2041000,BettingOutcomeResult,BettingOutcomeTypeID,int,32,True,The unique ID associated with this BettingOutcomeType,False,False
+2041000,BettingOutcomeResult,BettingOutcomeType,string,32,True,The name of BettingOutcomeType (e.g. Home; Away; Under; Over),False,False
+2041000,BettingOutcomeResult,BetValue,decimal,32,True,The offered betting line from a sportsbook for a game (i.e. If a team won a game by 2 and the run line was -1.5; the actual value would be 2 and the bet value would be -1.5),False,True
+2041000,BettingOutcomeResult,ActualValue,decimal,32,True,The value of the actual result that occured in game (i.e. If a team won a game by 2 and the spread was -1.5; the actual value would be 2 and the bet value would be -1.5),False,True
+2042000,BettingResultingMetadata,BettingMarketTypeId,integer,32,False,The unique ID associated with the market type of the betting market,False,False
+2042000,BettingResultingMetadata,BettingBetTypeId,integer,32,False,The ID associated with the name of the bet type within a market,False,False
+2042000,BettingResultingMetadata,BettingPeriodTypeId,integer,32,False,The BettingPeriodTypeID of this market,False,False
+2043000,GameBettingSplit,GameID,integer,32,False,The unique ID of the game tied to the BettingSplits,False,False
+2043000,GameBettingSplit,SeasonType,integer,32,False,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar).,False,False
+2043000,GameBettingSplit,Season,integer,32,False,The MLB season of the betting split,False,False
+2043000,GameBettingSplit,Day,datetime,32,True,The day of the game,False,False
+2043000,GameBettingSplit,AwayTeam,string,32,True,The abbreviation [Key] of the away team,False,False
+2043000,GameBettingSplit,HomeTeam,string,32,True,The abbreviation [Key] of the Home Team,False,False
+2043000,GameBettingSplit,BettingMarketSplits,BettingMarketSplit[],32,False,Shows the BettingMarkets that have splits included for them in a given game,False,False
+2044000,BettingMarketSplit,BettingMarketID,integer,32,False,The unique ID associated with the betting market,False,False
+2044000,BettingMarketSplit,BettingEventID,integer,32,False,The unique id of the associated betting event,True,False
+2044000,BettingMarketSplit,BettingMarketTypeID,integer,32,False,The unique ID associated with the market type of the betting market,False,False
+2044000,BettingMarketSplit,BettingMarketType,string,100,False,The name of the market type within a market (e.g. Player Prop; Team Prop; Game Prop; etc.),False,False
+2044000,BettingMarketSplit,BettingBetTypeID,integer,32,False,The ID associated with the name of the bet type within a market,False,False
+2044000,BettingMarketSplit,BettingBetType,string,100,False,The name of the bet type within a market (e.g. Total Runs; Moneyline; Run Line; etc.),False,False
+2044000,BettingMarketSplit,BettingPeriodTypeID,integer,32,False,The BettingPeriodTypeID of this market,False,False
+2044000,BettingMarketSplit,BettingPeriodType,string,100,False,The BettingPeriodType of this market (e.g. Full Game; 1st-5th Inning; 2nd Inning; Regular Season),False,False
+2044000,BettingMarketSplit,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO tied this market (if applicable),False,False
+2044000,BettingMarketSplit,TeamKey,string,32,True,The abbreviation [Key]  of the team tied to this market (if applicable),False,False
+2044000,BettingMarketSplit,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO tied to this market (if applicable) Note: this ID will stay with the player throughout their MLB career,False,False
+2044000,BettingMarketSplit,PlayerName,string,100,True,The full name of the player associated with this market,False,False
+2044000,BettingMarketSplit,BettingSplits,BettingSplit[],32,False,A list of betting splits for the BettingMarket,False,False
+2045000,BettingSplit,BettingMarketSplitID,integer,32,False,The unique ID assciated with the betting split,False,False
+2045000,BettingSplit,BettingMarketID,integer,32,False,The unique ID associated with the betting market,False,False
+2045000,BettingSplit,BettingOutcomeTypeID,integer,32,True,The unique ID associated with this BettingOutcomeType,False,False
+2045000,BettingSplit,BettingOutcomeType,string,32,True,The name of BettingOutcomeType (e.g. Home; Away; Under; Over),False,False
+2045000,BettingSplit,BetPercentage,integer,32,True,Percentage of bets placed on a specific outcome,False,True
+2045000,BettingSplit,MoneyPercentage,integer,32,True,The percentage of the money placed in wagers on this market taken by this type of bet,False,True
+2045000,BettingSplit,Created,datetime,32,False,The date and time this betting split was created in US Eastern Time,False,False
+2045000,BettingSplit,LastSeen,datetime,32,False,The date and time this set of values was last seen,False,False
+2046000,Series,HomeTeamWins,integer,32,False,Number of wins by the home team on in the series. Note: this is for postseason series only.,False,False
+2046000,Series,AwayTeamWins,integer,32,False,Number of wins by the away team in the series. Note: This is for postseason series only.,False,False
+2046000,Series,GameNumber,integer,32,False,Game number in series. Note: this applies to postseason series only.,False,False
+2046000,Series,MaxLength,integer,32,False,Maximum number of games in the series. Note: this is for postseason series only.,False,False
+2047000,StartingLineups,GameID,integer,32,False,The unique ID of the game tied to the StartingLineups,False,False
+2047000,StartingLineups,Season,integer,32,False,The MLB season of the game,False,False
+2047000,StartingLineups,SeasonType,integer,32,False,The type of season that this record corresponds to (1=Regular Season; 2=Preseason; 3=Postseason; 4=Offseason; 5=AllStar),False,False
+2047000,StartingLineups,Day,datetime,32,True,The day of the game,False,False
+2047000,StartingLineups,DateTime,datetime,32,True,The date and time of the game in US Eastern Time,False,False
+2047000,StartingLineups,Status,string,32,True,Indicates the game's status. Possible values include: Scheduled; InProgress; Final; Suspended; Delayed; Postponed; Canceled; Forfeit; NotNecessary.,False,False
+2047000,StartingLineups,HomeTeamID,integer,32,True,The unique ID of the home team tied to these StartingLineups,False,False
+2047000,StartingLineups,HomeTeam,string,32,True,The abbreviation [Key] of the Home Team,False,False
+2047000,StartingLineups,AwayTeamID,integer,32,True,The unique TeamID of the away team,False,False
+2047000,StartingLineups,AwayTeam,string,32,True,The abbreviation [Key] of the away team,False,False
+2047000,StartingLineups,HomeStartingPitcher,Lineup,32,True,Home team starting pitcher. Note: this is a probable pitcher until confirmed field = TRUE.,False,False
+2047000,StartingLineups,HomeBattingLineup,Lineup[],32,True,The batting lineup of the home team,False,False
+2047000,StartingLineups,AwayStartingPitcher,Lineup,32,True,Away team starting pitcher. Note: this is a probable pitcher until confirmed field = TRUE.,False,False
+2047000,StartingLineups,AwayBattingLineup,Lineup[],32,True,Away team batting lineup for the game,False,False
+2047000,StartingLineups,HomeTeamOpener,boolean,,True,Indicates whether the home team will use an Opener as the starting pitcher. NOTE: An opener is a pitcher (typically a relief pitcher) that is only scheduled to pitch the first 1-3 innings of the game.,False,False
+2047000,StartingLineups,AwayTeamOpener,boolean,,True,Indicates whether the away team will use an Opener as the starting pitcher. NOTE: An opener is a pitcher (typically a relief pitcher) that is only scheduled to pitch the first 1-3 innings of the game.,False,False
+2048000,Lineup,PlayerID,integer,32,False,The player's unique PlayerID as assigned by SportsDataIO Note: this ID will stay with the player throughout their MLB career,False,False
+2048000,Lineup,TeamID,integer,32,False,The team's unique TeamID as assigned by SportsDataIO,False,False
+2048000,Lineup,Team,string,32,False,The abbreviation [Key] of the team,False,False
+2048000,Lineup,FirstName,string,32,False,The player's first name,False,False
+2048000,Lineup,LastName,string,32,False,The player's last name,False,False
+2048000,Lineup,BattingOrder,integer,32,True,Where the player batted in the lineup for the game (1;2;3; etc.),False,True
+2048000,Lineup,Position,string,32,True,Player's position in the starting lineup (if started); otherwise the position he substituted for,False,False
+2048000,Lineup,Starting,bool,32,True,Indicates if this player is starting. Note: started = 1 and non starting= 0,False,True
+2048000,Lineup,Confirmed,bool,32,True,Indicates if batting order has been confirmed (true/false),False,True
+2049000,DepthChart,DepthChartID,integer,32,False,The unique ID of the Depth Chard record,False,False
+2049000,DepthChart,TeamID,integer,32,False,The team's unique TeamID as assigned by SportsDataIO,False,False
+2049000,DepthChart,PlayerID,integer,32,True,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career,False,False
+2049000,DepthChart,Name,string,32,True,Player's full name,False,False
+2049000,DepthChart,PositionCategory,string,32,True,The player's position category. Possible values: DH; IF; OF; P; PH; PR,False,False
+2049000,DepthChart,Position,string,32,True,Player's position in the depth chart. Note: a player can be listed in multiple positions of the depth chart,False,False
+2049000,DepthChart,DepthOrder,integer,32,True,The Depth Chart order of the player and where they are placed in the depth chart,False,True
+2049000,DepthChart,Updated,datetime,32,True,The date and time of the last update made to this depth chart (in US Eastern Time),False,False
+2050000,TeamDepthChart,DepthCharts,DepthChart[],32,True,List of Depth Chart Records for Team,True,False
+2050000,TeamDepthChart,TeamID,integer,32,False,The team's unique TeamID as assigned by SportsDataIO,False,False
+2057000,Transaction,PlayerID,integer,32,False,The player's unique PlayerID as assigned by SportsDataIO. Note: this ID will stay with the player throughout their MLB career.,False,False
+2057000,Transaction,Name,string,32,False,Player's full name,False,False
+2057000,Transaction,FormerTeamID,integer,32,True,TeamID of player's former team,False,False
+2057000,Transaction,FormerTeam,string,32,True,Player's former team in abbreviated format [Key] (e.g. SD; PHI; LAD; ATL etc.),False,False
+2057000,Transaction,TeamID,integer,32,True,The team's unique TeamID as assigned by SportsDataIO,False,False
+2057000,Transaction,Team,string,32,True,The abbreviation [Key] of the team,False,False
+2057000,Transaction,Type,string,50,True,Type of Transaction. Released; Waived; Signed; Promoted; Elevated; Demoted; and Traded.,True,False
+2057000,Transaction,Date,datetime,32,True,The date that this transaction took place,False,False
+2057000,Transaction,Note,string,100,True,A summary of the transaction (e.g. "Harris has signed with the Diamondbacks."),False,False
+2057000,Transaction,Created,datetime,32,True,The date and time this transaction was created in US Eastern Time,False,False
+2057000,Transaction,Updated,datetime,32,True,The date and time of the last update made to this transaction (in US Eastern Time),False,False

@@ -1,5 +1,4 @@
 import { requireAdmin } from "../require-admin";
-import { AdminNav } from "../AdminNav";
 import { SubmitButton } from "../SubmitButton";
 import { getAllSports } from "@/lib/sports";
 import { toggleSportVisibility } from "./actions";
@@ -18,7 +17,6 @@ export default async function AdminSportsPage({
 
   return (
     <main className="admin">
-      <AdminNav active="sports" />
       <h1>Sports</h1>
 
       {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}

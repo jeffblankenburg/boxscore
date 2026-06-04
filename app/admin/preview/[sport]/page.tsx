@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "../../require-admin";
-import { AdminNav } from "../../AdminNav";
 import { SubmitButton } from "../../SubmitButton";
 import { triggerCron } from "../../actions";
 import { CopyId } from "./CopyId";
@@ -119,7 +118,6 @@ export default async function PreviewPage({
 
   return (
     <main className="admin admin-preview">
-      <AdminNav activeSport={sport} active="preview" leagueBasePath="/admin/preview" />
       <PreviewTeamTabs sport={sport} activeTeam="league" />
       <section className="preview-main preview-main-full">
         <div className="preview-bar">

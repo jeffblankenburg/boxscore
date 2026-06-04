@@ -61,14 +61,34 @@ export async function GET(
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
+  // Three signals together: UA pattern, Sec-Fetch-User, and Sec-Fetch-Dest.
+  // Any miss → render the placeholder page rather than activating.
+  //
+  // - UA pattern: catches SafeLinks, Mimecast, Proofpoint, Barracuda, etc.
+  //   that identify themselves honestly (most do).
+  // - Sec-Fetch-User: browsers set "?1" ONLY when the navigation is the
+  //   result of user activation (click, form submit, address-bar enter).
+  //   Server-side prefetchers don't send it. Strongest signal we have.
+  // - Sec-Fetch-Dest: "document" for a real top-level navigation. Prefetch,
+  //   image, or worker requests won't match.
+  //
+  // The result of all three failing benignly: the user sees a tiny page
+  // telling them to "click the link in a browser" — same UX the original
+  // bot-UA path showed. The real click follows and activates normally.
   const looksLikeBot = isLikelyBot(req.headers.get("user-agent"));
+  const userInitiated = req.headers.get("sec-fetch-user") === "?1";
+  const destOk = req.headers.get("sec-fetch-dest") === "document";
 
-  // Bot path: render a tiny static page. We don't mark anything active and
-  // don't issue a session, so a link prefetcher can't "use up" the token.
-  // The real user click follows immediately after in practice.
-  if (looksLikeBot) {
+  if (looksLikeBot || !userInitiated || !destOk) {
     return new NextResponse(botPlaceholderHtml(), {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        // Critical: SafeLinks and similar will happily cache a 200 OK and
+        // replay it to the user. Forbid every form of caching so the
+        // placeholder doesn't get served instead of the real activation.
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        Pragma: "no-cache",
+      },
     });
   }
 
@@ -128,6 +148,9 @@ export async function GET(
     path: "/",
     maxAge: SUBSCRIBER_SESSION_TTL_SEC,
   });
+  // Belt-and-suspenders: also forbid caching on the activation redirect
+  // itself so no intermediary serves a stale 302 to a later visitor.
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   return res;
 }
 

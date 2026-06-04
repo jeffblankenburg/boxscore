@@ -5,7 +5,6 @@ import { findTeam, teamsBySport, type Team } from "@/lib/teams";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
 import { teamDailyEmail } from "@/lib/emails/templates";
 import { requireAdmin } from "../../require-admin";
-import { AdminNav } from "../../AdminNav";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -51,7 +50,6 @@ export default async function AdminTeamEmailPreview({
 
   return (
     <main className="admin admin-wide">
-      <AdminNav />
       <h1>Team email preview · {team.name}</h1>
       <TeamPicker teams={allTeams} current={team.slug} />
       {renderError ? (

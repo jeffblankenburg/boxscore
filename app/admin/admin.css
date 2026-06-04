@@ -1,0 +1,527 @@
+/* Admin UI namespace. Imported only by app/admin/layout.tsx so styles never
+   bleed into the public newspaper-mode site. All classes prefixed `a-` to
+   make the boundary obvious in markup and prevent accidental conflicts with
+   legacy admin-* classes in globals.css (which get deleted in chunk 6 of
+   issue #50).
+
+   Visual direction: Stripe-Dashboard-style utility admin. System sans, zinc
+   grayscale, indigo accent, sharp 1px borders, no drop shadows. Light theme
+   only. See issue #50 for the locked design decisions. */
+
+:root {
+  /* Color tokens — zinc grays + indigo accent + semantic statuses. */
+  --a-bg:            #ffffff;
+  --a-bg-sidebar:    #fafafa;
+  --a-bg-hover:      #f4f4f5;
+  --a-bg-muted:      #f4f4f5;
+  --a-border:        #e4e4e7;
+  --a-border-strong: #d4d4d8;
+  --a-text:          #18181b;
+  --a-text-muted:    #52525b;
+  --a-text-subtle:   #a1a1aa;
+  --a-accent:        #4f46e5;
+  --a-accent-hover:  #4338ca;
+  --a-accent-fg:     #ffffff;
+  --a-success-bg:    #dcfce7;
+  --a-success-fg:    #166534;
+  --a-warning-bg:    #fef3c7;
+  --a-warning-fg:    #854d0e;
+  --a-danger-bg:     #fee2e2;
+  --a-danger-fg:     #991b1b;
+  --a-info-bg:       #dbeafe;
+  --a-info-fg:       #1e40af;
+  --a-neutral-bg:    #f4f4f5;
+  --a-neutral-fg:    #3f3f46;
+
+  /* Typography. */
+  --a-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --a-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Aggressively override the public site's globals.css. Force system sans +
+   override the .admin / .admin-wide max-width constraints + override stat-card
+   Georgia. The newspaper preview in /admin/ads/explore is the one place where
+   we DO want Georgia back — it's a render preview of the real digest — so we
+   re-set Georgia inside .newspaper carve-outs below.
+
+   Universal `.a-shell *` selector is intentional: legacy admin-* classes set
+   their own font-family + max-width, and we want the new shell to win regardless
+   of which page hasn't been migrated yet. */
+.a-shell,
+.a-shell * {
+  box-sizing: border-box;
+  font-family: var(--a-font) !important;
+}
+.a-shell {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--a-text);
+  background: var(--a-bg);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "sidebar topbar"
+    "sidebar content";
+}
+.a-shell h1, .a-shell h2, .a-shell h3, .a-shell h4 {
+  font-weight: 600;
+  color: var(--a-text);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* Neutralise legacy admin-* wrappers on pages that haven't been migrated to
+   the new primitives yet (dashboard, clicks, sports config, etc.). The new
+   shell's .a-content already provides padding; the legacy classes can stop
+   constraining width and stop adding their own margins. */
+.a-shell .admin,
+.a-shell .admin-wide {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--a-font);
+  color: var(--a-text);
+}
+
+/* Re-enable Georgia inside the digest splice preview on /admin/ads/explore.
+   The preview's whole point is to look like the real newspaper, so the
+   inherited sans needs to step aside for any element underneath .newspaper.
+   `!important` matches the universal rule above so the cascade is balanced
+   (otherwise the universal rule with !important would beat anything here). */
+.a-shell .newspaper,
+.a-shell .newspaper * {
+  font-family: Georgia, "Times New Roman", Times, serif !important;
+}
+.a-shell .newspaper code,
+.a-shell .newspaper pre {
+  font-family: var(--a-mono) !important;
+}
+
+/* ─── Sidebar ────────────────────────────────────────────────────────── */
+
+.a-sidebar {
+  grid-area: sidebar;
+  background: var(--a-bg-sidebar);
+  border-right: 1px solid var(--a-border);
+  padding: 16px 0;
+  overflow-y: auto;
+}
+.a-sidebar-brand {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 4px 20px 16px;
+  color: var(--a-text);
+}
+.a-sidebar-brand small {
+  color: var(--a-text-subtle);
+  font-weight: 500;
+  margin-left: 4px;
+}
+.a-sidebar-section {
+  padding: 12px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--a-text-subtle);
+}
+.a-sidebar a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 20px 6px 24px;
+  font-size: 13px;
+  color: var(--a-text);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+}
+.a-sidebar a:hover {
+  background: var(--a-bg-hover);
+}
+.a-sidebar a.active {
+  font-weight: 600;
+  color: var(--a-accent);
+  border-left-color: var(--a-accent);
+  background: var(--a-bg-hover);
+}
+
+/* ─── Top bar ────────────────────────────────────────────────────────── */
+
+.a-topbar {
+  grid-area: topbar;
+  height: 48px;
+  border-bottom: 1px solid var(--a-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--a-bg);
+}
+.a-breadcrumb {
+  font-size: 13px;
+  color: var(--a-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.a-breadcrumb a {
+  color: var(--a-text-muted);
+  text-decoration: none;
+}
+.a-breadcrumb a:hover {
+  color: var(--a-text);
+}
+.a-breadcrumb .sep {
+  color: var(--a-text-subtle);
+}
+.a-breadcrumb .current {
+  color: var(--a-text);
+  font-weight: 500;
+}
+.a-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--a-text-muted);
+}
+
+/* ─── Content area ────────────────────────────────────────────────────── */
+
+.a-content {
+  grid-area: content;
+  padding: 24px 32px 48px;
+  overflow-x: auto;
+}
+
+/* Page header — title, subtitle, actions in top-right. */
+.a-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.a-page-head h1 {
+  font-size: 22px;
+  line-height: 1.2;
+}
+.a-page-head .subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--a-text-muted);
+}
+.a-page-head .actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ─── Section blocks ──────────────────────────────────────────────────── */
+
+.a-section {
+  margin-bottom: 32px;
+}
+.a-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+.a-section-head h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.a-section-head .actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Banded info rows for detail pages. Label · value pairs in a compact grid. */
+.a-info {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  border-top: 1px solid var(--a-border);
+}
+.a-info > dt,
+.a-info > dd {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--a-border);
+  margin: 0;
+}
+.a-info > dt {
+  font-size: 13px;
+  color: var(--a-text-muted);
+}
+.a-info > dd {
+  font-size: 13px;
+  color: var(--a-text);
+}
+.a-info code {
+  font-family: var(--a-mono);
+  font-size: 12px;
+  background: var(--a-bg-muted);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* ─── Tables (DataTable) ──────────────────────────────────────────────── */
+
+.a-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.a-table thead th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--a-text-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--a-border);
+  background: var(--a-bg-sidebar);
+}
+.a-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--a-border);
+  color: var(--a-text);
+  vertical-align: middle;
+}
+.a-table tbody tr:hover td {
+  background: var(--a-bg-hover);
+}
+.a-table tbody tr.linked {
+  cursor: pointer;
+}
+.a-table td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.a-table td.muted {
+  color: var(--a-text-muted);
+}
+.a-table a {
+  color: var(--a-text);
+  text-decoration: none;
+}
+.a-table a:hover {
+  color: var(--a-accent);
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────── */
+
+.a-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--a-font);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border: 1px solid var(--a-border-strong);
+  border-radius: 6px;
+  background: var(--a-bg);
+  color: var(--a-text);
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.4;
+}
+.a-btn:hover {
+  background: var(--a-bg-hover);
+}
+.a-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.a-btn-primary {
+  background: var(--a-accent);
+  color: var(--a-accent-fg);
+  border-color: var(--a-accent);
+}
+.a-btn-primary:hover {
+  background: var(--a-accent-hover);
+  border-color: var(--a-accent-hover);
+}
+.a-btn-danger {
+  color: var(--a-danger-fg);
+  border-color: var(--a-border-strong);
+}
+.a-btn-danger:hover {
+  background: var(--a-danger-bg);
+  border-color: var(--a-danger-fg);
+}
+.a-btn-sm {
+  font-size: 12px;
+  padding: 3px 8px;
+}
+.a-btn-ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.a-btn-ghost:hover {
+  background: var(--a-bg-hover);
+  border-color: var(--a-border);
+}
+
+/* ─── Form inputs ────────────────────────────────────────────────────── */
+
+.a-input, .a-textarea, .a-select {
+  font-family: var(--a-font);
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--a-border-strong);
+  border-radius: 6px;
+  background: var(--a-bg);
+  color: var(--a-text);
+  width: 100%;
+  max-width: 480px;
+}
+.a-input:focus, .a-textarea:focus, .a-select:focus {
+  outline: none;
+  border-color: var(--a-accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+.a-textarea {
+  font-family: var(--a-mono);
+  font-size: 12px;
+  resize: vertical;
+  min-height: 100px;
+}
+.a-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--a-text-muted);
+  margin-bottom: 4px;
+}
+.a-field {
+  margin-bottom: 14px;
+  max-width: 480px;
+}
+.a-field-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.a-field-row .a-field {
+  margin-bottom: 0;
+}
+.a-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--a-border);
+}
+
+/* ─── Status badges ──────────────────────────────────────────────────── */
+
+.a-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--a-neutral-bg);
+  color: var(--a-neutral-fg);
+  white-space: nowrap;
+}
+.a-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.a-badge-success { background: var(--a-success-bg); color: var(--a-success-fg); }
+.a-badge-warning { background: var(--a-warning-bg); color: var(--a-warning-fg); }
+.a-badge-danger  { background: var(--a-danger-bg);  color: var(--a-danger-fg); }
+.a-badge-info    { background: var(--a-info-bg);    color: var(--a-info-fg); }
+.a-badge-neutral { background: var(--a-neutral-bg); color: var(--a-neutral-fg); }
+
+/* ─── Alerts (page-level success/error) ──────────────────────────────── */
+
+.a-alert {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  border: 1px solid;
+}
+.a-alert-success {
+  background: var(--a-success-bg);
+  color: var(--a-success-fg);
+  border-color: var(--a-success-fg);
+}
+.a-alert-danger {
+  background: var(--a-danger-bg);
+  color: var(--a-danger-fg);
+  border-color: var(--a-danger-fg);
+}
+
+/* ─── Card (for grouping creative previews, etc.) ────────────────────── */
+
+.a-card {
+  border: 1px solid var(--a-border);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: var(--a-bg);
+}
+.a-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.a-card-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ─── Empty state ─────────────────────────────────────────────────────── */
+
+.a-empty {
+  text-align: center;
+  padding: 48px 16px;
+  border: 1px dashed var(--a-border-strong);
+  border-radius: 6px;
+  color: var(--a-text-muted);
+  font-size: 13px;
+}
+.a-empty .a-btn {
+  margin-top: 12px;
+}
+
+/* ─── Utility ────────────────────────────────────────────────────────── */
+
+.a-muted   { color: var(--a-text-muted); }
+.a-subtle  { color: var(--a-text-subtle); }
+.a-mono    { font-family: var(--a-mono); font-size: 12px; }
+.a-row     { display: flex; gap: 12px; align-items: center; }
+.a-spacer  { flex: 1; }
+
+.a-code-block {
+  background: var(--a-bg-muted);
+  border: 1px solid var(--a-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--a-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  margin: 0;
+}
+
+/* Shimmer keyframes for Suspense skeleton placeholders on /admin.
+   Used by SkeletonBar in _components/dashboard-blocks.tsx. The animation
+   stays on the shell stylesheet (not inline) so a single browser-cached
+   rule covers every block on the page. */
+@keyframes aShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

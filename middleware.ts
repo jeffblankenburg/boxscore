@@ -20,17 +20,29 @@ const SESSION_COOKIE = "boxscore_admin_session";
 
 const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/verify"];
 
+// Inject `x-admin: 1` on the forwarded request so the root layout
+// (`app/layout.tsx`) can detect admin requests and skip the public-site
+// chrome (newspaper wrapper, SiteHeader, SiteFooter). The header is set on
+// the request — not the response — so server components can read it via
+// `headers()`. Auth-page responses also get the header so login/verify
+// render bare too.
+function adminNext(req: NextRequest): NextResponse {
+  const reqHeaders = new Headers(req.headers);
+  reqHeaders.set("x-admin", "1");
+  return NextResponse.next({ request: { headers: reqHeaders } });
+}
+
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
   // Auth pages are always reachable.
   if (PUBLIC_ADMIN_PATHS.some((p) => path === p || path.startsWith(p + "/"))) {
-    return NextResponse.next();
+    return adminNext(req);
   }
 
   // 2FA session cookie present → let the admin pages validate it server-side.
   if (req.cookies.get(SESSION_COOKIE)?.value) {
-    return NextResponse.next();
+    return adminNext(req);
   }
 
   // Legacy ADMIN_SECRET path: query param mints the cookie, cookie value
@@ -53,7 +65,7 @@ export function middleware(req: NextRequest) {
       return res;
     }
     if (req.cookies.get(LEGACY_COOKIE)?.value === secret) {
-      return NextResponse.next();
+      return adminNext(req);
     }
   }
 

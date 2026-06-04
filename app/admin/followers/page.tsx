@@ -1,5 +1,4 @@
 import { requireAdmin } from "../require-admin";
-import { AdminNav } from "../AdminNav";
 import { getAllFollowers, type Follower, type Platform } from "@/lib/social-followers";
 
 // Followers dashboard. Live fetch on render with a 5-minute revalidate so a
@@ -40,7 +39,6 @@ export default async function AdminFollowersPage({
 
   return (
     <main className="admin">
-      <AdminNav active="followers" />
       <h1>Followers</h1>
       <p className="admin-meta">
         Combined view of the boxscore accounts&apos; followers on Twitter and

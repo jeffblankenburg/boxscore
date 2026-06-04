@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "../../../require-admin";
-import { AdminNav } from "../../../AdminNav";
 import { PreviewTeamTabs } from "../PreviewTeamTabs";
 import { DateInputWithToday } from "../DateInputWithToday";
 import { findTeam, type Sport } from "@/lib/teams";
 import { yesterdayInET, isValidIsoDate, nextDay, prevDay, shortPrettyDate } from "@/lib/dates";
 
-// Per-team variant of /admin/preview/[sport]. Same chrome (AdminNav,
-// LeagueSwitcher, PreviewTeamTabs) as the league preview; controls below
-// pick the team's date (not a mode), surface (web/email), and width.
+// Per-team variant of /admin/preview/[sport]. Same in-page chrome
+// (PreviewTeamTabs) as the league preview; admin chrome (sidebar nav,
+// breadcrumbs) is provided by /admin/layout.tsx. Controls below pick the
+// team's date (not a mode), surface (web/email), and width.
 //
 // Web surface points the iframe at the public page at /{sport}/{slug}/{date}
 // — it already renders the cached team digest with the site chrome. Email
@@ -83,7 +83,6 @@ export default async function TeamPreviewPage({
 
   return (
     <main className="admin admin-preview">
-      <AdminNav activeSport={sport} active="preview" leagueBasePath="/admin/preview" />
       <PreviewTeamTabs sport={sport} activeTeam={team.slug} />
       <div className="preview-shell">
         <section className="preview-main">

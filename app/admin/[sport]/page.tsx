@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "../require-admin";
-import { AdminNav } from "../AdminNav";
 import { SubmitButton } from "../SubmitButton";
 import { sendAdminPreview, sendTeamAdminPreview, setAnnouncement, removeAnnouncement } from "../actions";
 import { RegenerateAllRunner } from "./RegenerateAllRunner";
@@ -80,7 +79,6 @@ export default async function LeagueDashboard({
 
   return (
     <main className="admin admin-wide">
-      <AdminNav activeSport={sport} active="dashboard" />
       <h1>{sportRow.name}</h1>
 
       {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}

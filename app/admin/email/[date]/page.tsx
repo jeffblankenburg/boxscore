@@ -4,7 +4,6 @@ import { dailyEmail } from "@/lib/emails/templates";
 import { isValidIsoDate, nextDay, prettyDate } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { requireAdmin } from "../../require-admin";
-import { AdminNav } from "../../AdminNav";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Email preview · admin · boxscore", robots: { index: false } };
@@ -22,7 +21,6 @@ export default async function AdminEmailPreview({
   if (!digest || !digest.email_html) {
     return (
       <main className="admin">
-        <AdminNav />
         <h1>Email preview · {date}</h1>
         <p>No <code>email_html</code> stored for this date.</p>
       </main>
@@ -44,7 +42,6 @@ export default async function AdminEmailPreview({
 
   return (
     <main className="admin">
-      <AdminNav />
       <h1>Email preview · {prettyDate(date)}</h1>
       <p className="admin-meta">
         {(html.length / 1024).toFixed(1)} KB · isolated in iframe so the
