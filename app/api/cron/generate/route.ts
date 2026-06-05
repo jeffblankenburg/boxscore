@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { loadDailyData } from "@/lib/daily";
-import { renderContent } from "@/lib/render";
-import { renderEmailContent } from "@/lib/render-email";
+import {
+  renderContentWithAds,
+  renderEmailContentWithAds,
+} from "@/lib/ad-placements";
 import { upsertDigest } from "@/lib/digests";
 import { upsertTeamDigest } from "@/lib/team-digests";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
@@ -64,8 +66,14 @@ export async function GET(req: Request) {
 
     if (sport === "mlb") {
       const data = await loadDailyData(date, { refetch });
-      const html = renderContent(data);
-      const email_html = renderEmailContent(data);
+      // renderContentWithAds / renderEmailContentWithAds call the same
+      // underlying renderers and then splice in any live placements for
+      // (sport, edition_date). If the ads_enabled flag is OFF, or the
+      // sport scope check fails, or any layer throws, they return the
+      // base HTML unchanged — so the digest still ships. See the safety
+      // comments in lib/ad-placements.ts.
+      const html = await renderContentWithAds(data, sport);
+      const email_html = await renderEmailContentWithAds(data, sport);
       await upsertDigest({
         sport, date, html, email_html,
         game_count: data.games.length,

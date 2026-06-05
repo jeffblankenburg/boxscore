@@ -1,7 +1,10 @@
 import { requireAdmin } from "../require-admin";
 import { supabaseAdmin } from "@/lib/supabase";
+import { ADS_ENABLED_FLAG } from "@/lib/ad-placements";
+import { isFlagEnabled } from "@/lib/admin-settings";
 import {
   Alert,
+  Card,
   DataTable,
   EmptyState,
   PageHeader,
@@ -9,6 +12,7 @@ import {
   type BadgeVariant,
   type Column,
 } from "../_components/primitives";
+import { toggleAdsEnabled } from "./actions";
 
 // /admin/ads — Campaigns list. Operational landing for the ads section.
 // Replaces the old /admin/ads/manage accordion mess (see issue #50).
@@ -132,7 +136,11 @@ export default async function CampaignsListPage({
 }) {
   await requireAdmin();
   const { ok, error } = await searchParams;
-  const rows = await loadCampaignRows();
+  const [rows, adsEnabled] = await Promise.all([
+    loadCampaignRows(),
+    isFlagEnabled(ADS_ENABLED_FLAG).catch(() => false),
+  ]);
+  void ADS_ENABLED_FLAG; // reference keeps the import grouped with the action
 
   const columns: Column<CampaignRow>[] = [
     {
@@ -186,6 +194,37 @@ export default async function CampaignsListPage({
 
       {ok && <Alert variant="success">{ok}</Alert>}
       {error && <Alert variant="danger">{error}</Alert>}
+
+      {/* Master kill-switch for the daily-cron splice. Defaults to OFF so a
+          fresh deploy never starts injecting ads on its own — the admin
+          flips it on after verifying placements are correct. */}
+      <Card>
+        <div
+          className="a-row"
+          style={{ justifyContent: "space-between", alignItems: "center" }}
+        >
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <strong>Ads in daily digest:</strong>
+              <StatusBadge variant={adsEnabled ? "success" : "neutral"}>
+                {adsEnabled ? "Enabled" : "Disabled"}
+              </StatusBadge>
+            </div>
+            <div className="a-muted" style={{ fontSize: 12, marginTop: 4 }}>
+              {adsEnabled
+                ? "The next daily-cron run will splice live placements into the digest HTML."
+                : "The daily cron will skip ad splicing even if live placements exist."}
+            </div>
+          </div>
+          <form action={toggleAdsEnabled}>
+            <button type="submit" className="a-btn">
+              Turn {adsEnabled ? "off" : "on"}
+            </button>
+          </form>
+        </div>
+      </Card>
+
+      <div style={{ height: 16 }} />
 
       <DataTable
         rows={rows}

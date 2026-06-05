@@ -85,15 +85,13 @@
   color: var(--a-text);
 }
 
-/* Re-enable Georgia inside the digest splice preview on /admin/ads/explore.
-   The preview's whole point is to look like the real newspaper, so the
-   inherited sans needs to step aside for any element underneath .newspaper.
-   `!important` matches the universal rule above so the cascade is balanced
-   (otherwise the universal rule with !important would beat anything here). */
-.a-shell .newspaper,
-.a-shell .newspaper * {
-  font-family: Georgia, "Times New Roman", Times, serif !important;
-}
+/* No Georgia carve-out inside .newspaper here. The public site itself sets
+   body to Source Sans and only applies Georgia to specific accent selectors
+   (datelines, league bands, etc.). Force-applying Georgia to every element
+   in .newspaper made admin previews look like an older design exploration
+   we've moved past. Admin previews stay system-sans like the rest of admin,
+   which also matches what /advertise's sample tiles show. To see the real
+   digest faithfully, open /mlb/[date] in another tab. */
 .a-shell .newspaper code,
 .a-shell .newspaper pre {
   font-family: var(--a-mono) !important;
@@ -524,4 +522,47 @@
 @keyframes aShimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* Rotational keyframe for the save-status spinner in CreativeForm. */
+@keyframes aSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Modal dialogs ────────────────────────────────────────────────────
+   Native <dialog>-based modals. Centered, capped at 90vw, with a
+   semi-transparent backdrop. .a-dialog-inner provides the white card
+   surface, so backdrop clicks (which land on the dialog element itself,
+   not the inner) trigger close via the React handler. */
+.a-dialog {
+  border: none;
+  padding: 0;
+  max-width: min(900px, 90vw);
+  width: 100%;
+  border-radius: 8px;
+  background: transparent;
+}
+.a-dialog::backdrop {
+  background: rgba(15, 15, 20, 0.55);
+}
+.a-dialog-inner {
+  background: var(--a-bg);
+  border: 1px solid var(--a-border-strong);
+  border-radius: 8px;
+  padding: 20px 24px 24px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.a-dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--a-border);
+}
+.a-dialog-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
 }

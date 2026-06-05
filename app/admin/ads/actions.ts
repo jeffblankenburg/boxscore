@@ -3,6 +3,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
+import { SLOTS, type AdFormat } from "@/lib/ads-render";
+import { ADS_ENABLED_FLAG } from "@/lib/ad-placements";
+import { isFlagEnabled, setAdminSetting } from "@/lib/admin-settings";
 import { requireAdmin } from "../require-admin";
 
 // Server actions for the /admin/ads/* pages. Each action validates input,
@@ -43,6 +46,27 @@ function ok(returnPath: string, msg: string): never {
 
 function isValidStatus(s: string): s is "pending" | "approved" | "rejected" | "cancelled" {
   return s === "pending" || s === "approved" || s === "rejected" || s === "cancelled";
+}
+
+// ─── Settings ────────────────────────────────────────────────────────────
+
+// Master kill-switch for ad rendering in the daily digest cron. Reads the
+// current value from admin_settings, flips it, writes back. Always lands
+// the admin on /admin/ads so the new badge state is visible.
+export async function toggleAdsEnabled(formData: FormData): Promise<void> {
+  const email = await requireAdmin();
+  const current = await isFlagEnabled(ADS_ENABLED_FLAG).catch(() => false);
+  const next = !current;
+  void formData; // no inputs — toggle is a single button
+  try {
+    await setAdminSetting(ADS_ENABLED_FLAG, next ? "true" : "false", email);
+  } catch (err) {
+    redirect(`/admin/ads?error=${encodeURIComponent(`Toggle failed: ${(err as Error).message}`)}`);
+  }
+  revalidatePath("/admin/ads");
+  redirect(
+    `/admin/ads?ok=${encodeURIComponent(`Ads ${next ? "enabled" : "disabled"} for the daily cron.`)}`,
+  );
 }
 
 // ─── Advertisers ─────────────────────────────────────────────────────────
@@ -137,11 +161,13 @@ export async function markCampaignPaid(formData: FormData): Promise<void> {
   if (!campaignId) err(returnPath, "campaign_id is required.");
   if (!amountStr) err(returnPath, "Paid amount is required.");
 
-  // Accept "$250", "250", "250.00" — store as integer cents. Reject anything
-  // that doesn't parse as a positive number once cleaned.
+  // Accept "$250", "250", "250.00", or "0" — store as integer cents. $0 is
+  // valid for comp / test / make-good runs; only negative or non-numeric
+  // input is rejected. `paid_method` ("comp", "test", etc.) carries the
+  // context for why it's zero.
   const cleaned = amountStr.replace(/[$,\s]/g, "");
   const parsed = Number(cleaned);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+  if (!Number.isFinite(parsed) || parsed < 0) {
     err(returnPath, `Invalid paid amount: ${amountStr}`);
   }
   const paidAmountCents = Math.round(parsed * 100);
@@ -233,6 +259,85 @@ export async function createCreative(formData: FormData): Promise<void> {
   ok(returnPath, `Created ${format} creative.`);
 }
 
+// Auto-save variant of updateCreative. Called directly from CreativeForm's
+// debounced effect — returns a result instead of redirecting so the client
+// stays on the page and can show a small "Saved" indicator. Validates
+// identically to the form-submit path.
+export async function saveCreativeUpdates(args: {
+  creativeId: string;
+  payload: string;
+  imageBlobUrl: string | null;
+  altText: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAdmin();
+
+  if (!args.creativeId) return { ok: false, error: "creative_id is required" };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(args.payload);
+  } catch (e) {
+    return { ok: false, error: `Invalid JSON: ${(e as Error).message}` };
+  }
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return { ok: false, error: "Payload must be a JSON object" };
+  }
+  if (args.imageBlobUrl && !args.altText) {
+    return { ok: false, error: "Alt text is required when an image URL is set" };
+  }
+
+  const { error } = await supabaseAdmin()
+    .from("ad_creatives")
+    .update({
+      payload,
+      image_blob_url: args.imageBlobUrl,
+      alt_text: args.altText,
+    })
+    .eq("id", args.creativeId);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function updateCreative(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const returnPath = readReturn(formData);
+  const creativeId = readString(formData, "creative_id");
+  const payloadRaw = readString(formData, "payload");
+  const imageBlobUrl = readOptionalString(formData, "image_blob_url");
+  const altText = readOptionalString(formData, "alt_text");
+
+  if (!creativeId) err(returnPath, "creative_id is required.");
+  if (!payloadRaw) err(returnPath, "Payload JSON is required.");
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(payloadRaw);
+  } catch (e) {
+    err(returnPath, `Payload is not valid JSON: ${(e as Error).message}`);
+  }
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    err(returnPath, "Payload must be a JSON object.");
+  }
+  if (imageBlobUrl && !altText) {
+    err(returnPath, "Alt text is required when an image URL is set.");
+  }
+
+  const { error } = await supabaseAdmin()
+    .from("ad_creatives")
+    .update({
+      payload,
+      image_blob_url: imageBlobUrl,
+      alt_text: altText,
+    })
+    .eq("id", creativeId);
+
+  if (error) err(returnPath, `Update creative failed: ${error.message}`);
+
+  revalidatePath(returnPath);
+  ok(returnPath, "Saved creative.");
+}
+
 export async function deleteCreative(formData: FormData): Promise<void> {
   await requireAdmin();
   const returnPath = readReturn(formData);
@@ -282,6 +387,13 @@ export async function createPlacement(formData: FormData): Promise<void> {
     .eq("id", creativeId)
     .single();
   if (cErr || !creative) err(returnPath, `Creative not found: ${creativeId}`);
+
+  // Now that we know the format, enforce that slot_index falls inside
+  // SLOTS[format]. Catches typos / form-tampering before the row is written.
+  const maxSlot = SLOTS[creative.format as AdFormat]?.length ?? 0;
+  if (slotIndex > maxSlot) {
+    err(returnPath, `Slot ${slotIndex} is out of range for ${creative.format} (max ${maxSlot}).`);
+  }
 
   const { error } = await db.from("ad_placements").insert({
     creative_id: creativeId,

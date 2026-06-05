@@ -13,8 +13,11 @@ import {
   type InfoRow,
 } from "../../../_components/primitives";
 import { FormButton } from "../../../_components/FormButton";
+import { nextDay, yesterdayInET } from "@/lib/dates";
+import { SLOTS, type AdFormat } from "@/lib/ads-render";
+import { CreativeForm } from "../../_components/CreativeForm";
+import { NewCreativeButton } from "../../_components/NewCreativeButton";
 import {
-  createCreative,
   createPlacement,
   deleteCreative,
   deletePlacement,
@@ -30,7 +33,6 @@ import {
 export const dynamic = "force-dynamic";
 
 type CampaignStatus = "pending" | "approved" | "rejected" | "cancelled";
-type AdFormat = "sponsor_line" | "standings_strip" | "display_box" | "classified";
 
 type Campaign = {
   id: string;
@@ -64,47 +66,9 @@ type Placement = {
   slot_index: number;
 };
 
-// Default JSON payload shapes — shown as the textarea default per format so
-// the admin starts from a working template rather than an empty box. The
-// render path (ticket #45) treats these field names as template inputs.
-const PAYLOAD_TEMPLATES: Record<AdFormat, string> = {
-  sponsor_line: JSON.stringify(
-    {
-      copy: "Today's edition brought to you by Advertiser Name, doing X since YYYY",
-      cta_url: "https://advertiser.example.com",
-    },
-    null,
-    2,
-  ),
-  standings_strip: JSON.stringify(
-    {
-      headline: "ADVERTISER NAME",
-      body: "Tagline · Find us at advertiser.example.com",
-      cta_url: "https://advertiser.example.com",
-    },
-    null,
-    2,
-  ),
-  display_box: JSON.stringify(
-    {
-      headline: "Advertiser Name",
-      body: "Two-sentence pitch that reads like a small-paper display ad.",
-      cta_text: "Shop at advertiser.example.com",
-      cta_url: "https://advertiser.example.com",
-    },
-    null,
-    2,
-  ),
-  classified: JSON.stringify(
-    {
-      lead: "CATEGORY —",
-      body: "One-line classified copy with a phone number or URL at the end.",
-      cta_url: "https://advertiser.example.com",
-    },
-    null,
-    2,
-  ),
-};
+// Payload templates per format now live inside CreativeForm so the same
+// shape definitions drive both the create textarea seed and the
+// "should-format-change-reset-payload?" heuristic in edit mode.
 
 async function loadCampaign(id: string): Promise<Campaign | null> {
   const { data, error } = await supabaseAdmin()
@@ -213,9 +177,14 @@ export default async function CampaignDetailPage({
   }
 
   const returnPath = `/admin/ads/campaigns/${campaign.id}`;
-  // Tomorrow's date as the default placement target — matches the "ship a
-  // fake ad tomorrow" use case from ticket #44.
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  // Tomorrow's date (in ET) as the default placement target — matches the
+  // "ship a fake ad tomorrow" use case from ticket #44.
+  //
+  // Avoid Date.now() + 86_400_000 then toISOString(): toISOString returns
+  // UTC, and after ~8pm ET the UTC date is already +1, so +24h lands on
+  // day-after-tomorrow in the rendered YYYY-MM-DD. Use the codebase's ET
+  // helpers instead: yesterdayInET → today in ET → tomorrow in ET.
+  const tomorrow = nextDay(nextDay(yesterdayInET()));
 
   const info: InfoRow[] = [
     {
@@ -357,9 +326,19 @@ export default async function CampaignDetailPage({
         </Card>
       </Section>
 
-      <Section title={`Creatives (${creatives.length})`}>
+      <Section
+        title={`Creatives (${creatives.length})`}
+        actions={
+          <NewCreativeButton
+            campaignId={campaign.id}
+            returnPath={returnPath}
+          />
+        }
+      >
         {creatives.length === 0 ? (
-          <EmptyState message="No creatives yet. Add one below." />
+          <EmptyState
+            message='No creatives yet. Click "+ New creative" above to add one.'
+          />
         ) : (
           creatives.map((cr) => (
             <CreativeBlock
@@ -371,82 +350,6 @@ export default async function CampaignDetailPage({
             />
           ))
         )}
-      </Section>
-
-      <Section title="New creative">
-        <Card>
-          <form action={createCreative}>
-            <input type="hidden" name="_return" value={returnPath} />
-            <input type="hidden" name="campaign_id" value={campaign.id} />
-            <div className="a-field" style={{ maxWidth: 240 }}>
-              <label className="a-label" htmlFor="cr-format">Format</label>
-              <select
-                id="cr-format"
-                name="format"
-                className="a-select"
-                defaultValue="sponsor_line"
-              >
-                <option value="sponsor_line">sponsor_line</option>
-                <option value="standings_strip">standings_strip</option>
-                <option value="display_box">display_box</option>
-                <option value="classified">classified</option>
-              </select>
-            </div>
-            <div className="a-field" style={{ maxWidth: "none" }}>
-              <label className="a-label" htmlFor="cr-payload">Payload JSON</label>
-              <textarea
-                id="cr-payload"
-                name="payload"
-                required
-                rows={10}
-                className="a-textarea"
-                defaultValue={PAYLOAD_TEMPLATES.sponsor_line}
-              />
-              <details style={{ marginTop: 6 }}>
-                <summary className="a-muted" style={{ fontSize: 12, cursor: "pointer" }}>
-                  Payload templates per format
-                </summary>
-                <div style={{ marginTop: 8 }}>
-                  {(Object.keys(PAYLOAD_TEMPLATES) as AdFormat[]).map((f) => (
-                    <div key={f} style={{ marginBottom: 8 }}>
-                      <div className="a-muted" style={{ fontSize: 12, marginBottom: 2 }}>{f}</div>
-                      <pre className="a-code-block">{PAYLOAD_TEMPLATES[f]}</pre>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            </div>
-            <div className="a-field-row">
-              <div className="a-field" style={{ flex: 1 }}>
-                <label className="a-label" htmlFor="cr-img">Image URL (display_box only)</label>
-                <input
-                  id="cr-img"
-                  name="image_blob_url"
-                  type="url"
-                  className="a-input"
-                  placeholder="https://…blob.vercel-storage.com/…"
-                />
-              </div>
-              <div className="a-field" style={{ flex: 1 }}>
-                <label className="a-label" htmlFor="cr-alt">Alt text (required if image set)</label>
-                <input
-                  id="cr-alt"
-                  name="alt_text"
-                  type="text"
-                  className="a-input"
-                  placeholder="What's in the image"
-                />
-              </div>
-            </div>
-            <div className="a-form-actions">
-              <FormButton
-                idleLabel="Add creative"
-                pendingLabel="Creating…"
-                variant="primary"
-              />
-            </div>
-          </form>
-        </Card>
       </Section>
     </>
   );
@@ -481,19 +384,18 @@ function CreativeBlock({
         </form>
       }
     >
-      <pre className="a-code-block" style={{ marginBottom: 12 }}>
-        {JSON.stringify(creative.payload, null, 2)}
-      </pre>
-
-      {creative.image_blob_url && (
-        <div className="a-muted" style={{ fontSize: 12, marginBottom: 12 }}>
-          <strong>Image:</strong>{" "}
-          <a href={creative.image_blob_url} target="_blank" rel="noreferrer">
-            {creative.image_blob_url}
-          </a>
-          {creative.alt_text && <> · alt: <em>{creative.alt_text}</em></>}
-        </div>
-      )}
+      {/* CreativeForm renders its own 2-column edit/preview layout, the
+          "+ Add image" toggle (display_box only), the "Preview in digest →"
+          link, and an auto-save indicator. Auto-saves on valid JSON. */}
+      <CreativeForm
+        mode="edit"
+        creativeId={creative.id}
+        format={creative.format}
+        initialPayload={JSON.stringify(creative.payload, null, 2)}
+        initialImageUrl={creative.image_blob_url}
+        initialAltText={creative.alt_text}
+        returnPath={returnPath}
+      />
 
       <div style={{ marginTop: 16, borderTop: "1px solid var(--a-border)", paddingTop: 12 }}>
         <div className="a-muted" style={{ fontSize: 12, marginBottom: 8 }}>
@@ -501,33 +403,37 @@ function CreativeBlock({
         </div>
         {placements.length > 0 && (
           <div style={{ marginBottom: 12 }}>
-            {placements.map((p) => (
-              <div
-                key={p.id}
-                className="a-row"
-                style={{
-                  justifyContent: "space-between",
-                  padding: "6px 10px",
-                  border: "1px solid var(--a-border)",
-                  borderRadius: 4,
-                  marginBottom: 4,
-                  fontSize: 13,
-                }}
-              >
-                <span>
-                  <strong>{p.sport}</strong> · {p.date} · slot {p.slot_index}
-                </span>
-                <form action={deletePlacement}>
-                  <input type="hidden" name="_return" value={returnPath} />
-                  <input type="hidden" name="placement_id" value={p.id} />
-                  <button type="submit" className="a-btn a-btn-sm">remove</button>
-                </form>
-              </div>
-            ))}
+            {placements.map((p) => {
+              const slot = SLOTS[p.format]?.[p.slot_index - 1];
+              return (
+                <div
+                  key={p.id}
+                  className="a-row"
+                  style={{
+                    justifyContent: "space-between",
+                    padding: "6px 10px",
+                    border: "1px solid var(--a-border)",
+                    borderRadius: 4,
+                    marginBottom: 4,
+                    fontSize: 13,
+                  }}
+                >
+                  <span>
+                    <strong>{p.sport}</strong> · {p.date} ·{" "}
+                    {slot ? slot.label : `slot ${p.slot_index}`}
+                  </span>
+                  <form action={deletePlacement}>
+                    <input type="hidden" name="_return" value={returnPath} />
+                    <input type="hidden" name="placement_id" value={p.id} />
+                    <button type="submit" className="a-btn a-btn-sm">remove</button>
+                  </form>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        <form action={createPlacement} className="a-row" style={{ alignItems: "flex-end", gap: 8 }}>
+        <form action={createPlacement} className="a-row" style={{ alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
           <input type="hidden" name="_return" value={returnPath} />
           <input type="hidden" name="creative_id" value={creative.id} />
           <div className="a-field" style={{ marginBottom: 0, width: 100 }}>
@@ -546,16 +452,13 @@ function CreativeBlock({
               className="a-input"
             />
           </div>
-          <div className="a-field" style={{ marginBottom: 0, width: 80 }}>
+          <div className="a-field" style={{ marginBottom: 0, minWidth: 280, flex: 1 }}>
             <label className="a-label">Slot</label>
-            <input
-              name="slot_index"
-              type="number"
-              required
-              min={1}
-              defaultValue={1}
-              className="a-input"
-            />
+            <select name="slot_index" className="a-select" defaultValue={1}>
+              {SLOTS[creative.format].map((slot, i) => (
+                <option key={slot.id} value={i + 1}>{slot.label}</option>
+              ))}
+            </select>
           </div>
           <FormButton idleLabel="Add placement" pendingLabel="Saving…" />
         </form>

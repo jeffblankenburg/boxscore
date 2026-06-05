@@ -1931,27 +1931,39 @@ body:has(.paper-mode) .paper-toggle {
 /* Format 3: Standings strip — thin horizontal band. Eyebrow left,
    body fills the rest. Single hairline top + bottom. */
 .ad-standings-strip {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
+  display: block;
   padding: 8px 4px;
   margin: 18px 0;
   border-top: 1px solid var(--border-strong);
   border-bottom: 1px solid var(--border-strong);
   font-size: 13px;
   line-height: 1.4;
+  text-align: center;
+}
+/* When an ad immediately follows a .section (e.g. standings_strip slotted
+   between AL and NL sections), pull it up by ~the col-leaders intrinsic
+   margin-bottom (14px) so the gap above the ad balances the gap below.
+   Without this, col-leaders' 14px + .section's 20px margin-bottom +
+   ad's collapsed top margin compound into ~34px above, vs 18px below. */
+.section + .ad-standings-strip,
+.section + .ad-classifieds-block {
+  margin-top: -14px;
 }
 .ad-strip-eyebrow {
+  display: block;
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-style: italic;
   color: var(--text-muted);
-  flex-shrink: 0;
-  align-self: center;
+  margin-bottom: 4px;
 }
-.ad-strip-body { flex: 1; }
-.ad-strip-body b { letter-spacing: 0.02em; }
+.ad-strip-body { display: block; }
+.ad-strip-headline {
+  display: block;
+  letter-spacing: 0.02em;
+  margin-bottom: 2px;
+}
 
 /* Format 4: Display box — bordered card. Single hairline border, centered
    eyebrow + bold headline, hairline rule, left-aligned body, small uppercase
