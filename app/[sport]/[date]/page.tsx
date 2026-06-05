@@ -134,8 +134,23 @@ export default async function DayPage({
   if (!cached) notFound();
   const teamEditionDate = nextDay(cached.date);
   const today = nextDay(yesterdayInET());
+  // SportsTeam schema on the team-latest URL (which is also the canonical
+  // for this team's content). Tells search + AI bots that /[sport]/[slug]
+  // IS the team entity page; subordinate dated pages cite back to it.
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "SportsTeam",
+    "@id": `${EMAIL_LINK_BASE}/${sport}/${team.slug}`,
+    name: team.name,
+    url: `${EMAIL_LINK_BASE}/${sport}/${team.slug}`,
+    sport: sport === "mlb" ? "Baseball" : sport,
+  };
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      />
       <div dangerouslySetInnerHTML={{ __html: cached.html }} />
       <DateHeaderCalendar
         sport={sport}

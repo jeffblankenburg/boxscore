@@ -166,9 +166,11 @@ a { color: inherit; }
   color: inherit;
 }
 .dlc-cell-blank { visibility: hidden; }
-.dlc-cell-link { cursor: pointer; }
+/* Clickable days carry weight so they read as obvious affordances against
+   the muted off-days and future dates beside them. */
+.dlc-cell-link { cursor: pointer; font-weight: 700; }
 .dlc-cell-link:hover { text-decoration: underline; }
-.dlc-cell-disabled { color: var(--text-muted); }
+.dlc-cell-disabled { color: var(--text-muted); font-weight: 400; }
 .dlc-cell-future { color: #c8c4b8; }
 .dlc-cell-current {
   font-weight: 800;

@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { BRAND } from "@/lib/brand";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { PaperModeToggle } from "./PaperModeToggle";
 import { PostHogPageview } from "./PostHogProvider";
 import {
@@ -46,11 +47,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         {isAdmin ? (
           children
         ) : (
-          <div className="newspaper">
-            <SiteHeader />
-            {children}
-            <SiteFooter />
-          </div>
+          <>
+            <SiteSchema />
+            <div className="newspaper">
+              <SiteHeader />
+              {children}
+              <SiteFooter />
+            </div>
+          </>
         )}
         <Analytics />
         <SpeedInsights />
@@ -59,6 +63,39 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         </Suspense>
       </body>
     </html>
+  );
+}
+
+// JSON-LD on every public page. Two entities linked via @graph so Google
+// and AI crawlers know the site's identity once (publisher of every
+// digest, owner of the social profiles) without each page restating it.
+function SiteSchema() {
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${EMAIL_LINK_BASE}/#website`,
+        url: EMAIL_LINK_BASE,
+        name: BRAND.name,
+        description: "Daily MLB box scores, standings, and stat leaders — sent as a morning email and archived on the web.",
+        publisher: { "@id": `${EMAIL_LINK_BASE}/#org` },
+      },
+      {
+        "@type": "Organization",
+        "@id": `${EMAIL_LINK_BASE}/#org`,
+        name: BRAND.name,
+        url: EMAIL_LINK_BASE,
+        logo: `${EMAIL_LINK_BASE}/icon.png`,
+        sameAs: BRAND.social.map((s) => s.href),
+      },
+    ],
+  };
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
   );
 }
 

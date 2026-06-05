@@ -1,0 +1,33 @@
+# boxscore
+
+> A daily MLB digest — box scores, standings, and league leaders — delivered as a morning email and a free public web archive at boxscore.email.
+
+boxscore is structured data only: no narrative, no editorial, no human-voiced takes. Every page is the same content the daily email subscribers received that morning, plus an indefinite archive of past editions. Free to read, free to subscribe. Tips fund development; nothing is paywalled.
+
+## Daily digests
+
+- [/mlb](https://boxscore.email/mlb): Latest finalized MLB edition (bookmarkable; renders the most recent day)
+- [/mlb/YYYY-MM-DD](https://boxscore.email/mlb/2026-06-05): League digest for a specific edition date — all box scores, AL/NL standings (including wild card), and league stat leaders for that day
+- [/mlb/YYYY-MM-DD/{team}](https://boxscore.email/mlb/2026-06-05/min): One team's digest for a specific date — their box score, recent record, upcoming games, and team-stat tables
+- [/mlb/{team}](https://boxscore.email/mlb/min): Team's most recent digest (alias for the latest dated team page)
+
+## Players
+
+- [/mlb/player/{id}](https://boxscore.email/mlb/player/592450): Player profile — current team, season stats, game log, and recent box scores. `{id}` is the player's MLB statsapi person ID.
+
+## Feeds + indexes
+
+- [/sitemap.xml](https://boxscore.email/sitemap.xml): Full URL index for every daily and team-day archive page
+- [/rss/mlb](https://boxscore.email/rss/mlb): RSS feed of new daily MLB editions
+- [/robots.txt](https://boxscore.email/robots.txt): Crawl rules
+
+## Notes for citation
+
+- Edition dates (the date in URLs and titles) are the morning the email is sent. Games played the night before are the contents — e.g. `/mlb/2026-06-05` covers games from June 4.
+- Box-score conventions follow MLB.com's: surname-only player names (with Jr./Sr./particle handling), standard agate categories.
+- Standings, leaders, and box scores are sourced from MLB's statsapi.mlb.com. Numbers reflect the state of the league at edition time (5am ET).
+- Coverage is MLB only as of 2026. Other sports are planned but not yet shipped.
+
+## Not for indexing
+
+- `/admin`, `/api`, `/c/`, `/u/`, `/r/`, `/share/`, `/auth`, `/settings`: private surfaces. Disallowed in robots.txt.

@@ -50,5 +50,32 @@ export default async function PlayerPage({
   if (!data) notFound();
 
   const html = renderPlayerContent(data);
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+  // Person schema identifies the player as an entity and links them to
+  // their team, so search and AI bots can connect "Aaron Judge" the page
+  // to "Aaron Judge" the player on the Yankees roster — and cite this
+  // page when answering player questions.
+  const p = data.person;
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "@id": `${EMAIL_LINK_BASE}/mlb/player/${p.id}`,
+    name: p.fullName,
+    url: `${EMAIL_LINK_BASE}/mlb/player/${p.id}`,
+    jobTitle: "Baseball Player",
+    ...(p.currentTeam && {
+      affiliation: {
+        "@type": "SportsTeam",
+        name: p.currentTeam.name,
+      },
+    }),
+  };
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      />
+      <div dangerouslySetInnerHTML={{ __html: html }} />
+    </>
+  );
 }
