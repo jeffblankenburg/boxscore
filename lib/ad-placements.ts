@@ -16,6 +16,7 @@
 import { supabaseAdmin } from "./supabase";
 import { nextDay } from "./dates";
 import { isFlagEnabled } from "./admin-settings";
+import { trackedAdLink } from "./link-tracking";
 import {
   renderCreative,
   spliceIntoDigest,
@@ -165,10 +166,24 @@ async function spliceLiveAds(args: {
 
   for (const p of placements) {
     try {
-      const ctaUrl =
+      const rawCtaUrl =
         typeof p.creative.payload.cta_url === "string"
           ? p.creative.payload.cta_url
           : "#";
+      // Wrap the destination URL through our first-party redirect for
+      // click tracking. If the wrapper fails (DB read of the secret, HMAC
+      // generation, anything), fall back to the raw URL — losing click
+      // attribution is far better than serving a broken ad.
+      let ctaUrl = rawCtaUrl;
+      if (rawCtaUrl !== "#") {
+        try {
+          ctaUrl = await trackedAdLink(p.placement_id, rawCtaUrl);
+        } catch (err) {
+          errors.push(
+            `placement ${p.placement_id} tracked-link generation: ${(err as Error).message}`,
+          );
+        }
+      }
       const creativeHtml = renderCreative({
         format: p.format,
         payload: p.creative.payload,

@@ -118,6 +118,35 @@ async function loadPlacements(creativeIds: string[]): Promise<Placement[]> {
   return (data ?? []) as Placement[];
 }
 
+type ClickCount = { humans: number; bots: number };
+
+// Fetch every link_clicks row for these placements (label='ad' implicit
+// via FK; we only need is_bot to split humans from prefetchers). Tiny
+// row count expected in v1 — group in JS rather than build an RPC.
+async function loadClickCounts(
+  placementIds: string[],
+): Promise<Map<string, ClickCount>> {
+  const counts = new Map<string, ClickCount>();
+  if (placementIds.length === 0) return counts;
+  const { data, error } = await supabaseAdmin()
+    .from("link_clicks")
+    .select("placement_id, is_bot")
+    .in("placement_id", placementIds);
+  if (error) {
+    // Don't fail the page on a click-count read error — placement rows
+    // just show 0 and the admin can refresh later.
+    console.error(`load click counts: ${error.message}`);
+    return counts;
+  }
+  for (const r of (data ?? []) as Array<{ placement_id: string; is_bot: boolean }>) {
+    const cur = counts.get(r.placement_id) ?? { humans: 0, bots: 0 };
+    if (r.is_bot) cur.bots++;
+    else cur.humans++;
+    counts.set(r.placement_id, cur);
+  }
+  return counts;
+}
+
 function isLive(c: Campaign): boolean {
   return c.status === "approved" && c.paid_at !== null;
 }
@@ -169,6 +198,7 @@ export default async function CampaignDetailPage({
 
   const creatives = await loadCreatives(campaign.id);
   const placements = await loadPlacements(creatives.map((c) => c.id));
+  const clicksByPlacement = await loadClickCounts(placements.map((p) => p.id));
   const placementsByCreative = new Map<string, Placement[]>();
   for (const p of placements) {
     const list = placementsByCreative.get(p.creative_id) ?? [];
@@ -345,6 +375,7 @@ export default async function CampaignDetailPage({
               key={cr.id}
               creative={cr}
               placements={placementsByCreative.get(cr.id) ?? []}
+              clicksByPlacement={clicksByPlacement}
               returnPath={returnPath}
               defaultDate={tomorrow}
             />
@@ -358,11 +389,13 @@ export default async function CampaignDetailPage({
 function CreativeBlock({
   creative,
   placements,
+  clicksByPlacement,
   returnPath,
   defaultDate,
 }: {
   creative: Creative;
   placements: Placement[];
+  clicksByPlacement: Map<string, ClickCount>;
   returnPath: string;
   defaultDate: string;
 }) {
@@ -405,6 +438,7 @@ function CreativeBlock({
           <div style={{ marginBottom: 12 }}>
             {placements.map((p) => {
               const slot = SLOTS[p.format]?.[p.slot_index - 1];
+              const clicks = clicksByPlacement.get(p.id);
               return (
                 <div
                   key={p.id}
@@ -421,6 +455,15 @@ function CreativeBlock({
                   <span>
                     <strong>{p.sport}</strong> · {p.date} ·{" "}
                     {slot ? slot.label : `slot ${p.slot_index}`}
+                    <span className="a-muted" style={{ marginLeft: 12 }}>
+                      · clicks:{" "}
+                      <strong style={{ color: "var(--a-text)" }}>
+                        {clicks?.humans ?? 0}
+                      </strong>
+                      {clicks && clicks.bots > 0 && (
+                        <> ({clicks.bots} bot{clicks.bots === 1 ? "" : "s"})</>
+                      )}
+                    </span>
                   </span>
                   <form action={deletePlacement}>
                     <input type="hidden" name="_return" value={returnPath} />
