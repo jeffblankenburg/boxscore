@@ -4,6 +4,7 @@ import { prettyDate, yesterdayInET, nextDay } from "@/lib/dates";
 import { getSportById, isSportVisible } from "@/lib/sports";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { PaperMasthead } from "@/app/PaperMasthead";
+import { DateHeaderCalendar } from "@/app/DateHeaderCalendar";
 
 // Bookmarkable league page. URL stays as `/mlb` while rendering the latest
 // finalized day's digest. The dated route `/mlb/[date]` continues to serve
@@ -53,11 +54,14 @@ export default async function SportLatest({
 
   const { paper } = await searchParams;
   const paperMode = paper === "1";
+  const editionDate = nextDay(date);
+  const today = nextDay(yesterdayInET());
 
   return (
     <div className={paperMode ? "paper-mode" : undefined}>
       {paperMode && <PaperMasthead date={date} />}
       <div dangerouslySetInnerHTML={{ __html: digest.html }} />
+      <DateHeaderCalendar sport={sport} currentDate={editionDate} today={today} />
     </div>
   );
 }

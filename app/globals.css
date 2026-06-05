@@ -102,28 +102,78 @@ a { color: inherit; }
     margin-top: 4px;
   }
 }
-/* Day-nav arrows in the dateline. Near-invisible by default (low opacity,
-   not italic, lighter weight) — present for users who look for them,
-   absent for users who don't. Hover lifts to clearly clickable. */
-.dateline-arrow {
-  position: absolute; top: 50%;
-  transform: translateY(-50%);
-  font-style: normal; font-weight: 400;
-  font-size: 0.72em; line-height: 1;
-  padding: 4px 10px;
-  color: var(--text-primary);
-  opacity: 0.18; text-decoration: none;
-  transition: opacity 120ms ease;
-}
-.dateline-arrow:hover, .dateline-arrow:focus-visible { opacity: 0.85; }
-.dateline-prev { left: 4px; }
-.dateline-next { right: 4px; }
 .dateline-text { display: inline-block; }
-/* Suppress the dateline arrows when the wrapper says there's no further
-   cached date in that direction — keeps users from clicking into a 404. */
-.no-prev-day .dateline-prev,
-.no-next-day .dateline-next { display: none; }
+/* Day-nav arrows were removed when the date-header dropdown calendar
+   shipped. New digests no longer emit them; this hides the leftovers in
+   stored HTML until backfill regenerates those rows. */
+.dateline-arrow { display: none; }
+/* Hover affordance only attaches once the calendar client component has
+   mounted — without JS the dateline behaves like text, not a button. The
+   color shift is intentionally subtle: enough to notice on hover, not
+   enough to read as a primary CTA. */
+.dateline-text.calendar-enabled {
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.dateline-text.calendar-enabled:hover { color: #555; }
 
+/* Date-header dropdown calendar. Anchored under the dateline, rendered
+   through a portal so it isn't clipped by ancestor overflow. Plain
+   newspaper-aligned styling — black border, no rounded corners. */
+.dateline-calendar {
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  padding: 10px 12px 12px;
+  width: 260px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.dlc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.dlc-title {
+  font-weight: 700; letter-spacing: 0.01em;
+}
+.dlc-nav {
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; line-height: 1;
+  padding: 2px 8px; color: var(--text-primary);
+}
+.dlc-nav:disabled { opacity: 0.25; cursor: default; }
+.dlc-nav:not(:disabled):hover { color: #555; }
+
+.dlc-dow {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 4px;
+}
+.dlc-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.dlc-cell {
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 1 / 1;
+  font-size: 13px;
+  text-decoration: none;
+  color: inherit;
+}
+.dlc-cell-blank { visibility: hidden; }
+.dlc-cell-link { cursor: pointer; }
+.dlc-cell-link:hover { text-decoration: underline; }
+.dlc-cell-disabled { color: var(--text-muted); }
+.dlc-cell-future { color: #c8c4b8; }
+.dlc-cell-current {
+  font-weight: 800;
+  outline: 1px solid var(--border-strong);
+}
 .section { margin-bottom: 20px; }
 .league-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
 .col-standings, .col-leaders { width: 100%; margin-bottom: 14px; min-width: 0; }

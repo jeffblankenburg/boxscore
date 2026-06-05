@@ -299,12 +299,9 @@ function classifyMode(data: TeamEmailData): TeamDigestMode {
 export function renderTeamWebContent(data: TeamEmailData): string {
   const mode = classifyMode(data);
   // Team digests live at /{sport}/{slug}/{edition_date}. data.date is the
-  // games_date the digest was built from; editionDate = games_date + 1
-  // and prev/next walk ±1 day from there.
+  // games_date the digest was built from; editionDate = games_date + 1.
   const editionDate = nextDay(data.date);
   const datelineOpts = {
-    prevUrl: `/${data.team.sport}/${data.team.slug}/${prevDay(editionDate)}`,
-    nextUrl: `/${data.team.sport}/${data.team.slug}/${nextDay(editionDate)}`,
     volume: volumeNumber(editionDate),
     issue: issueNumber(editionDate),
   };

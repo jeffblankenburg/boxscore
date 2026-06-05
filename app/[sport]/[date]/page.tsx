@@ -1,13 +1,14 @@
 import { notFound } from "next/navigation";
-import { isValidIsoDate, prettyDate, prevDay, nextDay } from "@/lib/dates";
-import { getDigest, hasInSeasonDigest } from "@/lib/digests";
-import { getLatestTeamDigest, hasInSeasonTeamDigest } from "@/lib/team-digests";
+import { isValidIsoDate, prettyDate, prevDay, nextDay, yesterdayInET } from "@/lib/dates";
+import { getDigest } from "@/lib/digests";
+import { getLatestTeamDigest } from "@/lib/team-digests";
 import type { Metadata } from "next";
 import { getSportById, isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
 import { getScoreboardShareImageUrl } from "@/lib/share-storage";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { PaperMasthead } from "@/app/PaperMasthead";
+import { DateHeaderCalendar } from "@/app/DateHeaderCalendar";
 
 export const dynamicParams = true;
 export const revalidate = false;
@@ -110,42 +111,38 @@ export default async function DayPage({
   if (isValidIsoDate(date)) {
     const editionDate = date;
     const gamesDate = prevDay(editionDate);
-    // Existence checks for prev/next arrows look at adjacent EDITION
-    // dates, which translate to gamesDate ±1 from the current one.
-    const [digest, hasPrev, hasNext] = await Promise.all([
-      getDigest(sport, gamesDate),
-      hasInSeasonDigest(sport, prevDay(gamesDate)),
-      hasInSeasonDigest(sport, nextDay(gamesDate)),
-    ]);
+    const digest = await getDigest(sport, gamesDate);
     if (!digest) notFound();
     const { paper } = await searchParams;
     const paperMode = paper === "1";
-    const classes = [
-      paperMode ? "paper-mode" : null,
-      hasNext ? null : "no-next-day",
-      hasPrev ? null : "no-prev-day",
-    ].filter(Boolean).join(" ") || undefined;
+    const today = nextDay(yesterdayInET());
     return (
-      <div className={classes}>
+      <div className={paperMode ? "paper-mode" : undefined}>
         {paperMode && <PaperMasthead date={editionDate} />}
         <div dangerouslySetInnerHTML={{ __html: digest.html }} />
+        <DateHeaderCalendar sport={sport} currentDate={editionDate} today={today} />
       </div>
     );
   }
 
   // Branch B: team-slug-shaped → latest cached team digest. The page lives
   // at /[sport]/[slug] and renders whatever's most recent in team_digests.
-  // Visiting a specific date uses the 3-segment route. By definition this
-  // IS the latest cached date for the team, so the next-day arrow is
-  // always hidden here; check whether the prev calendar day has data.
+  // Visiting a specific date uses the 3-segment route.
   const team = findTeam(sport as Sport, date);
   if (!team) notFound();
   const cached = await getLatestTeamDigest(sport, team.slug);
   if (!cached) notFound();
-  const teamHasPrev = await hasInSeasonTeamDigest(sport, team.slug, prevDay(cached.date));
-  const teamClasses = [
-    "no-next-day",
-    teamHasPrev ? null : "no-prev-day",
-  ].filter(Boolean).join(" ");
-  return <div className={teamClasses} dangerouslySetInnerHTML={{ __html: cached.html }} />;
+  const teamEditionDate = nextDay(cached.date);
+  const today = nextDay(yesterdayInET());
+  return (
+    <div>
+      <div dangerouslySetInnerHTML={{ __html: cached.html }} />
+      <DateHeaderCalendar
+        sport={sport}
+        currentDate={teamEditionDate}
+        today={today}
+        teamSlug={team.slug}
+      />
+    </div>
+  );
 }

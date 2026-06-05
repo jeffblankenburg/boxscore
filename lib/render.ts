@@ -206,11 +206,9 @@ function buildTeamRecordMap(standings: DivisionStandings[]): Map<number, string>
 
 export function renderContent(data: DailyData): string {
   // League digests live at /mlb/{edition_date}. data.date is games_date,
-  // so editionDate = games_date + 1. Prev/next move ±1 day from there.
+  // so editionDate = games_date + 1.
   const editionDate = nextDay(data.date);
   const datelineOpts = {
-    prevUrl: `/mlb/${prevDay(editionDate)}`,
-    nextUrl: `/mlb/${nextDay(editionDate)}`,
     volume: volumeNumber(editionDate),
     issue: issueNumber(editionDate),
   };
@@ -280,22 +278,14 @@ export function renderTransactions(txs: Transaction[]): string {
 
 export function renderDateline(
   pretty: string,
-  opts: { prevUrl?: string; nextUrl?: string; volume?: number; issue?: number } = {},
+  opts: { volume?: number; issue?: number } = {},
 ): string {
-  // Subtle day-nav arrows positioned at each end of the dateline. CSS keeps
-  // them near-invisible (low opacity) until hovered; the chevrons survive
-  // contrast tests for "obviously clickable when you look for them" but
-  // don't compete with the date text for attention.
-  const prev = opts.prevUrl
-    ? `<a class="dateline-arrow dateline-prev" href="${esc(opts.prevUrl)}" aria-label="Previous day" rel="prev">&#x2039;</a>`
-    : "";
-  const next = opts.nextUrl
-    ? `<a class="dateline-arrow dateline-next" href="${esc(opts.nextUrl)}" aria-label="Next day" rel="next">&#x203A;</a>`
-    : "";
+  // Day-nav arrows were removed once the date-header dropdown calendar
+  // shipped — the calendar covers the same navigation with richer context.
   const counter = opts.volume && opts.issue
     ? `<div class="dateline-issue-no">Vol. ${opts.volume}, Issue ${opts.issue}</div>`
     : "";
-  return `<div class="dateline"><div class="dateline-row">${prev}<span class="dateline-text">${esc(pretty)}</span>${next}</div>${counter}</div>`;
+  return `<div class="dateline"><div class="dateline-row"><span class="dateline-text">${esc(pretty)}</span></div>${counter}</div>`;
 }
 
 function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leaderLimit = 5): string {

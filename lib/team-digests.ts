@@ -56,28 +56,6 @@ export async function getLatestTeamDigest(
 const IN_SEASON_MODES = ["regular", "no-games", "all-star", "postseason"];
 
 /**
- * Does an in-season cached team digest exist for (sport, team_slug, date)?
- * Mirrors hasInSeasonDigest — used to decide whether the team-page
- * dateline's prev/next arrow leads somewhere real.
- */
-export async function hasInSeasonTeamDigest(
-  sport: string,
-  teamSlug: string,
-  date: string,
-): Promise<boolean> {
-  const { data, error } = await supabaseAdmin()
-    .from("team_digests")
-    .select("date")
-    .eq("sport", sport)
-    .eq("team_slug", teamSlug)
-    .eq("date", date)
-    .in("mode", IN_SEASON_MODES)
-    .maybeSingle<{ date: string }>();
-  if (error) throw new Error(`hasInSeasonTeamDigest: ${error.message}`);
-  return !!data;
-}
-
-/**
  * Every in-season (team_slug, date) pair for the sport, newest first.
  * Paginated to escape the 1000-row Supabase cap. Powers app/sitemap.ts —
  * MLB alone generates ~30 teams × 180 game days ≈ 5400 rows per season,

@@ -26,29 +26,6 @@ export async function getDigest(sport: string, date: string): Promise<Digest | n
 const IN_SEASON_MODES = ["regular", "no-games", "all-star", "postseason"];
 
 /**
- * Does an in-season cached digest exist for this exact (sport, date)?
- * Used to decide whether the dateline's prev/next arrow points somewhere
- * meaningful. Bounds-based logic doesn't work here because the calendar
- * gap between seasons (Nov–Mar) means the global min/max is far from the
- * date the user is actually on; what matters is whether *yesterday* (or
- * *tomorrow*) is a real day, not the absolute season edge.
- */
-export async function hasInSeasonDigest(
-  sport: string,
-  date: string,
-): Promise<boolean> {
-  const { data, error } = await supabaseAdmin()
-    .from("daily_digests")
-    .select("date")
-    .eq("sport", sport)
-    .eq("date", date)
-    .in("mode", IN_SEASON_MODES)
-    .maybeSingle<{ date: string }>();
-  if (error) throw new Error(`hasInSeasonDigest: ${error.message}`);
-  return !!data;
-}
-
-/**
  * Every in-season games_date for the sport, newest first. Paginates around
  * Supabase's 1000-row cap. Powers app/sitemap.ts and the Wave 2 calendar
  * dropdown — both want the full list of dates that have a real digest, not
