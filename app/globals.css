@@ -656,7 +656,9 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
                       border-radius: 999px; }
 .followers-filter a.active { background: var(--text-primary); color: var(--bg-paper); }
 
-.followers-table { width: 100%; table-layout: fixed; font-size: 13px;
+/* No width:100% — let the table size to the sum of its column widths so we
+   don't get a "filler" column that hoovers up the rest of the page. */
+.followers-table { table-layout: fixed; font-size: 13px;
                    border-collapse: collapse; }
 .followers-table thead th { text-align: left; font-weight: 700;
                             padding: 6px 8px; border-bottom: 2px solid var(--border-strong);
@@ -669,17 +671,25 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
                             white-space: normal; word-wrap: break-word; }
 .followers-table tbody tr:hover td { background-color: rgba(0, 0, 0, 0.02); }
 
-/* Fixed widths so table-layout: fixed has something to distribute. Bio
-   gets whatever's left. */
+/* Fixed widths so table-layout: fixed has something to distribute. Notes
+   gets whatever's left over now that bio is constrained. */
 .followers-table .fl-avatar { width: 52px; }
 .followers-table .fl-avatar img { width: 40px; height: 40px; border-radius: 999px;
                                    display: block; object-fit: cover; }
 .followers-table .fl-avatar-blank { width: 40px; height: 40px; border-radius: 999px;
                                      background: rgba(0, 0, 0, 0.08); }
-.followers-table .fl-name { width: 180px; }
+/* Handle and name are now separate columns. Handle sits next to the avatar
+   because it's the primary identifier the operator scans by; name is the
+   human label. fl-handle-text styles the @-string itself so the column
+   header (which reuses the .fl-handle class) doesn't inherit the muted
+   color. */
+/* text-align: left overrides the table-wide `th, td { text-align: right }`
+   default — without it handles/names hug the right edge of their columns. */
+.followers-table .fl-handle { width: 160px; text-align: left; }
+.followers-table .fl-handle-text { color: var(--text-secondary); word-wrap: break-word; }
+.followers-table .fl-name { width: 160px; text-align: left; }
 .followers-table .fl-display { font-weight: 700; word-wrap: break-word; }
-.followers-table .fl-handle { font-size: 12px; color: var(--text-muted); word-wrap: break-word; }
-.followers-table .fl-bio { line-height: 1.4; color: var(--text-secondary); }
+.followers-table .fl-bio { width: 260px; line-height: 1.4; color: var(--text-secondary); }
 .followers-table .fl-empty { color: var(--text-muted); }
 .followers-table .fl-platform { width: 70px; font-size: 12px;
                                 color: var(--text-muted); text-transform: uppercase;
@@ -687,11 +697,68 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .followers-table .fl-action { width: 112px; white-space: nowrap; text-align: right; }
 .followers-table .fl-action a { color: var(--text-secondary); text-decoration: none; }
 .followers-table .fl-action a:hover { text-decoration: underline; }
+
+/* Star toggle column. ★ when starred, ☆ otherwise; both buttons are the
+   same width so the table doesn't shift when toggling. */
+.followers-table .fl-star { width: 28px; text-align: center; padding-left: 4px; padding-right: 4px; }
+.fl-star-btn { background: transparent; border: 0; font-size: 18px; line-height: 1;
+               cursor: pointer; color: var(--text-muted); padding: 4px; }
+.fl-star-btn.on { color: #f4b400; }
+.fl-star-btn:hover { color: #f4b400; }
+
+/* Notes column — debounced auto-save (NotesField.tsx). 240px keeps the
+   textarea wide enough for a short sentence without making the column
+   eat the whole row. The status span sits under the textarea and only
+   paints text while a save is in flight or just resolved. */
+.followers-table .fl-notes { width: 240px; }
+.fl-notes-field { display: flex; flex-direction: column; gap: 2px; }
+.fl-notes-field textarea { width: 100%; font: inherit; font-size: 12px;
+                           line-height: 1.3; padding: 4px 6px;
+                           border: 1px solid var(--border-light, #ddd);
+                           background: var(--bg-paper); resize: vertical;
+                           min-height: 36px; }
+.fl-notes-status { font-size: 10px; line-height: 1.2; min-height: 12px;
+                   color: var(--text-muted); align-self: flex-end;
+                   letter-spacing: 0.04em; }
+.fl-notes-status-saving { color: var(--text-muted); }
+.fl-notes-status-saved  { color: #1a7f37; }
+.fl-notes-status-error  { color: #8a1414; font-weight: 700; }
+
+/* "Follow back?" indicator. ✓ when we reciprocate, — when we don't.
+   font-size applies only to the cell content (via the inner spans) so the
+   header stays at the table's base size. */
+.followers-table .fl-followback { width: 80px; text-align: center; }
+.followers-table tbody .fl-followback { font-size: 16px; }
+.fl-yes { color: #1a7f37; font-weight: 700; }
+.fl-no  { color: var(--text-muted); }
+
+/* Sortable column headers. Render as buttons styled like text — clicking
+   re-loads the page with the matching ?sort=&dir= params. Active column
+   gets the ▲/▼ arrow; inactive columns reserve the same horizontal space
+   so the layout doesn't jump when the sort changes. */
+.fl-sort { background: transparent; border: 0; font: inherit; font-weight: 700;
+           color: var(--text-primary); cursor: pointer; padding: 0;
+           text-align: left; text-decoration: none; }
+.fl-sort:hover { text-decoration: underline; }
+.fl-sort-arrow { display: inline-block; width: 10px; margin-left: 4px;
+                 color: var(--text-muted); }
+.fl-sort.active .fl-sort-arrow { color: var(--text-primary); }
+
+/* Unfollowers (removed_at != null) — dim the row and show when they left. */
+.followers-table .fl-row-removed td { opacity: 0.55; }
+.fl-removed-tag { font-size: 11px; color: #8a1414; margin-top: 2px;
+                  text-transform: uppercase; letter-spacing: 0.04em; }
+
+.followers-actions { margin: 0 0 14px; }
+
 @media (max-width: 720px) {
   .followers-table { font-size: 12px; }
   .followers-table .fl-platform { display: none; }
-  .followers-table .fl-name { width: 130px; }
+  .followers-table .fl-handle { width: 120px; }
+  .followers-table .fl-name { width: 120px; }
   .followers-table .fl-action { width: 90px; }
+  .followers-table .fl-notes { display: none; }
+  .followers-table .fl-followback { width: 40px; }
 }
 
 /* League switcher — strip of league badges under the main admin nav. */
