@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { isSportVisible } from "@/lib/sports";
 import { loadPlayerPageData, renderPlayerContent } from "@/lib/render-player";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 
 // Player profile at /{sport}/player/{personId}. MLB only for now —
 // other sports 404 until they grow a player-page renderer of their own.
@@ -22,9 +23,15 @@ export async function generateMetadata({
   if (!Number.isFinite(personId)) return {};
   const data = await loadPlayerPageData(personId);
   if (!data) return {};
+  // Year in the title catches "[player] 2026 stats"-style queries, which
+  // outweigh the bare-name variant in search volume during the season.
+  const year = new Date().getUTCFullYear();
   return {
-    title: `${data.person.fullName} | boxscore`,
-    description: `${data.person.fullName} game log and season stats.`,
+    title: `${data.person.fullName} — ${year} Game Log and Stats | boxscore`,
+    description: `${data.person.fullName} game log, season stats, and recent box scores.`,
+    alternates: {
+      canonical: `${EMAIL_LINK_BASE}/mlb/player/${personId}`,
+    },
   };
 }
 

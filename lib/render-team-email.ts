@@ -24,6 +24,7 @@ import {
   dateline, sectionH, renderGame, renderDivisionStandings,
   esc, pad, fmtAvg, fmtEra, lastName,
 } from "./render-email";
+import { lastNameLinkEmail } from "./player-links";
 
 type ProbableStats = { wins: number; losses: number; era: string | null };
 
@@ -190,7 +191,7 @@ function renderHitters(players: RosterPlayer[]): string {
       : "";
     const pos = p.position ? ` <span class="es-mut">${esc(p.position.toLowerCase())}</span>` : "";
     return `<tr>
-      <td align="left">${jersey}${esc(lastName(p.fullName))}${pos}</td>
+      <td align="left">${jersey}${lastNameLinkEmail(p)}${pos}</td>
       <td align="right">${pad(h.gamesPlayed)}</td>
       <td align="right">${pad(h.atBats)}</td>
       <td align="right">${pad(h.runs)}</td>
@@ -237,7 +238,7 @@ function renderPitchers(players: RosterPlayer[]): string {
       ? `<span class="es-mut">#${esc(p.jerseyNumber)}</span> `
       : "";
     return `<tr>
-      <td align="left">${jersey}${esc(lastName(p.fullName))}</td>
+      <td align="left">${jersey}${lastNameLinkEmail(p)}</td>
       <td align="right">${pad(pi.gamesPlayed)}</td>
       <td align="right">${pad(pi.wins)}</td>
       <td align="right">${pad(pi.losses)}</td>
@@ -324,7 +325,7 @@ function renderAdvancedHitters(players: RosterPlayer[]): string {
       ? `<span class="es-mut">#${esc(p.jerseyNumber)}</span> `
       : "";
     return `<tr>
-      <td align="left">${jersey}${esc(lastName(p.fullName))}</td>
+      <td align="left">${jersey}${lastNameLinkEmail(p)}</td>
       <td align="right">${pad(h.plateAppearances)}</td>
       <td align="right">${fmtAvg(h.avg)}</td>
       <td align="right">${fmtAvg(h.obp)}</td>
@@ -364,7 +365,7 @@ function renderAdvancedPitchers(players: RosterPlayer[]): string {
       ? `<span class="es-mut">#${esc(p.jerseyNumber)}</span> `
       : "";
     return `<tr>
-      <td align="left">${jersey}${esc(lastName(p.fullName))}</td>
+      <td align="left">${jersey}${lastNameLinkEmail(p)}</td>
       <td align="right">${esc(pi.inningsPitched ?? "—")}</td>
       <td align="right">${esc(pi.strikeoutsPer9Inn ?? "—")}</td>
       <td align="right">${esc(pi.walksPer9Inn ?? "—")}</td>

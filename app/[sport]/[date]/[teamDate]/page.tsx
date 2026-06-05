@@ -3,6 +3,7 @@ import { isValidIsoDate, prettyDate, prevDay, nextDay } from "@/lib/dates";
 import { getTeamDigest, hasInSeasonTeamDigest } from "@/lib/team-digests";
 import { isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 
 // /{sport}/{slug}/{date} — a specific team's digest for a specific date.
 // Folder is named [teamDate] simply because Next.js requires unique segment
@@ -21,8 +22,11 @@ export async function generateMetadata({ params }: {
   if (!team || !isValidIsoDate(date)) return {};
   // URL date IS the edition date.
   return {
-    title: `${team.name} — ${prettyDate(date)} | boxscore`,
-    description: `${team.name} digest for ${prettyDate(date)}.`,
+    title: `${team.name} Box Score — ${prettyDate(date)} | boxscore`,
+    description: `${team.name} box score and recap for ${prettyDate(date)}.`,
+    alternates: {
+      canonical: `${EMAIL_LINK_BASE}/${sport}/${date}/${team.slug}`,
+    },
   };
 }
 

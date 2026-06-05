@@ -28,6 +28,7 @@ import { nextDay, prettyDate } from "./dates";
 import { findTeamByMlbApiId } from "./teams";
 import { EMAIL_LINK_BASE } from "./site";
 import { lastName } from "./names";
+import { lastNameLinkEmail } from "./player-links";
 
 // Re-exported for the basketball renderer, which imports lastName from here.
 // New code should import from "./names" directly.
@@ -48,6 +49,11 @@ export const EMAIL_STYLES = `
      as the cell, no underline. Backup for clients that strip the inline
      style on the <a> element. */
   .es-team-link { color: inherit !important; text-decoration: none !important; }
+
+  /* Player-name links across box scores, leaders, decisions. Same invisible
+     treatment as team links — no hover styling because most email clients
+     don't honour :hover anyway. */
+  .es-player-link { color: inherit !important; text-decoration: none !important; }
 
   .es-dateline {
     border-top: 3px double #161410; border-bottom: 1px solid #161410;
@@ -411,7 +417,7 @@ function renderLeagueStandings(label: string, key: "AL" | "NL", data: DailyData)
 function renderLeaderCategory(g: LeaderGroup, liveAbbrev: Record<string, string>, limit = 5): string {
   const rows = leadersThroughTies(g.rows, limit).map((L) =>
     `<tr>
-      <td align="left">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
+      <td align="left">${L.rank}. ${lastNameLinkEmail(L.person)}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
       <td align="right">${esc(L.value)}</td>
     </tr>`
   ).join("");
@@ -514,7 +520,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     const isStarter = !!p.battingOrder && p.battingOrder.endsWith("00");
     const indent = isStarter ? "" : ' style="padding-left:10px;"';
     return `<tr>
-      <td align="left"${indent}>${esc(lastName(p.person.fullName))} <span class="es-mut">${esc(pos)}</span></td>
+      <td align="left"${indent}>${lastNameLinkEmail(p.person)} <span class="es-mut">${esc(pos)}</span></td>
       <td align="right">${pad(b.atBats)}</td>
       <td align="right">${pad(b.runs)}</td>
       <td align="right">${pad(b.hits)}</td>
@@ -604,7 +610,7 @@ function renderPitching(team: BoxTeam, cityName: string): string {
       ? ` <span style="color:#6a6354;font-weight:400;">${esc(pi.note)}</span>`
       : "";
     return `<tr>
-      <td align="left">${esc(lastName(p.person.fullName))}${note}</td>
+      <td align="left">${lastNameLinkEmail(p.person)}${note}</td>
       <td align="right">${esc(pi.inningsPitched ?? "-")}</td>
       <td align="right">${pad(pi.hits)}</td>
       <td align="right">${pad(pi.runs)}</td>
@@ -714,9 +720,9 @@ export function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbb
   const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(ls?.home.runs)} ${padRhe(ls?.home.hits)} ${padRhe(ls?.home.errors)}`;
   const d = game.decisions;
   const decisionLine = [
-    d?.winner && `<b>W:</b> ${esc(lastName(d.winner.fullName))}`,
-    d?.loser && `<b>L:</b> ${esc(lastName(d.loser.fullName))}`,
-    d?.save && `<b>Sv:</b> ${esc(lastName(d.save.fullName))}`,
+    d?.winner && `<b>W:</b> ${lastNameLinkEmail(d.winner)}`,
+    d?.loser && `<b>L:</b> ${lastNameLinkEmail(d.loser)}`,
+    d?.save && `<b>Sv:</b> ${lastNameLinkEmail(d.save)}`,
   ].filter(Boolean).join(" &nbsp;·&nbsp; ");
 
   return `<div class="es-game">

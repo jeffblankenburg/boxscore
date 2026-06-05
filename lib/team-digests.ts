@@ -77,6 +77,33 @@ export async function hasInSeasonTeamDigest(
   return !!data;
 }
 
+/**
+ * Every in-season (team_slug, date) pair for the sport, newest first.
+ * Paginated to escape the 1000-row Supabase cap. Powers app/sitemap.ts —
+ * MLB alone generates ~30 teams × 180 game days ≈ 5400 rows per season,
+ * so a single unpaginated select would silently truncate.
+ */
+export async function listAllTeamDigestKeys(
+  sport: string,
+): Promise<{ team_slug: string; date: string }[]> {
+  const keys: { team_slug: string; date: string }[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin()
+      .from("team_digests")
+      .select("team_slug, date")
+      .eq("sport", sport)
+      .in("mode", IN_SEASON_MODES)
+      .order("date", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`listAllTeamDigestKeys: ${error.message}`);
+    if (!data || data.length === 0) break;
+    for (const row of data) keys.push(row as { team_slug: string; date: string });
+    if (data.length < pageSize) break;
+  }
+  return keys;
+}
+
 export async function upsertTeamDigest(args: {
   sport: string;
   team_slug: string;

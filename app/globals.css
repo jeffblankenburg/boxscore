@@ -159,6 +159,11 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .team-link, .team-link:visited { color: inherit; text-decoration: none; }
 .team-link:hover { text-decoration: underline; }
 
+/* Player-name links in box scores, leaders, and decisions follow the same
+   pattern — invisible by default, hover-underline as the only affordance. */
+.player-link, .player-link:visited { color: inherit; text-decoration: none; }
+.player-link:hover { text-decoration: underline; }
+
 .standings-wrap { max-width: 100%; }
 .standings-table { margin-bottom: 8px; table-layout: fixed; }
 .standings-table th { border-top: none; border-bottom: 1px solid var(--border-strong); }

@@ -7,6 +7,7 @@ import type { DigestMode } from "./digest-mode";
 import { findTeamByMlbApiId } from "./teams";
 import { prevDay, nextDay, prettyDate, issueNumber, volumeNumber } from "./dates";
 import { lastName } from "./names";
+import { lastNameLinkWeb } from "./player-links";
 
 // Re-exported for backwards compatibility with any caller that imports
 // lastName from "./render". New code should import from "./names" directly.
@@ -307,7 +308,7 @@ function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leade
     return rec ? renderDivisionTable(d.name, rec, { date: nextDay(data.date) }) : "";
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league.id === leagueId);
-  const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord) : "";
+  const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord, { date: nextDay(data.date) }) : "";
   const leadersHtml = renderLeagueLeaders(data.leaders[key], data.teamAbbrev, leaderLimit);
   return `<div class="league-layout">
   <div class="col-standings">
@@ -322,7 +323,10 @@ function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leade
 </div>`;
 }
 
-function renderWildCardTable(wc: WildCardLeagueStandings): string {
+function renderWildCardTable(
+  wc: WildCardLeagueStandings,
+  opts: { date?: string } = {},
+): string {
   const sorted = [...wc.teamRecords]
     .sort((a, b) => Number(a.wildCardRank ?? 99) - Number(b.wildCardRank ?? 99));
   const minTeams = 6;
@@ -344,8 +348,17 @@ function renderWildCardTable(wc: WildCardLeagueStandings): string {
     const away = t.records?.splitRecords?.find((s) => s.type === "away");
     const l10 = t.records?.splitRecords?.find((s) => s.type === "lastTen");
     const cutoffClass = i === 3 ? " wc-cutoff" : "";
+    // Same team-link treatment as the division standings above — opt in via
+    // opts.date so the All-Star wildcard (which doesn't carry a date) stays
+    // unlinked, matching renderAllStarDivisionTable.
+    const slug = findTeamByMlbApiId(t.team.id)?.slug;
+    const name = esc(nickname(t.team.name));
+    const teamHref = slug && opts.date ? `/mlb/${slug}/${opts.date}` : null;
+    const teamCell = teamHref
+      ? `<a class="team-link" href="${teamHref}">${name}</a>`
+      : name;
     return `<tr class="${cutoffClass.trim()}">
-      <td class="team-col">${esc(nickname(t.team.name))}</td>
+      <td class="team-col">${teamCell}</td>
       <td class="w-col">${t.wins}</td>
       <td class="l-col">${t.losses}</td>
       <td class="pct-col">${esc(t.leagueRecord.pct).replace(/^0/, "")}</td>
@@ -506,7 +519,7 @@ function renderAllStarLeaders(groups: LeaderGroup[], liveAbbrev: Record<string, 
   const cards = groups.map((g) => {
     const rows = leadersThroughTies(g.rows, 15).map((L) => `
       <tr>
-        <td class="player-col">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
+        <td class="player-col">${L.rank}. ${lastNameLinkWeb(L.person)}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
         <td>${esc(L.value)}</td>
       </tr>`).join("");
     return `<div class="leaders-section">
@@ -546,7 +559,7 @@ function renderLeagueLeaders(groups: LeaderGroup[], liveAbbrev: Record<string, s
   const cards = groups.map((g) => {
     const rows = leadersThroughTies(g.rows, limit).map((L) => `
       <tr>
-        <td class="player-col">${L.rank}. ${esc(lastName(L.person.fullName))}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
+        <td class="player-col">${L.rank}. ${lastNameLinkWeb(L.person)}, ${esc(tla(L.team?.name ?? "", liveAbbrev))}</td>
         <td>${esc(L.value)}</td>
       </tr>`).join("");
     return `<div class="leaders-section">
@@ -718,9 +731,9 @@ export function renderGame({ game, box, scoring }: Required<GameDetail>, liveAbb
 
   const d = game.decisions;
   const decisionParts = [
-    d?.winner && `<b>W:</b> ${esc(lastName(d.winner.fullName))}`,
-    d?.loser && `<b>L:</b> ${esc(lastName(d.loser.fullName))}`,
-    d?.save && `<b>Sv:</b> ${esc(lastName(d.save.fullName))}`,
+    d?.winner && `<b>W:</b> ${lastNameLinkWeb(d.winner)}`,
+    d?.loser && `<b>L:</b> ${lastNameLinkWeb(d.loser)}`,
+    d?.save && `<b>Sv:</b> ${lastNameLinkWeb(d.save)}`,
   ].filter(Boolean).join(" · ");
 
   const infoOrder = ["Umpires", "Weather", "T", "Att"];
@@ -767,7 +780,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     const isStarter = !!p.battingOrder && p.battingOrder.endsWith("00");
     const playerCls = isStarter ? "player-col" : "player-col is-sub";
     return `<tr>
-      <td class="${playerCls}">${esc(lastName(p.person.fullName))} ${esc(pos)}</td>
+      <td class="${playerCls}">${lastNameLinkWeb(p.person)} ${esc(pos)}</td>
       <td class="stat-col">${pad(b.atBats)}</td>
       <td class="r-col">${pad(b.runs)}</td>
       <td class="stat-col">${pad(b.hits)}</td>
@@ -855,7 +868,7 @@ function renderPitching(team: BoxTeam, cityName: string): string {
     // name when present so readers see who got the win/loss/save/hold inline.
     const note = pi.note ? ` <span class="pitcher-note">${esc(pi.note)}</span>` : "";
     return `<tr>
-      <td class="player-col">${esc(lastName(p.person.fullName))}${note}</td>
+      <td class="player-col">${lastNameLinkWeb(p.person)}${note}</td>
       <td class="ip-col">${esc(pi.inningsPitched ?? "-")}</td>
       <td class="stat-col">${pad(pi.hits)}</td>
       <td class="stat-col">${pad(pi.runs)}</td>

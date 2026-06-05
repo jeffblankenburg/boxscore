@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { loadDailyData } from "@/lib/daily";
 import {
   renderContentWithAds,
@@ -156,6 +157,10 @@ export async function GET(req: Request) {
         ...(scoreboard_image_url ? { scoreboard_image_url } : {}),
         ...(scoreboard_image_error ? { scoreboard_image_error } : {}),
       };
+      // A new edition (or a regenerated one) means the sitemap's dated URL
+      // list has changed — bust the 24h ISR cache so crawlers see the new
+      // entries immediately instead of waiting for the natural expiry.
+      revalidatePath("/sitemap.xml");
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });
     }
@@ -180,6 +185,7 @@ export async function GET(req: Request) {
       html_bytes: html.length,
       email_bytes: email_html.length,
     };
+    revalidatePath("/sitemap.xml");
     await finishCronRun(runId, { status: "ok", result });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {

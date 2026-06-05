@@ -48,6 +48,31 @@ export async function hasInSeasonDigest(
   return !!data;
 }
 
+/**
+ * Every in-season games_date for the sport, newest first. Paginates around
+ * Supabase's 1000-row cap. Powers app/sitemap.ts and the Wave 2 calendar
+ * dropdown — both want the full list of dates that have a real digest, not
+ * a placeholder preseason/offseason row.
+ */
+export async function listAllDigestDates(sport: string): Promise<string[]> {
+  const dates: string[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin()
+      .from("daily_digests")
+      .select("date")
+      .eq("sport", sport)
+      .in("mode", IN_SEASON_MODES)
+      .order("date", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`listAllDigestDates: ${error.message}`);
+    if (!data || data.length === 0) break;
+    for (const row of data) dates.push(row.date);
+    if (data.length < pageSize) break;
+  }
+  return dates;
+}
+
 export async function upsertDigest(args: {
   sport: string;
   date: string;

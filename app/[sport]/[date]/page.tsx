@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { isValidIsoDate, prettyDate, prevDay, nextDay } from "@/lib/dates";
 import { getDigest, hasInSeasonDigest } from "@/lib/digests";
 import { getLatestTeamDigest, hasInSeasonTeamDigest } from "@/lib/team-digests";
+import type { Metadata } from "next";
 import { getSportById, isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
 import { getScoreboardShareImageUrl } from "@/lib/share-storage";
@@ -24,8 +25,9 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
     // URL date IS the edition date now (the day labeled on the masthead).
     // Storage and metadata both use that string directly.
     const editionDate = date;
-    const title = `${row.name} — ${prettyDate(editionDate)} | boxscore`;
-    const description = `Daily ${row.name} digest for ${prettyDate(editionDate)}.`;
+    const title = `${row.name} Box Scores — ${prettyDate(editionDate)} | boxscore`;
+    const description = `Daily ${row.name} box scores, standings, and stat leaders for ${prettyDate(editionDate)}.`;
+    const canonicalUrl = `${EMAIL_LINK_BASE}/${sport}/${editionDate}`;
 
     // OpenGraph + Twitter share-image. Only MLB renders a daily image right
     // now (via the cron in step 3). Other sports return null and fall through
@@ -36,15 +38,20 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
       ? await getScoreboardShareImageUrl(editionDate)
       : null;
 
-    if (!shareImageUrl) return { title, description };
+    const base: Metadata = {
+      title,
+      description,
+      alternates: { canonical: canonicalUrl },
+    };
+    if (!shareImageUrl) return base;
 
     const ogTitle = `${row.name} — ${prettyDate(editionDate)}`;
     return {
-      title, description,
+      ...base,
       openGraph: {
         title: ogTitle,
         description,
-        url: `${EMAIL_LINK_BASE}/${sport}/${editionDate}`,
+        url: canonicalUrl,
         siteName: "boxscore",
         type: "article",
         // Declared dimensions are the design size (1200×630) per the OG spec
@@ -67,10 +74,23 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
   }
   const team = findTeam(sport as Sport, date);
   if (team) {
-    return {
-      title: `${team.name} | boxscore`,
-      description: `Daily ${team.name} digest.`,
+    const meta: Metadata = {
+      title: `${team.name} Box Scores and Recap | boxscore`,
+      description: `${team.name} game recaps, box scores, and season stats. Updated daily.`,
     };
+    // Canonical points to the dated team URL — /[sport]/[slug] and
+    // /[sport]/[date]/[slug] serve the same content for the latest date,
+    // and without canonical Google splits ranking signal between them.
+    // The dated URL is the right canonical because it's stable: links to
+    // it accumulate authority instead of pointing at a moving target.
+    const latest = await getLatestTeamDigest(sport, team.slug);
+    if (latest) {
+      const editionDate = nextDay(latest.date);
+      meta.alternates = {
+        canonical: `${EMAIL_LINK_BASE}/${sport}/${editionDate}/${team.slug}`,
+      };
+    }
+    return meta;
   }
   return {};
 }
