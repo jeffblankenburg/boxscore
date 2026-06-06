@@ -323,35 +323,67 @@ async function loadTeamConsoleRows(
   const teams = teamsBySport(sport as Sport);
 
   const { getActiveSubscriberIdSet } = await import("@/lib/subscribers");
+
+  // email_subscriptions and sends both silently cap at 1000 rows without
+  // pagination — sends in particular was capping the per-team accounting
+  // at exactly 1000 across all teams for a date, masking real send volume.
+  type SubRow = { team_id: string | null; subscriber_id: string };
+  type SendRow = { team_id: string | null; error: string | null };
+  const fetchAllSubs = async (): Promise<SubRow[]> => {
+    const out: SubRow[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await db.from("email_subscriptions")
+        .select("team_id, subscriber_id")
+        .eq("sport", sport)
+        .eq("scope", "team")
+        .eq("active", true)
+        .order("subscriber_id", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(`team-console subs: ${error.message}`);
+      const page = (data ?? []) as SubRow[];
+      out.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return out;
+  };
+  const fetchAllSends = async (): Promise<SendRow[]> => {
+    const out: SendRow[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await db.from("sends")
+        .select("team_id, error")
+        .eq("digest_sport", sport)
+        .eq("digest_date", date)
+        .not("team_id", "is", null)
+        .order("team_id", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(`team-console sends: ${error.message}`);
+      const page = (data ?? []) as SendRow[];
+      out.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return out;
+  };
+
   const [
-    { data: subRows, error: subErr },
+    subRows,
     activeIds,
     { data: digestRows, error: digestErr },
-    { data: sendRows, error: sendErr },
+    sendRows,
   ] = await Promise.all([
-    db.from("email_subscriptions")
-      .select("team_id, subscriber_id")
-      .eq("sport", sport)
-      .eq("scope", "team")
-      .eq("active", true),
-    // Paginated — un-paginated active-subscriber selects silently cap at
-    // 1000 rows. Same trap that hid the team-send cron bug.
+    fetchAllSubs(),
     getActiveSubscriberIdSet(),
+    // team_digests is bounded by sport+date (~30 rows), safe unpaginated.
     db.from("team_digests")
       .select("team_slug, has_game")
       .eq("sport", sport)
       .eq("date", date),
-    db.from("sends")
-      .select("team_id, error")
-      .eq("digest_sport", sport)
-      .eq("digest_date", date)
-      .not("team_id", "is", null),
+    fetchAllSends(),
   ]);
-  if (subErr) throw new Error(`team-console subs: ${subErr.message}`);
   if (digestErr) throw new Error(`team-console digests: ${digestErr.message}`);
-  if (sendErr) throw new Error(`team-console sends: ${sendErr.message}`);
   const subsByTeam = new Map<string, number>();
-  for (const r of (subRows ?? []) as Array<{ team_id: string | null; subscriber_id: string }>) {
+  for (const r of subRows) {
     if (!r.team_id) continue;
     if (!activeIds.has(r.subscriber_id)) continue;
     subsByTeam.set(r.team_id, (subsByTeam.get(r.team_id) ?? 0) + 1);
@@ -361,7 +393,7 @@ async function loadTeamConsoleRows(
     digestByTeam.set(r.team_slug, r.has_game);
   }
   const sendsByTeam = new Map<string, { sent: number; failed: number }>();
-  for (const r of (sendRows ?? []) as Array<{ team_id: string | null; error: string | null }>) {
+  for (const r of sendRows) {
     if (!r.team_id) continue;
     const cur = sendsByTeam.get(r.team_id) ?? { sent: 0, failed: 0 };
     if (r.error) cur.failed++;
