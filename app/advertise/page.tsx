@@ -76,16 +76,22 @@ export default async function AdvertisePage() {
   // with live-compute fallback — see loadAdStats above.
   const rolling = await loadAdStats();
 
-  // Forward-looking "what an advertiser actually sees per send" — current
-  // opt-in count discounted by delivery rate, then by open rate. Matches
-  // newsletter-industry convention (FOS, Morning Brew) where impressions
-  // = opens, not deliveries. Reach is the bigger number; impressions are
-  // the ones that earn the CPM.
-  const avgDailyImpressions = Math.round(
-    rolling.activeSubscribers
+  // Forward-looking "what an advertiser actually sees per day" — the sum of
+  // (1) email opens on the daily league send: subscribers × delivery rate
+  //     × open rate. Email convention (FOS, Morning Brew) treats opens as
+  //     impressions, not deliveries — reach is bigger, impressions earn CPM.
+  // (2) web pageviews per day: total production pageviews over the rolling
+  //     window divided by the window length. Sourced from the page_views
+  //     table populated by the Vercel Web Analytics Drain.
+  // Pageviews are zero until the Drain is configured; the email component
+  // works independently.
+  const dailyEmailImpressions = rolling.activeSubscribers
     * (rolling.deliveryRate || 1)
-    * (rolling.tracked ? rolling.openRate : 1),
-  );
+    * (rolling.tracked ? rolling.openRate : 1);
+  const dailyWebPageviews = rolling.windowDays > 0
+    ? rolling.webPageviews / rolling.windowDays
+    : 0;
+  const avgDailyImpressions = Math.round(dailyEmailImpressions + dailyWebPageviews);
 
   return (
     <article className="advertise-page">

@@ -1321,6 +1321,11 @@ export type PublicAdStats = {
   /** First date opens were tracked. Used so the UI can label the rate honestly. */
   engagementSince: string;
   tracked: boolean;
+  /** Total production pageviews over windowDays, from page_views (Vercel
+   *  Web Analytics Drain). Excludes preview/development deploys and
+   *  custom events; pageviews only. Zero when the Drain isn't configured
+   *  yet or no events have arrived in the window. */
+  webPageviews: number;
 };
 
 /**
@@ -1352,6 +1357,7 @@ export async function getPublicAdStatsSnapshot(
     { count: bouncedCount },
     engagement,
     { count: openEverCount },
+    { count: webPageviewsCount },
   ] = await Promise.all([
     db.from("email_subscriptions").select("id", { count: "exact", head: true })
       .eq("sport", sport).eq("scope", "league").eq("active", true),
@@ -1363,6 +1369,14 @@ export async function getPublicAdStatsSnapshot(
       .gte("event_at", sinceIso).eq("event_type", "email.bounced"),
     getEngagementRates(engagementSinceIso, sport),
     db.from("email_events").select("id", { count: "exact", head: true }).eq("event_type", "email.opened"),
+    // Web pageviews are not sport-scoped — the production site renders
+    // multiple sports' pages from one Vercel project. Counting all
+    // production pageviews is the correct "site-wide reach" number for
+    // the advertiser-facing stat.
+    db.from("page_views").select("id", { count: "exact", head: true })
+      .gte("occurred_at", sinceIso)
+      .eq("event_type", "pageview")
+      .eq("vercel_environment", "production"),
   ]);
 
   const sends = sendsCount ?? 0;
@@ -1383,6 +1397,7 @@ export async function getPublicAdStatsSnapshot(
     deliveryRate: sends === 0 ? 0 : delivered / sends,
     engagementSince: OPEN_TRACKING_START_ISO.slice(0, 10),
     tracked: (openEverCount ?? 0) > 0,
+    webPageviews: webPageviewsCount ?? 0,
   };
 }
 
@@ -1471,6 +1486,7 @@ export async function writeAdStatsSnapshot(stats: PublicAdStats): Promise<void> 
       delivery_rate: stats.deliveryRate,
       engagement_since: stats.engagementSince,
       tracked: stats.tracked,
+      web_pageviews: stats.webPageviews,
     });
   if (error) throw new Error(`writeAdStatsSnapshot: ${error.message}`);
 }
@@ -1493,6 +1509,7 @@ export async function readAdStatsSnapshot(): Promise<PublicAdStatsWithGeneratedA
     deliveryRate: Number(data.delivery_rate),
     engagementSince: data.engagement_since,
     tracked: data.tracked,
+    webPageviews: data.web_pageviews ?? 0,
     generatedAt: data.generated_at,
   };
 }
