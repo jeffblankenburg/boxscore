@@ -8,6 +8,7 @@ export const BRAND = {
     { label: "Twitter", href: "https://twitter.com/boxscoreemail" },
     { label: "Bluesky", href: "https://bsky.app/profile/boxscore.email" },
     { label: "Facebook", href: "https://facebook.com/boxscore.email" },
+    { label: "Discord", href: "https://discord.gg/ZskVxQq7yk" },
   ],
   // Footer "legal" links. Single source of truth for both the real site
   // (rendered as JSX in app/layout.tsx) and the admin preview frame

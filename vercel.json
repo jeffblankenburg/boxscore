@@ -25,6 +25,10 @@
       "schedule": "25 9 * * *"
     },
     {
+      "path": "/api/cron/post-discord?sport=mlb",
+      "schedule": "27 9 * * *"
+    },
+    {
       "path": "/api/cron/send-email?sport=nba",
       "schedule": "30 9 * * *"
     },
@@ -47,6 +51,10 @@
   ],
   "functions": {
     "app/api/cron/post-bluesky/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
+    },
+    "app/api/cron/post-discord/route.ts": {
       "memory": 1024,
       "maxDuration": 120
     },

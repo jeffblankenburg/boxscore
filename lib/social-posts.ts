@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "./supabase";
 
-export type Platform = "twitter" | "bluesky" | "facebook";
+export type Platform = "twitter" | "bluesky" | "facebook" | "discord";
 
 export async function hasAlreadyPosted(
   platform: Platform, sport: string, date: string, subId: string = "",
