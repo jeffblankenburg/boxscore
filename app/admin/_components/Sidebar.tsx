@@ -63,6 +63,8 @@ const SECTIONS: NavSection[] = [
     label: "Content",
     links: [
       { href: "/admin/content/digests", label: "Digests" },
+      { href: "/admin/historical", label: "Historical" },
+      { href: "/admin/historical?today=1", label: "On This Day" },
       // Chunk 2b: move these into /admin/content/*
       { href: "/admin/twitter", label: "Twitter" },
       { href: "/admin/images", label: "Images" },

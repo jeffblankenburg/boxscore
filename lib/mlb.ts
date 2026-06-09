@@ -115,6 +115,24 @@ export async function getBoxscore(gamePk: number): Promise<Boxscore> {
   return parseBoxscore(await fetchBoxscoreRaw(gamePk));
 }
 
+// Standalone linescore endpoint. The schedule envelope already carries a
+// linescore for live/recent games but the historical backfill walks games
+// one by one and needs a guaranteed-fresh linescore for the excitement
+// scorer (comeback magnitude reads inning-by-inning).
+export async function fetchLinescoreRaw(gamePk: number): Promise<unknown> {
+  return getRaw(`/v1/game/${gamePk}/linescore`);
+}
+
+// Sport-wide schedule for an entire season. Used by the historical backfill
+// to enumerate every gamePk in a year with one request. Hydrates team so
+// the envelope carries abbreviations; without it the historical store would
+// have null team_abbr columns for every backfilled row.
+export async function fetchScheduleSeasonRaw(season: number): Promise<unknown> {
+  return getRaw(
+    `/v1/schedule?sportId=1&season=${season}&startDate=${season}-01-01&endDate=${season}-12-31&hydrate=team`,
+  );
+}
+
 export type ScoringPlay = {
   inning: number;
   halfInning: "top" | "bottom";

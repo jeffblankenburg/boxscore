@@ -8,6 +8,18 @@ export function yesterdayInET(): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+// MM-DD of today in ET. Used by the historical OTD picker / admin viewer
+// to filter by calendar day across all years.
+export function todayMMDDInET(): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    month: "2-digit", day: "2-digit",
+  });
+  const parts = fmt.formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("month")}-${get("day")}`;
+}
+
 export function prettyDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
   const date = new Date(Date.UTC(y, m - 1, d));
