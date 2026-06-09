@@ -45,6 +45,24 @@ export const STATSAPI_MAPPING: MlbSourceMapping = {
 
     // ─── Game ────────────────────────────────────────────────────────
     {
+      canonicalType: "MlbInningLine",
+      endpoint: "/v1/schedule — linescore.innings[]",
+      fields: [
+        { canonical: "num", vendor: "innings[].num", status: "direct" },
+        { canonical: "awayRuns", vendor: "innings[].away.runs", status: "direct", notes: "?? null for future innings" },
+        { canonical: "homeRuns", vendor: "innings[].home.runs", status: "direct" },
+      ],
+    },
+    {
+      canonicalType: "MlbDecisions",
+      endpoint: "/v1/schedule — decisions (requires hydrate=decisions)",
+      fields: [
+        { canonical: "winner", vendor: "decisions.winner", status: "transformed", notes: "shaped to MlbPlayerRef; null on non-final" },
+        { canonical: "loser", vendor: "decisions.loser", status: "transformed" },
+        { canonical: "save", vendor: "decisions.save", status: "transformed", notes: "null when no save awarded" },
+      ],
+    },
+    {
       canonicalType: "MlbGame",
       endpoint: "/v1/schedule?sportId=1&date={d}&hydrate=linescore,team,decisions,probablePitcher",
       fields: [
@@ -105,6 +123,29 @@ export const STATSAPI_MAPPING: MlbSourceMapping = {
         { canonical: "strikes", vendor: "stats.pitching.strikes", status: "direct" },
         { canonical: "battersFaced", vendor: "stats.pitching.battersFaced", status: "direct" },
         { canonical: "era", vendor: "stats.pitching.era", status: "transformed" },
+      ],
+    },
+    {
+      canonicalType: "MlbSeasonBattingSummary",
+      endpoint: "/v1/game/{gamePk}/boxscore — players[ID*].seasonStats.batting",
+      fields: [
+        { canonical: "battingAverage", vendor: "seasonStats.batting.avg", status: "transformed", notes: "string → float" },
+        { canonical: "ops", vendor: "seasonStats.batting.ops", status: "transformed" },
+      ],
+    },
+    {
+      canonicalType: "MlbSeasonPitchingSummary",
+      endpoint: "/v1/game/{gamePk}/boxscore — players[ID*].seasonStats.pitching",
+      fields: [
+        { canonical: "era", vendor: "seasonStats.pitching.era", status: "transformed" },
+      ],
+    },
+    {
+      canonicalType: "MlbBoxInfo",
+      endpoint: "/v1/game/{gamePk}/boxscore — info[]",
+      fields: [
+        { canonical: "label", vendor: "info[].label", status: "direct", notes: 'e.g. "Att", "Weather", "T", "Umpires"' },
+        { canonical: "value", vendor: "info[].value", status: "direct", notes: "?? empty string when missing" },
       ],
     },
     {
@@ -173,6 +214,15 @@ export const STATSAPI_MAPPING: MlbSourceMapping = {
 
     // ─── Standings ───────────────────────────────────────────────────
     {
+      canonicalType: "MlbRecord",
+      endpoint: "/v1/standings — records.splitRecords[] entries",
+      fields: [
+        { canonical: "wins", vendor: "wins", status: "direct" },
+        { canonical: "losses", vendor: "losses", status: "direct" },
+        { canonical: "pct", vendor: "pct", status: "transformed", notes: "string → float; 0 when empty" },
+      ],
+    },
+    {
       canonicalType: "MlbStandingRow",
       endpoint: "/v1/standings?leagueId=103,104&season={s}&date={d} — records[].teamRecords[]",
       fields: [
@@ -214,6 +264,15 @@ export const STATSAPI_MAPPING: MlbSourceMapping = {
     },
 
     // ─── Leaders ─────────────────────────────────────────────────────
+    {
+      canonicalType: "MlbLeaderboard",
+      endpoint: "/v1/stats/leaders — leagueLeaders[0] wrapper",
+      fields: [
+        { canonical: "league", vendor: "(query arg leagueId: 103→AL, 104→NL)", status: "derived" },
+        { canonical: "category", vendor: "(query arg leaderCategories)", status: "derived" },
+        { canonical: "entries", vendor: "leagueLeaders[0].leaders[]", status: "transformed" },
+      ],
+    },
     {
       canonicalType: "MlbLeaderEntry",
       endpoint: "/v1/stats/leaders?leaderCategories={cat}&season={s}&sportId=1&leagueId={l}",

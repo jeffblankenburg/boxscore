@@ -15,10 +15,8 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
     "Paid feed (~$15K/season quoted). Parked behind statsapi as primary.",
     "PascalCase field names; ISO datetime for current games, YYYY-MMM-DD for path params.",
     "Bulk-heavy: PlayerSeasonStats is ~1,179 rows × 117 fields — adapter caches per-season.",
-    "Documented degradation: NO per-position fielding splits — getFielding returns one row for primary position with chances/putOuts/assists all zero.",
-    "Documented degradation: NO season-to-date batting averages inline on box scores — seasonBatting / seasonPitching come back null.",
-    "Documented degradation: NO venue name on Game — sdioGameToMlbGame sets venueName to null.",
-    "Documented degradation: NO game-info rows on box score (label/value pairs like attendance, weather) — info[] is always empty.",
+    "Unwired (quick wins, not real gaps): venueName via /Stadiums; seasonBatting/seasonPitching via PlayerSeasonStatsByTeam join; jerseyNumber via PlayersBasic.Jersey; info[] partial via Game.Attendance + Game.ForecastDescription; gamesStarted + pitcher BABIP both already on PlayerSeason.",
+    "Confirmed real gaps (no SDIO source anywhere in catalog): per-position fielding splits (innings, chances, putOuts, assists), umpires, AL-vs-AL standings split, postponement-reason narrative.",
   ],
 
   types: [
@@ -43,6 +41,24 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
 
     // ─── Game ────────────────────────────────────────────────────────
     {
+      canonicalType: "MlbInningLine",
+      endpoint: "GamesByDateFinal — Game.Innings[]",
+      fields: [
+        { canonical: "num", vendor: "Innings[].InningNumber", status: "transformed" },
+        { canonical: "awayRuns", vendor: "Innings[].AwayTeamRuns", status: "direct" },
+        { canonical: "homeRuns", vendor: "Innings[].HomeTeamRuns", status: "direct" },
+      ],
+    },
+    {
+      canonicalType: "MlbDecisions",
+      endpoint: "Game — Winning/Losing/SavingPitcher{ID, name}",
+      fields: [
+        { canonical: "winner", vendor: "WinningPitcherID + WinningPitcher", status: "derived", notes: "shaped to MlbPlayerRef; null when not awarded" },
+        { canonical: "loser", vendor: "LosingPitcherID + LosingPitcher", status: "derived" },
+        { canonical: "save", vendor: "SavingPitcherID + SavingPitcher", status: "derived" },
+      ],
+    },
+    {
       canonicalType: "MlbGame",
       endpoint: "/scores/json/GamesByDateFinal/{date} (or Games/{season} for ranges)",
       fields: [
@@ -50,7 +66,7 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
         { canonical: "startTime", vendor: "DateTime (fallback Day)", status: "transformed", notes: "DateTime preferred; Day fallback when null" },
         { canonical: "gameType", vendor: "SeasonType", status: "transformed", notes: "1→regular, 2→spring, 5→all-star, 3→world-series (SDIO collapses all postseason under 3)" },
         { canonical: "status", vendor: "Status", status: "transformed", notes: "Final→final, InProgress→live, Scheduled→scheduled, Postponed/Suspended/Canceled mapped" },
-        { canonical: "statusDetail", vendor: "Status", status: "degraded", notes: "SDIO has no separate human label — adapter reuses Status as-is" },
+        { canonical: "statusDetail", vendor: "Status (Game.InningDescription available for live games)", status: "degraded", notes: "For live games, InningDescription (\"Bottom of the 7th\") would beat reusing Status. No SDIO field carries postponement reasons (\"Postponed - Rain\") — that piece is a real gap." },
         { canonical: "awayTeam", vendor: "AwayTeamID (via teams cache)", status: "derived" },
         { canonical: "homeTeam", vendor: "HomeTeamID (via teams cache)", status: "derived" },
         { canonical: "awayScore", vendor: "AwayTeamRuns", status: "direct" },
@@ -65,7 +81,7 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
         { canonical: "decisions.winner", vendor: "WinningPitcherID + WinningPitcher", status: "derived" },
         { canonical: "decisions.loser", vendor: "LosingPitcherID + LosingPitcher", status: "derived" },
         { canonical: "decisions.save", vendor: "SavingPitcherID + SavingPitcher", status: "derived" },
-        { canonical: "venueName", vendor: "(not joined)", status: "missing", notes: "StadiumID is present; adapter doesn't hydrate stadium meta — always null" },
+        { canonical: "venueName", vendor: "Game.StadiumID → /scores/json/Stadiums (Stadium.Name)", status: "unwired", notes: "Stadiums endpoint exists; cache per season and join on StadiumID. Adapter doesn't hydrate yet." },
       ],
     },
 
@@ -106,18 +122,41 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
       ],
     },
     {
+      canonicalType: "MlbSeasonBattingSummary",
+      endpoint: "Join PlayerID → PlayerSeasonStatsByTeam.{BattingAverage, OnBasePlusSlugging}",
+      fields: [
+        { canonical: "battingAverage", vendor: "PlayerSeason.BattingAverage", status: "unwired", notes: "Adapter doesn't join box players to season stats; would need same cache used elsewhere." },
+        { canonical: "ops", vendor: "PlayerSeason.OnBasePlusSlugging", status: "unwired" },
+      ],
+    },
+    {
+      canonicalType: "MlbSeasonPitchingSummary",
+      endpoint: "Join PlayerID → PlayerSeasonStatsByTeam.EarnedRunAverage",
+      fields: [
+        { canonical: "era", vendor: "PlayerSeason.EarnedRunAverage", status: "unwired" },
+      ],
+    },
+    {
+      canonicalType: "MlbBoxInfo",
+      endpoint: "Game.Attendance + Game.ForecastDescription (umpires: no SDIO source)",
+      fields: [
+        { canonical: "label", vendor: '(synthesized from Game fields, e.g. "Att", "Weather")', status: "unwired", notes: "Adapter would construct label/value pairs from Game envelope; no native info[] structure." },
+        { canonical: "value", vendor: "Game.Attendance / Game.ForecastDescription", status: "unwired" },
+      ],
+    },
+    {
       canonicalType: "MlbBoxPlayer",
       endpoint: "/stats/json/BoxScoresFinal/{date} — PlayerGames[]",
       fields: [
         { canonical: "player", vendor: "PlayerID + Name", status: "transformed" },
         { canonical: "positionAbbr", vendor: "Position", status: "direct" },
-        { canonical: "jerseyNumber", vendor: "(not in PlayerGame)", status: "missing", notes: "adapter sets to null" },
+        { canonical: "jerseyNumber", vendor: "Join PlayerID → /scores/json/PlayersBasic/{team}.Jersey", status: "unwired", notes: "Jersey is on PlayersBasic; adapter already calls that endpoint for roster — could cache the map and join here." },
         { canonical: "startingOrder", vendor: "BattingOrder", status: "direct", notes: "1–9 directly; null for non-starters" },
         { canonical: "isStarter", vendor: "Started", status: "transformed", notes: "1 → true" },
         { canonical: "batting", vendor: "batting fields when PA or AB > 0", status: "derived" },
         { canonical: "pitching", vendor: "pitching fields when PitchesThrown or InningsPitchedOuts > 0", status: "derived" },
-        { canonical: "seasonBatting", vendor: "(not in box score)", status: "missing", notes: "always null — would require per-player join to PlayerSeasonStats" },
-        { canonical: "seasonPitching", vendor: "(not in box score)", status: "missing" },
+        { canonical: "seasonBatting", vendor: "Join PlayerID → PlayerSeasonStatsByTeam.{BattingAverage, OnBasePlusSlugging}", status: "unwired", notes: "Season stats already cached per season; join inline when building MlbBoxPlayer." },
+        { canonical: "seasonPitching", vendor: "Join PlayerID → PlayerSeasonStatsByTeam.EarnedRunAverage", status: "unwired" },
       ],
     },
     {
@@ -149,7 +188,7 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
         { canonical: "game", vendor: "Game", status: "transformed" },
         { canonical: "away", vendor: "PlayerGames + TeamGames filtered to AwayTeamID", status: "derived" },
         { canonical: "home", vendor: "PlayerGames + TeamGames filtered to HomeTeamID", status: "derived" },
-        { canonical: "info", vendor: "(not in feed)", status: "missing", notes: "always empty array — no attendance/weather/umps rows" },
+        { canonical: "info", vendor: "Game.Attendance + Game.ForecastDescription (umpires: no SDIO source)", status: "unwired", notes: "Attendance + weather already in Game envelope; surface as info[] rows. Umpire data is a real gap." },
       ],
     },
 
@@ -171,6 +210,15 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
 
     // ─── Standings ───────────────────────────────────────────────────
     {
+      canonicalType: "MlbRecord",
+      endpoint: "Standing — split-specific W/L pairs (HomeWins/HomeLosses, AwayWins/AwayLosses, etc.)",
+      fields: [
+        { canonical: "wins", vendor: "(split-specific Wins field, e.g. HomeWins)", status: "derived" },
+        { canonical: "losses", vendor: "(split-specific Losses field)", status: "derived" },
+        { canonical: "pct", vendor: "(computed wins / (wins+losses))", status: "derived", notes: "SDIO doesn't carry per-split pct; adapter derives it" },
+      ],
+    },
+    {
       canonicalType: "MlbStandingRow",
       endpoint: "/scores/json/Standings/{season}",
       fields: [
@@ -187,7 +235,7 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
         { canonical: "homeRecord", vendor: "HomeWins + HomeLosses", status: "derived", notes: "pct computed from W/L" },
         { canonical: "awayRecord", vendor: "AwayWins + AwayLosses", status: "derived" },
         { canonical: "lastTenRecord", vendor: "LastTenGamesWins + LastTenGamesLosses", status: "derived" },
-        { canonical: "leagueRecord", vendor: "(overall W/L + Percentage)", status: "degraded", notes: "SDIO doesn't split AL-vs-AL etc. — adapter uses overall row as leagueRecord" },
+        { canonical: "leagueRecord", vendor: "(overall W/L; AL-vs-AL split not in catalog)", status: "degraded", notes: "Confirmed real gap: SDIO Standing exposes home/away/division/night splits but no intra-league (AL-vs-AL, NL-vs-NL) split. Adapter substitutes the overall record." },
         { canonical: "clinchedDivision", vendor: "ClinchedDivision", status: "direct" },
         { canonical: "clinchedWildCard", vendor: "ClinchedWildCard", status: "direct" },
         { canonical: "eliminatedFromPlayoffs", vendor: "EliminatedFromPlayoffContention", status: "direct" },
@@ -212,6 +260,15 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
     },
 
     // ─── Leaders ─────────────────────────────────────────────────────
+    {
+      canonicalType: "MlbLeaderboard",
+      endpoint: "Computed from /stats/json/PlayerSeasonStats/{season}",
+      fields: [
+        { canonical: "league", vendor: "(filter on teams cache lookup)", status: "derived" },
+        { canonical: "category", vendor: "(arg → field selector via LEADER_SPECS)", status: "derived" },
+        { canonical: "entries", vendor: "(sorted/sliced PlayerSeasonStats rows)", status: "derived", notes: "SDIO has no native leaders endpoint — adapter computes from season stats" },
+      ],
+    },
     {
       canonicalType: "MlbLeaderEntry",
       endpoint: "Computed from cached /stats/json/PlayerSeasonStats/{season}",
@@ -303,7 +360,7 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
       endpoint: "/stats/json/PlayerSeasonStatsByTeam/{season}/{teamKey}",
       fields: [
         { canonical: "gamesPlayed", vendor: "Games", status: "transformed" },
-        { canonical: "gamesStarted", vendor: "(not in PlayerSeasonStats)", status: "missing", notes: "always 0" },
+        { canonical: "gamesStarted", vendor: "PlayerSeason.Started", status: "unwired", notes: "Field exists on PlayerSeasonStatsByTeam; wip adapter just didn't map it. One-line fix." },
         { canonical: "wins", vendor: "Wins", status: "direct" },
         { canonical: "losses", vendor: "Losses", status: "direct" },
         { canonical: "saves", vendor: "Saves", status: "direct" },
@@ -315,7 +372,7 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
         { canonical: "homeRuns", vendor: "PitchingHomeRuns", status: "transformed" },
         { canonical: "era", vendor: "EarnedRunAverage", status: "direct" },
         { canonical: "whip", vendor: "WalksHitsPerInningsPitched", status: "transformed" },
-        { canonical: "babip", vendor: "(not exposed for pitchers)", status: "missing", notes: "always null" },
+        { canonical: "babip", vendor: "PlayerSeason.PitchingBattingAverageOnBallsInPlay", status: "unwired", notes: "Field exists; wip adapter mapped to null. One-line fix." },
         { canonical: "strikeoutsPer9Inn", vendor: "PitchingStrikeoutsPerNineInnings", status: "transformed" },
         { canonical: "walksPer9Inn", vendor: "PitchingWalksPerNineInnings", status: "transformed" },
       ],
@@ -386,14 +443,14 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
       fields: [
         { canonical: "positionAbbr", vendor: "Position", status: "degraded", notes: "single primary position only — no per-position splits" },
         { canonical: "games", vendor: "Games", status: "degraded", notes: "total team games, not games-at-position" },
-        { canonical: "gamesStarted", vendor: "(not exposed)", status: "missing", notes: "always 0" },
-        { canonical: "innings", vendor: "(not exposed)", status: "missing", notes: "always 0 — renderer should treat zero-innings as 'data unavailable'" },
-        { canonical: "chances", vendor: "(not exposed)", status: "missing", notes: "always 0" },
-        { canonical: "putOuts", vendor: "(not exposed)", status: "missing", notes: "always 0" },
-        { canonical: "assists", vendor: "(not exposed)", status: "missing", notes: "always 0" },
+        { canonical: "gamesStarted", vendor: "(no SDIO source for fielding-position GS)", status: "missing", notes: "Confirmed real gap: SDIO has no per-position fielding splits anywhere in the catalog." },
+        { canonical: "innings", vendor: "(no SDIO source)", status: "missing", notes: "Confirmed real gap. Renderer should treat zero-innings as 'data unavailable'." },
+        { canonical: "chances", vendor: "(no SDIO source)", status: "missing", notes: "Confirmed real gap." },
+        { canonical: "putOuts", vendor: "(no SDIO source)", status: "missing", notes: "Confirmed real gap." },
+        { canonical: "assists", vendor: "(no SDIO source)", status: "missing", notes: "Confirmed real gap." },
         { canonical: "errors", vendor: "Errors", status: "direct" },
         { canonical: "doublePlays", vendor: "DoublePlays", status: "direct" },
-        { canonical: "fieldingPercentage", vendor: "(not exposed)", status: "missing", notes: "always null" },
+        { canonical: "fieldingPercentage", vendor: "(no SDIO source)", status: "missing", notes: "Confirmed real gap." },
       ],
     },
   ],

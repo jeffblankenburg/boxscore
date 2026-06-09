@@ -10,21 +10,24 @@ const STATUS_LABEL: Record<MappingStatus, string> = {
   transformed: "↦ transformed",
   derived: "↦ derived",
   degraded: "⚠ degraded",
+  unwired: "⚙ unwired",
   missing: "✗ missing",
 };
 
 export function MappingView({ mapping }: { mapping: MlbSourceMapping }) {
   // Counts for the top-of-page gap summary.
   const statusCounts: Record<MappingStatus, number> = {
-    direct: 0, transformed: 0, derived: 0, degraded: 0, missing: 0,
+    direct: 0, transformed: 0, derived: 0, degraded: 0, unwired: 0, missing: 0,
   };
   for (const t of mapping.types) {
     for (const f of t.fields) statusCounts[f.status]++;
   }
   const unmappedTotal = mapping.unmappedVendor.reduce((n, g) => n + g.fields.length, 0);
 
-  // Pre-compute missing + degraded lists for the gap summary so operators
-  // can scan "what's broken with this feed" without reading every table.
+  // Pre-compute the "what's broken" list for the gap summary. Includes
+  // missing (real catalog gap) + degraded (lossy fidelity), but NOT unwired
+  // — unwired entries are sourceable, just not pulled yet, so they belong
+  // on a to-do list rather than a gap list.
   const gaps: Array<{ canonicalType: string; canonical: string; status: MappingStatus; notes?: string }> = [];
   for (const t of mapping.types) {
     for (const f of t.fields) {
@@ -62,6 +65,7 @@ export function MappingView({ mapping }: { mapping: MlbSourceMapping }) {
           <span className="dm-count dm-status-transformed"><b>{statusCounts.transformed}</b> transformed</span>
           <span className="dm-count dm-status-derived"><b>{statusCounts.derived}</b> derived</span>
           <span className="dm-count dm-status-degraded"><b>{statusCounts.degraded}</b> degraded</span>
+          <span className="dm-count dm-status-unwired"><b>{statusCounts.unwired}</b> unwired</span>
           <span className="dm-count dm-status-missing"><b>{statusCounts.missing}</b> missing</span>
           <span className="dm-count dm-status-unmapped"><b>{unmappedTotal}</b> unmapped vendor</span>
         </div>
@@ -72,9 +76,9 @@ export function MappingView({ mapping }: { mapping: MlbSourceMapping }) {
             <table className="a-table dm-gap-table">
               <thead>
                 <tr>
-                  <th style={{ width: "25%" }}>Canonical type</th>
-                  <th style={{ width: "30%" }}>Field</th>
-                  <th style={{ width: "12%" }}>Status</th>
+                  <th style={{ width: "180px" }}>Canonical type</th>
+                  <th style={{ width: "160px" }}>Field</th>
+                  <th style={{ width: "120px" }}>Status</th>
                   <th>Notes</th>
                 </tr>
               </thead>

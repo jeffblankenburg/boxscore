@@ -745,6 +745,7 @@
 .dm-count.dm-status-transformed { background: var(--a-info-bg); color: var(--a-info-fg); }
 .dm-count.dm-status-derived     { background: var(--a-info-bg); color: var(--a-info-fg); }
 .dm-count.dm-status-degraded    { background: var(--a-warning-bg); color: var(--a-warning-fg); }
+.dm-count.dm-status-unwired     { background: #ede9fe; color: #5b21b6; }
 .dm-count.dm-status-missing     { background: var(--a-danger-bg); color: var(--a-danger-fg); }
 .dm-count.dm-status-unmapped    { background: var(--a-neutral-bg); color: var(--a-neutral-fg); }
 
@@ -759,6 +760,7 @@
 .dm-pill.dm-status-transformed { background: var(--a-info-bg); color: var(--a-info-fg); }
 .dm-pill.dm-status-derived     { background: var(--a-info-bg); color: var(--a-info-fg); }
 .dm-pill.dm-status-degraded    { background: var(--a-warning-bg); color: var(--a-warning-fg); }
+.dm-pill.dm-status-unwired     { background: #ede9fe; color: #5b21b6; }
 .dm-pill.dm-status-missing     { background: var(--a-danger-bg); color: var(--a-danger-fg); }
 
 .dm-gap-details {
@@ -778,6 +780,12 @@
 }
 .dm-gap-table {
   margin-top: 8px;
+  table-layout: fixed;
+}
+.dm-gap-table td {
+  vertical-align: top;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .dm-unmapped-card {

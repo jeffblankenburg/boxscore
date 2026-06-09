@@ -6,7 +6,8 @@ export type MappingStatus =
   | "transformed" // enum map, parse, one-step rename
   | "derived"     // computed from multiple vendor inputs
   | "degraded"    // canonical field populated but reduced fidelity
-  | "missing";    // vendor doesn't provide it
+  | "unwired"     // vendor exposes it (different endpoint or unmapped field) but adapter doesn't pull it yet
+  | "missing";    // vendor's full catalog has no source for this — real gap
 
 export type FieldMapping = {
   canonical: string;
