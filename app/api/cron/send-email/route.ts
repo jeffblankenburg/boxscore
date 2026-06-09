@@ -9,9 +9,13 @@ import { EMAIL_LINK_BASE } from "@/lib/site";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
 export const runtime = "nodejs";
-// Resend's batch API does ~100 sends in one HTTP round-trip, so even 5k+
-// subscribers finish in seconds; 300s is gross overkill but cheap insurance.
-export const maxDuration = 300;
+// Matches vercel.json's functions config for this route — both must agree
+// or readers of this file get a misleading picture of the actual cap.
+// Healthy runtime projects to ~315s (57 batches × ~5s Resend + parallel
+// recordSend); 800s gives 2.5x headroom for Resend or Supabase latency
+// spikes. The supervisor at /api/cron/supervise catches genuine hangs
+// at 30 min, which is a better signal than aggressively low maxDuration.
+export const maxDuration = 800;
 
 const BATCH_SIZE = 100;
 
@@ -81,7 +85,9 @@ export async function GET(req: Request) {
     const { getAnnouncement } = await import("@/lib/announcements");
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
 
-    for (const group of chunk(toSend, BATCH_SIZE)) {
+    const groups = chunk(toSend, BATCH_SIZE);
+    for (const [batchIndex, group] of groups.entries()) {
+      const batchStart = performance.now();
       const payload = group.map((sub) => {
         const unsubscribeUrl = `${EMAIL_LINK_BASE}/u/${sub.unsubscribe_token}`;
         // Mail-client native "Unsubscribe" buttons POST to this URL (RFC 8058).
@@ -116,19 +122,37 @@ export async function GET(req: Request) {
       try {
         results = await sendEmailBatch(payload);
       } catch (err) {
-        // Whole-batch transport failure (rare). Mark every row in this batch
-        // failed so we can retry from /admin via the manual trigger button —
-        // hasAlreadySent will skip the ones that did go through.
+        // Whole-batch transport failure (rare — network/timeout reaching
+        // Resend). Resend's structured errors are already caught inside
+        // sendEmailBatch and returned as per-row results. Mark every row
+        // in this batch failed so manual /admin retry or supervisor heal
+        // picks them up; hasAlreadySent will skip the ones that did go
+        // through. Parallelized to match the success path — sequential
+        // awaits here re-introduce the 100× latency multiplier.
         const msg = (err as Error).message;
-        for (const sub of group) {
+        await Promise.all(group.map(async (sub) => {
           await recordSend({ subscriberId: sub.id, sport, date, resendId: null, error: msg });
           failed++;
-        }
+        }));
+        console.log(
+          `[send-email] sport=${sport} date=${date} batch=${batchIndex + 1}/${groups.length}` +
+          ` size=${group.length} elapsed_ms=${Math.round(performance.now() - batchStart)} status=batch_failed`,
+        );
         continue;
       }
 
-      for (let i = 0; i < group.length; i++) {
-        const sub = group[i]!;
+      // Parallelize the per-subscriber recordSend writes. The previous
+      // sequential `await recordSend(...)` loop multiplied Supabase
+      // round-trip latency by group.length (100), which pushed
+      // multi-thousand-subscriber sends past Vercel's maxDuration when
+      // round-trip rose from ~50ms to ~150ms in early June 2026. See
+      // cron_runs failures on 2026-06-05..07; full diagnosis in
+      // scripts/diag-send-rate.ts. PostgREST is stateless HTTP so 100
+      // concurrent upserts finish in roughly one round-trip's wall time.
+      // sent/failed counter increments are safe under JS single-threaded
+      // concurrency — the async callbacks interleave on the event loop
+      // but each increment is atomic.
+      await Promise.all(group.map(async (sub, i) => {
         const r = results[i] ?? { id: null, error: "missing result" };
         await recordSend({
           subscriberId: sub.id, sport, date,
@@ -140,7 +164,15 @@ export async function GET(req: Request) {
         } else {
           sent++;
         }
-      }
+      }));
+      // Per-batch timing log. Lets future debugging see exactly where
+      // a stuck cron got to, and how long each batch took. Cheap to
+      // emit (57 lines per healthy run); filter on `[send-email]` in
+      // Vercel logs to pull just these.
+      console.log(
+        `[send-email] sport=${sport} date=${date} batch=${batchIndex + 1}/${groups.length}` +
+        ` size=${group.length} elapsed_ms=${Math.round(performance.now() - batchStart)} status=ok`,
+      );
     }
 
     const result = {

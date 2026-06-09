@@ -51,10 +51,9 @@ export async function POST(request: Request): Promise<Response> {
   try {
     events = parseEvents(rawBody);
   } catch (err) {
-    return NextResponse.json(
-      { error: `parse failed: ${(err as Error).message}` },
-      { status: 400 },
-    );
+    const msg = (err as Error).message;
+    console.error(`[vercel-analytics-ingest] parse failed: ${msg}`);
+    return NextResponse.json({ error: `parse failed: ${msg}` }, { status: 400 });
   }
 
   // Convert and drop events without a usable timestamp.
@@ -77,6 +76,9 @@ export async function POST(request: Request): Promise<Response> {
     });
 
   if (error) {
+    // Surface to function logs so future failures don't just appear as a
+    // bare 500 in the Vercel Drain UI.
+    console.error(`[vercel-analytics-ingest] db upsert failed: ${error.message}`);
     return NextResponse.json(
       { error: `db upsert failed: ${error.message}`, received: events.length },
       { status: 500 },
