@@ -82,6 +82,7 @@ function ordinalRank(rank: string): string {
 function renderHeader(data: PlayerPageData): string {
   const p = data.person;
   const pos = p.primaryPosition.abbreviation;
+  const jersey = p.primaryNumber;
   const team = p.currentTeam;
   const record = findRecord(data.standings, team?.id);
   const teamText = team
@@ -89,9 +90,14 @@ function renderHeader(data: PlayerPageData): string {
       ? `${team.name} (${record.wins}-${record.losses}, ${ordinalRank(record.rank)} ${record.division})`
       : team.name
     : "";
-  const sep = pos && teamText ? ", " : "";
-  const posLine = pos || teamText
-    ? `<div class="player-sub">${pos ? `<span class="pos">${esc(pos)}</span>` : ""}${sep}${teamText ? `<span class="player-team">${esc(teamText)}</span>` : ""}</div>`
+  // Sub-line: "#23, CF, New York Yankees (32-21, 1st AL East)". Each piece is
+  // optional; separators only appear when both flanking pieces are present.
+  const parts: string[] = [];
+  if (jersey) parts.push(`<span class="player-jersey">#${esc(jersey)}</span>`);
+  if (pos) parts.push(`<span class="pos">${esc(pos)}</span>`);
+  if (teamText) parts.push(`<span class="player-team">${esc(teamText)}</span>`);
+  const posLine = parts.length > 0
+    ? `<div class="player-sub">${parts.join(", ")}</div>`
     : "";
   return `<div class="team-name-header">${esc(p.fullName)}</div>${posLine}`;
 }

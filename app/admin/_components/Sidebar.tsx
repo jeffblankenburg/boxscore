@@ -92,6 +92,14 @@ const SECTIONS: NavSection[] = [
       { href: "/admin/sports", label: "Sports config" },
     ],
   },
+  {
+    label: "Data model",
+    links: [
+      { href: "/admin/data-model", label: "Canonical model" },
+      { href: "/admin/data-model/statsapi", label: "MLB API mapping" },
+      { href: "/admin/data-model/sportsdataio", label: "SportsDataIO mapping" },
+    ],
+  },
 ];
 
 function isActive(pathname: string, href: string): boolean {
