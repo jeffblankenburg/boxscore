@@ -566,3 +566,237 @@
   font-size: 16px;
   font-weight: 600;
 }
+
+/* ─── Data model pages ────────────────────────────────────────────────────
+   Used by /admin/data-model, /admin/data-model/statsapi, and
+   /admin/data-model/sportsdataio. Cards hold one canonical type each;
+   tables inside cards hold field rows. */
+
+.dm-toc {
+  margin-bottom: 32px;
+  padding: 12px 16px;
+  background: var(--a-bg-sidebar);
+  border: 1px solid var(--a-border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.dm-toc-section {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 12px;
+  padding: 4px 0;
+}
+.dm-toc-section + .dm-toc-section {
+  border-top: 1px dashed var(--a-border);
+}
+.dm-toc-section-label {
+  font-weight: 600;
+  color: var(--a-text);
+  text-decoration: none;
+}
+.dm-toc-section-label:hover {
+  color: var(--a-accent);
+}
+.dm-toc-types a {
+  color: var(--a-text-muted);
+  text-decoration: none;
+  font-family: var(--a-mono);
+}
+.dm-toc-types a:hover {
+  color: var(--a-accent);
+}
+.dm-toc-sep {
+  color: var(--a-text-subtle);
+}
+
+.dm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 16px;
+}
+.dm-mapping-list,
+.dm-unmapped-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dm-card {
+  border: 1px solid var(--a-border);
+  border-radius: 6px;
+  background: var(--a-bg);
+  padding: 16px;
+  scroll-margin-top: 24px;
+}
+.dm-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.dm-card-name {
+  font-family: var(--a-mono);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.dm-card-name a {
+  color: var(--a-text);
+  text-decoration: none;
+}
+.dm-card-name a:hover {
+  color: var(--a-accent);
+}
+.dm-purpose {
+  font-size: 13px;
+  color: var(--a-text-muted);
+  margin: 0 0 12px;
+}
+.dm-purpose code {
+  font-family: var(--a-mono);
+  font-size: 12px;
+  background: var(--a-bg-muted);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.dm-kind {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--a-neutral-bg);
+  color: var(--a-neutral-fg);
+}
+.dm-kind-union { background: var(--a-info-bg); color: var(--a-info-fg); }
+.dm-kind-alias { background: var(--a-warning-bg); color: var(--a-warning-fg); }
+.dm-kind-object { background: var(--a-neutral-bg); color: var(--a-neutral-fg); }
+.dm-kind-unmapped { background: var(--a-warning-bg); color: var(--a-warning-fg); }
+
+.dm-fields {
+  font-size: 12px;
+}
+.dm-fields code {
+  font-family: var(--a-mono);
+  font-size: 12px;
+}
+.dm-type-link {
+  color: var(--a-accent);
+  text-decoration: none;
+}
+.dm-type-link:hover {
+  text-decoration: underline;
+}
+.dm-vendor {
+  color: var(--a-text-muted);
+}
+
+.dm-alias {
+  font-family: var(--a-mono);
+  font-size: 13px;
+  padding: 6px 8px;
+  background: var(--a-bg-muted);
+  border-radius: 3px;
+}
+.dm-union {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dm-union li {
+  background: var(--a-bg-muted);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.dm-notes {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--a-text-muted);
+}
+.dm-notes li + li {
+  margin-top: 4px;
+}
+
+.dm-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.dm-count {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  background: var(--a-neutral-bg);
+  color: var(--a-neutral-fg);
+}
+.dm-count b {
+  font-weight: 600;
+  margin-right: 4px;
+}
+.dm-count.dm-status-direct      { background: var(--a-success-bg); color: var(--a-success-fg); }
+.dm-count.dm-status-transformed { background: var(--a-info-bg); color: var(--a-info-fg); }
+.dm-count.dm-status-derived     { background: var(--a-info-bg); color: var(--a-info-fg); }
+.dm-count.dm-status-degraded    { background: var(--a-warning-bg); color: var(--a-warning-fg); }
+.dm-count.dm-status-missing     { background: var(--a-danger-bg); color: var(--a-danger-fg); }
+.dm-count.dm-status-unmapped    { background: var(--a-neutral-bg); color: var(--a-neutral-fg); }
+
+.dm-pill {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.dm-pill.dm-status-direct      { background: var(--a-success-bg); color: var(--a-success-fg); }
+.dm-pill.dm-status-transformed { background: var(--a-info-bg); color: var(--a-info-fg); }
+.dm-pill.dm-status-derived     { background: var(--a-info-bg); color: var(--a-info-fg); }
+.dm-pill.dm-status-degraded    { background: var(--a-warning-bg); color: var(--a-warning-fg); }
+.dm-pill.dm-status-missing     { background: var(--a-danger-bg); color: var(--a-danger-fg); }
+
+.dm-gap-details {
+  border: 1px solid var(--a-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--a-bg);
+}
+.dm-gap-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--a-text);
+  padding: 4px 0;
+}
+.dm-gap-details summary:hover {
+  color: var(--a-accent);
+}
+.dm-gap-table {
+  margin-top: 8px;
+}
+
+.dm-unmapped-card {
+  border-style: dashed;
+}
+.dm-unmapped-fields {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+}
+.dm-unmapped-fields li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--a-border);
+}
+.dm-unmapped-fields li:last-child {
+  border-bottom: none;
+}
+.dm-unmapped-fields code {
+  font-family: var(--a-mono);
+  font-size: 12px;
+}
