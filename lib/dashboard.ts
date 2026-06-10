@@ -2,7 +2,7 @@ import { supabaseAdmin } from "./supabase";
 import { yesterdayInET } from "./dates";
 import { getVisibleSports } from "./sports";
 import { featuresFor, type CronRoute as SportCronRoute } from "./sport-features";
-import { getActiveSubscriberIdSet, getActiveSubscriberIdSetAt } from "./subscribers";
+import { getActiveSubscriberIdSet, getActiveSubscriberIdSetAt, getActiveSubscribersForSport } from "./subscribers";
 
 // Supabase's JS client caps un-paginated `select` at 1000 rows. The `sends`
 // and `subscribers` tables both grow past that, so any aggregation that needs
@@ -1335,10 +1335,13 @@ export type PublicAdStats = {
  * shows the audience that placement actually reaches — not the pooled total
  * across league + team + other-sport sends.
  *
- * Active-subscriber count comes from the email_subscriptions opt-in table for
- * (sport, scope='league', active=true). Slight over-count vs. the
- * subscribers.status='active' intersection, but accurate enough for the
- * "people signed up to receive this digest" stat.
+ * Active-subscriber count is the intersection of email_subscriptions
+ * (sport, scope='league', active=true) AND subscribers.status='active' —
+ * same rule getActiveSubscribersForSport uses for the send cron. Earlier
+ * versions of this function counted email_subscriptions rows directly,
+ * which inflated the public number by every subscriber who unsubscribed
+ * globally without their per-sport rows being flipped. Sharing the helper
+ * keeps /admin and /advertise reporting the same audience size.
  */
 export async function getPublicAdStatsSnapshot(
   sport: string,
@@ -1351,7 +1354,7 @@ export async function getPublicAdStatsSnapshot(
     : OPEN_TRACKING_START_ISO;
 
   const [
-    { count: activeSubscribers },
+    activeSubscribers,
     { count: sendsCount },
     { count: deliveredCount },
     { count: bouncedCount },
@@ -1359,8 +1362,7 @@ export async function getPublicAdStatsSnapshot(
     { count: openEverCount },
     { count: webPageviewsCount },
   ] = await Promise.all([
-    db.from("email_subscriptions").select("id", { count: "exact", head: true })
-      .eq("sport", sport).eq("scope", "league").eq("active", true),
+    getActiveSubscribersForSport(sport).then((rows) => rows.length),
     db.from("sends").select("id", { count: "exact", head: true })
       .gte("sent_at", sinceIso).eq("digest_sport", sport).is("team_id", null),
     db.from("sends").select("id", { count: "exact", head: true })
@@ -1388,7 +1390,7 @@ export async function getPublicAdStatsSnapshot(
 
   return {
     sport,
-    activeSubscribers: activeSubscribers ?? 0,
+    activeSubscribers,
     windowDays: days,
     sends,
     delivered,

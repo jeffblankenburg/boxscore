@@ -9,15 +9,46 @@ import { supabaseAdmin } from "./supabase";
 // (NFL, NBA, etc.) are added via /settings toggles, not at confirm time.
 export const DEFAULT_SPORT = "mlb";
 
-// Idempotent. The partial unique index on (subscriber_id, sport) where
-// scope='league' enforces one-per-subscriber-per-sport; we catch the
-// duplicate-key error on retries (e.g. a subscriber re-confirming after
-// resubscribing) and treat as success.
+// Idempotent. The active=true bump is load-bearing: when a subscriber
+// unsubscribes globally, the unsubscribe path flips their per-sport rows
+// to active=false; if they later resubscribe, this re-enables the row.
+// An insert-only path here would silently leave them unsubscribed from
+// email even though their parent subscriber row says active.
+//
+// Two-step (select-then-update-or-insert) rather than upsert because the
+// uniqueness is enforced by a PARTIAL unique index (scope='league'),
+// which PostgREST can't express in its onConflict parameter. The two-step
+// is not strictly atomic against a concurrent insert by another request
+// for the same (subscriber_id, sport), but: (a) ensureLeagueSubscription
+// is only called from confirm + resubscribe, both serialized per-user,
+// and (b) the partial index would surface the race as a 23505 we'd
+// retry. Good enough for v1; revisit if we ever bulk-flip subscriptions
+// from multiple workers.
 export async function ensureLeagueSubscription(
   subscriberId: string,
   sport: string = DEFAULT_SPORT,
 ): Promise<void> {
-  const { error } = await supabaseAdmin()
+  const db = supabaseAdmin();
+  const { data: existing, error: selErr } = await db
+    .from("email_subscriptions")
+    .select("id, active")
+    .eq("subscriber_id", subscriberId)
+    .eq("sport", sport)
+    .eq("scope", "league")
+    .maybeSingle<{ id: string; active: boolean }>();
+  if (selErr) throw new Error(`ensureLeagueSubscription select: ${selErr.message}`);
+
+  if (existing) {
+    if (existing.active) return;
+    const { error: updErr } = await db
+      .from("email_subscriptions")
+      .update({ active: true })
+      .eq("id", existing.id);
+    if (updErr) throw new Error(`ensureLeagueSubscription update: ${updErr.message}`);
+    return;
+  }
+
+  const { error: insErr } = await db
     .from("email_subscriptions")
     .insert({
       subscriber_id: subscriberId,
@@ -26,10 +57,13 @@ export async function ensureLeagueSubscription(
       team_id: null,
       active: true,
     });
-  if (!error) return;
-  const code = (error as { code?: string }).code;
-  if (code === "23505" || /duplicate key/i.test(error.message)) return;
-  throw new Error(`ensureLeagueSubscription: ${error.message}`);
+  if (!insErr) return;
+  // Race: another request inserted the row between our select and insert.
+  // Treat the unique-violation as success — the row exists with active=true
+  // because that's the only thing both code paths write.
+  const code = (insErr as { code?: string }).code;
+  if (code === "23505" || /duplicate key/i.test(insErr.message)) return;
+  throw new Error(`ensureLeagueSubscription insert: ${insErr.message}`);
 }
 
 /**

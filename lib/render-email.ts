@@ -279,17 +279,22 @@ function standingsColgroup(): string {
 }
 
 function standingsTableHead(label: string = "GB"): string {
+  // Inline white-space:nowrap on every cell because Gmail Android (especially
+  // in dark mode) strips class-based CSS from the <style> block, so the
+  // `.es-table th { white-space: nowrap }` rule never reaches the rendered
+  // table and headers like "STRK" get broken into "STR\nK".
+  const nowrap = `style="white-space:nowrap"`;
   return `<thead><tr>
-    <th align="left">Team</th>
-    <th align="right">W</th>
-    <th align="right">L</th>
-    <th align="right">Pct</th>
-    <th align="right">${label}</th>
-    <th align="right">Diff</th>
-    <th align="right">Home</th>
-    <th align="right">Away</th>
-    <th align="right">L10</th>
-    <th align="right">Strk</th>
+    <th align="left"  ${nowrap}>Team</th>
+    <th align="right" ${nowrap}>W</th>
+    <th align="right" ${nowrap}>L</th>
+    <th align="right" ${nowrap}>Pct</th>
+    <th align="right" ${nowrap}>${label}</th>
+    <th align="right" ${nowrap}>Diff</th>
+    <th align="right" ${nowrap}>Home</th>
+    <th align="right" ${nowrap}>Away</th>
+    <th align="right" ${nowrap}>L10</th>
+    <th align="right" ${nowrap}>Strk</th>
   </tr></thead>`;
 }
 
@@ -308,17 +313,20 @@ function standingsRow(
   const nameCell = r.teamHref
     ? `<a href="${r.teamHref}" class="es-team-link" style="color:inherit;text-decoration:none">${esc(r.nickname)}</a>`
     : esc(r.nickname);
+  // See standingsTableHead — inline the nowrap rule so Gmail Android stops
+  // breaking "39" into "3\n9" and "16-16" into "16-\n16".
+  const nowrap = `style="white-space:nowrap"`;
   return `<tr${cls}>
-    <td align="left">${nameCell}</td>
-    <td align="right">${r.wins}</td>
-    <td align="right">${r.losses}</td>
-    <td align="right">${esc(r.pct)}</td>
-    <td align="right">${esc(r.gb)}</td>
-    <td align="right">${esc(r.diff)}</td>
-    <td align="right">${esc(r.home)}</td>
-    <td align="right">${esc(r.away)}</td>
-    <td align="right">${esc(r.l10)}</td>
-    <td align="right">${esc(r.strk)}</td>
+    <td align="left"  ${nowrap}>${nameCell}</td>
+    <td align="right" ${nowrap}>${r.wins}</td>
+    <td align="right" ${nowrap}>${r.losses}</td>
+    <td align="right" ${nowrap}>${esc(r.pct)}</td>
+    <td align="right" ${nowrap}>${esc(r.gb)}</td>
+    <td align="right" ${nowrap}>${esc(r.diff)}</td>
+    <td align="right" ${nowrap}>${esc(r.home)}</td>
+    <td align="right" ${nowrap}>${esc(r.away)}</td>
+    <td align="right" ${nowrap}>${esc(r.l10)}</td>
+    <td align="right" ${nowrap}>${esc(r.strk)}</td>
   </tr>`;
 }
 

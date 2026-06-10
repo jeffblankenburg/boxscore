@@ -316,12 +316,20 @@ export async function getActiveSubscribersForSport(sport: string): Promise<Subsc
  * Flips active → unsubscribed. Idempotent — works regardless of current state
  * so the unsubscribe URL works forever. Default reason is "user" for the
  * customer-facing unsubscribe URL; webhooks pass "bounce"/"complaint".
+ *
+ * Also flips every per-newsletter opt-in row in email_subscriptions to
+ * active=false. Without this, the advertiser-facing rolling-subscribers
+ * stat (which reads email_subscriptions directly) was inflated by the
+ * count of subscribers who had unsubscribed globally but whose per-sport
+ * rows were never touched. The resubscribe path in ensureLeagueSubscription
+ * re-enables the right rows when the same subscriber comes back.
  */
 export async function unsubscribeSubscriber(
   id: string,
   reason: UnsubscribeReason = "user",
 ): Promise<Subscriber> {
-  const { data, error } = await supabaseAdmin()
+  const db = supabaseAdmin();
+  const { data, error } = await db
     .from("subscribers")
     .update({
       status: "unsubscribed" as const,
@@ -332,6 +340,14 @@ export async function unsubscribeSubscriber(
     .select(COLS)
     .single<Subscriber>();
   if (error) throw new Error(`unsubscribeSubscriber: ${error.message}`);
+  const { error: optErr } = await db
+    .from("email_subscriptions")
+    .update({ active: false })
+    .eq("subscriber_id", id)
+    .eq("active", true);
+  if (optErr) {
+    throw new Error(`unsubscribeSubscriber email_subscriptions: ${optErr.message}`);
+  }
   return data;
 }
 
@@ -346,7 +362,8 @@ export async function unsubscribeByEmail(
   reason: UnsubscribeReason,
 ): Promise<Subscriber | null> {
   const normalized = email.trim().toLowerCase();
-  const { data, error } = await supabaseAdmin()
+  const db = supabaseAdmin();
+  const { data, error } = await db
     .from("subscribers")
     .update({
       status: "unsubscribed" as const,
@@ -358,5 +375,17 @@ export async function unsubscribeByEmail(
     .select(COLS)
     .maybeSingle<Subscriber>();
   if (error) throw new Error(`unsubscribeByEmail: ${error.message}`);
-  return data ?? null;
+  if (!data) return null;
+  // Same per-newsletter cleanup as unsubscribeSubscriber. The .neq filter
+  // above means we only ran the subscribers update for not-already-unsubbed
+  // rows, so we only get here for genuine state transitions.
+  const { error: optErr } = await db
+    .from("email_subscriptions")
+    .update({ active: false })
+    .eq("subscriber_id", data.id)
+    .eq("active", true);
+  if (optErr) {
+    throw new Error(`unsubscribeByEmail email_subscriptions: ${optErr.message}`);
+  }
+  return data;
 }
