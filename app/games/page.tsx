@@ -1,0 +1,79 @@
+export const dynamic = "force-dynamic";
+export const metadata = {
+  title: "Games — boxscore",
+  robots: { index: false },          // unindex while in development
+};
+
+type GameEntry = {
+  slug: string;
+  title: string;
+  desc: string;
+  status: "live" | "soon";
+};
+
+// Single source of truth for the menu. Status flips from "soon" → "live"
+// as each game ships (per issues #59 / #60 / #61 / #62).
+const GAMES: GameEntry[] = [
+  {
+    slug: "mlbdle",
+    title: "MLBdle",
+    desc: "Guess the player from their game line — Wordle-style letter feedback.",
+    status: "live",
+  },
+  {
+    slug: "year",
+    title: "Guess the Year",
+    desc: "Read a box score from this calendar day in history. What year?",
+    status: "soon",
+  },
+  {
+    slug: "player",
+    title: "Guess the Player",
+    desc: "An outrageous single-game line. Who did it?",
+    status: "soon",
+  },
+  {
+    slug: "hilo",
+    title: "Higher / Lower",
+    desc: "Two careers, two seasons, two single-game lines. Pick the bigger number.",
+    status: "soon",
+  },
+];
+
+export default function GamesLanding() {
+  return (
+    <>
+      <header className="g-hero">
+        <h1>Games</h1>
+        <p>Daily puzzles from 75+ years of MLB box scores.</p>
+      </header>
+
+      <nav className="g-menu" aria-label="Available games">
+        {GAMES.map((g) =>
+          g.status === "live" ? (
+            <a key={g.slug} href={`/games/${g.slug}`} className="g-card g-card-live">
+              <div>
+                <p className="g-card-title">{g.title}</p>
+                <p className="g-card-desc">{g.desc}</p>
+              </div>
+              <span className="g-card-status g-card-status-play">Play</span>
+            </a>
+          ) : (
+            <div
+              key={g.slug}
+              className="g-card g-card-soon"
+              aria-disabled="true"
+              role="link"
+            >
+              <div>
+                <p className="g-card-title">{g.title}</p>
+                <p className="g-card-desc">{g.desc}</p>
+              </div>
+              <span className="g-card-status g-card-status-soon">Soon</span>
+            </div>
+          ),
+        )}
+      </nav>
+    </>
+  );
+}

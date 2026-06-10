@@ -33,18 +33,19 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  // Middleware sets `x-admin: 1` on admin requests so the admin shell
-  // (app/admin/layout.tsx) can take over the full viewport. Skip the
-  // `.newspaper` wrapper + SiteHeader + SiteFooter for those requests so
-  // the admin layout isn't centered in a 1280px column or topped with the
-  // public site's brand bar.
+  // Middleware sets `x-admin: 1` (admin shell) or `x-games: 1` (games
+  // shell) on those requests so the public-site chrome (newspaper
+  // wrapper, SiteHeader, SiteFooter) can step aside and the surface-
+  // specific layout takes over the viewport.
   const h = await headers();
   const isAdmin = h.get("x-admin") === "1";
+  const isGames = h.get("x-games") === "1";
+  const bare = isAdmin || isGames;
 
   return (
     <html lang="en">
       <body>
-        {isAdmin ? (
+        {bare ? (
           children
         ) : (
           <>

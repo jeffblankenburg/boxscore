@@ -1,5 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+// Two responsibilities in one middleware:
+//
+//   1. Mark /games/* requests with `x-games: 1` so the root layout can
+//      skip the public-site chrome and the games layout takes over the
+//      viewport. No auth required — same anonymous-friendly model as
+//      the digest pages.
+//   2. Gates /admin/* (everything below) behind one of two auth mechanisms.
+
+function gamesNext(req: NextRequest): NextResponse {
+  const reqHeaders = new Headers(req.headers);
+  reqHeaders.set("x-games", "1");
+  return NextResponse.next({ request: { headers: reqHeaders } });
+}
+
 // Gates /admin/* behind one of two auth mechanisms:
 //
 //   1. Email-2FA session cookie (boxscore_admin_session) — the modern path.
@@ -34,6 +48,12 @@ function adminNext(req: NextRequest): NextResponse {
 
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
+
+  // Games surface — no auth, just header injection so the root layout
+  // can skip the digest-site chrome.
+  if (path === "/games" || path.startsWith("/games/")) {
+    return gamesNext(req);
+  }
 
   // Auth pages are always reachable.
   if (PUBLIC_ADMIN_PATHS.some((p) => path === p || path.startsWith(p + "/"))) {
@@ -78,5 +98,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: "/admin/:path*",
+  // Match both surfaces. The function above branches on path.
+  matcher: ["/admin/:path*", "/games", "/games/:path*"],
 };

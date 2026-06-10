@@ -1,0 +1,190 @@
+/* Games surface — mobile-first, app-style. The shell takes the full
+   viewport on every device; on wider screens we constrain the inner
+   content to a phone-like column so the experience stays consistent.
+   Whitespace is intentional — less newspapery than the digest site. */
+
+.g-shell {
+  --bg: #f6f3eb;
+  --surface: #ffffff;
+  --ink: #161410;
+  --muted: #6a6354;
+  --border: #e0d8c4;
+  --border-strong: #c4baa5;
+  --accent: #1f6f3a;
+  --accent-ink: #ffffff;
+
+  min-height: 100vh;
+  min-height: 100dvh;        /* iOS Safari toolbar-aware */
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Source Sans 3', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Sticky brand bar ─────────────────────────────────────── */
+
+.g-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(246, 243, 235, 0.92);
+  backdrop-filter: saturate(160%) blur(8px);
+  -webkit-backdrop-filter: saturate(160%) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.g-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.g-brand-icon {
+  border-radius: 4px;
+  display: block;
+}
+.g-brand-mark {
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.g-brand-mark-sub {
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+}
+
+.g-bar-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.g-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.g-link-tip {
+  color: var(--muted);
+}
+.g-link-tip:hover { color: var(--ink); }
+.g-link-cta {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.g-link-cta:hover { background: #000; border-color: #000; }
+
+/* ─── Main content column ──────────────────────────────────── */
+
+.g-main {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px 14px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Landing — games menu ─────────────────────────────────── */
+
+.g-hero {
+  margin: 2px 0 18px;
+}
+.g-hero h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.g-hero p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.g-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.g-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform 0.1s ease, border-color 0.1s ease, background 0.1s ease;
+}
+.g-card-live {
+  cursor: pointer;
+}
+.g-card-live:hover {
+  border-color: var(--border-strong);
+}
+.g-card-live:active {
+  transform: scale(0.99);
+}
+.g-card-soon {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.g-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+}
+.g-card-desc {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.g-card-status {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.g-card-status-play {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.g-card-status-soon {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border-strong);
+}
+
+@media (min-width: 720px) {
+  /* Desktop still uses the phone-column column. Apps don't grow with
+     viewport; they stay anchored. */
+  .g-bar { padding: 12px 18px; }
+}
