@@ -301,6 +301,11 @@ type TeamConsoleRow = {
   hasGameYesterday: boolean | null; // null = no team_digests row at all
   digestGenerated: boolean;
   send: { sent: number; failed: number } | null;
+  // Rolling-7-day opens for this team's digest. null when no sends in
+  // window; renderer shows "—" rather than 0% to distinguish "no data"
+  // from "0% opens." Opens accumulate over days so a 7-day window is more
+  // representative than yesterday-only.
+  opens7d: { sent: number; opened: number } | null;
 };
 
 // Per-team rollup for the team console section: subscriber count, did the
@@ -366,11 +371,57 @@ async function loadTeamConsoleRows(
     return out;
   };
 
+  // 7-day window of successful team sends with their resend_id, joined to
+  // opens via email_events. Window is long enough that opens have time to
+  // accumulate (most opens land within 24h but MPP prefetch dribbles in
+  // through the week) and short enough to stay representative.
+  type Sends7dRow = { team_id: string | null; resend_id: string | null };
+  const opensWindowDays = 7;
+  const opensSinceIso = new Date(Date.now() - opensWindowDays * 86_400_000).toISOString();
+  const fetchAllSends7d = async (): Promise<Sends7dRow[]> => {
+    const out: Sends7dRow[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await db.from("sends")
+        .select("team_id, resend_id")
+        .eq("digest_sport", sport)
+        .not("team_id", "is", null)
+        .is("error", null)
+        .gte("sent_at", opensSinceIso)
+        .order("team_id", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(`team-console sends7d: ${error.message}`);
+      const page = (data ?? []) as Sends7dRow[];
+      out.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return out;
+  };
+  type OpenEventRow = { resend_id: string | null };
+  const fetchAllOpens7d = async (): Promise<OpenEventRow[]> => {
+    const out: OpenEventRow[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await db.from("email_events")
+        .select("resend_id")
+        .eq("event_type", "email.opened")
+        .gte("event_at", opensSinceIso)
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(`team-console opens7d: ${error.message}`);
+      const page = (data ?? []) as OpenEventRow[];
+      out.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return out;
+  };
+
   const [
     subRows,
     activeIds,
     { data: digestRows, error: digestErr },
     sendRows,
+    sends7d,
+    opens7d,
   ] = await Promise.all([
     fetchAllSubs(),
     getActiveSubscriberIdSet(),
@@ -380,6 +431,8 @@ async function loadTeamConsoleRows(
       .eq("sport", sport)
       .eq("date", date),
     fetchAllSends(),
+    fetchAllSends7d(),
+    fetchAllOpens7d(),
   ]);
   if (digestErr) throw new Error(`team-console digests: ${digestErr.message}`);
   const subsByTeam = new Map<string, number>();
@@ -401,6 +454,20 @@ async function loadTeamConsoleRows(
     sendsByTeam.set(r.team_id, cur);
   }
 
+  // Per-team 7-day open rollup. Build the opened-resend_id set once, then
+  // walk every team send in the window and bucket it by team + whether
+  // its resend_id had an open event.
+  const openedIds = new Set<string>();
+  for (const r of opens7d) if (r.resend_id) openedIds.add(r.resend_id);
+  const opens7dByTeam = new Map<string, { sent: number; opened: number }>();
+  for (const r of sends7d) {
+    if (!r.team_id) continue;
+    const cur = opens7dByTeam.get(r.team_id) ?? { sent: 0, opened: 0 };
+    cur.sent++;
+    if (r.resend_id && openedIds.has(r.resend_id)) cur.opened++;
+    opens7dByTeam.set(r.team_id, cur);
+  }
+
   return teams
     .map((team) => ({
       slug: team.slug,
@@ -411,6 +478,7 @@ async function loadTeamConsoleRows(
       hasGameYesterday: digestByTeam.has(team.slug) ? digestByTeam.get(team.slug)! : null,
       digestGenerated: digestByTeam.has(team.slug),
       send: sendsByTeam.get(team.slug) ?? null,
+      opens7d: opens7dByTeam.get(team.slug) ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -617,8 +685,12 @@ function TeamConsole({
     generated: rows.reduce((s, r) => s + (r.digestGenerated ? 1 : 0), 0),
     sent: rows.reduce((s, r) => s + (r.send?.sent ?? 0), 0),
     failed: rows.reduce((s, r) => s + (r.send?.failed ?? 0), 0),
+    opens7dSent:   rows.reduce((s, r) => s + (r.opens7d?.sent   ?? 0), 0),
+    opens7dOpened: rows.reduce((s, r) => s + (r.opens7d?.opened ?? 0), 0),
     teams: rows.length,
   };
+  const fmtPct = (num: number, den: number) =>
+    den === 0 ? "—" : `${Math.round((num / den) * 100)}%`;
   return (
     <table className="admin-team-console">
       <thead>
@@ -628,6 +700,7 @@ function TeamConsole({
           <th className="admin-team-col-state">Yesterday</th>
           <th className="admin-team-col-state">Last gen</th>
           <th className="admin-team-col-state">Send (ok/fail)</th>
+          <th className="admin-team-col-state" title="Rolling 7-day open rate: opens / successful sends">Open rate (7d)</th>
           <th className="admin-team-col-actions"></th>
         </tr>
       </thead>
@@ -646,6 +719,11 @@ function TeamConsole({
           const genCell = r.digestGenerated
             ? <span className="admin-team-ok">OK</span>
             : <span className="admin-team-bad">missing</span>;
+          const opensCell = r.opens7d && r.opens7d.sent > 0
+            ? <span title={`${r.opens7d.opened} of ${r.opens7d.sent} successful sends opened`}>
+                {fmtPct(r.opens7d.opened, r.opens7d.sent)}
+              </span>
+            : <span className="admin-team-empty">—</span>;
           return (
             <tr key={r.slug}>
               <td className="admin-team-col-name">
@@ -662,6 +740,7 @@ function TeamConsole({
               <td className="admin-team-col-state">{yesterdayCell}</td>
               <td className="admin-team-col-state">{genCell}</td>
               <td className="admin-team-col-state">{sendCell}</td>
+              <td className="admin-team-col-state">{opensCell}</td>
               <td className="admin-team-col-actions">
                 <a
                   href={`/${sport}/${r.slug}/${date}`}
@@ -686,6 +765,9 @@ function TeamConsole({
             <span className={totals.failed > 0 ? "admin-team-bad" : "admin-team-ok"}>
               {totals.sent}/{totals.failed}
             </span>
+          </td>
+          <td className="admin-team-col-state">
+            {fmtPct(totals.opens7dOpened, totals.opens7dSent)}
           </td>
           <td className="admin-team-col-actions"></td>
         </tr>
