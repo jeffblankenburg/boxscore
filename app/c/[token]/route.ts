@@ -5,9 +5,18 @@
 // can read cookies but not write them; the cookie-set has to live in a route
 // handler or server action.
 //
+// No bot/prefetch detection. The earlier version AND-gated isLikelyBot,
+// Sec-Fetch-User, and Sec-Fetch-Dest — but mobile Gmail in-app browsers,
+// iOS Safari < 16.4, and Google's link-redirector wrapper all fail at
+// least one of those signals, so legitimate first-click activations from
+// phones were getting blocked with a "click your confirmation link in a
+// browser" placeholder. The trade was wrong: blocking marginal prefetcher
+// activations cost real conversion. Activating a subscriber who already
+// opted in — even slightly early via a prefetcher — costs nothing. The
+// confirmSubscriberIfPending transition is atomic so a prefetch + a real
+// click both reach the right end state.
+//
 // Branches:
-//   - bot UA            → render a static "click to confirm" page; no DB write,
-//                         no session, so a link-prefetcher can't claim the row.
 //   - subscriber missing → 404
 //   - already unsubscribed → redirect to /subscribe?reason=unsubscribed
 //   - pending → active (this request did the transition):
@@ -20,9 +29,9 @@
 //                         confirm token being a permanent sign-in cheat code.
 //
 // Session creation only happens when *this* request flipped pending→active.
-// confirmSubscriberIfPending is atomic, so repeat clicks of the same URL
-// can't grant a session after the first one. The confirm token itself never
-// rotates; the gate is the row's status, not the token.
+// A prefetcher that races ahead of the human will see "already active" on
+// the human's later click — the human lands on /settings with a magic-link
+// prompt, same as any returning subscriber.
 
 import { NextResponse } from "next/server";
 import {
@@ -39,7 +48,6 @@ import { welcomeEmail } from "@/lib/emails/templates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { getDigest } from "@/lib/digests";
 import { nextDay, yesterdayInET, prettyDate } from "@/lib/dates";
-import { isLikelyBot } from "@/lib/bot-detect";
 
 export const dynamic = "force-dynamic";
 
@@ -59,37 +67,6 @@ export async function GET(
   const subscriber = await findByConfirmToken(token);
   if (!subscriber) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
-  }
-
-  // Three signals together: UA pattern, Sec-Fetch-User, and Sec-Fetch-Dest.
-  // Any miss → render the placeholder page rather than activating.
-  //
-  // - UA pattern: catches SafeLinks, Mimecast, Proofpoint, Barracuda, etc.
-  //   that identify themselves honestly (most do).
-  // - Sec-Fetch-User: browsers set "?1" ONLY when the navigation is the
-  //   result of user activation (click, form submit, address-bar enter).
-  //   Server-side prefetchers don't send it. Strongest signal we have.
-  // - Sec-Fetch-Dest: "document" for a real top-level navigation. Prefetch,
-  //   image, or worker requests won't match.
-  //
-  // The result of all three failing benignly: the user sees a tiny page
-  // telling them to "click the link in a browser" — same UX the original
-  // bot-UA path showed. The real click follows and activates normally.
-  const looksLikeBot = isLikelyBot(req.headers.get("user-agent"));
-  const userInitiated = req.headers.get("sec-fetch-user") === "?1";
-  const destOk = req.headers.get("sec-fetch-dest") === "document";
-
-  if (looksLikeBot || !userInitiated || !destOk) {
-    return new NextResponse(botPlaceholderHtml(), {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        // Critical: SafeLinks and similar will happily cache a 200 OK and
-        // replay it to the user. Forbid every form of caching so the
-        // placeholder doesn't get served instead of the real activation.
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        Pragma: "no-cache",
-      },
-    });
   }
 
   if (subscriber.status === "unsubscribed") {
@@ -152,18 +129,4 @@ export async function GET(
   // itself so no intermediary serves a stale 302 to a later visitor.
   res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   return res;
-}
-
-function botPlaceholderHtml(): string {
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Confirm — boxscore</title>
-<meta name="robots" content="noindex">
-</head>
-<body style="font-family:system-ui,sans-serif;padding:24px;">
-<p>Click your confirmation link in a browser to finish signing up.</p>
-</body>
-</html>`;
 }
