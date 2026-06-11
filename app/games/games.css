@@ -44,6 +44,8 @@
   gap: 8px;
   text-decoration: none;
   color: var(--ink);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .g-brand-icon {
   border-radius: 4px;
@@ -78,6 +80,7 @@
   border-radius: 999px;
   border: 1px solid transparent;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .g-link-tip {
   color: var(--muted);
@@ -89,6 +92,19 @@
   border-color: var(--ink);
 }
 .g-link-cta:hover { background: #000; border-color: #000; }
+
+/* Icon-only link in the chrome (stats, etc.). Same hit target size as
+   the labeled links so taps don't shift the bar around. */
+.g-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--muted);
+}
+.g-link-icon:hover { color: var(--ink); }
 
 /* ─── Main content column ──────────────────────────────────── */
 

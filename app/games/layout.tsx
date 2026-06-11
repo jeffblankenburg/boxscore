@@ -23,7 +23,7 @@ export default async function GamesLayout({ children }: { children: ReactNode })
         <a className="g-brand" href="/games" aria-label="boxscore games">
           <img src="/icon.png" alt="" width={24} height={24} className="g-brand-icon" />
           <span className="g-brand-mark">
-            boxscore <span className="g-brand-mark-sub">games</span>
+            boxscore
           </span>
         </a>
         <nav className="g-bar-nav">

@@ -4,7 +4,7 @@
 //
 // Identity:
 //   - `id` is our internal canonical id (bigserial). Everything internal
-//     — FKs from historical_player_lines, MLBdle reveal queries, leader-
+//     — FKs from historical_player_lines, Linescordle reveal queries, leader-
 //     board joins — references this.
 //   - `mlb_id` is the MLB Stats API person id, used only when we need
 //     to talk to the MLB API or look up a player from the box-score

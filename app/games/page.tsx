@@ -15,9 +15,9 @@ type GameEntry = {
 // as each game ships (per issues #59 / #60 / #61 / #62).
 const GAMES: GameEntry[] = [
   {
-    slug: "mlbdle",
-    title: "MLBdle",
-    desc: "Guess the player from their game line — Wordle-style letter feedback.",
+    slug: "linescordle",
+    title: "Linescordle",
+    desc: "Guess the player name from their game line — Wordle-style letter feedback.",
     status: "live",
   },
   {

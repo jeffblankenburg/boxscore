@@ -1,4 +1,4 @@
-// MLBdle letter-feedback. Same green/yellow/gray semantics as Wordle:
+// Linescordle letter-feedback. Same green/yellow/gray semantics as Wordle:
 //   green  = right letter, right position
 //   yellow = right letter, wrong position
 //   gray   = letter not in the answer (or already used up by earlier
@@ -78,4 +78,48 @@ export function keyboardState(
     }
   }
   return out;
+}
+
+// ─── Share grid ──────────────────────────────────────────────────────
+//
+// Wordle-style emoji block, copy-to-clipboard friendly. Format:
+//
+//   Linescordle · 2026-06-10
+//   4/6 · 1 💡
+//
+//   🟨⬛⬛⬛🟩⬛⬛⬛⬛⬛⬛⬛⬛
+//   ⬛🟩🟨🟩⬛⬛🟨⬛⬛⬛⬛⬛⬛
+//   🟩🟩🟩🟩🟩🟩⬛⬛⬛⬛🟨⬛⬛
+//   🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
+//
+//   boxscore.games/linescordle
+//
+// Doesn't include the answer in any form — the grid pattern only
+// reveals letter count + position-by-position feedback, never the
+// player's name. Hint count is part of the headline so friends can see
+// the difficulty profile, not the content.
+
+const EMOJI: Record<LetterState, string> = {
+  green:  "🟩",
+  yellow: "🟨",
+  gray:   "⬛",
+};
+
+export function buildShareText(opts: {
+  puzzleDate: string;                                              // YYYY-MM-DD
+  solved: boolean;
+  guesses: Array<{ scores: LetterState[] }>;
+  maxGuesses: number;
+  hintsUsed: number;
+  shareUrl?: string;
+}): string {
+  const { puzzleDate, solved, guesses, maxGuesses, hintsUsed, shareUrl } = opts;
+  const score = solved ? `${guesses.length}/${maxGuesses}` : `X/${maxGuesses}`;
+  const hintLine = hintsUsed === 0 ? "" : ` · ${hintsUsed} 💡`;
+  const headline = `Linescordle · ${puzzleDate}\n${score}${hintLine}`;
+  const grid = guesses
+    .map((g) => g.scores.map((s) => EMOJI[s]).join(""))
+    .join("\n");
+  const tail = shareUrl ? `\n\n${shareUrl}` : "";
+  return `${headline}\n\n${grid}${tail}`;
 }

@@ -8,6 +8,22 @@ export function yesterdayInET(): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+// Today's date as YYYY-MM-DD in America/New_York. Used by the games
+// surface as the puzzle-date key so the daily rollover happens at
+// midnight ET (matching MLB's home timezone and the digest cron). A
+// naive `new Date().toISOString().slice(0,10)` rolls over at 00:00
+// UTC instead, which is 8pm ET (summer) — players see tomorrow's
+// puzzle while their wall clock still says today.
+export function todayInET(): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const parts = fmt.formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 // MM-DD of today in ET. Used by the historical OTD picker / admin viewer
 // to filter by calendar day across all years.
 export function todayMMDDInET(): string {

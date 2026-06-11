@@ -25,7 +25,7 @@ async function shoot(path: string, viewport: { width: number; height: number }, 
   // Landing
   await shoot("/games", { width: 390, height: 844 }, "/tmp/games-landing-mobile.png");
   await shoot("/games", { width: 1280, height: 900 }, "/tmp/games-landing-desktop.png");
-  // MLBdle inside the new shell
-  await shoot("/games/mlbdle", { width: 390, height: 844 }, "/tmp/games-mlbdle-mobile.png");
-  await shoot("/games/mlbdle", { width: 1280, height: 1000 }, "/tmp/games-mlbdle-desktop.png");
+  // Linescordle inside the new shell
+  await shoot("/games/linescordle", { width: 390, height: 844 }, "/tmp/games-linescordle-mobile.png");
+  await shoot("/games/linescordle", { width: 1280, height: 1000 }, "/tmp/games-linescordle-desktop.png");
 })().catch((e) => { console.error(e); process.exit(1); });

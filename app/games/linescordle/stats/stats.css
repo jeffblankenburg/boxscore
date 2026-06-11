@@ -1,0 +1,107 @@
+/* Linescordle stats page. Sits inside the games shell. Numbers-forward. */
+
+.linescordle-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 0 4px 24px;
+}
+
+.linescordle-stats-h h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.linescordle-stats-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted, #6a6354);
+}
+.linescordle-stats-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #6a6354);
+  font-style: italic;
+}
+
+.linescordle-stats-headline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--border, #e0d8c4);
+  border-radius: 8px;
+  padding: 12px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.linescordle-stats-kpi {
+  text-align: center;
+}
+.linescordle-stats-kpi-value {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.linescordle-stats-kpi-label {
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted, #6a6354);
+}
+
+.linescordle-stats-section h2.linescordle-stats-h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted, #6a6354);
+}
+
+.linescordle-stats-dist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.linescordle-stats-dist-row {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 6px;
+  align-items: center;
+}
+.linescordle-stats-dist-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink, #161410);
+  text-align: right;
+}
+.linescordle-stats-dist-bar {
+  background: var(--accent, #1f6f3a);
+  color: #fff;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 3px;
+  text-align: right;
+  min-width: 22px;
+  box-sizing: border-box;
+}
+
+.linescordle-stats-back {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+.linescordle-stats-back a {
+  color: var(--ink, #161410);
+  text-decoration: none;
+  font-weight: 600;
+}
+.linescordle-stats-back a:hover { text-decoration: underline; }

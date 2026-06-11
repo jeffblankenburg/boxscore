@@ -1,0 +1,436 @@
+/* Linescordle styling. Mobile-first. The tile grid uses a CSS custom
+   property `--cols` set per-row so the auto-sizing works for any name
+   length: PEDRO MARTINEZ (13) on iPhone SE through 8-char names on
+   desktop look balanced. clamp() keeps the tile readable at small sizes
+   without stretching it absurdly on wide viewports. */
+
+.linescordle {
+  /* Inherits color/background from .g-shell, but keeps its own palette
+     tokens so a future stand-alone embed still looks right. */
+  --ink: #161410;
+  --muted: #6a6354;
+  --border: #e0d8c4;
+  --tile-border: #b0a692;
+  --green: #1f6f3a;
+  --yellow: #c4a23c;
+  --gray: #6a6354;
+  --filled-bg: #fffcf3;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  /* user-select intentionally NOT set here. Earlier version applied
+     `user-select: none` to the whole game, which on iOS Safari
+     interferes with touch event delivery to descendant <button>s and
+     killed taps on the on-screen keyboard. Narrowed to .linescordle-grid
+     below — only the tile rows need selection suppressed. */
+}
+
+.linescordle-h {
+  position: relative;
+  text-align: center;
+}
+.linescordle-h-title {
+  /* Title block stays centered; the stats icon is absolutely
+     positioned so it doesn't shift the centered title off-axis. */
+}
+.linescordle-h h2 {
+  margin: 0 0 2px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.linescordle-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.linescordle-stats-link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+.linescordle-stats-link:hover { color: var(--ink); background: rgba(0, 0, 0, 0.04); }
+
+/* ─── Clue card ────────────────────────────────────────────── */
+
+.linescordle-clue {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.linescordle-clue-intro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.linescordle-clue-meta {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  /* Reserve a single line of vertical space even when both date and
+     teams are still hidden, so revealing them doesn't push the rest
+     of the page downward. */
+  min-height: 1.4em;
+}
+
+/* Hint button row sits below whatever clue pieces have been revealed.
+   Wraps gracefully on narrow viewports — three full pills fit on most
+   phones but a particularly cramped one will stack to two rows. */
+.linescordle-hint-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.linescordle-hint-btn {
+  flex: 1 1 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--tile-border);
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.12);
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.linescordle-hint-btn:hover {
+  background: var(--filled-bg);
+}
+.linescordle-hint-btn:active {
+  background: #ece5d3;
+}
+.linescordle-line {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.linescordle-line th {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  text-align: right;
+  padding: 2px 4px;
+}
+.linescordle-line td {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: right;
+  padding: 2px 4px;
+}
+.linescordle-line th:first-child,
+.linescordle-line td:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+.linescordle-line th:last-child,
+.linescordle-line td:last-child {
+  padding-right: 0;
+}
+
+/* ─── Guess grid ───────────────────────────────────────────── */
+
+.linescordle-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Tile rows shouldn't be selectable — long-press on a row would
+     otherwise spawn the iOS selection handles, which we don't want
+     mid-puzzle. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.linescordle-row {
+  display: grid;
+  /* Each column is at most 52px (keyboard-key-sized) and centers the
+     group when total < container width. For PEDROMARTINEZ (13 cols)
+     the columns shrink to fit the container; for YAZ (3 cols) they
+     cap at 52px each and the row sits centered with empty space on
+     either side. justify-content: center pulls the populated columns
+     to the middle when they're capped below the row's available width. */
+  grid-template-columns: repeat(var(--cols, 5), minmax(0, 52px));
+  gap: 4px;
+  justify-content: center;
+}
+.linescordle-tile {
+  /* Tile auto-sizes within the row's column track. Use aspect-ratio so
+     tiles stay square regardless of computed width. */
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: clamp(13px, 4.5vw, 22px);
+  text-transform: uppercase;
+  border: 2px solid var(--tile-border);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 3px;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.linescordle-tile-empty {
+  border-color: var(--tile-border);
+  opacity: 0.6;
+}
+.linescordle-tile-filled {
+  border-color: var(--ink);
+  background: var(--filled-bg);
+}
+.linescordle-tile-green {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+.linescordle-tile-yellow {
+  background: var(--yellow);
+  color: #fff;
+  border-color: var(--yellow);
+}
+.linescordle-tile-gray {
+  background: var(--gray);
+  color: #fff;
+  border-color: var(--gray);
+}
+
+@keyframes linescordle-shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-4px); }
+  40%      { transform: translateX(4px); }
+  60%      { transform: translateX(-3px); }
+  80%      { transform: translateX(3px); }
+}
+.linescordle-row-shake {
+  animation: linescordle-shake 0.4s ease;
+}
+
+/* ─── Keyboard ─────────────────────────────────────────────── */
+
+.linescordle-kbd {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.linescordle-kbd-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+.linescordle-key {
+  flex: 1 1 0;
+  min-height: 48px;     /* 44px+ tap target per accessibility guidelines */
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+
+  /* touch-action: manipulation tells the browser this element doesn't
+     participate in double-tap-to-zoom, so iOS Safari delivers the click
+     immediately instead of waiting ~300ms for a second tap. Without it,
+     the OS sometimes cancels the click entirely when interpreting a
+     gesture. This was the root cause of "taps do nothing on mobile." */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  /* Make the tap register visually as soon as the finger lands. */
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.12);
+}
+.linescordle-key:active {
+  transform: translateY(1px);
+  background: #f0ebe0;
+}
+.linescordle-key-wide {
+  flex: 1.5 1 0;
+  font-size: 12px;
+}
+.linescordle-key-green {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+.linescordle-key-yellow {
+  background: var(--yellow);
+  color: #fff;
+  border-color: var(--yellow);
+}
+.linescordle-key-gray {
+  background: var(--gray);
+  color: #fff;
+  border-color: var(--gray);
+  opacity: 0.65;
+}
+
+/* ─── Reveal ───────────────────────────────────────────────── */
+
+.linescordle-reveal {
+  margin-top: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  text-align: center;
+}
+.linescordle-reveal-status {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.linescordle-reveal-won .linescordle-reveal-status { color: var(--green); }
+.linescordle-reveal-lost .linescordle-reveal-status { color: var(--gray); }
+.linescordle-reveal-name {
+  margin: 6px 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.linescordle-reveal-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+/* Sections below the share button on the reveal — career line and
+   the full source-game box score. */
+.linescordle-reveal-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+.linescordle-reveal-h {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.linescordle-reveal-h-date {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+/* Career stat line — prose. Each value-label pair stays together
+   across wraps via white-space: nowrap on the span. Larger font than
+   tabular would allow because flex wrapping handles overflow instead
+   of truncation. */
+.linescordle-career-line {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  text-align: left;
+}
+.linescordle-career-stat {
+  white-space: nowrap;
+}
+.linescordle-career-stat b {
+  font-weight: 700;
+}
+.linescordle-reveal-career-missing {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* Small "Start fresh" reset link, parked at the bottom of the page.
+   Keeps it discoverable but not a primary CTA. */
+.linescordle-reset {
+  margin: 24px auto 4px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  cursor: pointer;
+  align-self: center;
+}
+.linescordle-reset:hover { color: var(--ink); border-color: var(--border); }
+.linescordle-reset:disabled { opacity: 0.5; cursor: progress; }
+.linescordle-reveal-career-missing {
+  margin: 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* The full source box score is rendered via globals.css's .game-container
+   et al. We just give it a constrained font and let the inner styles
+   handle the rest. The team-name and team-score lines need a tighter
+   override because globals.css sets them explicitly on .team-line and
+   .game-header — inheritance from .linescordle-reveal-box alone doesn't
+   reach them. */
+.linescordle-reveal-box {
+  font-size: 12px;
+}
+.linescordle-reveal-box table { font-size: inherit; }
+.linescordle-reveal-box .game-header { font-size: 15px; }
+.linescordle-reveal-box .team-line   { font-size: 11px; }
+
+/* Share button — primary CTA on the reveal screen. */
+.linescordle-share-btn {
+  margin-top: 14px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.15);
+}
+.linescordle-share-btn:hover  { background: #000; }
+.linescordle-share-btn:active { transform: translateY(1px); }
