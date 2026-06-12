@@ -96,11 +96,16 @@ export async function GET(
       const digestUrl = `${EMAIL_LINK_BASE}/mlb/${nextDay(digestDate)}`;
       const unsubscribeUrl = `${EMAIL_LINK_BASE}/u/${justActivated.unsubscribe_token}`;
       const manageUrl = `${EMAIL_LINK_BASE}/settings`;
+      const { trackedEmailLink } = await import("@/lib/link-tracking");
+      const [digestTrackedUrl, manageTrackedUrl] = await Promise.all([
+        trackedEmailLink("welcome-header-digest", digestUrl),
+        trackedEmailLink("welcome-header-manage", manageUrl),
+      ]);
       const { subject, html, text } = welcomeEmail({
         digestPrettyDate: prettyDate(digestDate),
-        digestUrl,
+        digestUrl:  digestTrackedUrl,
         unsubscribeUrl,
-        manageUrl,
+        manageUrl:  manageTrackedUrl,
         digestEmailHtml: digest.email_html,
       });
       await sendEmail({ to: justActivated.email, subject, html, text });

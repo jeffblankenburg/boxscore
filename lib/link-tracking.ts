@@ -100,3 +100,32 @@ export async function verifyAdLink(
   const expected = sign(payload, secret);
   return timingSafeEquals(sig, expected);
 }
+
+// Generic email-chrome link tracker. Used for digest title, Manage
+// Subscriptions, and any other top-of-email link we want click-rate
+// data on. Distinct namespace ("email") from ad clicks so an attacker
+// can't replay an ad-signed URL through the email route or vice versa.
+export async function trackedEmailLink(
+  src: string,
+  destinationUrl: string,
+): Promise<string> {
+  const secret = await getSecret();
+  const payload = `email|${src}|${destinationUrl}`;
+  const sig = sign(payload, secret);
+  const params = new URLSearchParams({
+    to: destinationUrl,
+    sig,
+  });
+  return `${EMAIL_LINK_BASE}/r/e/${encodeURIComponent(src)}?${params.toString()}`;
+}
+
+export async function verifyEmailLink(
+  src: string,
+  destinationUrl: string,
+  sig: string,
+): Promise<boolean> {
+  const secret = await getSecret();
+  const payload = `email|${src}|${destinationUrl}`;
+  const expected = sign(payload, secret);
+  return timingSafeEquals(sig, expected);
+}

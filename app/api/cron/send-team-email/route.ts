@@ -161,6 +161,14 @@ export async function GET(req: Request) {
         // from team_digests.html (no request-time rendering).
         const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${team.slug}/${nextDay(date)}`;
         const manageUrl = `${EMAIL_LINK_BASE}/settings`;
+        // Same /r/e/[src] tracking as the league digest cron. Distinct
+        // src tags so we can read per-team vs per-league click rates
+        // independently in the admin dashboard.
+        const { trackedEmailLink } = await import("@/lib/link-tracking");
+        const [digestTrackedUrl, manageTrackedUrl] = await Promise.all([
+          trackedEmailLink("team-email-header-digest", digestUrl),
+          trackedEmailLink("team-email-header-manage", manageUrl),
+        ]);
 
         for (const group of chunk(toSend, BATCH_SIZE)) {
           const payload = group.map((sub) => {
@@ -173,9 +181,9 @@ export async function GET(req: Request) {
               teamName: team.name,
               digestDate: date,
               digestPrettyDate,
-              digestUrl,
+              digestUrl:  digestTrackedUrl,
               unsubscribeUrl,
-              manageUrl,
+              manageUrl:  manageTrackedUrl,
               announcementBanner,
               digestEmailHtml: body,
             });

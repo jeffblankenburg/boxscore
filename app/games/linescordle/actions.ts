@@ -14,6 +14,17 @@ import { saveAttempt, getAttempt, type AttemptRow } from "@/lib/games/attempts";
 import { getPuzzleBySubjectId } from "@/lib/games/linescordle/content";
 import { normalize, scoreGuess, type LetterState } from "@/lib/games/linescordle/feedback";
 import { buildRevealData } from "@/lib/games/linescordle/reveal";
+import { searchPlayerNames, type SearchConstraints } from "@/lib/games/linescordle/player-search";
+
+// ─── Autocomplete ────────────────────────────────────────────────
+// Used by the typing assist in LinescordleGame. Returns up to 30
+// display names matching the current row's partial input + the
+// constraints derived from prior greens/yellows. Never leaks the
+// puzzle's answer — the constraints are passed by the client based on
+// what the server has already revealed via submitGuess.
+export async function searchPlayers(input: SearchConstraints): Promise<string[]> {
+  return searchPlayerNames(input);
+}
 
 // ─── Persistence (unchanged) ──────────────────────────────────────
 

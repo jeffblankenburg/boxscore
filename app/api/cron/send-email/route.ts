@@ -82,6 +82,16 @@ export async function GET(req: Request) {
     let sent = 0, failed = 0;
 
     const manageUrl = `${EMAIL_LINK_BASE}/settings`;
+    // Wrap the top-of-email links through /r/e/[src] for first-party
+    // click tracking. The destination is HMAC-signed so the URL can't
+    // be re-aimed at a different target. Wrapping happens once per
+    // batch — the secret is cached in module memory after the first
+    // call, so the second is a no-op.
+    const { trackedEmailLink } = await import("@/lib/link-tracking");
+    const [digestTrackedUrl, manageTrackedUrl] = await Promise.all([
+      trackedEmailLink("email-header-digest", digestUrl),
+      trackedEmailLink("email-header-manage", manageUrl),
+    ]);
     const { getAnnouncement } = await import("@/lib/announcements");
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
 
@@ -98,9 +108,9 @@ export async function GET(req: Request) {
           sport,
           digestDate: date,
           digestPrettyDate,
-          digestUrl,
+          digestUrl:  digestTrackedUrl,
           unsubscribeUrl,
-          manageUrl,
+          manageUrl:  manageTrackedUrl,
           announcementBanner,
           digestEmailHtml: digest.email_html!,
         });

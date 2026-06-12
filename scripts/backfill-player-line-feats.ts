@@ -21,7 +21,12 @@ const PROGRESS_SENTINEL_SEASON = 0;
 // Per-game extraction batch size. boxscore_raw is ~50KB per row so
 // 200 rows ≈ 10MB of jsonb shipped per page, which periodically times
 // out under DB load. 100 stays reliable.
-const GAME_PAGE = 100;
+// Boxscores carry heavy jsonb. Larger pages tripped the 8s statement
+// timeout:
+//   100/page → failed at pk 237k (1985 era)
+//    50/page → failed at pk 748k (2024 era — modern boxes are larger)
+//    25/page → stable for the modern range
+const GAME_PAGE = 25;
 
 // ─── Args ─────────────────────────────────────────────────────────────
 
@@ -45,7 +50,7 @@ function parseArgs(): Args {
 
 // ─── Player-id mapping ────────────────────────────────────────────────
 
-async function loadPlayerIdMap(): Promise<Map<number, number>> {
+export async function loadPlayerIdMap(): Promise<Map<number, number>> {
   const db = supabaseAdmin();
   const map = new Map<number, number>();
   const PAGE = 1000;
@@ -130,7 +135,7 @@ type RowToInsert = {
   scored_at: string;
 };
 
-function extractLines(
+export function extractLines(
   meta: GameMeta,
   box: Boxscore,
   playerIdMap: Map<number, number>,
@@ -386,15 +391,19 @@ async function main() {
     const data = boxes;
 
     if (rowsToInsert.length > 0) {
-      // Bulk insert. Onconflict by (game_pk, player_id, line_type) would
-      // require a unique constraint — we don't have one. For now, the
-      // expectation is a fresh ingest; --rescore handles updates.
+      // Upsert on (game_pk, player_id, line_type) — added in migration
+      // 0044 to make resume idempotent. If the same game gets processed
+      // twice (e.g. cursor resumed across a partial run), we overwrite
+      // the existing row with the freshly-scored one instead of
+      // duplicating.
       const CHUNK = 500;
       for (let i = 0; i < rowsToInsert.length; i += CHUNK) {
         const slice = rowsToInsert.slice(i, i + CHUNK);
-        const { error: ierr } = await db.from("historical_player_lines").insert(slice);
+        const { error: ierr } = await db
+          .from("historical_player_lines")
+          .upsert(slice, { onConflict: "game_pk,player_id,line_type" });
         if (ierr) {
-          console.error(`insert chunk @ ${i}: ${ierr.message}`);
+          console.error(`upsert chunk @ ${i}: ${ierr.message}`);
           continue;
         }
         inserted += slice.length;
@@ -419,7 +428,11 @@ async function main() {
   console.log(`\nDone. processed=${processed.toLocaleString()} games  inserted=${inserted.toLocaleString()} lines`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Run only when invoked as the entry point so other scripts can
+// `import { extractLines, ... }` without kicking off a full backfill.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

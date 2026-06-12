@@ -39,12 +39,21 @@ const RUNS_5 = 25;
 const SB_4   = 15;
 
 // Pitcher
-const CG_SHUTOUT     = 40;     // complete game with 0 ER allowed
+// A bare CGSO is era-loaded: routine in 1955-1985, rare after. Keep it
+// as a small bonus so it nudges 1-hitter / low-K performances upward
+// without qualifying as a feat on its own (10 < threshold 30). The
+// audit on 2026-06-11 showed CGSO-as-floor was putting 90% pitching
+// into the top 700.
+const CG_SHUTOUT     = 10;     // complete game with 0 ER allowed
 const K_15           = 30;
 const K_18           = 60;     // replaces K_15
 const K_20           = 120;    // replaces K_18
-const ONE_HITTER     = 60;
-const TWO_HITTER     = 30;
+// X-hitter weights cut on 2026-06-11 to balance the top-700 picker pool
+// to ~50/50 batting/pitching. Tuner sweep confirmed: oneHitter=40,
+// twoHitter=20 with everything else fixed produces 51% batting in the
+// top 700 across every decade 1950-2025.
+const ONE_HITTER     = 40;
+const TWO_HITTER     = 20;
 const NO_HITTER      = 100;
 const PERFECT_GAME   = 200;
 const ZERO_BB_IN_CG  = 15;

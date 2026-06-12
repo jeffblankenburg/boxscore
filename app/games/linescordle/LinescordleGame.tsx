@@ -11,6 +11,7 @@ import type { LinescordlePuzzlePublic } from "@/lib/games/linescordle/content";
 import {
   keyboardState,
   buildShareText,
+  normalize,
   type LetterState,
 } from "@/lib/games/linescordle/feedback";
 import {
@@ -19,6 +20,7 @@ import {
   getReveal,
   persistAttempt,
   syncLocalAttempts,
+  searchPlayers,
   type RevealPayload,
 } from "./actions";
 import {
@@ -102,6 +104,22 @@ export function LinescordleGame({
   const [hintValues, setHintValues] = useState<HintValues>(initialHintValues);
   const [reveal, setReveal] = useState<RevealPayload | null>(initialReveal);
   const [pending, setPending] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // First-visit auto-open of the help modal. localStorage flag stops it
+  // from popping up on every return visit.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem("linescordle:help-seen") !== "1") {
+        setHelpOpen(true);
+      }
+    } catch { /* private mode */ }
+  }, []);
+
+  const closeHelp = useCallback(() => {
+    setHelpOpen(false);
+    try { window.localStorage.setItem("linescordle:help-seen", "1"); } catch { /* ignore */ }
+  }, []);
 
   const keyState = useMemo(() => keyboardState(guesses), [guesses]);
 
@@ -292,22 +310,35 @@ export function LinescordleGame({
           <h2>Linescordle</h2>
           <p className="linescordle-sub">Guess the player name from their game line.</p>
         </div>
-        {/* Stats icon — anchored top-right of the title block so it
-            shares the line with the page title and stays out of the
-            chrome bar where there's no room. */}
-        <a
-          className="linescordle-stats-link"
-          href="/games/linescordle/stats"
-          aria-label="Stats"
-          title="Stats"
-        >
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <rect x="1"   y="9" width="3" height="6"  rx="0.5" />
-            <rect x="6.5" y="5" width="3" height="10" rx="0.5" />
-            <rect x="12"  y="1" width="3" height="14" rx="0.5" />
-          </svg>
-        </a>
+        {/* Header icons — help (?) and stats. Both anchored top-right of
+            the title block so they share the line with the page title
+            and stay out of the chrome bar where there's no room. */}
+        <div className="linescordle-h-icons">
+          <button
+            type="button"
+            className="linescordle-help-btn"
+            onClick={() => setHelpOpen(true)}
+            aria-label="How to play"
+            title="How to play"
+          >
+            ?
+          </button>
+          <a
+            className="linescordle-stats-link"
+            href="/games/linescordle/stats"
+            aria-label="Stats"
+            title="Stats"
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <rect x="1"   y="9" width="3" height="6"  rx="0.5" />
+              <rect x="6.5" y="5" width="3" height="10" rx="0.5" />
+              <rect x="12"  y="1" width="3" height="14" rx="0.5" />
+            </svg>
+          </a>
+        </div>
       </header>
+
+      {helpOpen ? <HelpModal onClose={closeHelp} maxGuesses={MAX_GUESSES} /> : null}
 
       <ClueArea
         puzzle={puzzle}
@@ -326,7 +357,15 @@ export function LinescordleGame({
       />
 
       {status === "playing" ? (
-        <Keyboard keyState={keyState} onKey={pressKey} />
+        <>
+          <Suggestions
+            current={current}
+            guesses={guesses}
+            nameLength={answerLen}
+            onPick={setCurrent}
+          />
+          <Keyboard keyState={keyState} onKey={pressKey} />
+        </>
       ) : (
         <Reveal
           puzzle={puzzle}
@@ -528,6 +567,138 @@ function Keyboard({
   );
 }
 
+// ─── Autocomplete ─────────────────────────────────────────────────
+
+function Suggestions({
+  current, guesses, nameLength, onPick,
+}: {
+  current: string;
+  guesses: Guess[];
+  nameLength: number;
+  onPick: (name: string) => void;
+}) {
+  // Derive greens + yellows from the guess history. Greens are
+  // position-locked; yellows just need to appear somewhere. The
+  // computation is cheap; memoized so we don't rebuild on every
+  // keystroke into `current`.
+  const constraints = useMemo(() => {
+    const greens: Array<[number, string]> = [];
+    const yellowSet = new Set<string>();
+    for (const g of guesses) {
+      for (let i = 0; i < g.letters.length; i++) {
+        const L = g.letters[i]!;
+        const S = g.scores[i]!;
+        if (S === "green")  greens.push([i, L]);
+        if (S === "yellow") yellowSet.add(L);
+      }
+    }
+    return { greens, yellows: Array.from(yellowSet) };
+  }, [guesses]);
+
+  const [results, setResults]   = useState<string[]>([]);
+  const [pending, setPending]   = useState(false);
+
+  // Debounced fetch: trail keystrokes by 150ms before hitting the
+  // server. Constraints (greens/yellows) trigger a re-fetch
+  // immediately on guess commit, since they only change once per
+  // submitted row.
+  useEffect(() => {
+    // Don't bother showing suggestions until the user is at least
+    // partly committed: two letters typed, or any constraint from a
+    // prior guess. Avoids dumping 30 random names on a blank input.
+    if (current.length < 2 && constraints.greens.length === 0 && constraints.yellows.length === 0) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    setPending(true);
+    const t = setTimeout(() => {
+      // Temporary debug: log what we send so we can verify the
+      // constraint build against the visible board. Remove after the
+      // "Wilson Alvarez slipped past green R" mystery from 2026-06-12
+      // is resolved.
+      console.log("[Linescordle] searchPlayers payload", {
+        query:      current,
+        nameLength,
+        greens:     constraints.greens,
+        yellows:    constraints.yellows,
+        excluded:   guesses.map((g) => g.letters.join("")),
+      });
+      searchPlayers({
+        query:      current,
+        nameLength,
+        greens:     constraints.greens,
+        yellows:    constraints.yellows,
+        exclude:    guesses.map((g) => g.letters.join("")),
+      })
+        .then((r) => {
+          console.log("[Linescordle] searchPlayers results", r);
+          if (!cancelled) { setResults(r); setPending(false); }
+        })
+        .catch((e) => { console.error("searchPlayers:", e); if (!cancelled) setPending(false); });
+    }, 150);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [current, constraints, nameLength, guesses]);
+
+  if (results.length === 0 && !pending) return null;
+
+  return (
+    <div className="linescordle-suggestions" role="listbox" aria-label="Player suggestions">
+      {results.map((name, i) => (
+        // Index suffix on the key as a safety belt: even if the source
+        // index ever returns two entries with the same display string,
+        // React still gets unique keys instead of throwing.
+        <button
+          key={`${name}|${i}`}
+          type="button"
+          className="linescordle-suggestion"
+          onClick={() => onPick(normalize(name))}
+        >
+          {name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Help modal ───────────────────────────────────────────────────
+
+function HelpModal({ onClose, maxGuesses }: { onClose: () => void; maxGuesses: number }) {
+  // Lock body scroll while open and close on Escape.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="linescordle-modal-backdrop" onClick={onClose}>
+      <div className="linescordle-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="How to play">
+        <button type="button" className="linescordle-modal-close" onClick={onClose} aria-label="Close">×</button>
+        <h3>How to play</h3>
+        <ul>
+          <li>Guess the MLB player in <b>{maxGuesses} tries</b>.</li>
+          <li>Type the player&rsquo;s first and last name with <b>no spaces</b> (e.g. PEDROMARTINEZ).</li>
+          <li>Suffixes count: type JR, SR, or II as part of the name (e.g. KENGRIFFEYJR).</li>
+          <li>
+            <span style={{ display: "inline-block", width: 10, height: 10, background: "#4d8a4d", verticalAlign: "middle", marginRight: 4 }} />
+            green = correct letter, correct spot.{" "}
+            <span style={{ display: "inline-block", width: 10, height: 10, background: "#c4a23f", verticalAlign: "middle", marginRight: 4, marginLeft: 8 }} />
+            yellow = right letter, wrong spot.{" "}
+            <span style={{ display: "inline-block", width: 10, height: 10, background: "#7a7a7a", verticalAlign: "middle", marginRight: 4, marginLeft: 8 }} />
+            gray = not in the name.
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // ─── Reveal ───────────────────────────────────────────────────────
 
 function Reveal({
@@ -552,6 +723,22 @@ function Reveal({
       hintsUsed,
       shareUrl: SHARE_URL,
     });
+    // Mobile (pointer: coarse) gets the native share sheet so the user
+    // can pick iMessage / Twitter / etc directly. Desktop falls back
+    // to clipboard, matching the prior behavior. Feature-detect the
+    // share API too — if it's missing we always copy.
+    const isMobile = typeof window !== "undefined"
+      && window.matchMedia?.("(pointer: coarse)").matches;
+    if (isMobile && typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (e) {
+        // User dismissed the share sheet, or share failed. Fall through
+        // to clipboard so the result isn't lost.
+        if ((e as Error).name === "AbortError") return;
+      }
+    }
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
@@ -591,6 +778,14 @@ function Reveal({
         {hintLabel ? ` · ${hintLabel}` : ""}
       </div>
 
+      <button
+        type="button"
+        className="linescordle-share-btn"
+        onClick={onShare}
+      >
+        {copied ? "Copied!" : "Share result"}
+      </button>
+
       {reveal ? (
         <>
           <div className="linescordle-reveal-name">{reveal.displayName}</div>
@@ -606,14 +801,6 @@ function Reveal({
           <div className="linescordle-reveal-meta">{loadingRole}</div>
         </>
       )}
-
-      <button
-        type="button"
-        className="linescordle-share-btn"
-        onClick={onShare}
-      >
-        {copied ? "Copied!" : "Share result"}
-      </button>
 
       {reveal ? (
         <>

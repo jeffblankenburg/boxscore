@@ -17,13 +17,17 @@
 
 export type LetterState = "green" | "yellow" | "gray";
 
-// Strip accents, drop spaces, uppercase.
+// Strip accents, drop everything that isn't a letter, uppercase.
+// Drops spaces ("Pedro Martinez" → "PEDROMARTINEZ"), punctuation
+// ("Ken Griffey Jr." → "KENGRIFFEYJR" so users can actually type the
+// suffix on the letter-only keyboard), and apostrophes ("D'Backs" →
+// "DBACKS"). Safe to call on already-normalized strings (idempotent).
 export function normalize(s: string): string {
   return s
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/\s+/g, "")
-    .toUpperCase();
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
 }
 
 export function scoreGuess(answer: string, guess: string): LetterState[] {

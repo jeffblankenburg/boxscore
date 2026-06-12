@@ -74,7 +74,7 @@ const runtime = { force: false };
 
 // ─── Schedule envelope shapes ─────────────────────────────────────────
 
-type SchedGame = {
+export type SchedGame = {
   gamePk: number;
   gameDate: string;
   gameType?: string;
@@ -93,18 +93,30 @@ type SchedEnvelope = {
 
 // ─── Single-game ingest ───────────────────────────────────────────────
 
-async function ingestGame(g: SchedGame): Promise<"ingested" | "skipped" | "failed"> {
+export async function ingestGame(g: SchedGame): Promise<"ingested" | "skipped" | "failed"> {
   const supa = supabaseAdmin();
 
   // Skip if already present unless --force. The crawler is idempotent,
   // but skipping early avoids the MLB API round-trip on resumed runs.
+  //
+  // Both tables matter: an earlier run may have written historical_games
+  // but failed on the boxscore fetch, leaving a partial row that the
+  // games-only guard would treat as "done." Audit-retry caught 10 such
+  // pks in 2026-06 (#45). Skip only when both tables have the row.
   if (!runtime.force) {
-    const { data: existing } = await supa
+    const { data: gameRow } = await supa
       .from("historical_games")
       .select("game_pk")
       .eq("game_pk", g.gamePk)
       .maybeSingle();
-    if (existing) return "skipped";
+    if (gameRow) {
+      const { data: boxRow } = await supa
+        .from("historical_boxscores")
+        .select("game_pk")
+        .eq("game_pk", g.gamePk)
+        .maybeSingle();
+      if (boxRow) return "skipped";
+    }
   }
 
   let boxRaw: unknown;
@@ -398,7 +410,13 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only run main() when invoked as the entry point. Without this guard,
+// importing `ingestGame` from another script (e.g. retry-missing-boxscores)
+// triggers a full backfill on import. The `import.meta.url` check is the
+// ESM equivalent of `require.main === module`.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
