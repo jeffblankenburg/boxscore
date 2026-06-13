@@ -247,16 +247,20 @@
   margin: 10px 0 6px;
 }
 .statsharks-dot {
-  /* No mount animation — the flying dot lands in the same position
-     and we mount the permanent dot at the moment the flight ends.
-     A pop animation here would cause a flicker as the flying dot
-     vanishes (opacity 0) and the permanent dot scales up (opacity 0
-     → 1). Instead the flying dot stays at opacity 1, we unmount it,
-     and the permanent dot replaces it instantly. */
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  box-sizing: border-box;
+}
+.statsharks-dot.is-filled {
   background: #1f7a3a;
+}
+.statsharks-dot.is-empty {
+  background: transparent;
+  border: 2px solid var(--border-strong);
+  /* Empty circle is slightly visually smaller because the border eats
+     into the 12px. Looks balanced next to filled ones. */
+  opacity: 0.6;
 }
 .statsharks-dot-flying {
   position: fixed;
@@ -280,14 +284,6 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   margin: 14px 0 18px;
-}
-.statsharks-prompt-counter {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.06em;
-  margin-left: 10px;
-  vertical-align: middle;
 }
 
 /* Cards stack top/bottom — gives each card the full 368px content

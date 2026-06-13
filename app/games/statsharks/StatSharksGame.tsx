@@ -615,16 +615,18 @@ function RunView({
       ) : null}
       <TopBar stat={stat} streak={streak} secondsLeft={secondsLeft} />
       <div className="statsharks-dots" ref={dotsRowRef}>
-        {Array.from({ length: streak }).map((_, i) => (
-          <span key={i} className="statsharks-dot" />
-        ))}
+        {isDaily
+          ? Array.from({ length: DAILY_ROUND_COUNT }).map((_, i) => (
+              <span
+                key={i}
+                className={"statsharks-dot " + (i < streak ? "is-filled" : "is-empty")}
+              />
+            ))
+          : Array.from({ length: streak }).map((_, i) => (
+              <span key={i} className="statsharks-dot is-filled" />
+            ))}
       </div>
-      <div className="statsharks-prompt">
-        {stat.prompt}
-        {isDaily ? (
-          <span className="statsharks-prompt-counter">{rounds.length + 1}/{DAILY_ROUND_COUNT}</span>
-        ) : null}
-      </div>
+      <div className="statsharks-prompt">{stat.prompt}</div>
       <div className="statsharks-cards">
         <Card
           side="left"
