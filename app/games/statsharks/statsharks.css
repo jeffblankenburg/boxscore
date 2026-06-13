@@ -1,0 +1,239 @@
+/* Stat Sharks UI styles. Matches the Linescordle rhythm: paper card
+   on a warm beige background, strong black borders, mono numerals
+   where stat values appear. Layout is column on mobile, row on
+   wider screens. */
+
+.statsharks {
+  max-width: 720px;
+  margin: 20px auto;
+  padding: 0 16px 40px;
+  font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
+  color: var(--text-primary);
+}
+.statsharks-h {
+  position: relative;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.statsharks-h h2 {
+  margin: 0 0 2px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.statsharks-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Sign-in gate */
+.statsharks-signin {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-paper);
+  padding: 18px 20px;
+  border-radius: 6px;
+  text-align: center;
+}
+.statsharks-signin p {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.statsharks-signin-btn {
+  display: inline-block;
+  padding: 10px 22px;
+  background: var(--text-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.statsharks-signin-btn:hover { background: #000; }
+
+/* Top bar: streak + stat name + timer */
+.statsharks-topbar {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-paper);
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+.statsharks-streak, .statsharks-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+.statsharks-streak-num, .statsharks-timer-num {
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.statsharks-streak-label, .statsharks-timer-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.statsharks-timer.is-low .statsharks-timer-num { color: #c4392a; }
+.statsharks-statname {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Prompt above the cards: "MORE HOME RUNS?" */
+.statsharks-prompt {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin: 14px 0 18px;
+}
+
+/* Card row */
+.statsharks-cards {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+.statsharks-vs {
+  align-self: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.statsharks-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--bg-paper);
+  border: 2px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 20px 16px;
+  min-height: 180px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: transform 0.15s ease-out, background 0.2s, border-color 0.2s;
+}
+.statsharks-card:hover:not(:disabled) { transform: translateY(-2px); }
+.statsharks-card:active:not(:disabled) { transform: translateY(0); }
+.statsharks-card:disabled { cursor: default; }
+.statsharks-card-name {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 4px;
+}
+.statsharks-card-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 18px;
+}
+.statsharks-card-value {
+  font-size: 36px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.statsharks-card-value-hidden { color: var(--border-light); }
+
+/* Reveal coloring */
+.statsharks-card-correct {
+  border-color: #1f7a3a;
+  background: #f0f8f1;
+}
+.statsharks-card-wrong {
+  border-color: #c4392a;
+  background: #fdeeec;
+}
+.statsharks-card.is-flipped .statsharks-card-value {
+  animation: ssh-pop 0.4s ease-out;
+}
+@keyframes ssh-pop {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* End screen */
+.statsharks-end {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-paper);
+  padding: 22px 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+.statsharks-end-status {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.statsharks-end-stat {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+.statsharks-end-grid {
+  font-family: inherit;
+  font-size: 20px;
+  margin: 14px 0;
+  letter-spacing: 1px;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.statsharks-share-btn {
+  display: inline-block;
+  background: var(--text-primary);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  border: 1px solid var(--text-primary);
+  cursor: pointer;
+}
+.statsharks-share-btn:hover { background: #000; }
+.statsharks-end-tomorrow {
+  margin: 18px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.statsharks-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* Mobile: stack cards vertically */
+@media (max-width: 540px) {
+  .statsharks-cards {
+    grid-template-columns: 1fr;
+  }
+  .statsharks-vs {
+    text-align: center;
+    margin: 4px 0;
+  }
+  .statsharks-card { min-height: 140px; }
+  .statsharks-card-name { font-size: 18px; }
+  .statsharks-card-value { font-size: 30px; }
+  .statsharks-topbar { grid-template-columns: 1fr 1.5fr 1fr; }
+  .statsharks-streak-num, .statsharks-timer-num { font-size: 24px; }
+  .statsharks-prompt { font-size: 16px; }
+}
