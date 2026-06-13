@@ -367,10 +367,11 @@ function RunView({
       dy: targetY - startY,
       id: Date.now(),
     });
-    // Animation length matches the CSS keyframe duration. Clear the
-    // floating dot once it lands so the row's permanent dot is the
-    // only one visible.
-    setTimeout(() => setFlyingDot(null), 700);
+    // No timeout to clear here — clearing is intentionally batched
+    // with setRounds at REVEAL_MS so the floating dot vanishes on the
+    // exact frame the permanent dot mounts. (Two setTimeouts firing
+    // at the same scheduled time become separate React batches, which
+    // produces a one-frame flicker.)
   }, []);
 
   // Persist on any state change (daily only really uses this; endless
@@ -481,16 +482,17 @@ function RunView({
           // Wrong path: mount the wrong-round in history (doesn't grow
           // the dot row since wasCorrect is false), end the run.
           setRounds(nextRounds);
+          setFlyingDot(null);
           setEnded(true);
           setPair(null);
           return;
         }
         // Correct path: mount the new permanent dot (via setRounds) AT
-        // the same instant we swap to the next pair. Use the pre-
-        // fetched pair if available; otherwise the picker is slower
-        // than the human, so fall through to a synchronous fetch and
-        // accept a brief loader.
+        // the same instant we swap to the next pair AND unmount the
+        // flying dot. All three setStates batch into one render so
+        // the user never sees a frame without the dot.
         setRounds(nextRounds);
+        setFlyingDot(null);
         if (nextPair) {
           setPair(nextPair);
           setNextPair(null);
