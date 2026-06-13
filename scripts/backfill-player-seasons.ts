@@ -17,7 +17,7 @@ import { supabaseAdmin } from "../lib/supabase";
 import {
   computeEligibility,
   parseInnings,
-} from "../lib/games/hilo/eligibility";
+} from "../lib/games/statsharks/eligibility";
 
 const REQUEST_DELAY_MS = 200;
 const JOB = "player-seasons";
