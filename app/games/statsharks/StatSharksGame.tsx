@@ -167,18 +167,50 @@ function DailyRun({
 
 // ─── Endless mode ────────────────────────────────────────────────
 
-function EndlessRun({ stat, statKey, playedOn }: { stat: StatDef; statKey: StatKey; playedOn: string }) {
-  // `runId` re-keys RunView to force a fresh state on "Play again".
+function EndlessRun({ statKey: todayKey, playedOn }: { stat: StatDef; statKey: StatKey; playedOn: string }) {
+  // Endless lets the user pick the stat themselves — `selectedKey`
+  // null = show the chooser; non-null = run that stat. The pre-fill
+  // defaults to today's daily stat so a one-tap "start endless" works.
+  const [selectedKey, setSelectedKey] = useState<StatKey | null>(null);
   const [runId, setRunId] = useState(0);
-  const [best, setBest] = useState<number>(() => loadBestEndless(playedOn, statKey));
 
+  if (!selectedKey) {
+    return <StatChooser
+      defaultKey={todayKey}
+      playedOn={playedOn}
+      onPick={(k) => { setSelectedKey(k); setRunId(0); }}
+    />;
+  }
+
+  const stat = STATS[selectedKey];
+  return (
+    <EndlessRunForStat
+      key={`${selectedKey}-${runId}`}
+      stat={stat}
+      statKey={selectedKey}
+      playedOn={playedOn}
+      onPlayAgain={() => setRunId((n) => n + 1)}
+      onChooseDifferent={() => setSelectedKey(null)}
+    />
+  );
+}
+
+function EndlessRunForStat({
+  stat, statKey, playedOn, onPlayAgain, onChooseDifferent,
+}: {
+  stat: StatDef;
+  statKey: StatKey;
+  playedOn: string;
+  onPlayAgain: () => void;
+  onChooseDifferent: () => void;
+}) {
+  const [best, setBest] = useState<number>(() => loadBestEndless(playedOn, statKey));
   return (
     <RunView
-      key={runId}
       stat={stat} statKey={statKey} playedOn={playedOn}
       initialRounds={[]}
       initialEnded={false}
-      initialPair={null}  // RunView will fetch a first pair when initialPair is null
+      initialPair={null}
       persist={(rounds, ended) => {
         if (ended) {
           const streak = rounds.filter((r) => r.wasCorrect).length;
@@ -187,9 +219,52 @@ function EndlessRun({ stat, statKey, playedOn }: { stat: StatDef; statKey: StatK
         }
       }}
       endVariant="endless"
-      onPlayAgain={() => setRunId((n) => n + 1)}
+      onPlayAgain={onPlayAgain}
+      onChooseDifferent={onChooseDifferent}
       bestEndless={best}
     />
+  );
+}
+
+function StatChooser({
+  defaultKey, playedOn, onPick,
+}: {
+  defaultKey: StatKey;
+  playedOn: string;
+  onPick: (k: StatKey) => void;
+}) {
+  // Show each stat as a chip with the day's best streak inline so the
+  // user can see "you got 12 on K already today" and pick something
+  // harder. Best lookup is cheap (one localStorage read per stat).
+  const allKeys = Object.keys(STATS) as StatKey[];
+  return (
+    <section className="statsharks-chooser">
+      <h3 className="statsharks-chooser-h">Pick your stat</h3>
+      <p className="statsharks-chooser-sub">
+        Same Card Sharks rules — build the longest streak. Practice runs don&rsquo;t affect today&rsquo;s daily score.
+      </p>
+      <div className="statsharks-chooser-grid">
+        {allKeys.map((k) => {
+          const s = STATS[k];
+          const best = loadBestEndless(playedOn, k);
+          const isDefault = k === defaultKey;
+          return (
+            <button
+              key={k}
+              type="button"
+              className={"statsharks-chooser-chip" + (isDefault ? " is-default" : "")}
+              onClick={() => onPick(k)}
+            >
+              <span className="statsharks-chooser-chip-key">{k}</span>
+              <span className="statsharks-chooser-chip-label">{s.label}</span>
+              {best > 0
+                ? <span className="statsharks-chooser-chip-best">best {best}</span>
+                : <span className="statsharks-chooser-chip-best-empty">—</span>}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -198,7 +273,7 @@ function EndlessRun({ stat, statKey, playedOn }: { stat: StatDef; statKey: StatK
 function RunView({
   stat, statKey, playedOn,
   initialRounds, initialEnded, initialPair,
-  persist, endVariant, onPlayAgain, bestEndless,
+  persist, endVariant, onPlayAgain, onChooseDifferent, bestEndless,
 }: {
   stat: StatDef;
   statKey: StatKey;
@@ -209,6 +284,7 @@ function RunView({
   persist:       (rounds: PersistedRound[], ended: boolean) => void;
   endVariant:    "daily" | "endless";
   onPlayAgain?:  () => void;
+  onChooseDifferent?: () => void;
   bestEndless?:  number;
 }) {
   const [rounds, setRounds]   = useState<PersistedRound[]>(initialRounds);
@@ -345,6 +421,7 @@ function RunView({
         stat={stat} rounds={rounds} playedOn={playedOn}
         variant={endVariant}
         onPlayAgain={onPlayAgain}
+        onChooseDifferent={onChooseDifferent}
         bestEndless={bestEndless}
       />
     );
@@ -440,13 +517,14 @@ function Card({
 }
 
 function EndScreen({
-  stat, rounds, playedOn, variant, onPlayAgain, bestEndless,
+  stat, rounds, playedOn, variant, onPlayAgain, onChooseDifferent, bestEndless,
 }: {
   stat: StatDef;
   rounds: PersistedRound[];
   playedOn: string;
   variant: "daily" | "endless";
   onPlayAgain?: () => void;
+  onChooseDifferent?: () => void;
   bestEndless?: number;
 }) {
   const [copied, setCopied] = useState(false);
@@ -516,6 +594,15 @@ function EndScreen({
             onClick={onPlayAgain}
           >
             Play again
+          </button>
+        ) : null}
+        {variant === "endless" && onChooseDifferent ? (
+          <button
+            type="button"
+            className="statsharks-play-again-btn"
+            onClick={onChooseDifferent}
+          >
+            Pick different stat
           </button>
         ) : null}
       </div>

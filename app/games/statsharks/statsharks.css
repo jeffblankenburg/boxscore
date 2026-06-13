@@ -53,6 +53,73 @@
 }
 .statsharks-signin-btn:hover { background: #000; }
 
+/* Endless stat chooser */
+.statsharks-chooser {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-paper);
+  border-radius: 8px;
+  padding: 16px 16px 18px;
+}
+.statsharks-chooser-h {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.statsharks-chooser-sub {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.statsharks-chooser-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+.statsharks-chooser-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--bg-paper);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.1s, background 0.15s;
+}
+.statsharks-chooser-chip:hover { background: rgba(0, 0, 0, 0.04); transform: translateY(-1px); }
+.statsharks-chooser-chip:active { transform: translateY(0); }
+.statsharks-chooser-chip.is-default {
+  border-width: 2px;
+  background: #fff7e0;
+}
+.statsharks-chooser-chip-key {
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.statsharks-chooser-chip-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+.statsharks-chooser-chip-best {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1f7a3a;
+  margin-top: 2px;
+}
+.statsharks-chooser-chip-best-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 /* Mode tabs */
 .statsharks-tabs {
   display: flex;
