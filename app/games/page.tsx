@@ -11,8 +11,10 @@ type GameEntry = {
   status: "live" | "soon";
 };
 
-// Single source of truth for the menu. Status flips from "soon" → "live"
-// as each game ships (per issues #59 / #60 / #61 / #62).
+// Single source of truth for the menu. Only "live" games are listed —
+// the unbuilt ones (Guess the Year / Guess the Player) come back when
+// they ship. Card Sharks-style stat comparison ships as Stat Sharks
+// (the Hi/Lo idea, renamed).
 const GAMES: GameEntry[] = [
   {
     slug: "linescordle",
@@ -21,22 +23,10 @@ const GAMES: GameEntry[] = [
     status: "live",
   },
   {
-    slug: "year",
-    title: "Guess the Year",
-    desc: "Read a box score from this calendar day in history. What year?",
-    status: "soon",
-  },
-  {
-    slug: "player",
-    title: "Guess the Player",
-    desc: "An outrageous single-game line. Who did it?",
-    status: "soon",
-  },
-  {
-    slug: "hilo",
-    title: "Higher / Lower",
-    desc: "Two careers, two seasons, two single-game lines. Pick the bigger number.",
-    status: "soon",
+    slug: "statsharks",
+    title: "Stat Sharks",
+    desc: "Two players, two seasons. Pick whose stat is higher — and build a streak.",
+    status: "live",
   },
 ];
 
