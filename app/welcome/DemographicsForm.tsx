@@ -109,24 +109,13 @@ export function DemographicsForm({ initial, showSkip = true }: DemographicsFormP
       <div className="welcome-actions">
         <button type="submit" className="welcome-submit">Save and continue</button>
         {showSkip ? (
-          // Skip = submit the form with all fields empty. The action
-          // still marks demographics_completed_at so the welcome step
-          // doesn't fire again on the next sign-in.
-          <button
-            type="submit"
-            className="welcome-skip"
-            formNoValidate
-            onClick={(e) => {
-              const form = (e.currentTarget as HTMLButtonElement).form;
-              if (!form) return;
-              for (const el of Array.from(form.elements)) {
-                const i = el as HTMLInputElement | HTMLSelectElement;
-                if (i.name) i.value = "";
-              }
-            }}
-          >
+          // Skip = leave the form without saving anything. Because
+          // demographics_completed_at stays null, the next sign-in
+          // (via /auth/[token]) will push them back to /welcome —
+          // intentional, per the "skip should not be complete" spec.
+          <a href="/settings" className="welcome-skip">
             Skip for now
-          </button>
+          </a>
         ) : null}
       </div>
     </form>

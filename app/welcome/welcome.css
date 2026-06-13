@@ -96,6 +96,11 @@
 }
 .welcome-submit,
 .welcome-skip {
+  /* Inline-flex so .welcome-skip (now an <a>, not a <button>) respects
+     padding + min-height the same way the submit button does. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: inherit;
   font-weight: 700;
   font-size: 14px;
@@ -103,6 +108,8 @@
   border-radius: 999px;
   cursor: pointer;
   min-height: 44px;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 .welcome-submit {
   background: var(--text-primary);

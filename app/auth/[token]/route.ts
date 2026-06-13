@@ -23,6 +23,7 @@ import {
   SUBSCRIBER_SESSION_TTL_SEC,
 } from "@/lib/subscriber-auth";
 import { isLikelyBot } from "@/lib/bot-detect";
+import { supabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,18 @@ async function consumeAndRedirect(token: string, url: URL): Promise<NextResponse
   const { token: sessionToken } = await createSession({
     subscriberId: claim.subscriberId,
   });
-  const res = NextResponse.redirect(new URL("/settings", url));
+  // Pull the demographics-completion flag so a subscriber who's never
+  // filled in the welcome form gets routed there even on a 2nd / 3rd
+  // sign-in. The /welcome page's "Skip" button stamps
+  // demographics_completed_at so once they've seen and dismissed the
+  // form they won't be pushed there again.
+  const { data: sub } = await supabaseAdmin()
+    .from("subscribers")
+    .select("demographics_completed_at")
+    .eq("id", claim.subscriberId)
+    .maybeSingle<{ demographics_completed_at: string | null }>();
+  const next = sub?.demographics_completed_at ? "/settings" : "/welcome";
+  const res = NextResponse.redirect(new URL(next, url));
   res.cookies.set({
     name: SUBSCRIBER_SESSION_COOKIE,
     value: sessionToken,
