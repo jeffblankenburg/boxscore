@@ -5,10 +5,18 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Historical backfill · admin · boxscore", robots: { index: false } };
 
 const FIRST_SEASON = 1950;
-// The page assumes anything that has a backfill_progress row with
-// last_date_done past late October is fully ingested for that season.
-// Anything pre-late-October is the worker still mid-season.
-const SEASON_DONE_THRESHOLD_MMDD = "10-20";
+// Done criterion: backfill_progress.last_date_done equals the max
+// game_date in historical_games for that season — i.e. the worker
+// reached the last game we know about. Older versions of this page
+// used a fixed Oct-20 threshold, which marked pre-2000 seasons as
+// permanently "running" because their World Series often wrapped
+// earlier than Oct 20. Per-season real-end-date lookup fixes that
+// without depending on a calendar heuristic.
+//
+// For the current season, we also require the calendar to be past
+// roughly the latest a season could plausibly run (Nov 10) — otherwise
+// a caught-up worker mid-season would falsely flip to "done."
+const CURRENT_SEASON_END_MMDD = "11-10";
 
 type ProgressRow = {
   season: number;
@@ -47,19 +55,48 @@ function fractionWithinSeason(lastDate: string | null, season: number): number {
   return Math.max(0, Math.min(1, (cx - sx) / (ex - sx)));
 }
 
+async function loadSeasonEndDates(seasons: number[]): Promise<Map<number, string>> {
+  // Per-season max(game_date) from historical_games. PostgREST has no
+  // GROUP BY, so we issue one parallel query per season — the seasons
+  // list is bounded (≤ ~80 entries) and each query is an indexed
+  // ORDER BY ... LIMIT 1, so this is cheap.
+  const db = supabaseAdmin();
+  const results = await Promise.all(seasons.map(async (s) => {
+    const { data } = await db
+      .from("historical_games")
+      .select("game_date")
+      .eq("season", s)
+      .order("game_date", { ascending: false })
+      .limit(1);
+    return [s, (data?.[0] as { game_date: string } | undefined)?.game_date ?? null] as const;
+  }));
+  const out = new Map<number, string>();
+  for (const [s, d] of results) if (d) out.set(s, d);
+  return out;
+}
+
 async function loadProgress(): Promise<DisplayRow[]> {
   const currentYear = new Date().getUTCFullYear();
-  const { data, error } = await supabaseAdmin()
-    .from("backfill_progress")
-    .select("season,last_date_done,games_seen,games_ingested,failed_game_pks,finished_at")
-    .eq("job", "historical-boxscores")
-    .gte("season", FIRST_SEASON)
-    .lte("season", currentYear)
-    .order("season", { ascending: true });
+  const seasons: number[] = [];
+  for (let y = FIRST_SEASON; y <= currentYear; y++) seasons.push(y);
+
+  const [{ data, error }, seasonEnds] = await Promise.all([
+    supabaseAdmin()
+      .from("backfill_progress")
+      .select("season,last_date_done,games_seen,games_ingested,failed_game_pks,finished_at")
+      .eq("job", "historical-boxscores")
+      .gte("season", FIRST_SEASON)
+      .lte("season", currentYear)
+      .order("season", { ascending: true }),
+    loadSeasonEndDates(seasons),
+  ]);
   if (error) throw new Error(`loadProgress: ${error.message}`);
   const bySeason = new Map<number, ProgressRow>(
     ((data ?? []) as ProgressRow[]).map((r) => [r.season, r]),
   );
+
+  const today = new Date();
+  const todayMMDD = `${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
 
   const out: DisplayRow[] = [];
   for (let y = FIRST_SEASON; y <= currentYear; y++) {
@@ -77,8 +114,17 @@ async function loadProgress(): Promise<DisplayRow[]> {
       continue;
     }
     const failed = r.failed_game_pks?.length ?? 0;
-    const isDone = r.last_date_done != null
-      && r.last_date_done.slice(5) >= SEASON_DONE_THRESHOLD_MMDD;
+    const seasonEnd = seasonEnds.get(y) ?? null;
+    // Past seasons: done iff we reached the actual last game in
+    // historical_games. Current season: same condition plus the
+    // calendar must be past CURRENT_SEASON_END_MMDD, otherwise a
+    // caught-up worker would falsely flip to done mid-season.
+    const reachedEnd = seasonEnd != null
+      && r.last_date_done != null
+      && r.last_date_done >= seasonEnd;
+    const calendarAllowsDone = y < currentYear
+      || todayMMDD >= CURRENT_SEASON_END_MMDD;
+    const isDone = reachedEnd && calendarAllowsDone;
     out.push({
       season: y,
       state: isDone ? "done" : "in_progress",
