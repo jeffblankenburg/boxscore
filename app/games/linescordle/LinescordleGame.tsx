@@ -613,17 +613,6 @@ function Suggestions({
     let cancelled = false;
     setPending(true);
     const t = setTimeout(() => {
-      // Temporary debug: log what we send so we can verify the
-      // constraint build against the visible board. Remove after the
-      // "Wilson Alvarez slipped past green R" mystery from 2026-06-12
-      // is resolved.
-      console.log("[Linescordle] searchPlayers payload", {
-        query:      current,
-        nameLength,
-        greens:     constraints.greens,
-        yellows:    constraints.yellows,
-        excluded:   guesses.map((g) => g.letters.join("")),
-      });
       searchPlayers({
         query:      current,
         nameLength,
@@ -631,10 +620,7 @@ function Suggestions({
         yellows:    constraints.yellows,
         exclude:    guesses.map((g) => g.letters.join("")),
       })
-        .then((r) => {
-          console.log("[Linescordle] searchPlayers results", r);
-          if (!cancelled) { setResults(r); setPending(false); }
-        })
+        .then((r) => { if (!cancelled) { setResults(r); setPending(false); } })
         .catch((e) => { console.error("searchPlayers:", e); if (!cancelled) setPending(false); });
     }, 150);
     return () => { cancelled = true; clearTimeout(t); };
