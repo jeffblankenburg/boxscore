@@ -38,6 +38,7 @@ type LocalDaily = {
 
 const dailyKey   = (date: string) => `statsharks:attempt:${date}`;
 const bestKey    = (date: string, stat: StatKey) => `statsharks:best-endless:${date}:${stat}`;
+const lifetimeKey = (stat: StatKey) => `statsharks:lifetime-endless:${stat}`;
 
 function loadDailyLocal(date: string): LocalDaily | null {
   if (typeof window === "undefined") return null;
@@ -65,6 +66,22 @@ function saveBestEndless(date: string, stat: StatKey, streak: number): void {
   try {
     const prev = loadBestEndless(date, stat);
     if (streak > prev) window.localStorage.setItem(bestKey(date, stat), String(streak));
+  } catch { /* quota */ }
+}
+
+function loadLifetimeEndless(stat: StatKey): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = window.localStorage.getItem(lifetimeKey(stat));
+    return raw ? Number(raw) || 0 : 0;
+  } catch { return 0; }
+}
+
+function saveLifetimeEndless(stat: StatKey, streak: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    const prev = loadLifetimeEndless(stat);
+    if (streak > prev) window.localStorage.setItem(lifetimeKey(stat), String(streak));
   } catch { /* quota */ }
 }
 
@@ -204,7 +221,8 @@ function EndlessRunForStat({
   onPlayAgain: () => void;
   onChooseDifferent: () => void;
 }) {
-  const [best, setBest] = useState<number>(() => loadBestEndless(playedOn, statKey));
+  const [bestToday, setBestToday] = useState<number>(() => loadBestEndless(playedOn, statKey));
+  const [bestLifetime, setBestLifetime] = useState<number>(() => loadLifetimeEndless(statKey));
   return (
     <RunView
       stat={stat} statKey={statKey} playedOn={playedOn}
@@ -215,13 +233,16 @@ function EndlessRunForStat({
         if (ended) {
           const streak = rounds.filter((r) => r.wasCorrect).length;
           saveBestEndless(playedOn, statKey, streak);
-          setBest((prev) => (streak > prev ? streak : prev));
+          saveLifetimeEndless(statKey, streak);
+          setBestToday((prev) => (streak > prev ? streak : prev));
+          setBestLifetime((prev) => (streak > prev ? streak : prev));
         }
       }}
       endVariant="endless"
       onPlayAgain={onPlayAgain}
       onChooseDifferent={onChooseDifferent}
-      bestEndless={best}
+      bestEndless={bestToday}
+      bestLifetime={bestLifetime}
     />
   );
 }
@@ -233,9 +254,11 @@ function StatChooser({
   playedOn: string;
   onPick: (k: StatKey) => void;
 }) {
-  // Show each stat as a chip with the day's best streak inline so the
-  // user can see "you got 12 on K already today" and pick something
-  // harder. Best lookup is cheap (one localStorage read per stat).
+  // Show each stat as a chip with two best-streak numbers inline:
+  // "today" (resets at midnight ET) on top, "all-time" lifetime best
+  // underneath. Lifetime numbers give the user something to chase
+  // across multiple days; today's number tells them how they've done
+  // so far.
   const allKeys = Object.keys(STATS) as StatKey[];
   return (
     <section className="statsharks-chooser">
@@ -246,7 +269,8 @@ function StatChooser({
       <div className="statsharks-chooser-grid">
         {allKeys.map((k) => {
           const s = STATS[k];
-          const best = loadBestEndless(playedOn, k);
+          const bestToday    = loadBestEndless(playedOn, k);
+          const bestLifetime = loadLifetimeEndless(k);
           const isDefault = k === defaultKey;
           return (
             <button
@@ -257,9 +281,14 @@ function StatChooser({
             >
               <span className="statsharks-chooser-chip-key">{k}</span>
               <span className="statsharks-chooser-chip-label">{s.label}</span>
-              {best > 0
-                ? <span className="statsharks-chooser-chip-best">best {best}</span>
-                : <span className="statsharks-chooser-chip-best-empty">—</span>}
+              <span className="statsharks-chooser-chip-bests">
+                {bestToday > 0
+                  ? <span className="statsharks-chooser-chip-today">today {bestToday}</span>
+                  : <span className="statsharks-chooser-chip-today-empty">today —</span>}
+                {bestLifetime > 0
+                  ? <span className="statsharks-chooser-chip-lifetime">best {bestLifetime}</span>
+                  : null}
+              </span>
             </button>
           );
         })}
@@ -273,7 +302,7 @@ function StatChooser({
 function RunView({
   stat, statKey, playedOn,
   initialRounds, initialEnded, initialPair,
-  persist, endVariant, onPlayAgain, onChooseDifferent, bestEndless,
+  persist, endVariant, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
 }: {
   stat: StatDef;
   statKey: StatKey;
@@ -286,6 +315,7 @@ function RunView({
   onPlayAgain?:  () => void;
   onChooseDifferent?: () => void;
   bestEndless?:  number;
+  bestLifetime?: number;
 }) {
   const [rounds, setRounds]   = useState<PersistedRound[]>(initialRounds);
   const [ended, setEnded]     = useState<boolean>(initialEnded);
@@ -423,6 +453,7 @@ function RunView({
         onPlayAgain={onPlayAgain}
         onChooseDifferent={onChooseDifferent}
         bestEndless={bestEndless}
+        bestLifetime={bestLifetime}
       />
     );
   }
@@ -517,7 +548,7 @@ function Card({
 }
 
 function EndScreen({
-  stat, rounds, playedOn, variant, onPlayAgain, onChooseDifferent, bestEndless,
+  stat, rounds, playedOn, variant, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
 }: {
   stat: StatDef;
   rounds: PersistedRound[];
@@ -526,6 +557,7 @@ function EndScreen({
   onPlayAgain?: () => void;
   onChooseDifferent?: () => void;
   bestEndless?: number;
+  bestLifetime?: number;
 }) {
   const [copied, setCopied] = useState(false);
   const streak = rounds.filter((r) => r.wasCorrect).length;
@@ -575,8 +607,12 @@ function EndScreen({
         {streak === 0 ? "Tough start." : `Streak: ${streak}`}
       </div>
       <div className="statsharks-end-stat">Today: <b>{stat.label}</b></div>
-      {variant === "endless" && bestEndless != null && bestEndless > 0 ? (
-        <div className="statsharks-end-best">Best today: <b>{bestEndless}</b></div>
+      {variant === "endless" ? (
+        <div className="statsharks-end-best">
+          {bestEndless != null && bestEndless > 0 ? <>Best today: <b>{bestEndless}</b></> : null}
+          {bestEndless != null && bestEndless > 0 && bestLifetime != null && bestLifetime > 0 ? " · " : null}
+          {bestLifetime != null && bestLifetime > 0 ? <>All-time best: <b>{bestLifetime}</b></> : null}
+        </div>
       ) : null}
       <pre className="statsharks-end-grid">{grid}</pre>
       <div className="statsharks-end-actions">
