@@ -3,12 +3,18 @@
    where stat values appear. Layout is column on mobile, row on
    wider screens. */
 
+/* Locked to 400px so name length never shifts the layout. Cards
+   below are fixed-width inside this and use min-height on the name
+   block so "Vlad Guerrero Jr." and "Cy Young" produce identical
+   card heights. */
 .statsharks {
-  max-width: 720px;
+  width: 100%;
+  max-width: 400px;
   margin: 20px auto;
   padding: 0 16px 40px;
   font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
   color: var(--text-primary);
+  box-sizing: border-box;
 }
 .statsharks-h {
   position: relative;
@@ -276,20 +282,23 @@
   margin: 14px 0 18px;
 }
 
-/* Card row */
+/* Card row — explicit equal-width columns so a long name on one side
+   can't push the other card narrower. Cards are 160px each within the
+   400px container (368 content - 24 vs - 24 gap = 320, / 2 = 160). */
 .statsharks-cards {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr 24px 1fr;
+  gap: 12px;
   align-items: stretch;
 }
 .statsharks-vs {
   align-self: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  text-align: center;
 }
 .statsharks-card {
   display: flex;
@@ -298,20 +307,29 @@
   background: var(--bg-paper);
   border: 2px solid var(--border-strong);
   border-radius: 8px;
-  padding: 20px 16px;
-  min-height: 180px;
+  padding: 16px 12px;
+  min-height: 200px;
+  width: 100%;
+  min-width: 0;
   cursor: pointer;
   font-family: inherit;
   text-align: left;
   transition: transform 0.15s ease-out, background 0.2s, border-color 0.2s;
+  box-sizing: border-box;
 }
 .statsharks-card:hover:not(:disabled) { transform: translateY(-2px); }
 .statsharks-card:active:not(:disabled) { transform: translateY(0); }
 .statsharks-card:disabled { cursor: default; }
 .statsharks-card-name {
-  font-size: 22px;
+  /* Reserve enough room for 2 lines of name at this font size so a
+     long name (e.g. "Vlad Guerrero Jr.") doesn't lengthen one card.
+     Names that fit on one line just leave whitespace below. */
+  font-size: 18px;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.15;
+  min-height: calc(18px * 1.15 * 2);
+  word-break: break-word;
+  hyphens: auto;
   margin-bottom: 2px;
 }
 .statsharks-card-year {
@@ -319,21 +337,23 @@
   font-weight: 800;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 .statsharks-card-team {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
-  margin-bottom: 18px;
+  margin-bottom: 12px;
   text-transform: uppercase;
 }
 .statsharks-card-value {
-  font-size: 36px;
+  font-size: 32px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  line-height: 1;
+  margin-top: auto;
 }
 .statsharks-card-value-hidden { color: var(--border-light); }
 
@@ -426,19 +446,6 @@
   color: var(--text-muted);
 }
 
-/* Mobile: stack cards vertically */
-@media (max-width: 540px) {
-  .statsharks-cards {
-    grid-template-columns: 1fr;
-  }
-  .statsharks-vs {
-    text-align: center;
-    margin: 4px 0;
-  }
-  .statsharks-card { min-height: 140px; }
-  .statsharks-card-name { font-size: 18px; }
-  .statsharks-card-value { font-size: 30px; }
-  .statsharks-topbar { grid-template-columns: 1fr 1.5fr 1fr; }
-  .statsharks-streak-num, .statsharks-timer-num { font-size: 24px; }
-  .statsharks-prompt { font-size: 16px; }
-}
+/* Container is already locked to 400px; we keep cards side-by-side at
+   every viewport. Phones narrower than 400px will compress
+   proportionally via box-sizing + min-width: 0 on the cards. */
