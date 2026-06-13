@@ -667,9 +667,13 @@ const Card = function Card({
       disabled={disabled}
       aria-label={`Pick ${card.player_name}, ${card.season}`}
     >
-      <div className="statsharks-card-name">{card.player_name}</div>
-      <div className="statsharks-card-year">{card.season}</div>
-      <div className="statsharks-card-team">{card.team_abbr ?? "—"}</div>
+      <div className="statsharks-card-left">
+        <div className="statsharks-card-name">{card.player_name}</div>
+        <div className="statsharks-card-yearteam">
+          <span className="statsharks-card-year">{card.season}</span>
+          {card.team_abbr ? <span className="statsharks-card-team">{card.team_abbr}</span> : null}
+        </div>
+      </div>
       {reveal ? (
         <div className="statsharks-card-value">{formatStatValue(stat, reveal.value)}</div>
       ) : (

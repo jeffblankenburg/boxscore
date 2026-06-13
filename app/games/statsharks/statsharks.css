@@ -282,33 +282,33 @@
   margin: 14px 0 18px;
 }
 
-/* Card row — explicit equal-width columns so a long name on one side
-   can't push the other card narrower. Cards are 160px each within the
-   400px container (368 content - 24 vs - 24 gap = 320, / 2 = 160). */
+/* Cards stack top/bottom — gives each card the full 368px content
+   width so player names breathe and the stat value gets a big right-
+   aligned slot. "vs" divider sits between them. */
 .statsharks-cards {
-  display: grid;
-  grid-template-columns: 1fr 24px 1fr;
-  gap: 12px;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .statsharks-vs {
   align-self: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  text-align: center;
+  letter-spacing: 0.14em;
+  padding: 2px 0;
 }
 .statsharks-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
   background: var(--bg-paper);
   border: 2px solid var(--border-strong);
   border-radius: 8px;
-  padding: 16px 12px;
-  min-height: 200px;
+  padding: 14px 16px;
+  min-height: 96px;
   width: 100%;
   min-width: 0;
   cursor: pointer;
@@ -320,40 +320,56 @@
 .statsharks-card:hover:not(:disabled) { transform: translateY(-2px); }
 .statsharks-card:active:not(:disabled) { transform: translateY(0); }
 .statsharks-card:disabled { cursor: default; }
+/* Left column of each card: name on top, year + team on the row below. */
+.statsharks-card-left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.statsharks-card-yearteam {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
 .statsharks-card-name {
-  /* Reserve enough room for 2 lines of name at this font size so a
-     long name (e.g. "Vlad Guerrero Jr.") doesn't lengthen one card.
-     Names that fit on one line just leave whitespace below. */
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1.15;
-  min-height: calc(18px * 1.15 * 2);
-  word-break: break-word;
-  hyphens: auto;
   margin-bottom: 2px;
+  /* Single line max — the 368px-wide card has plenty of room for even
+     "Vlad Guerrero Jr." Names that somehow overflow get truncated. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .statsharks-card-year {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  margin-bottom: 2px;
+  display: inline-block;
 }
 .statsharks-card-team {
-  font-size: 11px;
+  display: inline-block;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--text-muted);
-  margin-bottom: 12px;
   text-transform: uppercase;
+  margin-left: 8px;
 }
 .statsharks-card-value {
+  /* Right column of the horizontal card. Big right-aligned number
+     that fills on reveal. Stays visually anchored when "?" is the
+     placeholder so the layout doesn't shift on flip. */
   font-size: 32px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   text-align: right;
   line-height: 1;
-  margin-top: auto;
+  min-width: 80px;
 }
 .statsharks-card-value-hidden { color: var(--border-light); }
 
