@@ -106,12 +106,16 @@ export function statForDate(yyyymmdd: string): StatDef {
 
 /**
  * Linear gap ratio interpolation. Round 0 returns `loosestGap`,
- * round 20+ returns `tightestGap`. The picker uses this to enforce
- * a value-ratio gap between player A and player B that shrinks as
- * the user's streak grows.
+ * round `totalRounds`+ returns `tightestGap`. The picker uses this
+ * to enforce a value-ratio gap between player A and player B that
+ * shrinks as the user's streak grows.
+ *
+ * Pass `totalRounds=10` for the 10-round Daily mode (the curve peaks
+ * by the last round). Endless mode keeps the default 20 so streaks
+ * past 10 still have room to get harder.
  */
-export function gapForRound(stat: StatDef, round: number): number {
-  const T = 20;
+export function gapForRound(stat: StatDef, round: number, totalRounds = 20): number {
+  const T = totalRounds;
   const t = Math.max(0, Math.min(T, round)) / T;
   return stat.loosestGap + (stat.tightestGap - stat.loosestGap) * t;
 }

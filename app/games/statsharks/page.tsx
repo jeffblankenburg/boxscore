@@ -3,7 +3,7 @@ import {
   validateSession,
   SUBSCRIBER_SESSION_COOKIE,
 } from "@/lib/subscriber-auth";
-import { getPair, loadAttempt, type PublicPair, type PersistedAttempt } from "./actions";
+import { getDailySequence, loadAttempt, type DailyPublicPair, type PersistedAttempt } from "./actions";
 import { statForDate } from "@/lib/games/statsharks/stats";
 import { todayInET } from "@/lib/dates";
 import { StatSharksGame } from "./StatSharksGame";
@@ -30,22 +30,13 @@ export default async function StatSharksPage() {
   let initialAttempt: PersistedAttempt | null = null;
   if (isAuthed) initialAttempt = await loadAttempt(playedOn);
 
-  // If the user already finished today's run, skip the pair fetch —
-  // they'll see the end screen.
-  let firstPair: PublicPair | null = null;
-  if (!initialAttempt?.ended) {
-    const usedIds: number[] = [];
-    if (initialAttempt) {
-      for (const r of initialAttempt.rounds) {
-        usedIds.push(r.leftId, r.rightId);
-      }
-    }
-    firstPair = await getPair({
-      statKey: stat.key,
-      round:   initialAttempt?.rounds.length ?? 0,
-      usedPlayerSeasonIds: usedIds,
-    });
-  }
+  // Daily sequence: 10 pairs in a fixed order, the same for every
+  // subscriber today. Fetched once at page load — no per-round
+  // roundtrips during play.
+  const dailySequence = await getDailySequence({
+    playedOn,
+    statKey: stat.key,
+  });
 
   return (
     <main className="statsharks">
@@ -59,7 +50,7 @@ export default async function StatSharksPage() {
         playedOn={playedOn}
         isAuthed={isAuthed}
         initialAttempt={initialAttempt}
-        initialPair={firstPair}
+        dailySequence={dailySequence}
       />
     </main>
   );

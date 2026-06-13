@@ -17,12 +17,15 @@ import {
   scorePair,
   persistAttempt,
   type PublicPair,
+  type DailyPublicPair,
   type PersistedAttempt,
   type PersistedRound,
 } from "./actions";
+
+const DAILY_ROUND_COUNT = 10;
 import { STATS, VISIBLE_STATS, formatStatValue, type StatDef, type StatKey } from "@/lib/games/statsharks/stats";
 
-const TIMER_SEC = 30;
+const TIMER_SEC = 15;
 const REVEAL_MS = 1400;
 const FLIGHT_MS = 700;
 // Flying dot launches so it lands exactly when REVEAL_MS expires —
@@ -92,13 +95,13 @@ function saveLifetimeEndless(stat: StatKey, streak: number): void {
 // ─── Top-level ───────────────────────────────────────────────────
 
 export function StatSharksGame({
-  statKey, playedOn, isAuthed, initialAttempt, initialPair,
+  statKey, playedOn, isAuthed, initialAttempt, dailySequence,
 }: {
   statKey:         StatKey;
   playedOn:        string;
   isAuthed:        boolean;
   initialAttempt:  PersistedAttempt | null;
-  initialPair:     PublicPair | null;
+  dailySequence:   DailyPublicPair[];
 }) {
   const stat: StatDef = STATS[statKey];
   const [mode, setMode] = useState<Mode>("daily");
@@ -128,7 +131,8 @@ export function StatSharksGame({
       {mode === "daily" ? (
         <DailyRun
           stat={stat} statKey={statKey} playedOn={playedOn} isAuthed={isAuthed}
-          initialAttempt={initialAttempt} initialPair={initialPair}
+          initialAttempt={initialAttempt}
+          dailySequence={dailySequence}
           mode={mode}
         />
       ) : (
@@ -141,41 +145,34 @@ export function StatSharksGame({
 // ─── Daily mode ──────────────────────────────────────────────────
 
 function DailyRun({
-  stat, statKey, playedOn, isAuthed, initialAttempt, initialPair, mode,
+  stat, statKey, playedOn, isAuthed, initialAttempt, dailySequence, mode,
 }: {
   stat: StatDef;
   statKey: StatKey;
   playedOn: string;
   isAuthed: boolean;
   initialAttempt: PersistedAttempt | null;
-  initialPair: PublicPair | null;
+  dailySequence: DailyPublicPair[];
   mode: Mode;
 }) {
-  const initial = useMemo<{ rounds: PersistedRound[]; ended: boolean; pair: PublicPair | null }>(() => {
+  const initial = useMemo<{ rounds: PersistedRound[]; ended: boolean }>(() => {
     if (initialAttempt) {
-      return {
-        rounds: initialAttempt.rounds,
-        ended:  initialAttempt.ended,
-        pair:   initialAttempt.ended ? null : initialPair,
-      };
+      return { rounds: initialAttempt.rounds, ended: initialAttempt.ended };
     }
     const local = loadDailyLocal(playedOn);
     if (local && local.stat === statKey) {
-      return {
-        rounds: local.rounds,
-        ended:  local.ended,
-        pair:   local.ended ? null : initialPair,
-      };
+      return { rounds: local.rounds, ended: local.ended };
     }
-    return { rounds: [], ended: false, pair: initialPair };
-  }, [initialAttempt, initialPair, playedOn, statKey]);
+    return { rounds: [], ended: false };
+  }, [initialAttempt, playedOn, statKey]);
 
   return (
     <RunView
       stat={stat} statKey={statKey} playedOn={playedOn}
       initialRounds={initial.rounds}
       initialEnded={initial.ended}
-      initialPair={initial.pair}
+      initialPair={null}
+      dailySequence={dailySequence}
       persist={(rounds, ended) => {
         saveDailyLocal({ date: playedOn, stat: statKey, rounds, ended });
         if (isAuthed) {
@@ -313,6 +310,7 @@ function StatChooser({
 function RunView({
   stat, statKey, playedOn,
   initialRounds, initialEnded, initialPair,
+  dailySequence,
   persist, endVariant, mode, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
 }: {
   stat: StatDef;
@@ -321,6 +319,10 @@ function RunView({
   initialRounds: PersistedRound[];
   initialEnded:  boolean;
   initialPair:   PublicPair | null;
+  /** Daily mode supplies a fixed 10-pair sequence; round index =
+   * rounds.length. Endless leaves this undefined and uses random
+   * picker calls. */
+  dailySequence?: DailyPublicPair[];
   persist:       (rounds: PersistedRound[], ended: boolean) => void;
   endVariant:    "daily" | "endless";
   mode:          Mode;
@@ -329,12 +331,19 @@ function RunView({
   bestEndless?:  number;
   bestLifetime?: number;
 }) {
+  const isDaily = !!dailySequence;
+  const totalRounds = isDaily ? DAILY_ROUND_COUNT : null;
   const [rounds, setRounds]   = useState<PersistedRound[]>(initialRounds);
   const [ended, setEnded]     = useState<boolean>(initialEnded);
-  const [pair, setPair]       = useState<PublicPair | null>(initialPair);
-  // Pre-fetched next pair, so a correct answer can swap instantly
-  // without a network roundtrip showing a loading state.
-  const [nextPair, setNextPair] = useState<PublicPair | null>(null);
+  // For Endless mode only — Daily derives its pair from dailySequence
+  // by index = rounds.length.
+  const [endlessPair, setEndlessPair] = useState<PublicPair | null>(initialPair);
+  const [nextEndlessPair, setNextEndlessPair] = useState<PublicPair | null>(null);
+  const pair: PublicPair | null = ended
+    ? null
+    : isDaily
+      ? (dailySequence![rounds.length] ?? null)
+      : endlessPair;
   const [reveal, setReveal]   = useState<{
     leftValue: number; rightValue: number;
     correctSide: "left" | "right";
@@ -343,6 +352,12 @@ function RunView({
   } | null>(null);
   const [pending, setPending] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SEC);
+  // Wall-clock start of the current round's timer. We compute
+  // secondsLeft as (TIMER_SEC - elapsed) so a paused tab (mobile
+  // backgrounded) doesn't keep the clock alive — when the tab
+  // returns we recompute and either show the right number OR fire
+  // the timeout if it should already have expired.
+  const timerStartedAtRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Refs + state for the "dot flies from card to dots row" animation
@@ -388,9 +403,12 @@ function RunView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rounds, ended]);
 
-  // Endless / cold-start: if no initial pair was supplied, fetch one.
+  // Endless mode only: cold-start fetch + pre-fetch of next pair. Daily
+  // mode bypasses both because the entire sequence is already in
+  // memory.
   useEffect(() => {
-    if (pair || ended) return;
+    if (isDaily) return;
+    if (endlessPair || ended) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -400,7 +418,7 @@ function RunView({
           usedPlayerSeasonIds: [],
         });
         if (!cancelled) {
-          if (next) setPair(next);
+          if (next) setEndlessPair(next);
           else setEnded(true);
         }
       } catch (e) { console.error("getPair:", e); }
@@ -409,16 +427,13 @@ function RunView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pre-fetch the NEXT pair as soon as the current one mounts so a
-  // correct answer can swap in instantly. Doesn't fire if we already
-  // have a pre-fetched pair (e.g. from the round before) or the run
-  // is already over.
   useEffect(() => {
-    if (!pair || ended || nextPair) return;
+    if (isDaily) return;
+    if (!endlessPair || ended || nextEndlessPair) return;
     let cancelled = false;
     const usedForNext: number[] = [];
     for (const r of rounds) usedForNext.push(r.leftId, r.rightId);
-    usedForNext.push(pair.left.id, pair.right.id);
+    usedForNext.push(endlessPair.left.id, endlessPair.right.id);
     void (async () => {
       try {
         const next = await getPair({
@@ -426,23 +441,37 @@ function RunView({
           round: rounds.length + 1,
           usedPlayerSeasonIds: usedForNext,
         });
-        if (!cancelled && next) setNextPair(next);
+        if (!cancelled && next) setNextEndlessPair(next);
       } catch (e) { console.error("prefetch getPair:", e); }
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pair?.left.id, pair?.right.id]);
+  }, [endlessPair?.left.id, endlessPair?.right.id]);
 
-  // Timer.
+  // Timer. Wall-clock based so backgrounded mobile tabs can't pause
+  // the clock indefinitely — when the tab returns we recompute from
+  // Date.now() and the timeout fires immediately if it should have.
   useEffect(() => {
-    if (ended || !pair || reveal) return;
+    if (ended || !pair || reveal) {
+      timerStartedAtRef.current = null;
+      setSecondsLeft(TIMER_SEC);
+      return;
+    }
+    timerStartedAtRef.current = Date.now();
     setSecondsLeft(TIMER_SEC);
+    const tick = () => {
+      const start = timerStartedAtRef.current;
+      if (start === null) return;
+      const remaining = Math.max(0, TIMER_SEC - Math.floor((Date.now() - start) / 1000));
+      setSecondsLeft(remaining);
+    };
     if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setSecondsLeft((s) => (s > 0 ? s - 1 : 0));
-    }, 1000);
+    timerRef.current = setInterval(tick, 250);
+    const onVisible = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [pair?.left.id, pair?.right.id, ended, reveal]);
 
@@ -485,30 +514,39 @@ function RunView({
       setTimeout(() => {
         setReveal(null);
         const nextRounds = [...rounds, newRound];
+
+        // Wrong → end the run (lose in Daily, end in Endless).
         if (!score.wasCorrect) {
-          // Wrong path: mount the wrong-round in history (doesn't grow
-          // the dot row since wasCorrect is false), end the run.
           setRounds(nextRounds);
           setFlyingDot(null);
           setEnded(true);
-          setPair(null);
+          setEndlessPair(null);
           return;
         }
-        // Correct path: mount the new permanent dot (via setRounds) AT
-        // the same instant we swap to the next pair AND unmount the
-        // flying dot. All three setStates batch into one render so
-        // the user never sees a frame without the dot.
+
+        // Daily: cap at DAILY_ROUND_COUNT. If we just hit it, win and
+        // end. Otherwise the derived `pair` updates automatically
+        // because rounds.length changed.
+        if (isDaily) {
+          const reachedCap = nextRounds.length >= DAILY_ROUND_COUNT;
+          setRounds(nextRounds);
+          setFlyingDot(null);
+          if (reachedCap) {
+            setEnded(true);
+          }
+          return;
+        }
+
+        // Endless: swap to the pre-fetched next pair (or fetch on
+        // demand if the pre-fetch was slower than the human).
         setRounds(nextRounds);
         setFlyingDot(null);
-        if (nextPair) {
-          setPair(nextPair);
-          setNextPair(null);
+        if (nextEndlessPair) {
+          setEndlessPair(nextEndlessPair);
+          setNextEndlessPair(null);
         } else {
-          // Fallback path. The pre-fetch effect will re-fire if pair
-          // becomes null then non-null, but we need an immediate fetch
-          // here so the user doesn't sit on a blank screen.
           const used = usedIds;
-          setPair(null);  // shows loader briefly
+          setEndlessPair(null);
           void (async () => {
             try {
               const next = await getPair({
@@ -516,12 +554,12 @@ function RunView({
                 round: nextRounds.length,
                 usedPlayerSeasonIds: used,
               });
-              if (next) setPair(next);
-              else { setEnded(true); setPair(null); }
+              if (next) setEndlessPair(next);
+              else { setEnded(true); setEndlessPair(null); }
             } catch (e) {
               console.error("fallback getPair:", e);
               setEnded(true);
-              setPair(null);
+              setEndlessPair(null);
             }
           })();
         }
@@ -531,7 +569,7 @@ function RunView({
     } finally {
       setPending(false);
     }
-  }, [pending, reveal, ended, pair, rounds, usedIds, statKey, launchFlyingDot, nextPair]);
+  }, [pending, reveal, ended, pair, rounds, usedIds, statKey, launchFlyingDot, nextEndlessPair, isDaily]);
 
   useEffect(() => {
     if (secondsLeft !== 0) return;
@@ -555,6 +593,7 @@ function RunView({
       <EndScreen
         stat={stat} rounds={rounds} playedOn={playedOn}
         variant={endVariant}
+        totalRounds={totalRounds ?? undefined}
         onPlayAgain={onPlayAgain}
         onChooseDifferent={onChooseDifferent}
         bestEndless={bestEndless}
@@ -580,7 +619,12 @@ function RunView({
           <span key={i} className="statsharks-dot" />
         ))}
       </div>
-      <div className="statsharks-prompt">{stat.prompt}</div>
+      <div className="statsharks-prompt">
+        {stat.prompt}
+        {isDaily ? (
+          <span className="statsharks-prompt-counter">{rounds.length + 1}/{DAILY_ROUND_COUNT}</span>
+        ) : null}
+      </div>
       <div className="statsharks-cards">
         <Card
           side="left"
@@ -684,12 +728,14 @@ const Card = function Card({
 };
 
 function EndScreen({
-  stat, rounds, playedOn, variant, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
+  stat, rounds, playedOn, variant, totalRounds, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
 }: {
   stat: StatDef;
   rounds: PersistedRound[];
   playedOn: string;
   variant: "daily" | "endless";
+  /** Daily mode passes 10; Endless leaves undefined (open-ended). */
+  totalRounds?: number;
   onPlayAgain?: () => void;
   onChooseDifferent?: () => void;
   bestEndless?: number;
@@ -697,13 +743,22 @@ function EndScreen({
 }) {
   const [copied, setCopied] = useState(false);
   const streak = rounds.filter((r) => r.wasCorrect).length;
+  const isDailyWin = variant === "daily" && totalRounds != null && streak >= totalRounds;
   const grid = rounds.map((r) => r.wasCorrect ? "🟢" : "🔴").join("");
   const shareText = useMemo(() => {
-    const headline = variant === "daily"
-      ? `Boxscore Stat Sharks — ${playedOn}`
-      : `Boxscore Stat Sharks (endless) — ${playedOn}`;
+    if (variant === "daily" && totalRounds != null) {
+      return [
+        `Boxscore Stat Sharks — ${playedOn}`,
+        `Today: ${stat.label}`,
+        ``,
+        `${streak}/${totalRounds}${isDailyWin ? " ✨" : ""}`,
+        grid,
+        ``,
+        `boxscore.games/statsharks`,
+      ].join("\n");
+    }
     return [
-      headline,
+      `Boxscore Stat Sharks (endless) — ${playedOn}`,
       `Today: ${stat.label}`,
       ``,
       `Streak: ${streak}`,
@@ -711,7 +766,7 @@ function EndScreen({
       ``,
       `boxscore.games/statsharks`,
     ].join("\n");
-  }, [stat.label, streak, grid, playedOn, variant]);
+  }, [stat.label, streak, grid, playedOn, variant, totalRounds, isDailyWin]);
 
   const onShare = async () => {
     const isMobile = typeof window !== "undefined"
@@ -740,7 +795,9 @@ function EndScreen({
   return (
     <section className="statsharks-end">
       <div className="statsharks-end-status">
-        {streak === 0 ? "Tough start." : `Streak: ${streak}`}
+        {variant === "daily" && totalRounds != null
+          ? (isDailyWin ? `${streak}/${totalRounds} ✨` : `${streak}/${totalRounds}`)
+          : (streak === 0 ? "Tough start." : `Streak: ${streak}`)}
       </div>
       <div className="statsharks-end-stat">
         {variant === "daily" ? <>Today: <b>{stat.label}</b></> : <b>{stat.label}</b>}

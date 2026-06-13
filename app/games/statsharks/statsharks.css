@@ -281,6 +281,14 @@
   letter-spacing: 0.06em;
   margin: 14px 0 18px;
 }
+.statsharks-prompt-counter {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  margin-left: 10px;
+  vertical-align: middle;
+}
 
 /* Cards stack top/bottom — gives each card the full 368px content
    width so player names breathe and the stat value gets a big right-

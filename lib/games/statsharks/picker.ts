@@ -21,6 +21,25 @@
 import { supabaseAdmin } from "../../supabase";
 import { gapForRound, STATS, type StatDef, type StatKey } from "./stats";
 
+// ─── Seeded RNG ──────────────────────────────────────────────────
+//
+// Mulberry32 — small, fast 32-bit PRNG. Used by the Daily mode so
+// every subscriber gets the exact same sequence of pairs for a given
+// (date, stat). Endless mode still uses Math.random for variety.
+export type RNG = () => number;
+export function mulberry32(seed: number): RNG {
+  let s = seed;
+  return function () {
+    let t = (s += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}
+export function dateSeed(yyyymmdd: string): number {
+  return Number(yyyymmdd.replace(/-/g, ""));
+}
+
 // Per-season prominence cut. 1950s seasons regularly had only ~150
 // games per team and the eligibility threshold (≥100 PA / ≥20 IP)
 // already filters obscure callups, so the per-season pool of "the
@@ -165,18 +184,26 @@ export async function pickStatSharksPair(opts: {
   statKey:             StatKey;
   round:               number;
   usedPlayerSeasonIds: ReadonlySet<number> | number[];
+  /** Deterministic RNG. Daily mode passes a seeded one so all
+   *  subscribers see the same pair sequence. Defaults to Math.random
+   *  for Endless mode. */
+  rng?:                RNG;
+  /** Used by gapForRound to scale the difficulty curve. Daily passes
+   *  10 (the 10-round cap). Endless leaves the default 20. */
+  totalRounds?:        number;
 }): Promise<StatSharksPair | null> {
   const stat = STATS[opts.statKey];
   if (!stat) throw new Error(`unknown stat: ${opts.statKey}`);
   const used = opts.usedPlayerSeasonIds instanceof Set
     ? opts.usedPlayerSeasonIds
     : new Set(opts.usedPlayerSeasonIds);
+  const rng: RNG = opts.rng ?? Math.random;
 
   const pool = (await getPool(stat)).filter((r) => !used.has(r.id));
   if (pool.length < 2) return null;
 
-  const a = pool[Math.floor(Math.random() * pool.length)]!;
-  const targetGap = gapForRound(stat, opts.round);
+  const a = pool[Math.floor(rng() * pool.length)]!;
+  const targetGap = gapForRound(stat, opts.round, opts.totalRounds);
 
   // Pick player B such that the ratio between the two stat values is
   // at least `targetGap`. For lower-is-better stats the math flips —
@@ -209,7 +236,7 @@ export async function pickStatSharksPair(opts: {
     // Last-ditch: pick any other row.
     bPool = pool.filter((b) => b.id !== a.id);
   }
-  const b = bPool[Math.floor(Math.random() * bPool.length)]!;
+  const b = bPool[Math.floor(rng() * bPool.length)]!;
 
   // Decide which side is "correct" given the stat direction.
   const aIsBetter = stat.direction === "higher"
@@ -218,7 +245,7 @@ export async function pickStatSharksPair(opts: {
 
   // Randomize visual ordering so "the correct one is always the bigger
   // number on the left" can't become a strategy.
-  const aOnLeft = Math.random() < 0.5;
+  const aOnLeft = rng() < 0.5;
   const left  = aOnLeft ? a : b;
   const right = aOnLeft ? b : a;
   const correct: "left" | "right" =
@@ -245,4 +272,42 @@ export async function pickStatSharksPair(opts: {
  * "rebuild stat pool" button. */
 export function _resetPoolCacheForTests(): void {
   poolCache.clear();
+}
+
+// ─── Daily sequence ──────────────────────────────────────────────
+
+/** A single round of the daily sequence. Only the left/right
+ * player_seasons.ids are persisted; correctness is re-derived by
+ * scorePair() on the server. Player metadata (name/year/team) is
+ * fetched separately when the sequence is read so the cached row
+ * stays compact. */
+export type DailySequenceItem = {
+  leftId:  number;
+  rightId: number;
+};
+
+/** Deterministically build a 10-pair sequence for (stat, date) using
+ * a date-seeded mulberry32 RNG. All subscribers get the same pairs
+ * in the same order so the daily share grid is comparable. */
+export async function generateDailySequence(opts: {
+  statKey: StatKey;
+  date:    string;        // YYYY-MM-DD
+  count:   number;        // e.g. 10
+}): Promise<DailySequenceItem[]> {
+  const rng = mulberry32(dateSeed(opts.date));
+  const used: number[] = [];
+  const out: DailySequenceItem[] = [];
+  for (let i = 0; i < opts.count; i++) {
+    const pair = await pickStatSharksPair({
+      statKey:             opts.statKey,
+      round:               i,
+      usedPlayerSeasonIds: used,
+      rng,
+      totalRounds:         opts.count,
+    });
+    if (!pair) break;
+    used.push(pair.left.id, pair.right.id);
+    out.push({ leftId: pair.left.id, rightId: pair.right.id });
+  }
+  return out;
 }
