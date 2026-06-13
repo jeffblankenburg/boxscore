@@ -24,6 +24,10 @@ import { STATS, VISIBLE_STATS, formatStatValue, type StatDef, type StatKey } fro
 
 const TIMER_SEC = 30;
 const REVEAL_MS = 1400;
+const FLIGHT_MS = 700;
+// Flying dot launches so it lands exactly when REVEAL_MS expires —
+// i.e. right when the cards would be cleared for the next round.
+const FLIGHT_DELAY_MS = REVEAL_MS - FLIGHT_MS;
 
 type Mode = "daily" | "endless";
 
@@ -321,6 +325,9 @@ function RunView({
   const [rounds, setRounds]   = useState<PersistedRound[]>(initialRounds);
   const [ended, setEnded]     = useState<boolean>(initialEnded);
   const [pair, setPair]       = useState<PublicPair | null>(initialPair);
+  // Pre-fetched next pair, so a correct answer can swap instantly
+  // without a network roundtrip showing a loading state.
+  const [nextPair, setNextPair] = useState<PublicPair | null>(null);
   const [reveal, setReveal]   = useState<{
     leftValue: number; rightValue: number;
     correctSide: "left" | "right";
@@ -394,6 +401,30 @@ function RunView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pre-fetch the NEXT pair as soon as the current one mounts so a
+  // correct answer can swap in instantly. Doesn't fire if we already
+  // have a pre-fetched pair (e.g. from the round before) or the run
+  // is already over.
+  useEffect(() => {
+    if (!pair || ended || nextPair) return;
+    let cancelled = false;
+    const usedForNext: number[] = [];
+    for (const r of rounds) usedForNext.push(r.leftId, r.rightId);
+    usedForNext.push(pair.left.id, pair.right.id);
+    void (async () => {
+      try {
+        const next = await getPair({
+          statKey,
+          round: rounds.length + 1,
+          usedPlayerSeasonIds: usedForNext,
+        });
+        if (!cancelled && next) setNextPair(next);
+      } catch (e) { console.error("prefetch getPair:", e); }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pair?.left.id, pair?.right.id]);
+
   // Timer.
   useEffect(() => {
     if (ended || !pair || reveal) return;
@@ -432,37 +463,58 @@ function RunView({
         pickedSide: side,
         wasCorrect: score.wasCorrect,
       };
+      const nextSlotIndex = rounds.filter((r) => r.wasCorrect).length;
+
       // Dot-flight: launch from the picked card toward the next slot
-      // in the dots row. We schedule it so it lands at the moment the
-      // rounds row updates, creating the illusion that the flight
-      // "deposited" the new dot.
-      if (score.wasCorrect && side !== "timeout") {
-        const nextSlotIndex = rounds.filter((r) => r.wasCorrect).length;
-        setTimeout(() => launchFlyingDot(side, nextSlotIndex), REVEAL_MS - 700);
+      // in the dots row. Lands at exactly REVEAL_MS, the same moment
+      // the permanent dot mounts and the cards swap to the next pair.
+      // The flying dot stays at opacity 1 throughout — the unmount
+      // and the permanent dot's mount happen on the same frame.
+      if (score.wasCorrect && (side === "left" || side === "right")) {
+        setTimeout(() => launchFlyingDot(side, nextSlotIndex), FLIGHT_DELAY_MS);
       }
-      setTimeout(async () => {
+
+      setTimeout(() => {
         setReveal(null);
         const nextRounds = [...rounds, newRound];
         if (!score.wasCorrect) {
+          // Wrong path: mount the wrong-round in history (doesn't grow
+          // the dot row since wasCorrect is false), end the run.
           setRounds(nextRounds);
           setEnded(true);
           setPair(null);
           return;
         }
-        try {
-          const next = await getPair({
-            statKey,
-            round: nextRounds.length,
-            usedPlayerSeasonIds: usedIds,
-          });
-          setRounds(nextRounds);
-          if (!next) { setEnded(true); setPair(null); }
-          else setPair(next);
-        } catch (e) {
-          console.error("getPair:", e);
-          setRounds(nextRounds);
-          setEnded(true);
-          setPair(null);
+        // Correct path: mount the new permanent dot (via setRounds) AT
+        // the same instant we swap to the next pair. Use the pre-
+        // fetched pair if available; otherwise the picker is slower
+        // than the human, so fall through to a synchronous fetch and
+        // accept a brief loader.
+        setRounds(nextRounds);
+        if (nextPair) {
+          setPair(nextPair);
+          setNextPair(null);
+        } else {
+          // Fallback path. The pre-fetch effect will re-fire if pair
+          // becomes null then non-null, but we need an immediate fetch
+          // here so the user doesn't sit on a blank screen.
+          const used = usedIds;
+          setPair(null);  // shows loader briefly
+          void (async () => {
+            try {
+              const next = await getPair({
+                statKey,
+                round: nextRounds.length,
+                usedPlayerSeasonIds: used,
+              });
+              if (next) setPair(next);
+              else { setEnded(true); setPair(null); }
+            } catch (e) {
+              console.error("fallback getPair:", e);
+              setEnded(true);
+              setPair(null);
+            }
+          })();
         }
       }, REVEAL_MS);
     } catch (e) {
@@ -470,7 +522,7 @@ function RunView({
     } finally {
       setPending(false);
     }
-  }, [pending, reveal, ended, pair, rounds, usedIds, statKey, launchFlyingDot]);
+  }, [pending, reveal, ended, pair, rounds, usedIds, statKey, launchFlyingDot, nextPair]);
 
   useEffect(() => {
     if (secondsLeft !== 0) return;

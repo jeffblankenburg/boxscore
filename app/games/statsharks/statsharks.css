@@ -206,16 +206,16 @@
   margin: 10px 0 6px;
 }
 .statsharks-dot {
+  /* No mount animation — the flying dot lands in the same position
+     and we mount the permanent dot at the moment the flight ends.
+     A pop animation here would cause a flicker as the flying dot
+     vanishes (opacity 0) and the permanent dot scales up (opacity 0
+     → 1). Instead the flying dot stays at opacity 1, we unmount it,
+     and the permanent dot replaces it instantly. */
   width: 12px;
   height: 12px;
   border-radius: 50%;
   background: #1f7a3a;
-  animation: ssh-dot-pop 0.3s ease-out;
-}
-@keyframes ssh-dot-pop {
-  0%   { transform: scale(0.4); opacity: 0; }
-  60%  { transform: scale(1.1); opacity: 1; }
-  100% { transform: scale(1); }
 }
 .statsharks-dot-flying {
   position: fixed;
@@ -229,8 +229,7 @@
 }
 @keyframes ssh-dot-fly {
   0%   { transform: translate(0, 0)            scale(1.6); opacity: 1; }
-  90%  { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1);  opacity: 0; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1);  opacity: 1; }
 }
 
 /* Prompt above the cards: "MORE HOME RUNS?" */
