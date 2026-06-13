@@ -188,8 +188,9 @@ export async function fetchPlayerFromApi(mlbId: number): Promise<FetchedProfile 
   const env = (await res.json()) as ApiEnvelope;
   const p = env.people?.[0];
   if (!p) return null;
+  const { applyNameOverride } = await import("./players/name-overrides");
   return {
-    full_name:        p.fullName,
+    full_name:        applyNameOverride(mlbId, p.fullName),
     first_name:       p.firstName ?? null,
     last_name:        p.lastName ?? null,
     middle_name:      p.middleName ?? null,
