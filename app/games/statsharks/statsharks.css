@@ -53,6 +53,35 @@
 }
 .statsharks-signin-btn:hover { background: #000; }
 
+/* Mode tabs */
+.statsharks-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 4px;
+  background: var(--bg-paper);
+}
+.statsharks-tab {
+  flex: 1;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border: 0;
+}
+.statsharks-tab.is-active {
+  background: var(--text-primary);
+  color: #fff;
+}
+
 /* Top bar: streak + stat name + timer */
 .statsharks-topbar {
   display: grid;
@@ -188,6 +217,11 @@
   color: var(--text-secondary);
   margin-bottom: 14px;
 }
+.statsharks-end-best {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
 .statsharks-end-grid {
   font-family: inherit;
   font-size: 20px;
@@ -196,19 +230,34 @@
   word-break: break-all;
   white-space: pre-wrap;
 }
-.statsharks-share-btn {
+.statsharks-end-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.statsharks-share-btn,
+.statsharks-play-again-btn {
   display: inline-block;
-  background: var(--text-primary);
-  color: #fff;
   font-family: inherit;
   font-weight: 700;
   font-size: 14px;
   padding: 12px 24px;
   border-radius: 999px;
-  border: 1px solid var(--text-primary);
   cursor: pointer;
 }
+.statsharks-share-btn {
+  background: var(--text-primary);
+  color: #fff;
+  border: 1px solid var(--text-primary);
+}
 .statsharks-share-btn:hover { background: #000; }
+.statsharks-play-again-btn {
+  background: var(--bg-paper);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+}
+.statsharks-play-again-btn:hover { background: rgba(0, 0, 0, 0.04); }
 .statsharks-end-tomorrow {
   margin: 18px 0 0;
   font-size: 12px;

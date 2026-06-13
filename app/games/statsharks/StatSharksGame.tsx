@@ -6,6 +6,10 @@
 // and additionally syncs to puzzle_attempts when the subscriber is
 // signed in. The server scores picks and supplies pairs but holds no
 // session state.
+//
+// Two modes: Daily (one play per day, server-synced for authed) and
+// Endless (unlimited replays with today's stat, local-only, tracks
+// today's best streak).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -21,39 +25,50 @@ import { STATS, formatStatValue, type StatDef, type StatKey } from "@/lib/games/
 const TIMER_SEC = 30;
 const REVEAL_MS = 1400;
 
+type Mode = "daily" | "endless";
+
 // ─── Local persistence ───────────────────────────────────────────
 
-type LocalState = {
-  date:    string;            // YYYY-MM-DD
+type LocalDaily = {
+  date:    string;
   stat:    StatKey;
-  rounds:  PersistedRound[];  // completed history
+  rounds:  PersistedRound[];
   ended:   boolean;
 };
 
-function localKey(date: string): string { return `statsharks:attempt:${date}`; }
+const dailyKey   = (date: string) => `statsharks:attempt:${date}`;
+const bestKey    = (date: string, stat: StatKey) => `statsharks:best-endless:${date}:${stat}`;
 
-function loadLocal(date: string): LocalState | null {
+function loadDailyLocal(date: string): LocalDaily | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(localKey(date));
-    if (!raw) return null;
-    return JSON.parse(raw) as LocalState;
-  } catch {
-    return null;
-  }
+    const raw = window.localStorage.getItem(dailyKey(date));
+    return raw ? JSON.parse(raw) as LocalDaily : null;
+  } catch { return null; }
 }
 
-function saveLocal(state: LocalState): void {
+function saveDailyLocal(s: LocalDaily): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(dailyKey(s.date), JSON.stringify(s)); } catch { /* quota */ }
+}
+
+function loadBestEndless(date: string, stat: StatKey): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = window.localStorage.getItem(bestKey(date, stat));
+    return raw ? Number(raw) || 0 : 0;
+  } catch { return 0; }
+}
+
+function saveBestEndless(date: string, stat: StatKey, streak: number): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(localKey(state.date), JSON.stringify(state));
-  } catch {
-    // QuotaExceeded etc — silently fail; the server copy (for authed)
-    // is canonical anyway.
-  }
+    const prev = loadBestEndless(date, stat);
+    if (streak > prev) window.localStorage.setItem(bestKey(date, stat), String(streak));
+  } catch { /* quota */ }
 }
 
-// ─── Component ───────────────────────────────────────────────────
+// ─── Top-level ───────────────────────────────────────────────────
 
 export function StatSharksGame({
   statKey, playedOn, isAuthed, initialAttempt, initialPair,
@@ -65,20 +80,63 @@ export function StatSharksGame({
   initialPair:     PublicPair | null;
 }) {
   const stat: StatDef = STATS[statKey];
+  const [mode, setMode] = useState<Mode>("daily");
 
-  // Resolve initial state: server attempt (authed) takes precedence
-  // over localStorage; if neither, start fresh with the server-supplied
-  // first pair.
+  return (
+    <>
+      <nav className="statsharks-tabs" role="tablist">
+        <button
+          type="button"
+          className={"statsharks-tab" + (mode === "daily" ? " is-active" : "")}
+          role="tab"
+          aria-selected={mode === "daily"}
+          onClick={() => setMode("daily")}
+        >
+          Daily
+        </button>
+        <button
+          type="button"
+          className={"statsharks-tab" + (mode === "endless" ? " is-active" : "")}
+          role="tab"
+          aria-selected={mode === "endless"}
+          onClick={() => setMode("endless")}
+        >
+          Endless
+        </button>
+      </nav>
+      {mode === "daily" ? (
+        <DailyRun
+          stat={stat} statKey={statKey} playedOn={playedOn} isAuthed={isAuthed}
+          initialAttempt={initialAttempt} initialPair={initialPair}
+        />
+      ) : (
+        <EndlessRun stat={stat} statKey={statKey} playedOn={playedOn} />
+      )}
+    </>
+  );
+}
+
+// ─── Daily mode ──────────────────────────────────────────────────
+
+function DailyRun({
+  stat, statKey, playedOn, isAuthed, initialAttempt, initialPair,
+}: {
+  stat: StatDef;
+  statKey: StatKey;
+  playedOn: string;
+  isAuthed: boolean;
+  initialAttempt: PersistedAttempt | null;
+  initialPair: PublicPair | null;
+}) {
   const initial = useMemo<{ rounds: PersistedRound[]; ended: boolean; pair: PublicPair | null }>(() => {
     if (initialAttempt) {
       return {
         rounds: initialAttempt.rounds,
         ended:  initialAttempt.ended,
-        // If server attempt is not ended, initialPair is the next pair
-        pair: initialAttempt.ended ? null : initialPair,
+        pair:   initialAttempt.ended ? null : initialPair,
       };
     }
-    const local = loadLocal(playedOn);
+    const local = loadDailyLocal(playedOn);
     if (local && local.stat === statKey) {
       return {
         rounds: local.rounds,
@@ -89,10 +147,74 @@ export function StatSharksGame({
     return { rounds: [], ended: false, pair: initialPair };
   }, [initialAttempt, initialPair, playedOn, statKey]);
 
-  const [rounds, setRounds] = useState<PersistedRound[]>(initial.rounds);
-  const [ended, setEnded] = useState<boolean>(initial.ended);
-  const [pair, setPair] = useState<PublicPair | null>(initial.pair);
-  const [reveal, setReveal] = useState<{
+  return (
+    <RunView
+      stat={stat} statKey={statKey} playedOn={playedOn}
+      initialRounds={initial.rounds}
+      initialEnded={initial.ended}
+      initialPair={initial.pair}
+      persist={(rounds, ended) => {
+        saveDailyLocal({ date: playedOn, stat: statKey, rounds, ended });
+        if (isAuthed) {
+          void persistAttempt({ playedOn, statKey, rounds, ended })
+            .catch((e) => console.error("persistAttempt:", e));
+        }
+      }}
+      endVariant="daily"
+    />
+  );
+}
+
+// ─── Endless mode ────────────────────────────────────────────────
+
+function EndlessRun({ stat, statKey, playedOn }: { stat: StatDef; statKey: StatKey; playedOn: string }) {
+  // `runId` re-keys RunView to force a fresh state on "Play again".
+  const [runId, setRunId] = useState(0);
+  const [best, setBest] = useState<number>(() => loadBestEndless(playedOn, statKey));
+
+  return (
+    <RunView
+      key={runId}
+      stat={stat} statKey={statKey} playedOn={playedOn}
+      initialRounds={[]}
+      initialEnded={false}
+      initialPair={null}  // RunView will fetch a first pair when initialPair is null
+      persist={(rounds, ended) => {
+        if (ended) {
+          const streak = rounds.filter((r) => r.wasCorrect).length;
+          saveBestEndless(playedOn, statKey, streak);
+          setBest((prev) => (streak > prev ? streak : prev));
+        }
+      }}
+      endVariant="endless"
+      onPlayAgain={() => setRunId((n) => n + 1)}
+      bestEndless={best}
+    />
+  );
+}
+
+// ─── Shared run view ─────────────────────────────────────────────
+
+function RunView({
+  stat, statKey, playedOn,
+  initialRounds, initialEnded, initialPair,
+  persist, endVariant, onPlayAgain, bestEndless,
+}: {
+  stat: StatDef;
+  statKey: StatKey;
+  playedOn: string;
+  initialRounds: PersistedRound[];
+  initialEnded:  boolean;
+  initialPair:   PublicPair | null;
+  persist:       (rounds: PersistedRound[], ended: boolean) => void;
+  endVariant:    "daily" | "endless";
+  onPlayAgain?:  () => void;
+  bestEndless?:  number;
+}) {
+  const [rounds, setRounds]   = useState<PersistedRound[]>(initialRounds);
+  const [ended, setEnded]     = useState<boolean>(initialEnded);
+  const [pair, setPair]       = useState<PublicPair | null>(initialPair);
+  const [reveal, setReveal]   = useState<{
     leftValue: number; rightValue: number;
     correctSide: "left" | "right";
     pickedSide:  "left" | "right" | "timeout";
@@ -102,18 +224,35 @@ export function StatSharksGame({
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SEC);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Sync to localStorage + server on any state change.
+  // Persist on any state change (daily only really uses this; endless
+  // ignores in-flight saves and only records bests on end).
   useEffect(() => {
-    const local: LocalState = { date: playedOn, stat: statKey, rounds, ended };
-    saveLocal(local);
-    if (isAuthed) {
-      void persistAttempt({ playedOn, statKey, rounds, ended })
-        .catch((e) => console.error("persistAttempt:", e));
-    }
-  }, [rounds, ended, isAuthed, playedOn, statKey]);
+    persist(rounds, ended);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rounds, ended]);
 
-  // Restart the 30s timer whenever a new pair appears (and not during
-  // reveal pause).
+  // Endless / cold-start: if no initial pair was supplied, fetch one.
+  useEffect(() => {
+    if (pair || ended) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await getPair({
+          statKey,
+          round: 0,
+          usedPlayerSeasonIds: [],
+        });
+        if (!cancelled) {
+          if (next) setPair(next);
+          else setEnded(true);
+        }
+      } catch (e) { console.error("getPair:", e); }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Timer.
   useEffect(() => {
     if (ended || !pair || reveal) return;
     setSecondsLeft(TIMER_SEC);
@@ -151,7 +290,6 @@ export function StatSharksGame({
         pickedSide: side,
         wasCorrect: score.wasCorrect,
       };
-      // After reveal pause: either advance to next pair or end the run.
       setTimeout(async () => {
         setReveal(null);
         const nextRounds = [...rounds, newRound];
@@ -168,12 +306,8 @@ export function StatSharksGame({
             usedPlayerSeasonIds: usedIds,
           });
           setRounds(nextRounds);
-          if (!next) {
-            setEnded(true);
-            setPair(null);
-          } else {
-            setPair(next);
-          }
+          if (!next) { setEnded(true); setPair(null); }
+          else setPair(next);
         } catch (e) {
           console.error("getPair:", e);
           setRounds(nextRounds);
@@ -188,7 +322,6 @@ export function StatSharksGame({
     }
   }, [pending, reveal, ended, pair, rounds, usedIds, statKey]);
 
-  // Auto-submit timeout on countdown 0.
   useEffect(() => {
     if (secondsLeft !== 0) return;
     if (pending || reveal || !pair || ended) return;
@@ -196,7 +329,6 @@ export function StatSharksGame({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft]);
 
-  // Keyboard shortcuts.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (ended) return;
@@ -208,15 +340,20 @@ export function StatSharksGame({
   }, [doPick, ended]);
 
   if (ended) {
-    return <EndScreen stat={stat} rounds={rounds} playedOn={playedOn} />;
+    return (
+      <EndScreen
+        stat={stat} rounds={rounds} playedOn={playedOn}
+        variant={endVariant}
+        onPlayAgain={onPlayAgain}
+        bestEndless={bestEndless}
+      />
+    );
   }
-
   if (!pair) {
-    return <p className="statsharks-empty">No pair available right now — try again tomorrow.</p>;
+    return <p className="statsharks-empty">Loading…</p>;
   }
 
   const streak = rounds.filter((r) => r.wasCorrect).length;
-
   return (
     <section className="statsharks-game">
       <TopBar stat={stat} streak={streak} secondsLeft={secondsLeft} />
@@ -226,8 +363,7 @@ export function StatSharksGame({
           side="left"
           card={pair.left}
           reveal={reveal
-            ? { value: reveal.leftValue,
-                wasCorrectSide: reveal.correctSide === "left" }
+            ? { value: reveal.leftValue, wasCorrectSide: reveal.correctSide === "left" }
             : null}
           stat={stat}
           onPick={() => void doPick("left")}
@@ -238,8 +374,7 @@ export function StatSharksGame({
           side="right"
           card={pair.right}
           reveal={reveal
-            ? { value: reveal.rightValue,
-                wasCorrectSide: reveal.correctSide === "right" }
+            ? { value: reveal.rightValue, wasCorrectSide: reveal.correctSide === "right" }
             : null}
           stat={stat}
           onPick={() => void doPick("right")}
@@ -304,15 +439,25 @@ function Card({
   );
 }
 
-function EndScreen({ stat, rounds, playedOn }: {
-  stat: StatDef; rounds: PersistedRound[]; playedOn: string;
+function EndScreen({
+  stat, rounds, playedOn, variant, onPlayAgain, bestEndless,
+}: {
+  stat: StatDef;
+  rounds: PersistedRound[];
+  playedOn: string;
+  variant: "daily" | "endless";
+  onPlayAgain?: () => void;
+  bestEndless?: number;
 }) {
   const [copied, setCopied] = useState(false);
   const streak = rounds.filter((r) => r.wasCorrect).length;
   const grid = rounds.map((r) => r.wasCorrect ? "🟢" : "🔴").join("");
   const shareText = useMemo(() => {
+    const headline = variant === "daily"
+      ? `Boxscore Stat Sharks — ${playedOn}`
+      : `Boxscore Stat Sharks (endless) — ${playedOn}`;
     return [
-      `Boxscore Stat Sharks — ${playedOn}`,
+      headline,
       `Today: ${stat.label}`,
       ``,
       `Streak: ${streak}`,
@@ -320,7 +465,7 @@ function EndScreen({ stat, rounds, playedOn }: {
       ``,
       `boxscore.games/statsharks`,
     ].join("\n");
-  }, [stat.label, streak, grid, playedOn]);
+  }, [stat.label, streak, grid, playedOn, variant]);
 
   const onShare = async () => {
     const isMobile = typeof window !== "undefined"
@@ -352,17 +497,33 @@ function EndScreen({ stat, rounds, playedOn }: {
         {streak === 0 ? "Tough start." : `Streak: ${streak}`}
       </div>
       <div className="statsharks-end-stat">Today: <b>{stat.label}</b></div>
+      {variant === "endless" && bestEndless != null && bestEndless > 0 ? (
+        <div className="statsharks-end-best">Best today: <b>{bestEndless}</b></div>
+      ) : null}
       <pre className="statsharks-end-grid">{grid}</pre>
-      <button
-        type="button"
-        className="statsharks-share-btn"
-        onClick={onShare}
-      >
-        {copied ? "Copied!" : "Share result"}
-      </button>
-      <p className="statsharks-end-tomorrow">
-        New stat tomorrow. Come back at midnight ET.
-      </p>
+      <div className="statsharks-end-actions">
+        <button
+          type="button"
+          className="statsharks-share-btn"
+          onClick={onShare}
+        >
+          {copied ? "Copied!" : "Share result"}
+        </button>
+        {variant === "endless" && onPlayAgain ? (
+          <button
+            type="button"
+            className="statsharks-play-again-btn"
+            onClick={onPlayAgain}
+          >
+            Play again
+          </button>
+        ) : null}
+      </div>
+      {variant === "daily" ? (
+        <p className="statsharks-end-tomorrow">
+          New stat tomorrow. Come back at midnight ET — or try Endless mode above.
+        </p>
+      ) : null}
     </section>
   );
 }
