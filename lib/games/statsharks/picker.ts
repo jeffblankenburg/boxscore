@@ -34,6 +34,11 @@ const PER_SEASON_TOP_N = 100;
 // but we don't want Snuffy Stirnweiss and Eddie Lake showing up in
 // the daily Stat Sharks pool.
 const FIRST_SEASON = 1950;
+// Season ceiling — the current calendar year is in progress so its
+// stats are partial. Asking "did Mike Trout have more HR in 2026 or
+// 1976" three weeks into the 2026 season is misleading at best.
+// Computed once at module load; process restarts at year rollover.
+const LAST_FINISHED_SEASON = new Date().getUTCFullYear() - 1;
 
 // Module-scope cache. Keyed by stat key. Expires daily so the picker
 // picks up any new rows added by tomorrow's backfill run (we don't
@@ -75,6 +80,7 @@ async function loadPool(stat: StatDef): Promise<PoolRow[]> {
       .select(select)
       .eq(eligibilityCol, true)
       .gte("season", FIRST_SEASON)
+      .lte("season", LAST_FINISHED_SEASON)
       .not(stat.column, "is", null)
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`statsharks loadPool(${stat.key}): ${error.message}`);
