@@ -1,19 +1,25 @@
 import { headers } from "next/headers";
 
 /**
- * Hardcoded production origin for anything externally visible — links baked
- * into outbound emails (confirm/unsub/digest/manage), magic-link tokens, and
+ * Production origin for anything externally visible — links baked into
+ * outbound emails (confirm/unsub/digest/manage), magic-link tokens, and
  * URLs embedded in social-post text. The origin must be reachable to the
- * recipient, which means it must NOT be `localhost` even when the renderer
- * happened to run on a dev box, and must NOT be a Vercel deployment-specific
- * URL even when the cron ran on a preview deployment.
+ * recipient, which means it must NOT be `localhost` in production and
+ * must NOT be a Vercel deployment-specific URL even when the cron ran
+ * on a preview deployment.
+ *
+ * Dev override: set EMAIL_LINK_BASE=http://localhost:3000 in .env.local
+ * to make magic-link / confirm emails point at the local server. Real
+ * inboxes won't reach a localhost URL, of course — only useful when
+ * sending test emails to yourself with Resend in dev and clicking the
+ * resulting links from your dev browser.
  *
  * Use this — not `siteOrigin()` — anywhere a URL ends up in front of a
- * subscriber's eyeballs. Reserve `siteOrigin()` for server-to-server fetches
- * inside the same deployment (admin → /api/cron/*) and for puppeteer's
- * `baseUrl` when rendering share images.
+ * subscriber's eyeballs. Reserve `siteOrigin()` for server-to-server
+ * fetches inside the same deployment (admin → /api/cron/*) and for
+ * puppeteer's `baseUrl` when rendering share images.
  */
-export const EMAIL_LINK_BASE = "https://boxscore.email";
+export const EMAIL_LINK_BASE = process.env.EMAIL_LINK_BASE ?? "https://boxscore.email";
 
 /**
  * The reachable site origin for the current deployment (e.g.,

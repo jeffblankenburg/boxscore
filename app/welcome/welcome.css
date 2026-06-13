@@ -1,0 +1,118 @@
+/* Welcome / demographics form. Used by both /welcome (post-confirm) and
+   the "About you" card on /settings. Variables follow the names defined
+   in app/globals.css — earlier draft used invented names (--ink,
+   --muted, --border) that silently resolved to no value, leaving form
+   elements with default browser styling. */
+
+.welcome {
+  max-width: 560px;
+  margin: 40px auto;
+  padding: 0 16px;
+  font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
+  color: var(--text-primary);
+}
+.welcome-card {
+  background: var(--bg-paper);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 28px 28px 24px;
+}
+.welcome-h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.welcome-lede {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.welcome-error {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  background: #fdecec;
+  border: 1px solid #f5b8b8;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #8a2222;
+}
+.welcome-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Breathing room between the lede paragraph and the first field —
+     applies whether the form is mounted on /welcome (where the lede
+     uses .welcome-lede) or /settings (where it uses .subscribe-fine).
+     Keeps the gap consistent across both surfaces. */
+  margin-top: 16px;
+}
+.welcome-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.welcome-field label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.welcome-field select,
+.welcome-field input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-paper);
+  color: var(--text-primary);
+  min-height: 40px;
+  /* Reset platform select chrome (iOS, Chrome) so the border is the
+     only visible boundary. We re-add a chevron via background-image so
+     selects still look like dropdowns. */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+.welcome-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%23000' stroke-width='1.5'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 8px;
+  padding-right: 32px;
+}
+.welcome-field select:focus,
+.welcome-field input:focus {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -1px;
+}
+.welcome-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+.welcome-submit,
+.welcome-skip {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.welcome-submit {
+  background: var(--text-primary);
+  color: #fff;
+  border: 1px solid var(--text-primary);
+}
+.welcome-submit:hover { background: #000; }
+.welcome-skip {
+  background: var(--bg-paper);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+}
+.welcome-skip:hover { background: rgba(0, 0, 0, 0.04); }

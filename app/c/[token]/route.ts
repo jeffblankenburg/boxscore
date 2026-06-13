@@ -115,12 +115,18 @@ export async function GET(
   }
 
   // Auto-sign-in: the click proves they own the inbox, so dropping them
-  // straight into /settings (instead of forcing another magic-link round
-  // trip) is the right UX. Cookie semantics match /auth/[token]'s POST.
+  // straight into the welcome page (instead of forcing another magic-link
+  // round trip) is the right UX. Cookie semantics match /auth/[token]'s
+  // POST. The welcome page collects optional demographics and then
+  // hands off to /settings?welcome=1. Re-activations (already-active
+  // subscribers) skip the welcome step.
   const { token: sessionToken } = await createSession({
     subscriberId: justActivated.id,
   });
-  const res = NextResponse.redirect(new URL("/settings?welcome=1", url));
+  const next = justActivated.demographics_completed_at
+    ? "/settings?welcome=1"
+    : "/welcome";
+  const res = NextResponse.redirect(new URL(next, url));
   res.cookies.set({
     name: SUBSCRIBER_SESSION_COOKIE,
     value: sessionToken,

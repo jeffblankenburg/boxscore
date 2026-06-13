@@ -22,6 +22,7 @@ import {
   setTeamSubscription,
 } from "./actions";
 import { SettingsToggleCheckbox } from "./SettingsToggleCheckbox";
+import { DemographicsForm } from "@/app/welcome/DemographicsForm";
 
 // Sports that have a per-team digest pipeline wired. Team toggles only
 // surface for these on /settings. MLB-only at v1; flip on NBA/WNBA once
@@ -44,10 +45,21 @@ export default async function SettingsPage({
   if (session) {
     const { data: sub } = await supabaseAdmin()
       .from("subscribers")
-      .select("email, status, is_admin")
+      .select("email, status, is_admin, country, region, age_band, income_band, gender, demographics_completed_at")
       .eq("id", session.subscriber_id)
-      .maybeSingle<{ email: string; status: string; is_admin: boolean }>();
+      .maybeSingle<{
+        email: string;
+        status: string;
+        is_admin: boolean;
+        country: string | null;
+        region: string | null;
+        age_band: string | null;
+        income_band: string | null;
+        gender: string | null;
+        demographics_completed_at: string | null;
+      }>();
     const isAdmin = sub?.is_admin === true;
+    const demographicsMissing = !sub?.demographics_completed_at;
 
     const [sports, subscriptions, teamSubscriptions] = await Promise.all([
       getVisibleSports({ includeAdminOnly: isAdmin }),
@@ -74,6 +86,12 @@ export default async function SettingsPage({
           <p className="subscribe-welcome">
             You&rsquo;re in. The boxes you picked at signup are already
             turned on below — toggle anything else on or off, any time.
+          </p>
+        )}
+        {demographicsMissing && welcome !== "1" && (
+          <p className="subscribe-welcome">
+            Want to help us understand the boxscore audience?{" "}
+            <a href="#about-you">A few quick optional questions →</a>
           </p>
         )}
         <p className="subscribe-lede">
@@ -172,6 +190,30 @@ export default async function SettingsPage({
             )}
           </>
         )}
+
+        <h2 className="settings-section-h" id="about-you">About you</h2>
+        {demographicsMissing ? (
+          <p className="subscribe-fine">
+            Boxscore stays free because advertisers help support it —
+            and they want to understand who&rsquo;s reading. A few quick
+            optional answers give us an aggregate picture of the
+            audience. Every field is optional.
+          </p>
+        ) : (
+          <p className="subscribe-fine">
+            Thanks for sharing. Change any answer below, any time.
+          </p>
+        )}
+        <DemographicsForm
+          showSkip={false}
+          initial={{
+            country:     sub?.country     ?? null,
+            region:      sub?.region      ?? null,
+            age_band:    sub?.age_band    ?? null,
+            income_band: sub?.income_band ?? null,
+            gender:      sub?.gender      ?? null,
+          }}
+        />
       </section>
     );
   }

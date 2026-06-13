@@ -18,10 +18,14 @@ export type Subscriber = {
   confirm_token: string;
   unsubscribe_token: string;
   is_admin: boolean;
+  // demographics_completed_at gates the welcome page redirect after
+  // /c/[token] activation. Other demographic columns aren't loaded
+  // here — fetch them via the dedicated /settings card when needed.
+  demographics_completed_at: string | null;
 };
 
 const COLS =
-  "id, email, status, created_at, confirmed_at, unsubscribed_at, unsubscribe_reason, confirm_token, unsubscribe_token, is_admin";
+  "id, email, status, created_at, confirmed_at, unsubscribed_at, unsubscribe_reason, confirm_token, unsubscribe_token, is_admin, demographics_completed_at";
 
 /**
  * Idempotent: starting a subscription for an email that already exists in any
