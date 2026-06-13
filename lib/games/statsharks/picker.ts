@@ -28,6 +28,13 @@ import { gapForRound, STATS, type StatDef, type StatKey } from "./stats";
 // breadth we want represented.
 const PER_SEASON_TOP_N = 100;
 
+// Season floor — matches the rest of the boxscore data universe
+// (historical_games, historical_player_lines all start in 1950). The
+// yearByYear ingest pulled in players' entire careers back to ~1920,
+// but we don't want Snuffy Stirnweiss and Eddie Lake showing up in
+// the daily Stat Sharks pool.
+const FIRST_SEASON = 1950;
+
 // Module-scope cache. Keyed by stat key. Expires daily so the picker
 // picks up any new rows added by tomorrow's backfill run (we don't
 // expect that often, but the alternative — long-lived cache with no
@@ -67,6 +74,7 @@ async function loadPool(stat: StatDef): Promise<PoolRow[]> {
       .from("player_seasons")
       .select(select)
       .eq(eligibilityCol, true)
+      .gte("season", FIRST_SEASON)
       .not(stat.column, "is", null)
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`statsharks loadPool(${stat.key}): ${error.message}`);
