@@ -9,7 +9,7 @@ import { LeagueSwitcher } from "./LeagueSwitcher";
 // `active` highlights the current top-level item. Pass the matching key
 // from each page so the operator can see where they are. Defaults to
 // undefined (no highlight) for older callers that haven't been updated.
-export type AdminNavItem = "dashboard" | "preview" | "clicks" | "ads" | "sports" | "followers";
+export type AdminNavItem = "dashboard" | "preview" | "clicks" | "ads" | "sports" | "followers" | "demographics";
 
 export function AdminNav({
   activeSport,
@@ -30,6 +30,7 @@ export function AdminNav({
     { key: "ads", href: "/admin/ads", label: "Ads" },
     { key: "sports", href: "/admin/sports", label: "Sports" },
     { key: "followers", href: "/admin/followers", label: "Followers" },
+    { key: "demographics", href: "/admin/demographics", label: "Demographics" },
   ];
   return (
     <>
