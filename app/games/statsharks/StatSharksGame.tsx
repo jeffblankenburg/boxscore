@@ -17,13 +17,14 @@ import {
   scorePair,
   persistAttempt,
   persistEndlessRun,
+} from "./actions";
+import {
+  DAILY_ROUND_COUNT,
   type PublicPair,
   type DailyPublicPair,
   type PersistedAttempt,
   type PersistedRound,
-} from "./actions";
-
-const DAILY_ROUND_COUNT = 10;
+} from "./types";
 import { STATS, VISIBLE_STATS, formatStatValue, type StatDef, type StatKey } from "@/lib/games/statsharks/stats";
 
 const TIMER_SEC = 15;
@@ -272,42 +273,42 @@ function StatChooser({
   playedOn: string;
   onPick: (k: StatKey) => void;
 }) {
-  // Show each stat as a chip with two best-streak numbers inline:
-  // "today" (resets at midnight ET) on top, "all-time" lifetime best
-  // underneath. Lifetime numbers give the user something to chase
-  // across multiple days; today's number tells them how they've done
-  // so far. The chooser only surfaces VISIBLE_STATS — the rest stay
-  // hidden until we re-enable them centrally.
+  // Each stat is a diamond (rotated black square, same as the topbar's
+  // current-stat indicator). All-time best for the stat — if any —
+  // appears as a small green dot with the number at the top-right of
+  // the diamond, like a trophy chip.
   const allKeys = VISIBLE_STATS;
+  // Suppress unused-warning for the playedOn arg; we no longer display
+  // today's per-stat best here but the prop signature stays consistent
+  // for future per-day surfaces.
+  void playedOn;
   return (
     <section className="statsharks-chooser">
       <h3 className="statsharks-chooser-h">Pick your stat</h3>
       <p className="statsharks-chooser-sub">
-        Same Card Sharks rules — build the longest streak. Practice runs don&rsquo;t affect today&rsquo;s daily score.
+        Same Card Sharks rules — build the longest streak. Practice
+        runs don&rsquo;t affect today&rsquo;s daily score.
       </p>
       <div className="statsharks-chooser-grid">
         {allKeys.map((k) => {
           const s = STATS[k];
-          const bestToday    = loadBestEndless(playedOn, k);
           const bestLifetime = loadLifetimeEndless(k);
           const isDefault = k === defaultKey;
           return (
             <button
               key={k}
               type="button"
-              className={"statsharks-chooser-chip" + (isDefault ? " is-default" : "")}
+              className={"statsharks-chooser-diamond-wrap" + (isDefault ? " is-default" : "")}
               onClick={() => onPick(k)}
+              aria-label={`${s.label}${bestLifetime > 0 ? ` — best streak ${bestLifetime}` : ""}`}
+              title={s.label}
             >
-              <span className="statsharks-chooser-chip-key">{k}</span>
-              <span className="statsharks-chooser-chip-label">{s.label}</span>
-              <span className="statsharks-chooser-chip-bests">
-                {bestToday > 0
-                  ? <span className="statsharks-chooser-chip-today">today {bestToday}</span>
-                  : <span className="statsharks-chooser-chip-today-empty">today —</span>}
-                {bestLifetime > 0
-                  ? <span className="statsharks-chooser-chip-lifetime">best {bestLifetime}</span>
-                  : null}
+              <span className="statsharks-chooser-diamond">
+                <span className="statsharks-chooser-diamond-text">{k}</span>
               </span>
+              {bestLifetime > 0 ? (
+                <span className="statsharks-chooser-diamond-best">{bestLifetime}</span>
+              ) : null}
             </button>
           );
         })}

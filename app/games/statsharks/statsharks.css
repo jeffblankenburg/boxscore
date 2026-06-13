@@ -79,60 +79,71 @@
   color: var(--text-muted);
   line-height: 1.4;
 }
+/* Diamond grid — 3 columns of rotated-square stat icons. Each cell
+   is a fixed-size button wrapping a rotated diamond and (optionally)
+   a green "best streak" chip in the corner. */
 .statsharks-chooser-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  justify-items: center;
+  margin-top: 6px;
 }
-.statsharks-chooser-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 12px;
-  background: var(--bg-paper);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  font-family: inherit;
+.statsharks-chooser-diamond-wrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border: 0;
+  background: transparent;
+  padding: 0;
   cursor: pointer;
-  text-align: left;
-  transition: transform 0.1s, background 0.15s;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
 }
-.statsharks-chooser-chip:hover { background: rgba(0, 0, 0, 0.04); transform: translateY(-1px); }
-.statsharks-chooser-chip:active { transform: translateY(0); }
-.statsharks-chooser-chip.is-default {
-  border-width: 2px;
-  background: #fff7e0;
+.statsharks-chooser-diamond-wrap:hover { transform: translateY(-2px); }
+.statsharks-chooser-diamond-wrap:active { transform: translateY(0); }
+.statsharks-chooser-diamond {
+  width: 60px;
+  height: 60px;
+  background: var(--text-primary);
+  color: #fff;
+  transform: rotate(45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
 }
-.statsharks-chooser-chip-key {
-  font-size: 16px;
+.statsharks-chooser-diamond-text {
+  transform: rotate(-45deg);
   font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
-.statsharks-chooser-chip-label {
-  font-size: 11px;
-  color: var(--text-secondary);
-  line-height: 1.2;
+.statsharks-chooser-diamond-wrap.is-default .statsharks-chooser-diamond {
+  outline: 2px solid #c4a23f;
+  outline-offset: 3px;
 }
-.statsharks-chooser-chip-bests {
+.statsharks-chooser-diamond-best {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  background: #1f7a3a;
+  color: #fff;
+  border-radius: 999px;
+  border: 2px solid var(--bg-paper);
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-top: 2px;
-}
-.statsharks-chooser-chip-today {
-  font-size: 11px;
-  font-weight: 700;
-  color: #1f7a3a;
-}
-.statsharks-chooser-chip-today-empty {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.statsharks-chooser-chip-lifetime {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-secondary);
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Mode tabs */

@@ -21,46 +21,15 @@ import {
 } from "@/lib/games/statsharks/picker";
 import { STATS, statForDate, type StatKey } from "@/lib/games/statsharks/stats";
 import { supabaseAdmin } from "@/lib/supabase";
-
-export const DAILY_ROUND_COUNT = 10;
-
-// ─── Shared types ────────────────────────────────────────────────
-
-/** Public card — what the client sees BEFORE a round is scored. No
- * stat value; the value is only revealed by scorePair() after the
- * user picks. */
-export type PublicCard = {
-  id:          number;
-  player_name: string;
-  season:      number;
-  team_abbr:   string | null;
-};
-
-export type PublicPair = {
-  left:  PublicCard;
-  right: PublicCard;
-};
-
-export type ScoreResult = {
-  leftValue:   number;
-  rightValue:  number;
-  correctSide: "left" | "right";
-  wasCorrect:  boolean;
-};
-
-// Persisted history per attempt — what we store in puzzle_attempts
-// for authed subscribers + in localStorage for everyone.
-export type PersistedRound = {
-  leftId:      number;
-  rightId:     number;
-  pickedSide:  "left" | "right" | "timeout";
-  wasCorrect:  boolean;
-};
-export type PersistedAttempt = {
-  stat:    StatKey;
-  rounds:  PersistedRound[];
-  ended:   boolean;
-};
+import {
+  DAILY_ROUND_COUNT,
+  type DailyPublicPair,
+  type PersistedAttempt,
+  type PersistedRound,
+  type PublicCard,
+  type PublicPair,
+  type ScoreResult,
+} from "./types";
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
@@ -160,13 +129,6 @@ export async function persistAttempt(opts: {
 }
 
 // ─── Daily sequence ──────────────────────────────────────────────
-
-/** Public card list for the daily 10-round sequence. Stat values stay
- * hidden — they're only revealed when the user scores a round. */
-export type DailyPublicPair = {
-  left:  PublicCard;
-  right: PublicCard;
-};
 
 /** Read-or-create today's daily sequence from puzzle_picks. Once the
  * first subscriber loads the page, the sequence is locked for the day

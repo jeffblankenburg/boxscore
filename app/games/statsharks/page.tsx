@@ -3,7 +3,8 @@ import {
   validateSession,
   SUBSCRIBER_SESSION_COOKIE,
 } from "@/lib/subscriber-auth";
-import { getDailySequence, loadAttempt, type DailyPublicPair, type PersistedAttempt } from "./actions";
+import { getDailySequence, loadAttempt } from "./actions";
+import type { PersistedAttempt } from "./types";
 import { statForDate } from "@/lib/games/statsharks/stats";
 import { todayInET } from "@/lib/dates";
 import { StatSharksGame } from "./StatSharksGame";
