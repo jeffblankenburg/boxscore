@@ -51,9 +51,8 @@ export default async function StatSharksPage() {
     <main className="statsharks">
       <header className="statsharks-h">
         <h2>Stat Sharks</h2>
-        <p className="statsharks-sub">
-          Today&rsquo;s category: <b>{stat.label}</b>
-        </p>
+        {/* Per-mode subtitle moved into the game box so the page header
+            stays identical between Daily and Endless. */}
       </header>
       <StatSharksGame
         statKey={stat.key}

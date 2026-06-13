@@ -196,6 +196,41 @@
   letter-spacing: 0.08em;
 }
 
+/* Stat diamond — visual stand-in for the spelled-out stat name in the
+   topbar. Rotated square (baseball diamond) with the stat code inside
+   counter-rotated so it reads upright. Matches the brand's
+   strong-black-on-paper aesthetic. */
+.statsharks-stat-diamond {
+  width: 42px;
+  height: 42px;
+  background: var(--text-primary);
+  color: #fff;
+  transform: rotate(45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px auto;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.statsharks-stat-diamond-text {
+  transform: rotate(-45deg);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* "Today's category" caption — only rendered in Daily mode. Lives
+   above the topbar so the page header (Stat Sharks h2) reads the
+   same whether you're on Daily or Endless. */
+.statsharks-todays {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
 /* Streak dot row. Each correct answer flies a green dot from the picked
    card into this row, then the dot settles permanently. */
 .statsharks-dots {

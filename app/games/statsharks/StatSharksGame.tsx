@@ -129,9 +129,10 @@ export function StatSharksGame({
         <DailyRun
           stat={stat} statKey={statKey} playedOn={playedOn} isAuthed={isAuthed}
           initialAttempt={initialAttempt} initialPair={initialPair}
+          mode={mode}
         />
       ) : (
-        <EndlessRun stat={stat} statKey={statKey} playedOn={playedOn} />
+        <EndlessRun stat={stat} statKey={statKey} playedOn={playedOn} mode={mode} />
       )}
     </>
   );
@@ -140,7 +141,7 @@ export function StatSharksGame({
 // ─── Daily mode ──────────────────────────────────────────────────
 
 function DailyRun({
-  stat, statKey, playedOn, isAuthed, initialAttempt, initialPair,
+  stat, statKey, playedOn, isAuthed, initialAttempt, initialPair, mode,
 }: {
   stat: StatDef;
   statKey: StatKey;
@@ -148,6 +149,7 @@ function DailyRun({
   isAuthed: boolean;
   initialAttempt: PersistedAttempt | null;
   initialPair: PublicPair | null;
+  mode: Mode;
 }) {
   const initial = useMemo<{ rounds: PersistedRound[]; ended: boolean; pair: PublicPair | null }>(() => {
     if (initialAttempt) {
@@ -182,13 +184,14 @@ function DailyRun({
         }
       }}
       endVariant="daily"
+      mode={mode}
     />
   );
 }
 
 // ─── Endless mode ────────────────────────────────────────────────
 
-function EndlessRun({ statKey: todayKey, playedOn }: { stat: StatDef; statKey: StatKey; playedOn: string }) {
+function EndlessRun({ statKey: todayKey, playedOn, mode }: { stat: StatDef; statKey: StatKey; playedOn: string; mode: Mode }) {
   // Endless lets the user pick the stat themselves — `selectedKey`
   // null = show the chooser; non-null = run that stat. The pre-fill
   // defaults to today's daily stat so a one-tap "start endless" works.
@@ -210,6 +213,7 @@ function EndlessRun({ statKey: todayKey, playedOn }: { stat: StatDef; statKey: S
       stat={stat}
       statKey={selectedKey}
       playedOn={playedOn}
+      mode={mode}
       onPlayAgain={() => setRunId((n) => n + 1)}
       onChooseDifferent={() => setSelectedKey(null)}
     />
@@ -217,11 +221,12 @@ function EndlessRun({ statKey: todayKey, playedOn }: { stat: StatDef; statKey: S
 }
 
 function EndlessRunForStat({
-  stat, statKey, playedOn, onPlayAgain, onChooseDifferent,
+  stat, statKey, playedOn, mode, onPlayAgain, onChooseDifferent,
 }: {
   stat: StatDef;
   statKey: StatKey;
   playedOn: string;
+  mode: Mode;
   onPlayAgain: () => void;
   onChooseDifferent: () => void;
 }) {
@@ -243,6 +248,7 @@ function EndlessRunForStat({
         }
       }}
       endVariant="endless"
+      mode={mode}
       onPlayAgain={onPlayAgain}
       onChooseDifferent={onChooseDifferent}
       bestEndless={bestToday}
@@ -307,7 +313,7 @@ function StatChooser({
 function RunView({
   stat, statKey, playedOn,
   initialRounds, initialEnded, initialPair,
-  persist, endVariant, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
+  persist, endVariant, mode, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
 }: {
   stat: StatDef;
   statKey: StatKey;
@@ -317,6 +323,7 @@ function RunView({
   initialPair:   PublicPair | null;
   persist:       (rounds: PersistedRound[], ended: boolean) => void;
   endVariant:    "daily" | "endless";
+  mode:          Mode;
   onPlayAgain?:  () => void;
   onChooseDifferent?: () => void;
   bestEndless?:  number;
@@ -562,6 +569,11 @@ function RunView({
   const streak = rounds.filter((r) => r.wasCorrect).length;
   return (
     <section className="statsharks-game">
+      {mode === "daily" ? (
+        <div className="statsharks-todays">
+          Today&rsquo;s category: <b>{stat.label}</b>
+        </div>
+      ) : null}
       <TopBar stat={stat} streak={streak} secondsLeft={secondsLeft} />
       <div className="statsharks-dots" ref={dotsRowRef}>
         {Array.from({ length: streak }).map((_, i) => (
@@ -620,7 +632,9 @@ function TopBar({ stat, streak, secondsLeft }: {
         <span className="statsharks-streak-num">{streak}</span>
         <span className="statsharks-streak-label">STREAK</span>
       </div>
-      <div className="statsharks-statname">{stat.label}</div>
+      <div className="statsharks-stat-diamond" aria-label={stat.label} title={stat.label}>
+        <span className="statsharks-stat-diamond-text">{stat.key}</span>
+      </div>
       <div className={"statsharks-timer" + (timerLow ? " is-low" : "")}>
         <span className="statsharks-timer-num">{secondsLeft}</span>
         <span className="statsharks-timer-label">SEC</span>
