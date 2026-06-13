@@ -16,6 +16,7 @@ import {
   getPair,
   scorePair,
   persistAttempt,
+  persistEndlessRun,
   type PublicPair,
   type DailyPublicPair,
   type PersistedAttempt,
@@ -136,7 +137,7 @@ export function StatSharksGame({
           mode={mode}
         />
       ) : (
-        <EndlessRun stat={stat} statKey={statKey} playedOn={playedOn} mode={mode} />
+        <EndlessRun stat={stat} statKey={statKey} playedOn={playedOn} mode={mode} isAuthed={isAuthed} />
       )}
     </>
   );
@@ -188,7 +189,7 @@ function DailyRun({
 
 // ─── Endless mode ────────────────────────────────────────────────
 
-function EndlessRun({ statKey: todayKey, playedOn, mode }: { stat: StatDef; statKey: StatKey; playedOn: string; mode: Mode }) {
+function EndlessRun({ statKey: todayKey, playedOn, mode, isAuthed }: { stat: StatDef; statKey: StatKey; playedOn: string; mode: Mode; isAuthed: boolean }) {
   // Endless lets the user pick the stat themselves — `selectedKey`
   // null = show the chooser; non-null = run that stat. The pre-fill
   // defaults to today's daily stat so a one-tap "start endless" works.
@@ -211,6 +212,7 @@ function EndlessRun({ statKey: todayKey, playedOn, mode }: { stat: StatDef; stat
       statKey={selectedKey}
       playedOn={playedOn}
       mode={mode}
+      isAuthed={isAuthed}
       onPlayAgain={() => setRunId((n) => n + 1)}
       onChooseDifferent={() => setSelectedKey(null)}
     />
@@ -218,12 +220,13 @@ function EndlessRun({ statKey: todayKey, playedOn, mode }: { stat: StatDef; stat
 }
 
 function EndlessRunForStat({
-  stat, statKey, playedOn, mode, onPlayAgain, onChooseDifferent,
+  stat, statKey, playedOn, mode, isAuthed, onPlayAgain, onChooseDifferent,
 }: {
   stat: StatDef;
   statKey: StatKey;
   playedOn: string;
   mode: Mode;
+  isAuthed: boolean;
   onPlayAgain: () => void;
   onChooseDifferent: () => void;
 }) {
@@ -242,6 +245,14 @@ function EndlessRunForStat({
           saveLifetimeEndless(statKey, streak);
           setBestToday((prev) => (streak > prev ? streak : prev));
           setBestLifetime((prev) => (streak > prev ? streak : prev));
+          // Server-side persistence for authed users — fire-and-forget.
+          // Display still reads from localStorage so the UI is fast;
+          // the DB row exists for future per-stat leaderboards +
+          // cross-device sync.
+          if (isAuthed) {
+            void persistEndlessRun({ statKey, rounds, playedOn })
+              .catch((e) => console.error("persistEndlessRun:", e));
+          }
         }
       }}
       endVariant="endless"

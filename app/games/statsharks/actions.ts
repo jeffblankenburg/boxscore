@@ -244,6 +244,32 @@ export async function getDailySequence(opts: {
   }));
 }
 
+/** Insert a completed Endless run for the signed-in subscriber. No-op
+ * for anonymous sessions (they keep only localStorage state). The
+ * insert is fire-and-forget from the client's perspective — even if
+ * it fails the client's local "best" tracking is canonical for
+ * display. */
+export async function persistEndlessRun(opts: {
+  statKey:  StatKey;
+  rounds:   PersistedRound[];
+  playedOn: string;
+}): Promise<void> {
+  const jar = await cookies();
+  const session = await validateSession(jar.get(SUBSCRIBER_SESSION_COOKIE)?.value);
+  if (!session) return;
+  const streak = opts.rounds.filter((r) => r.wasCorrect).length;
+  const { error } = await supabaseAdmin()
+    .from("statsharks_endless_runs")
+    .insert({
+      subscriber_id: session.subscriber_id,
+      stat_key:      opts.statKey,
+      streak,
+      rounds:        opts.rounds,
+      played_on:     opts.playedOn,
+    });
+  if (error) console.error(`persistEndlessRun: ${error.message}`);
+}
+
 /** Server-side initial-state lookup for authed subscribers. Returns
  * the persisted attempt for today, or null if no row exists yet. */
 export async function loadAttempt(playedOn: string): Promise<PersistedAttempt | null> {
