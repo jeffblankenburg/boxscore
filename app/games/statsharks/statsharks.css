@@ -196,6 +196,43 @@
   letter-spacing: 0.08em;
 }
 
+/* Streak dot row. Each correct answer flies a green dot from the picked
+   card into this row, then the dot settles permanently. */
+.statsharks-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 14px;
+  margin: 10px 0 6px;
+}
+.statsharks-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1f7a3a;
+  animation: ssh-dot-pop 0.3s ease-out;
+}
+@keyframes ssh-dot-pop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.statsharks-dot-flying {
+  position: fixed;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1f7a3a;
+  z-index: 999;
+  pointer-events: none;
+  animation: ssh-dot-fly 700ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+@keyframes ssh-dot-fly {
+  0%   { transform: translate(0, 0)            scale(1.6); opacity: 1; }
+  90%  { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1);  opacity: 0; }
+}
+
 /* Prompt above the cards: "MORE HOME RUNS?" */
 .statsharks-prompt {
   text-align: center;
@@ -238,16 +275,25 @@
 .statsharks-card:active:not(:disabled) { transform: translateY(0); }
 .statsharks-card:disabled { cursor: default; }
 .statsharks-card-name {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+.statsharks-card-year {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
   margin-bottom: 4px;
 }
-.statsharks-card-meta {
-  font-size: 13px;
+.statsharks-card-team {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
-  letter-spacing: 0.02em;
   margin-bottom: 18px;
+  text-transform: uppercase;
 }
 .statsharks-card-value {
   font-size: 36px;

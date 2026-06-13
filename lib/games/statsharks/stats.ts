@@ -70,12 +70,24 @@ export const STATS: Record<StatKey, StatDef> = {
   WHIP: { key: "WHIP", side: "pitcher", label: "WHIP",            prompt: "LOWER WHIP?",     column: "whip",    direction: "lower",  decimals: 2, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
 };
 
+// Stats currently surfaced in the game. Used for both the daily
+// rotation and the Endless mode chooser. The full STATS catalog stays
+// intact so we can switch any stat on later without re-importing or
+// re-typing the chart; we just expand this whitelist.
+//
+// Filter (per Jeff, 2026-06-13):
+//   Batters: HR, RBI, H, SB, AVG
+//   Pitchers: W, K, SV, ERA
+export const VISIBLE_STATS: ReadonlyArray<StatKey> = [
+  "HR", "RBI", "H", "SB", "AVG",
+  "K",  "W",   "SV", "ERA",
+];
+
 // Daily rotation. Interleaved batter / pitcher stats so a player who
 // shows up two days in a row doesn't experience "batter week" or
-// "pitcher week". 17 stats → cycle every 17 days.
+// "pitcher week". 9 stats → cycle every 9 days.
 export const ROTATION: ReadonlyArray<StatKey> = [
-  "HR", "K", "RBI", "ERA", "H", "W", "R", "WHIP",
-  "SB", "IP", "BB", "SV", "2B", "AVG", "3B", "OBP", "OPS",
+  "HR", "K", "RBI", "ERA", "H", "W", "SB", "SV", "AVG",
 ];
 
 /**

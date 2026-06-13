@@ -20,7 +20,7 @@ import {
   type PersistedAttempt,
   type PersistedRound,
 } from "./actions";
-import { STATS, formatStatValue, type StatDef, type StatKey } from "@/lib/games/statsharks/stats";
+import { STATS, VISIBLE_STATS, formatStatValue, type StatDef, type StatKey } from "@/lib/games/statsharks/stats";
 
 const TIMER_SEC = 30;
 const REVEAL_MS = 1400;
@@ -258,8 +258,9 @@ function StatChooser({
   // "today" (resets at midnight ET) on top, "all-time" lifetime best
   // underneath. Lifetime numbers give the user something to chase
   // across multiple days; today's number tells them how they've done
-  // so far.
-  const allKeys = Object.keys(STATS) as StatKey[];
+  // so far. The chooser only surfaces VISIBLE_STATS — the rest stay
+  // hidden until we re-enable them centrally.
+  const allKeys = VISIBLE_STATS;
   return (
     <section className="statsharks-chooser">
       <h3 className="statsharks-chooser-h">Pick your stat</h3>
@@ -330,6 +331,41 @@ function RunView({
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SEC);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Refs + state for the "dot flies from card to dots row" animation
+  // when a round is scored correct.
+  const leftCardRef  = useRef<HTMLButtonElement>(null);
+  const rightCardRef = useRef<HTMLButtonElement>(null);
+  const dotsRowRef   = useRef<HTMLDivElement>(null);
+  const [flyingDot, setFlyingDot] = useState<{
+    startX: number; startY: number; dx: number; dy: number; id: number;
+  } | null>(null);
+
+  const launchFlyingDot = useCallback((side: "left" | "right", nextSlotIndex: number) => {
+    const cardEl = side === "left" ? leftCardRef.current : rightCardRef.current;
+    const rowEl  = dotsRowRef.current;
+    if (!cardEl || !rowEl) return;
+    const cr = cardEl.getBoundingClientRect();
+    const dotSize = 12;
+    const gap     = 6;
+    // Target = the left edge of the dots row + (slot * (dot + gap)) +
+    // half the dot, vertically centered on the row.
+    const rr = rowEl.getBoundingClientRect();
+    const targetX = rr.left + nextSlotIndex * (dotSize + gap) + dotSize / 2;
+    const targetY = rr.top + rr.height / 2;
+    const startX = cr.left + cr.width / 2;
+    const startY = cr.top + cr.height / 2;
+    setFlyingDot({
+      startX, startY,
+      dx: targetX - startX,
+      dy: targetY - startY,
+      id: Date.now(),
+    });
+    // Animation length matches the CSS keyframe duration. Clear the
+    // floating dot once it lands so the row's permanent dot is the
+    // only one visible.
+    setTimeout(() => setFlyingDot(null), 700);
+  }, []);
+
   // Persist on any state change (daily only really uses this; endless
   // ignores in-flight saves and only records bests on end).
   useEffect(() => {
@@ -396,6 +432,14 @@ function RunView({
         pickedSide: side,
         wasCorrect: score.wasCorrect,
       };
+      // Dot-flight: launch from the picked card toward the next slot
+      // in the dots row. We schedule it so it lands at the moment the
+      // rounds row updates, creating the illusion that the flight
+      // "deposited" the new dot.
+      if (score.wasCorrect && side !== "timeout") {
+        const nextSlotIndex = rounds.filter((r) => r.wasCorrect).length;
+        setTimeout(() => launchFlyingDot(side, nextSlotIndex), REVEAL_MS - 700);
+      }
       setTimeout(async () => {
         setReveal(null);
         const nextRounds = [...rounds, newRound];
@@ -426,7 +470,7 @@ function RunView({
     } finally {
       setPending(false);
     }
-  }, [pending, reveal, ended, pair, rounds, usedIds, statKey]);
+  }, [pending, reveal, ended, pair, rounds, usedIds, statKey, launchFlyingDot]);
 
   useEffect(() => {
     if (secondsLeft !== 0) return;
@@ -465,11 +509,17 @@ function RunView({
   return (
     <section className="statsharks-game">
       <TopBar stat={stat} streak={streak} secondsLeft={secondsLeft} />
+      <div className="statsharks-dots" ref={dotsRowRef}>
+        {Array.from({ length: streak }).map((_, i) => (
+          <span key={i} className="statsharks-dot" />
+        ))}
+      </div>
       <div className="statsharks-prompt">{stat.prompt}</div>
       <div className="statsharks-cards">
         <Card
           side="left"
           card={pair.left}
+          cardRef={leftCardRef}
           reveal={reveal
             ? { value: reveal.leftValue, wasCorrectSide: reveal.correctSide === "left" }
             : null}
@@ -481,6 +531,7 @@ function RunView({
         <Card
           side="right"
           card={pair.right}
+          cardRef={rightCardRef}
           reveal={reveal
             ? { value: reveal.rightValue, wasCorrectSide: reveal.correctSide === "right" }
             : null}
@@ -489,6 +540,18 @@ function RunView({
           disabled={!!reveal || pending}
         />
       </div>
+      {flyingDot ? (
+        <span
+          key={flyingDot.id}
+          className="statsharks-dot-flying"
+          style={{
+            left: flyingDot.startX - 6,
+            top:  flyingDot.startY - 6,
+            ["--dx" as keyof React.CSSProperties]: `${flyingDot.dx}px`,
+            ["--dy" as keyof React.CSSProperties]: `${flyingDot.dy}px`,
+          } as React.CSSProperties}
+        />
+      ) : null}
     </section>
   );
 }
@@ -512,8 +575,8 @@ function TopBar({ stat, streak, secondsLeft }: {
   );
 }
 
-function Card({
-  side, card, reveal, stat, onPick, disabled,
+const Card = function Card({
+  side, card, reveal, stat, onPick, disabled, cardRef,
 }: {
   side:  "left" | "right";
   card:  { player_name: string; season: number; team_abbr: string | null };
@@ -521,6 +584,7 @@ function Card({
   stat:  StatDef;
   onPick: () => void;
   disabled: boolean;
+  cardRef?: React.RefObject<HTMLButtonElement | null>;
 }) {
   const flipped = reveal !== null;
   const tone = !reveal ? "neutral"
@@ -528,6 +592,7 @@ function Card({
     : "wrong";
   return (
     <button
+      ref={cardRef}
       type="button"
       className={`statsharks-card statsharks-card-${side} statsharks-card-${tone}` + (flipped ? " is-flipped" : "")}
       onClick={onPick}
@@ -535,9 +600,8 @@ function Card({
       aria-label={`Pick ${card.player_name}, ${card.season}`}
     >
       <div className="statsharks-card-name">{card.player_name}</div>
-      <div className="statsharks-card-meta">
-        {card.season}{card.team_abbr ? ` · ${card.team_abbr}` : ""}
-      </div>
+      <div className="statsharks-card-year">{card.season}</div>
+      <div className="statsharks-card-team">{card.team_abbr ?? "—"}</div>
       {reveal ? (
         <div className="statsharks-card-value">{formatStatValue(stat, reveal.value)}</div>
       ) : (
@@ -545,7 +609,7 @@ function Card({
       )}
     </button>
   );
-}
+};
 
 function EndScreen({
   stat, rounds, playedOn, variant, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
@@ -606,7 +670,9 @@ function EndScreen({
       <div className="statsharks-end-status">
         {streak === 0 ? "Tough start." : `Streak: ${streak}`}
       </div>
-      <div className="statsharks-end-stat">Today: <b>{stat.label}</b></div>
+      <div className="statsharks-end-stat">
+        {variant === "daily" ? <>Today: <b>{stat.label}</b></> : <b>{stat.label}</b>}
+      </div>
       {variant === "endless" ? (
         <div className="statsharks-end-best">
           {bestEndless != null && bestEndless > 0 ? <>Best today: <b>{bestEndless}</b></> : null}
