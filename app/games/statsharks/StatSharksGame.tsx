@@ -1,33 +1,121 @@
 "use client";
 
-// Stat Sharks game UI. Two cards, pick the better stat, build a
-// streak. v1 daily mode only — anonymous play / free play land in a
-// later pass. Mirrors Linescordle's client/server split: scoring +
-// next-pair pickup all happen in the server action; the client just
-// renders and routes user clicks.
+// Stat Sharks game UI. Mirrors Linescordle's client-owned state +
+// stateless server actions pattern: the client tracks the full run
+// (rounds + current pair), persists to localStorage on every change,
+// and additionally syncs to puzzle_attempts when the subscriber is
+// signed in. The server scores picks and supplies pairs but holds no
+// session state.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { submitPick, type ClientState, type RoundReveal } from "./actions";
-import { formatStatValue, type StatDef } from "@/lib/games/statsharks/stats";
+import {
+  getPair,
+  scorePair,
+  persistAttempt,
+  type PublicPair,
+  type PersistedAttempt,
+  type PersistedRound,
+} from "./actions";
+import { STATS, formatStatValue, type StatDef, type StatKey } from "@/lib/games/statsharks/stats";
 
 const TIMER_SEC = 30;
-
-// Reveal pause before the next pair shows. Long enough to read the
-// numbers but short enough that a confident player on a streak still
-// feels momentum.
 const REVEAL_MS = 1400;
 
-export function StatSharksGame({ initial }: { initial: ClientState }) {
-  const [state, setState] = useState<ClientState>(initial);
+// ─── Local persistence ───────────────────────────────────────────
+
+type LocalState = {
+  date:    string;            // YYYY-MM-DD
+  stat:    StatKey;
+  rounds:  PersistedRound[];  // completed history
+  ended:   boolean;
+};
+
+function localKey(date: string): string { return `statsharks:attempt:${date}`; }
+
+function loadLocal(date: string): LocalState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(localKey(date));
+    if (!raw) return null;
+    return JSON.parse(raw) as LocalState;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocal(state: LocalState): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(localKey(state.date), JSON.stringify(state));
+  } catch {
+    // QuotaExceeded etc — silently fail; the server copy (for authed)
+    // is canonical anyway.
+  }
+}
+
+// ─── Component ───────────────────────────────────────────────────
+
+export function StatSharksGame({
+  statKey, playedOn, isAuthed, initialAttempt, initialPair,
+}: {
+  statKey:         StatKey;
+  playedOn:        string;
+  isAuthed:        boolean;
+  initialAttempt:  PersistedAttempt | null;
+  initialPair:     PublicPair | null;
+}) {
+  const stat: StatDef = STATS[statKey];
+
+  // Resolve initial state: server attempt (authed) takes precedence
+  // over localStorage; if neither, start fresh with the server-supplied
+  // first pair.
+  const initial = useMemo<{ rounds: PersistedRound[]; ended: boolean; pair: PublicPair | null }>(() => {
+    if (initialAttempt) {
+      return {
+        rounds: initialAttempt.rounds,
+        ended:  initialAttempt.ended,
+        // If server attempt is not ended, initialPair is the next pair
+        pair: initialAttempt.ended ? null : initialPair,
+      };
+    }
+    const local = loadLocal(playedOn);
+    if (local && local.stat === statKey) {
+      return {
+        rounds: local.rounds,
+        ended:  local.ended,
+        pair:   local.ended ? null : initialPair,
+      };
+    }
+    return { rounds: [], ended: false, pair: initialPair };
+  }, [initialAttempt, initialPair, playedOn, statKey]);
+
+  const [rounds, setRounds] = useState<PersistedRound[]>(initial.rounds);
+  const [ended, setEnded] = useState<boolean>(initial.ended);
+  const [pair, setPair] = useState<PublicPair | null>(initial.pair);
+  const [reveal, setReveal] = useState<{
+    leftValue: number; rightValue: number;
+    correctSide: "left" | "right";
+    pickedSide:  "left" | "right" | "timeout";
+    wasCorrect:  boolean;
+  } | null>(null);
   const [pending, setPending] = useState(false);
-  const [reveal, setReveal] = useState<RoundReveal | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SEC);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Reset the timer whenever a new pair appears.
+  // Sync to localStorage + server on any state change.
   useEffect(() => {
-    if (state.status !== "playing" || !state.currentPair) return;
-    if (reveal) return;       // don't run timer during reveal pause
+    const local: LocalState = { date: playedOn, stat: statKey, rounds, ended };
+    saveLocal(local);
+    if (isAuthed) {
+      void persistAttempt({ playedOn, statKey, rounds, ended })
+        .catch((e) => console.error("persistAttempt:", e));
+    }
+  }, [rounds, ended, isAuthed, playedOn, statKey]);
+
+  // Restart the 30s timer whenever a new pair appears (and not during
+  // reveal pause).
+  useEffect(() => {
+    if (ended || !pair || reveal) return;
     setSecondsLeft(TIMER_SEC);
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
@@ -36,75 +124,112 @@ export function StatSharksGame({ initial }: { initial: ClientState }) {
     return () => {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     };
-  }, [state.currentPair?.roundIndex, state.status, reveal]);
+  }, [pair?.left.id, pair?.right.id, ended, reveal]);
 
-  // Auto-submit timeout when the clock hits 0. Counts as wrong, ends
-  // the run.
+  const usedIds = useMemo<number[]>(() => {
+    const out: number[] = [];
+    for (const r of rounds) { out.push(r.leftId, r.rightId); }
+    if (pair) { out.push(pair.left.id, pair.right.id); }
+    return out;
+  }, [rounds, pair]);
+
+  const doPick = useCallback(async (side: "left" | "right" | "timeout") => {
+    if (pending || reveal || ended || !pair) return;
+    setPending(true);
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    try {
+      const score = await scorePair({
+        statKey,
+        leftId:     pair.left.id,
+        rightId:    pair.right.id,
+        pickedSide: side,
+      });
+      setReveal({ ...score, pickedSide: side });
+      const newRound: PersistedRound = {
+        leftId:     pair.left.id,
+        rightId:    pair.right.id,
+        pickedSide: side,
+        wasCorrect: score.wasCorrect,
+      };
+      // After reveal pause: either advance to next pair or end the run.
+      setTimeout(async () => {
+        setReveal(null);
+        const nextRounds = [...rounds, newRound];
+        if (!score.wasCorrect) {
+          setRounds(nextRounds);
+          setEnded(true);
+          setPair(null);
+          return;
+        }
+        try {
+          const next = await getPair({
+            statKey,
+            round: nextRounds.length,
+            usedPlayerSeasonIds: usedIds,
+          });
+          setRounds(nextRounds);
+          if (!next) {
+            setEnded(true);
+            setPair(null);
+          } else {
+            setPair(next);
+          }
+        } catch (e) {
+          console.error("getPair:", e);
+          setRounds(nextRounds);
+          setEnded(true);
+          setPair(null);
+        }
+      }, REVEAL_MS);
+    } catch (e) {
+      console.error("scorePair:", e);
+    } finally {
+      setPending(false);
+    }
+  }, [pending, reveal, ended, pair, rounds, usedIds, statKey]);
+
+  // Auto-submit timeout on countdown 0.
   useEffect(() => {
     if (secondsLeft !== 0) return;
-    if (pending || reveal || !state.currentPair) return;
+    if (pending || reveal || !pair || ended) return;
     void doPick("timeout");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft]);
 
-  const doPick = useCallback(async (side: "left" | "right" | "timeout") => {
-    if (pending || reveal || state.status !== "playing" || !state.currentPair) return;
-    setPending(true);
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    try {
-      const { reveal: r, next } = await submitPick({
-        roundIndex: state.currentPair.roundIndex,
-        pickedSide: side,
-      });
-      setReveal(r);
-      // Hold the reveal, then move to next state.
-      setTimeout(() => {
-        setReveal(null);
-        setState(next);
-      }, REVEAL_MS);
-    } catch (e) {
-      console.error("submitPick:", e);
-    } finally {
-      setPending(false);
-    }
-  }, [pending, reveal, state]);
-
-  // Keyboard: left / right arrows + 1/2 for pair selection.
+  // Keyboard shortcuts.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (state.status !== "playing") return;
-      if (e.key === "ArrowLeft" || e.key === "1") { e.preventDefault(); void doPick("left"); }
+      if (ended) return;
+      if (e.key === "ArrowLeft"  || e.key === "1") { e.preventDefault(); void doPick("left"); }
       if (e.key === "ArrowRight" || e.key === "2") { e.preventDefault(); void doPick("right"); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [doPick, state.status]);
+  }, [doPick, ended]);
 
-  if (state.status === "ended") {
-    return <EndScreen state={state} />;
+  if (ended) {
+    return <EndScreen stat={stat} rounds={rounds} playedOn={playedOn} />;
   }
 
-  const pair = state.currentPair;
   if (!pair) {
     return <p className="statsharks-empty">No pair available right now — try again tomorrow.</p>;
   }
 
+  const streak = rounds.filter((r) => r.wasCorrect).length;
+
   return (
     <section className="statsharks-game">
-      <TopBar stat={state.stat} streak={state.streak} secondsLeft={secondsLeft} />
-
-      <div className="statsharks-prompt">{state.stat.prompt}</div>
-
+      <TopBar stat={stat} streak={streak} secondsLeft={secondsLeft} />
+      <div className="statsharks-prompt">{stat.prompt}</div>
       <div className="statsharks-cards">
         <Card
           side="left"
           card={pair.left}
-          reveal={reveal && reveal.roundIndex === pair.roundIndex
-            ? { value: reveal.leftStat,  picked: reveal.pickedSide === "left",
-                wasCorrectSide: reveal.correctSide === "left",
-                wasCorrectPick: reveal.wasCorrect && reveal.pickedSide === "left" }
+          reveal={reveal
+            ? { value: reveal.leftValue,
+                wasCorrectSide: reveal.correctSide === "left" }
             : null}
-          stat={state.stat}
+          stat={stat}
           onPick={() => void doPick("left")}
           disabled={!!reveal || pending}
         />
@@ -112,12 +237,11 @@ export function StatSharksGame({ initial }: { initial: ClientState }) {
         <Card
           side="right"
           card={pair.right}
-          reveal={reveal && reveal.roundIndex === pair.roundIndex
-            ? { value: reveal.rightStat, picked: reveal.pickedSide === "right",
-                wasCorrectSide: reveal.correctSide === "right",
-                wasCorrectPick: reveal.wasCorrect && reveal.pickedSide === "right" }
+          reveal={reveal
+            ? { value: reveal.rightValue,
+                wasCorrectSide: reveal.correctSide === "right" }
             : null}
-          stat={state.stat}
+          stat={stat}
           onPick={() => void doPick("right")}
           disabled={!!reveal || pending}
         />
@@ -145,19 +269,12 @@ function TopBar({ stat, streak, secondsLeft }: {
   );
 }
 
-type CardReveal = {
-  value:          number;
-  picked:         boolean;
-  wasCorrectSide: boolean;
-  wasCorrectPick: boolean;
-};
-
 function Card({
   side, card, reveal, stat, onPick, disabled,
 }: {
   side:  "left" | "right";
   card:  { player_name: string; season: number; team_abbr: string | null };
-  reveal: CardReveal | null;
+  reveal: { value: number; wasCorrectSide: boolean } | null;
   stat:  StatDef;
   onPick: () => void;
   disabled: boolean;
@@ -187,10 +304,23 @@ function Card({
   );
 }
 
-function EndScreen({ state }: { state: ClientState }) {
+function EndScreen({ stat, rounds, playedOn }: {
+  stat: StatDef; rounds: PersistedRound[]; playedOn: string;
+}) {
   const [copied, setCopied] = useState(false);
-
-  const shareText = useMemo(() => buildShareText(state), [state]);
+  const streak = rounds.filter((r) => r.wasCorrect).length;
+  const grid = rounds.map((r) => r.wasCorrect ? "🟢" : "🔴").join("");
+  const shareText = useMemo(() => {
+    return [
+      `Boxscore Stat Sharks — ${playedOn}`,
+      `Today: ${stat.label}`,
+      ``,
+      `Streak: ${streak}`,
+      grid,
+      ``,
+      `boxscore.games/statsharks`,
+    ].join("\n");
+  }, [stat.label, streak, grid, playedOn]);
 
   const onShare = async () => {
     const isMobile = typeof window !== "undefined"
@@ -216,16 +346,13 @@ function EndScreen({ state }: { state: ClientState }) {
     }
   };
 
-  const grid = state.rounds.map((r) => r.wasCorrect ? "🟢" : "🔴").join("");
-
   return (
     <section className="statsharks-end">
       <div className="statsharks-end-status">
-        {state.finalStreak === 0 ? "Tough start." : `Streak: ${state.finalStreak}`}
+        {streak === 0 ? "Tough start." : `Streak: ${streak}`}
       </div>
-      <div className="statsharks-end-stat">Today: <b>{state.stat.label}</b></div>
+      <div className="statsharks-end-stat">Today: <b>{stat.label}</b></div>
       <pre className="statsharks-end-grid">{grid}</pre>
-
       <button
         type="button"
         className="statsharks-share-btn"
@@ -233,24 +360,9 @@ function EndScreen({ state }: { state: ClientState }) {
       >
         {copied ? "Copied!" : "Share result"}
       </button>
-
       <p className="statsharks-end-tomorrow">
         New stat tomorrow. Come back at midnight ET.
       </p>
     </section>
   );
-}
-
-function buildShareText(state: ClientState): string {
-  const grid = state.rounds.map((r) => r.wasCorrect ? "🟢" : "🔴").join("");
-  const lines = [
-    `Boxscore Stat Sharks — ${state.playedOn}`,
-    `Today: ${state.stat.label}`,
-    ``,
-    `Streak: ${state.finalStreak}`,
-    grid,
-    ``,
-    `boxscore.games/statsharks`,
-  ];
-  return lines.join("\n");
 }
