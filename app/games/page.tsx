@@ -28,6 +28,12 @@ const GAMES: GameEntry[] = [
     desc: "Two players, two seasons. Pick whose stat is higher. Build a streak.",
     status: "live",
   },
+  {
+    slug: "time-machine",
+    title: "Time Machine",
+    desc: "Guess the year of a real box score. Six tries, higher / lower hints.",
+    status: "live",
+  },
 ];
 
 export default function GamesLanding() {

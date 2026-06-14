@@ -1,0 +1,259 @@
+/* Time Machine UI. The boxscore reuses globals.css's .game-container /
+   .batting-table styles; everything below scopes only the guess grid,
+   end screen, and accordion. */
+
+.time-machine {
+  width: 100%;
+  max-width: 720px;
+  margin: 20px auto;
+  padding: 0 16px 40px;
+  font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.time-machine-h {
+  text-align: center;
+  margin-bottom: 14px;
+}
+.time-machine-h h2 {
+  margin: 0 0 2px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.time-machine-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ─── Box score block (shown above grid during play) ───────────── */
+
+.tm-box {
+  margin: 0 0 18px;
+}
+
+/* ─── 6×4 guess grid ────────────────────────────────────────────── */
+
+.tm-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Each row: [spacer 28px] [4× cells 56px] [hint 28px], gap 6px.
+   Mirroring the hint column with an equal-width spacer keeps the four
+   cells visually centered in the container. */
+.tm-row {
+  display: grid;
+  grid-template-columns: 28px repeat(4, 56px) 28px;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+}
+.tm-row-spacer {
+  display: block;
+  width: 28px;
+  height: 1px;
+}
+
+.tm-cell {
+  width: 56px;
+  height: 56px;
+  box-sizing: border-box;
+  border: 2px solid var(--border-strong);
+  background: var(--bg-paper);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  text-align: center;
+  padding: 0;
+  margin: 0;
+}
+.tm-cell-empty {
+  border-color: rgba(0, 0, 0, 0.18);
+  background: transparent;
+}
+.tm-cell-input {
+  /* Native input styled as a cell. */
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  caret-color: var(--text-primary);
+}
+.tm-cell-input:focus {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+}
+.tm-cell-input:disabled {
+  opacity: 0.6;
+}
+
+.tm-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+.tm-hint-correct { color: #1f7a1f; }
+.tm-hint-higher,
+.tm-hint-lower   { color: #a83232; }
+
+/* ─── Submit ───────────────────────────────────────────────────── */
+
+.tm-submit-row {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 18px;
+}
+.tm-submit {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 12px 32px;
+  border-radius: 999px;
+  border: 1px solid var(--text-primary);
+  background: var(--text-primary);
+  color: #fff;
+  cursor: pointer;
+}
+.tm-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tm-submit:not(:disabled):hover { background: #000; }
+
+/* ─── End screen ───────────────────────────────────────────────── */
+
+.tm-end {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-paper);
+  border-radius: 8px;
+  padding: 22px 20px;
+  text-align: center;
+  margin: 18px 0 0;
+}
+.tm-end-status {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.tm-end-answer {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.tm-end-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.tm-end-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 auto 16px;
+  max-width: 380px;
+}
+.tm-end-stat {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 10px 4px;
+  background: rgba(0, 0, 0, 0.02);
+}
+.tm-end-stat-num {
+  font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.tm-end-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.tm-end-grid {
+  font-family: inherit;
+  font-size: 18px;
+  margin: 0 0 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+.tm-end-share {
+  display: inline-block;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  border: 1px solid var(--text-primary);
+  background: var(--text-primary);
+  color: #fff;
+  cursor: pointer;
+}
+.tm-end-share:hover { background: #000; }
+
+.tm-end-box-toggle {
+  margin: 18px 0 0;
+  text-align: left;
+}
+.tm-end-box-toggle > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+}
+.tm-end-box-toggle > summary::-webkit-details-marker { display: none; }
+.tm-end-box-toggle > summary::before {
+  content: "▸";
+  display: inline-block;
+  transition: transform 120ms ease;
+  font-size: 10px;
+}
+.tm-end-box-toggle[open] > summary::before { transform: rotate(90deg); }
+.tm-box-revealed {
+  margin-top: 12px;
+}
+
+.tm-end-tomorrow {
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ─── Narrow viewports ─────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .tm-row {
+    grid-template-columns: 22px repeat(4, 46px) 22px;
+    gap: 5px;
+  }
+  .tm-row-spacer { width: 22px; }
+  .tm-cell { width: 46px; height: 46px; font-size: 24px; }
+  .tm-hint { font-size: 16px; }
+  .tm-end-stat-num { font-size: 19px; }
+  .tm-submit { width: 100%; max-width: 280px; }
+}

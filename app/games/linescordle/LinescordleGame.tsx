@@ -32,7 +32,7 @@ import {
 } from "@/lib/games/linescordle/localStore";
 
 const MAX_GUESSES = 6;
-const SHARE_URL = "boxscore.email/games/linescordle";
+const SHARE_URL = "https://boxscore.email/games/linescordle";
 
 // Short human-readable date for the box-score header. "May 18, 1979"
 // rather than the full weekday — we're labeling a historical game, not
