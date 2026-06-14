@@ -9,7 +9,26 @@ import { LeagueSwitcher } from "./LeagueSwitcher";
 // `active` highlights the current top-level item. Pass the matching key
 // from each page so the operator can see where they are. Defaults to
 // undefined (no highlight) for older callers that haven't been updated.
-export type AdminNavItem = "dashboard" | "preview" | "clicks" | "ads" | "sports" | "followers" | "demographics" | "games";
+export type AdminNavItem =
+  | "dashboard"
+  | "preview"
+  | "content"
+  | "historical"
+  | "data-model"
+  | "crons"
+  | "sends"
+  | "deliverability"
+  | "email-lookup"
+  | "subscribers"
+  | "rss-metrics"
+  | "clicks"
+  | "demographics"
+  | "ads"
+  | "followers"
+  | "sports"
+  | "games"
+  | "discord"
+  | "share-preview";
 
 export function AdminNav({
   activeSport,
@@ -26,12 +45,23 @@ export function AdminNav({
   const items: Array<{ key: AdminNavItem; href: string; label: string }> = [
     { key: "dashboard", href: "/admin", label: "Dashboard" },
     { key: "preview", href: "/admin/preview/mlb", label: "Preview" },
+    { key: "content", href: "/admin/content/digests", label: "Content" },
+    { key: "historical", href: "/admin/historical", label: "Historical" },
+    { key: "data-model", href: "/admin/data-model", label: "Data model" },
+    { key: "crons", href: "/admin/operations/crons", label: "Crons" },
+    { key: "sends", href: "/admin/operations/sends", label: "Sends" },
+    { key: "deliverability", href: "/admin/operations/deliverability", label: "Deliverability" },
+    { key: "email-lookup", href: "/admin/operations/email-lookup", label: "Email lookup" },
+    { key: "subscribers", href: "/admin/metrics/subscribers", label: "Subscribers" },
+    { key: "rss-metrics", href: "/admin/metrics/rss", label: "RSS metrics" },
     { key: "clicks", href: "/admin/clicks", label: "Click tracking" },
-    { key: "ads", href: "/admin/ads", label: "Ads" },
-    { key: "sports", href: "/admin/sports", label: "Sports" },
-    { key: "followers", href: "/admin/followers", label: "Followers" },
     { key: "demographics", href: "/admin/demographics", label: "Demographics" },
+    { key: "ads", href: "/admin/ads", label: "Ads" },
+    { key: "followers", href: "/admin/followers", label: "Followers" },
+    { key: "sports", href: "/admin/sports", label: "Sports" },
     { key: "games", href: "/admin/games", label: "Games" },
+    { key: "discord", href: "/admin/discord", label: "Discord" },
+    { key: "share-preview", href: "/admin/share-preview", label: "Share preview" },
   ];
   return (
     <>
