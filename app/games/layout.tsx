@@ -5,6 +5,7 @@ import {
   SUBSCRIBER_SESSION_COOKIE,
 } from "@/lib/subscriber-auth";
 import { BRAND } from "@/lib/brand";
+import { GamesSubBar } from "./games-sub-bar";
 import "./games.css";
 
 // Games surface chrome. Slim sticky brand bar at the top, app-style.
@@ -20,7 +21,7 @@ export default async function GamesLayout({ children }: { children: ReactNode })
   return (
     <div className="g-shell">
       <header className="g-bar">
-        <a className="g-brand" href="/games" aria-label="boxscore games">
+        <a className="g-brand" href="/" aria-label="boxscore home">
           <img src="/icon.png" alt="" width={24} height={24} className="g-brand-icon" />
           <span className="g-brand-mark">
             boxscore
@@ -46,6 +47,7 @@ export default async function GamesLayout({ children }: { children: ReactNode })
           )}
         </nav>
       </header>
+      <GamesSubBar />
       <main className="g-main">{children}</main>
     </div>
   );

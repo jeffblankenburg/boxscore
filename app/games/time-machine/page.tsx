@@ -29,6 +29,7 @@ export default async function TimeMachinePage() {
   return (
     <main className="time-machine">
       <header className="time-machine-h">
+        <img src="/timemachine_icon.png" alt="" className="time-machine-h-logo" draggable={false} />
         <h2>Time Machine</h2>
         <p className="time-machine-sub">
           Guess the year. Six tries, higher / lower hints after each miss.

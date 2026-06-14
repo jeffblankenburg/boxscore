@@ -4,12 +4,12 @@
    Whitespace is intentional — less newspapery than the digest site. */
 
 .g-shell {
-  --bg: #f6f3eb;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --ink: #161410;
-  --muted: #6a6354;
-  --border: #e0d8c4;
-  --border-strong: #c4baa5;
+  --ink: #111111;
+  --muted: #6b7280;
+  --border: #e5e5e5;
+  --border-strong: #d1d5db;
   --accent: #1f6f3a;
   --accent-ink: #ffffff;
 
@@ -32,7 +32,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: rgba(246, 243, 235, 0.92);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: saturate(160%) blur(8px);
   -webkit-backdrop-filter: saturate(160%) blur(8px);
   border-bottom: 1px solid var(--border);
@@ -106,6 +106,68 @@
 }
 .g-link-icon:hover { color: var(--ink); }
 
+/* ─── Sub-bar (boxscore games + pills) ─────────────────────── */
+
+/* Single row at every viewport. Pills cluster at the right; wordmark
+   is the tightest version of itself so the whole bar fits on 375px
+   without horizontal scroll. Overflow stays auto as a safety valve
+   for even narrower screens (320px iPhone SE / nested webviews). */
+
+.g-sub-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.g-sub-bar-mark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  text-decoration: none;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.g-sub-bar-mark-lo {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+.g-sub-bar-mark-hi {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.g-sub-bar-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.g-sub-bar-pills::-webkit-scrollbar { display: none; }
+.g-sub-bar-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: color 0.1s ease, background 0.1s ease;
+}
+.g-sub-bar-pill:hover { color: var(--ink); background: rgba(0, 0, 0, 0.04); }
+.g-sub-bar-pill-active {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.06);
+}
+
 /* ─── Main content column ──────────────────────────────────── */
 
 .g-main {
@@ -143,22 +205,23 @@
 }
 .g-card {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 56px 1fr auto;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   text-decoration: none;
   color: var(--ink);
-  transition: transform 0.1s ease, border-color 0.1s ease, background 0.1s ease;
+  transition: transform 0.1s ease, border-color 0.1s ease, background 0.1s ease, box-shadow 0.1s ease;
 }
 .g-card-live {
   cursor: pointer;
 }
 .g-card-live:hover {
-  border-color: var(--border-strong);
+  border-color: var(--ink);
+  box-shadow: 0 1px 0 var(--ink);
 }
 .g-card-live:active {
   transform: scale(0.99);
@@ -167,6 +230,24 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+.g-card-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.g-card-icon svg,
+.g-card-icon img {
+  width: 48px;
+  height: 48px;
+  display: block;
+  object-fit: contain;
+}
+.g-card-body { min-width: 0; }
 
 .g-card-title {
   font-size: 17px;
@@ -178,6 +259,20 @@
   font-size: 13px;
   color: var(--muted);
   line-height: 1.35;
+}
+.g-card-status-line {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.g-card-status-done-win  { color: #1f7a1f; }
+.g-card-status-done-loss { color: #a83232; }
+.g-card-status-in-progress {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .g-card-status {

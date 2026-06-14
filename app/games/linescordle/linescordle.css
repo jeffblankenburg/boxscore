@@ -31,6 +31,13 @@
   position: relative;
   text-align: center;
 }
+.linescordle-h-logo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin: 0 auto 4px;
+}
 .linescordle-h-title {
   /* Title block stays centered; the stats icon is absolutely
      positioned so it doesn't shift the centered title off-axis. */

@@ -308,6 +308,7 @@ export function LinescordleGame({
   return (
     <div className="linescordle">
       <header className="linescordle-h">
+        <img src="/linescordle_icon.png" alt="" className="linescordle-h-logo" draggable={false} />
         <div className="linescordle-h-title">
           <h2>Linescordle</h2>
           <p className="linescordle-sub">Guess the player name from their game line.</p>

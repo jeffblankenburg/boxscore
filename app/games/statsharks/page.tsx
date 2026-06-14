@@ -52,6 +52,7 @@ export default async function StatSharksPage() {
   return (
     <main className="statsharks">
       <header className="statsharks-h">
+        <img src="/statsharks_icon.png" alt="" className="statsharks-h-logo" draggable={false} />
         <h2>Stat Sharks</h2>
         {/* Per-mode subtitle moved into the game box so the page header
             stays identical between Daily and Endless. */}

@@ -1,3 +1,7 @@
+import { GAME_ICONS } from "./icons";
+import { DailyStatus } from "./daily-status";
+import { todayInET } from "@/lib/dates";
+
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Games | boxscore",
@@ -11,17 +15,12 @@ type GameEntry = {
   status: "live" | "soon";
 };
 
-// Single source of truth for the menu. Only "live" games are listed —
-// the unbuilt ones (Guess the Year / Guess the Player) come back when
-// they ship. Card Sharks-style stat comparison ships as Stat Sharks
-// (the Hi/Lo idea, renamed).
+// Single source of truth for the menu. Linescordle is intentionally
+// omitted — the difficulty knob isn't right yet (without hints it's
+// brutal; with the autocomplete suggestions it solves in ~4 by
+// brute-force). The route still works for anyone with a bookmark; it
+// just isn't surfaced. Restore the entry when the gameplay tuning lands.
 const GAMES: GameEntry[] = [
-  {
-    slug: "linescordle",
-    title: "Linescordle",
-    desc: "Guess the player name from their game line. Wordle-style letter feedback.",
-    status: "live",
-  },
   {
     slug: "statsharks",
     title: "Stat Sharks",
@@ -37,6 +36,7 @@ const GAMES: GameEntry[] = [
 ];
 
 export default function GamesLanding() {
+  const today = todayInET();
   return (
     <>
       <header className="g-hero">
@@ -45,14 +45,30 @@ export default function GamesLanding() {
       </header>
 
       <nav className="g-menu" aria-label="Available games">
-        {GAMES.map((g) =>
-          g.status === "live" ? (
-            <a key={g.slug} href={`/games/${g.slug}`} className="g-card g-card-live">
-              <div>
+        {GAMES.map((g) => {
+          const Icon = GAME_ICONS[g.slug];
+          const body = (
+            <>
+              <span className="g-card-icon">
+                {Icon ? <Icon /> : null}
+              </span>
+              <div className="g-card-body">
                 <p className="g-card-title">{g.title}</p>
                 <p className="g-card-desc">{g.desc}</p>
+                {g.status === "live" ? (
+                  <DailyStatus slug={g.slug} playedOn={today} />
+                ) : null}
               </div>
-              <span className="g-card-status g-card-status-play">Play</span>
+              <span
+                className={`g-card-status g-card-status-${g.status === "live" ? "play" : "soon"}`}
+              >
+                {g.status === "live" ? "Play" : "Soon"}
+              </span>
+            </>
+          );
+          return g.status === "live" ? (
+            <a key={g.slug} href={`/games/${g.slug}`} className="g-card g-card-live">
+              {body}
             </a>
           ) : (
             <div
@@ -61,14 +77,10 @@ export default function GamesLanding() {
               aria-disabled="true"
               role="link"
             >
-              <div>
-                <p className="g-card-title">{g.title}</p>
-                <p className="g-card-desc">{g.desc}</p>
-              </div>
-              <span className="g-card-status g-card-status-soon">Soon</span>
+              {body}
             </div>
-          ),
-        )}
+          );
+        })}
       </nav>
     </>
   );
