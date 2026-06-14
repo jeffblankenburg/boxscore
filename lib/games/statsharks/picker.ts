@@ -40,12 +40,19 @@ export function dateSeed(yyyymmdd: string): number {
   return Number(yyyymmdd.replace(/-/g, ""));
 }
 
-// Per-season prominence cut. 1950s seasons regularly had only ~150
-// games per team and the eligibility threshold (≥100 PA / ≥20 IP)
-// already filters obscure callups, so the per-season pool of "the
-// top-100 RBI hitters of 1956" is exactly the kind of historical
-// breadth we want represented.
-const PER_SEASON_TOP_N = 100;
+// Per-season prominence cut. Top-50 per season ≈ the most prominent
+// regulars at each position; mid-tier bench guys (Milt Bolling 1956,
+// Jose Tartabull 1968, Dave Hollins 1991) drop out. Was 100 — too
+// deep, surfaced too many never-heard-of names.
+const PER_SEASON_TOP_N = 50;
+
+// Rate stats (AVG, OBP, OPS, ERA, WHIP) need a stricter playing-time
+// threshold than the global eligibility flag (which only requires
+// 100 PA / 20 IP). At 100 PA, a hot two-week callup can post .350
+// AVG and rank top-50, but nobody remembers him. 300 PA ≈ half-season
+// regular; 100 IP ≈ a #4 starter or workhorse reliever.
+const RATE_MIN_PA = 300;
+const RATE_MIN_IP = 100;
 
 // Season floor — matches the rest of the boxscore data universe
 // (historical_games, historical_player_lines all start in 1950). The
@@ -94,14 +101,19 @@ async function loadPool(stat: StatDef): Promise<PoolRow[]> {
     [k: string]: unknown;
   }> = [];
   for (;;) {
-    const { data, error } = await db
+    let q = db
       .from("player_seasons")
       .select(select)
       .eq(eligibilityCol, true)
       .gte("season", FIRST_SEASON)
       .lte("season", LAST_FINISHED_SEASON)
-      .not(stat.column, "is", null)
-      .range(from, from + PAGE - 1);
+      .not(stat.column, "is", null);
+    // Rate stats: enforce a half-season playing-time floor so fluky
+    // small-sample leaders never enter the pool.
+    if (stat.isRateStat) {
+      q = stat.side === "batter" ? q.gte("pa", RATE_MIN_PA) : q.gte("ip", RATE_MIN_IP);
+    }
+    const { data, error } = await q.range(from, from + PAGE - 1);
     if (error) throw new Error(`statsharks loadPool(${stat.key}): ${error.message}`);
     if (!data || data.length === 0) break;
     raw.push(...(data as unknown as typeof raw));
