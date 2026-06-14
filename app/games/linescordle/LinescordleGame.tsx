@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LinescordlePuzzlePublic } from "@/lib/games/linescordle/content";
+import { useResetAtMidnightET } from "@/lib/games/use-reset-at-midnight-et";
 import {
   keyboardState,
   buildShareText,
@@ -89,6 +90,7 @@ export function LinescordleGame({
   initialReveal: RevealPayload | null;
 }) {
   const answerLen = puzzle.nameLength;
+  useResetAtMidnightET(playedOn);
 
   const [guesses, setGuesses] = useState<Guess[]>(() => initial?.guesses ?? []);
   const [current, setCurrent] = useState<string>("");

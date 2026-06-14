@@ -26,6 +26,7 @@ import {
   type PersistedRound,
 } from "./types";
 import { STATS, VISIBLE_STATS, formatStatValue, type StatDef, type StatKey } from "@/lib/games/statsharks/stats";
+import { useResetAtMidnightET } from "@/lib/games/use-reset-at-midnight-et";
 
 const TIMER_SEC = 15;
 const REVEAL_MS = 1400;
@@ -107,6 +108,7 @@ export function StatSharksGame({
 }) {
   const stat: StatDef = STATS[statKey];
   const [mode, setMode] = useState<Mode>("daily");
+  useResetAtMidnightET(playedOn);
 
   return (
     <>
