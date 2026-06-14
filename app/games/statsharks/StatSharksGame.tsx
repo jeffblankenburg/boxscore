@@ -820,7 +820,13 @@ function EndScreen({
           : (streak === 0 ? "Tough start." : `Streak: ${streak}`)}
       </div>
       <div className="statsharks-end-stat">
-        {variant === "daily" ? <>Today: <b>{stat.label}</b></> : <b>{stat.label}</b>}
+        {variant === "daily" ? (
+          <>Today: <b>{stat.label}</b></>
+        ) : (
+          <span className="statsharks-stat-diamond statsharks-end-diamond" aria-label={stat.label} title={stat.label}>
+            <span className="statsharks-stat-diamond-text">{stat.key}</span>
+          </span>
+        )}
       </div>
       {variant === "endless" ? (
         <div className="statsharks-end-best">

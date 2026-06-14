@@ -238,6 +238,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* On the Endless end-screen we render the stat as a diamond (same as
+   the topbar's). Sized down a touch so it doesn't dwarf the streak
+   number above it; uses margin to center horizontally within the
+   centered .statsharks-end container. */
+.statsharks-end-diamond {
+  display: inline-flex;
+  margin: 8px auto 4px;
+}
+
 /* "Today's category" caption — only rendered in Daily mode. Lives
    above the topbar so the page header (Stat Sharks h2) reads the
    same whether you're on Daily or Endless. */
