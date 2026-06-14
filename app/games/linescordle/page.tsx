@@ -18,7 +18,7 @@ import "./linescordle.css";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Linescordle — boxscore games",
+  title: "Linescordle | boxscore games",
   robots: { index: false },     // unindex while in development
 };
 

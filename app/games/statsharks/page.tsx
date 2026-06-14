@@ -12,7 +12,7 @@ import "./statsharks.css";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Stat Sharks — boxscore games",
+  title: "Stat Sharks | boxscore games",
   robots: { index: false },
 };
 

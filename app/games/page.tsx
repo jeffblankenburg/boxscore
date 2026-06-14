@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Games — boxscore",
+  title: "Games | boxscore",
   robots: { index: false },          // unindex while in development
 };
 
@@ -19,13 +19,13 @@ const GAMES: GameEntry[] = [
   {
     slug: "linescordle",
     title: "Linescordle",
-    desc: "Guess the player name from their game line — Wordle-style letter feedback.",
+    desc: "Guess the player name from their game line. Wordle-style letter feedback.",
     status: "live",
   },
   {
     slug: "statsharks",
     title: "Stat Sharks",
-    desc: "Two players, two seasons. Pick whose stat is higher — and build a streak.",
+    desc: "Two players, two seasons. Pick whose stat is higher. Build a streak.",
     status: "live",
   },
 ];

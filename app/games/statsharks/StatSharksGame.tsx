@@ -286,8 +286,8 @@ function StatChooser({
     <section className="statsharks-chooser">
       <h3 className="statsharks-chooser-h">Pick your stat</h3>
       <p className="statsharks-chooser-sub">
-        Same Card Sharks rules — build the longest streak. Practice
-        runs don&rsquo;t affect today&rsquo;s daily score.
+        Pick higher or lower. Build the longest streak you can.
+        Practice runs don&rsquo;t affect today&rsquo;s daily score.
       </p>
       <div className="statsharks-chooser-grid">
         {allKeys.map((k) => {
@@ -762,7 +762,7 @@ function EndScreen({
   const shareText = useMemo(() => {
     if (variant === "daily" && totalRounds != null) {
       return [
-        `Boxscore Stat Sharks — ${playedOn}`,
+        `Stat Sharks (${playedOn})`,
         `Today: ${stat.label}`,
         ``,
         `${streak}/${totalRounds}${isDailyWin ? " ✨" : ""}`,
@@ -772,7 +772,7 @@ function EndScreen({
       ].join("\n");
     }
     return [
-      `Boxscore Stat Sharks (endless) — ${playedOn}`,
+      `Stat Sharks endless (${playedOn})`,
       `Today: ${stat.label}`,
       ``,
       `Streak: ${streak}`,
@@ -853,7 +853,7 @@ function EndScreen({
       </div>
       {variant === "daily" ? (
         <p className="statsharks-end-tomorrow">
-          New stat tomorrow. Come back at midnight ET — or try Endless mode above.
+          New stat tomorrow. Come back at midnight ET, or try Endless mode above.
         </p>
       ) : null}
     </section>

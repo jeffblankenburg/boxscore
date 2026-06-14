@@ -9,7 +9,7 @@ import { StatsView } from "./StatsView";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Linescordle Stats — boxscore games",
+  title: "Linescordle Stats | boxscore games",
   robots: { index: false },
 };
 
