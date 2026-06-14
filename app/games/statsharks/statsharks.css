@@ -335,17 +335,32 @@
 .statsharks-card:hover:not(:disabled) { transform: translateY(-2px); }
 .statsharks-card:active:not(:disabled) { transform: translateY(0); }
 .statsharks-card:disabled { cursor: default; }
-/* Left column of each card: name on top, year + team on the row below. */
+/* Left column of each card: name on top, year + team on the row below.
+   `width: 100%` + `justify-self: start` lock the column to the full
+   grid cell so iOS data-detector links (which wrap names + years in
+   inline-block <a> tags) can't shrink the column and shift the value
+   slot. */
 .statsharks-card-left {
   min-width: 0;
+  width: 100%;
+  justify-self: start;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  text-align: left;
 }
 .statsharks-card-yearteam {
   display: flex;
   align-items: baseline;
   gap: 8px;
+}
+/* Neutralize iOS Safari's auto-link styling when format-detection
+   doesn't take effect (cached pages, older WKWebView builds). */
+.statsharks-card-left a {
+  color: inherit !important;
+  text-decoration: none !important;
+  pointer-events: none;
+  display: inline;
 }
 .statsharks-card-name {
   font-size: 20px;
