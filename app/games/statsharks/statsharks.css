@@ -511,22 +511,20 @@ a[href^="x-apple-data-detectors"],
   color: var(--text-muted);
 }
 
-/* Continue button shown after a wrong pick — replaces the auto-advance
-   so the user can study the reveal before the EndScreen takes over. */
-.statsharks-continue-btn {
-  display: block;
-  margin: 16px auto 0;
-  font-family: inherit;
-  font-weight: 700;
-  font-size: 14px;
-  padding: 12px 28px;
-  border-radius: 999px;
-  background: var(--text-primary);
-  color: #fff;
-  border: 1px solid var(--text-primary);
-  cursor: pointer;
+/* Last-pick block at the top of the EndScreen — same shape as a
+   review row, with a small label above. */
+.statsharks-end-lastpick {
+  margin: 14px 0 0;
 }
-.statsharks-continue-btn:hover { background: #000; }
+.statsharks-end-lastpick-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-align: center;
+}
 
 /* Post-game review list. One row per round, two columns inside. */
 .statsharks-review-loading {

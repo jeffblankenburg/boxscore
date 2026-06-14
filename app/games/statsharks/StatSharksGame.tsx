@@ -366,10 +366,6 @@ function RunView({
     wasCorrect:  boolean;
   } | null>(null);
   const [pending, setPending] = useState(false);
-  // When the user picks wrong we hold the reveal on screen and stash
-  // the "advance to EndScreen" callback here; tapping Continue invokes
-  // it. Null when no advance is pending (regular flow).
-  const [pendingContinue, setPendingContinue] = useState<(() => void) | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SEC);
   // Wall-clock start of the current round's timer. We compute
   // secondsLeft as (TIMER_SEC - elapsed) so a paused tab (mobile
@@ -525,13 +521,20 @@ function RunView({
       };
       const nextSlotIndex = rounds.filter((r) => r.wasCorrect).length;
 
-      // Closure-captures `rounds`, `score`, `newRound`. Safe to call
-      // later (from a tap) because none of those references can shift.
-      const advance = () => {
-        setPendingContinue(null);
+      // Dot-flight: launch from the picked card toward the next slot
+      // in the dots row. Lands at exactly REVEAL_MS, the same moment
+      // the permanent dot mounts and the cards swap to the next pair.
+      if (score.wasCorrect && (side === "left" || side === "right")) {
+        setTimeout(() => launchFlyingDot(side, nextSlotIndex), FLIGHT_DELAY_MS);
+      }
+
+      setTimeout(() => {
         setReveal(null);
         const nextRounds = [...rounds, newRound];
 
+        // Wrong → end the run. The EndScreen renders the last pick so
+        // the user can see what they missed without needing to hold
+        // the reveal on screen here.
         if (!score.wasCorrect) {
           setRounds(nextRounds);
           setFlyingDot(null);
@@ -539,6 +542,7 @@ function RunView({
           setEndlessPair(null);
           return;
         }
+
         if (isDaily) {
           const reachedCap = nextRounds.length >= DAILY_ROUND_COUNT;
           setRounds(nextRounds);
@@ -546,6 +550,7 @@ function RunView({
           if (reachedCap) setEnded(true);
           return;
         }
+
         setRounds(nextRounds);
         setFlyingDot(null);
         if (nextEndlessPair) {
@@ -570,20 +575,7 @@ function RunView({
             }
           })();
         }
-      };
-
-      if (score.wasCorrect) {
-        // Right → fly the dot in (lands at REVEAL_MS) and auto-advance.
-        if (side === "left" || side === "right") {
-          setTimeout(() => launchFlyingDot(side, nextSlotIndex), FLIGHT_DELAY_MS);
-        }
-        setTimeout(advance, REVEAL_MS);
-      } else {
-        // Wrong → hold the reveal on screen and wait for the user to
-        // tap "Continue" so they can absorb what they got wrong before
-        // the EndScreen takes over. Beta-tester feedback 2026-06-14.
-        setPendingContinue(() => advance);
-      }
+      }, REVEAL_MS);
     } catch (e) {
       console.error("scorePair:", e);
     } finally {
@@ -683,15 +675,6 @@ function RunView({
             ["--dy" as keyof React.CSSProperties]: `${flyingDot.dy}px`,
           } as React.CSSProperties}
         />
-      ) : null}
-      {pendingContinue ? (
-        <button
-          type="button"
-          className="statsharks-continue-btn"
-          onClick={() => pendingContinue()}
-        >
-          Continue →
-        </button>
       ) : null}
     </section>
   );
@@ -804,6 +787,9 @@ function EndScreen({
   const openReview = async () => {
     if (reviewOpen) { setReviewOpen(false); return; }
     setReviewOpen(true);
+    await ensureReviewData();
+  };
+  const ensureReviewData = async () => {
     if (reviewData || reviewLoading) return;
     setReviewLoading(true);
     try {
@@ -819,6 +805,20 @@ function EndScreen({
       setReviewLoading(false);
     }
   };
+
+  // Auto-fetch on mount when the last round was a miss — the EndScreen
+  // surfaces that round inline so the user can see what they just got
+  // wrong without having to tap "Review puzzle".
+  const lastRoundIndex = rounds.length - 1;
+  const lastRound = lastRoundIndex >= 0 ? rounds[lastRoundIndex] : null;
+  const showLastPick = !!lastRound && !lastRound.wasCorrect;
+  useEffect(() => {
+    if (showLastPick) void ensureReviewData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showLastPick]);
+  const lastReview = showLastPick && reviewData && lastRoundIndex >= 0
+    ? reviewData[lastRoundIndex] ?? null
+    : null;
   const streak = rounds.filter((r) => r.wasCorrect).length;
   const isDailyWin = variant === "daily" && totalRounds != null && streak >= totalRounds;
   const grid = rounds.map((r) => r.wasCorrect ? "🟢" : "🔴").join("");
@@ -885,6 +885,34 @@ function EndScreen({
           </span>
         )}
       </div>
+      {showLastPick ? (
+        <div className="statsharks-end-lastpick">
+          <div className="statsharks-end-lastpick-label">Your last pick</div>
+          {lastReview ? (
+            <ol className="statsharks-review" style={{ margin: 0 }}>
+              <li className="statsharks-review-row">
+                <span className="statsharks-review-num">{lastRoundIndex + 1}</span>
+                <div className="statsharks-review-pair">
+                  <ReviewSide
+                    card={lastReview.left}
+                    stat={stat}
+                    isCorrect={lastReview.correctSide === "left"}
+                    isPicked={lastRound?.pickedSide === "left"}
+                  />
+                  <ReviewSide
+                    card={lastReview.right}
+                    stat={stat}
+                    isCorrect={lastReview.correctSide === "right"}
+                    isPicked={lastRound?.pickedSide === "right"}
+                  />
+                </div>
+              </li>
+            </ol>
+          ) : (
+            <div className="statsharks-review-loading">Loading…</div>
+          )}
+        </div>
+      ) : null}
       {variant === "endless" ? (
         <div className="statsharks-end-best">
           {bestEndless != null && bestEndless > 0 ? <>Best today: <b>{bestEndless}</b></> : null}
