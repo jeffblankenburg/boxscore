@@ -1031,20 +1031,28 @@ function ReviewSide({
 }: {
   card: ReviewRound["left"];
   stat: StatDef;
+  /** True when this side was the actual correct answer (independent
+   *  of what the user picked). Used only to compute `correctPick`. */
   isCorrect: boolean;
+  /** True when the user selected this side. */
   isPicked: boolean;
 }) {
-  const wrongPick = isPicked && !isCorrect;
+  const correctPick = isPicked && isCorrect;
+  const wrongPick   = isPicked && !isCorrect;
+  // The opponent side (user didn't pick it) stays neutral — green
+  // means "you got this one right", red means "you picked this and
+  // it was wrong". The actual correct answer on a missed round can be
+  // read from the stat values themselves.
   return (
     <div className={
       "statsharks-review-side"
-      + (isCorrect ? " is-correct" : "")
+      + (correctPick ? " is-correct-pick" : "")
       + (wrongPick ? " is-wrong-pick" : "")
     }>
       <div className="statsharks-review-name">
         <NoDetect text={card.player_name} />
-        {isCorrect ? <span className="statsharks-review-tag" aria-label="correct">✓</span> : null}
-        {wrongPick ? <span className="statsharks-review-tag" aria-label="your pick">✗</span> : null}
+        {correctPick ? <span className="statsharks-review-tag" aria-label="your correct pick">✓</span> : null}
+        {wrongPick ? <span className="statsharks-review-tag" aria-label="your wrong pick">✗</span> : null}
       </div>
       <div className="statsharks-review-meta">
         {card.team_abbr ? <span>{card.team_abbr} </span> : null}

@@ -300,7 +300,16 @@ export type DailySequenceItem = {
 
 /** Deterministically build a 10-pair sequence for (stat, date) using
  * a date-seeded mulberry32 RNG. All subscribers get the same pairs
- * in the same order so the daily share grid is comparable. */
+ * in the same order so the daily share grid is comparable.
+ *
+ * Side balance: after the picker assigns left/right, we flip the pair
+ * if one side has run ≥2 ahead on correct answers. The picker's own
+ * RNG-driven aOnLeft is fair on average, but the gap-filter step in
+ * pickStatSharksPair tends to choose `b` lower than `a`, which means
+ * the "correct" side ends up clustered on whichever side `a` lands
+ * on in a given run. Beta tester reported "correct is usually on the
+ * right" — this pass guarantees no more than one side is ever 2+
+ * ahead of the other across the 10 daily rounds. */
 export async function generateDailySequence(opts: {
   statKey: StatKey;
   date:    string;        // YYYY-MM-DD
@@ -309,6 +318,8 @@ export async function generateDailySequence(opts: {
   const rng = mulberry32(dateSeed(opts.date));
   const used: number[] = [];
   const out: DailySequenceItem[] = [];
+  let leftCorrect  = 0;
+  let rightCorrect = 0;
   for (let i = 0; i < opts.count; i++) {
     const pair = await pickStatSharksPair({
       statKey:             opts.statKey,
@@ -318,8 +329,24 @@ export async function generateDailySequence(opts: {
       totalRounds:         opts.count,
     });
     if (!pair) break;
-    used.push(pair.left.id, pair.right.id);
-    out.push({ leftId: pair.left.id, rightId: pair.right.id });
+
+    // If placing the correct answer on its assigned side would push
+    // the running count to ≥2 ahead of the other side, swap them.
+    let { left, right } = pair;
+    let correct = pair.correct;
+    const wouldRight = correct === "right" ? rightCorrect + 1 : rightCorrect;
+    const wouldLeft  = correct === "left"  ? leftCorrect  + 1 : leftCorrect;
+    const skewBeforeFlip = Math.abs(wouldRight - wouldLeft);
+    if (skewBeforeFlip >= 2) {
+      [left, right] = [right, left];
+      correct = correct === "left" ? "right" : "left";
+    }
+
+    if (correct === "left") leftCorrect++;
+    else rightCorrect++;
+
+    used.push(left.id, right.id);
+    out.push({ leftId: left.id, rightId: right.id });
   }
   return out;
 }

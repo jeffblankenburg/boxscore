@@ -571,7 +571,7 @@ a[href^="x-apple-data-detectors"],
   border-radius: 4px;
   border: 1px solid transparent;
 }
-.statsharks-review-side.is-correct {
+.statsharks-review-side.is-correct-pick {
   border-color: #1f7a3a;
   background: #f0f8f1;
 }
@@ -592,7 +592,7 @@ a[href^="x-apple-data-detectors"],
   font-weight: 800;
   font-size: 12px;
 }
-.statsharks-review-side.is-correct .statsharks-review-tag { color: #1f7a3a; }
+.statsharks-review-side.is-correct-pick .statsharks-review-tag { color: #1f7a3a; }
 .statsharks-review-side.is-wrong-pick .statsharks-review-tag { color: #c4392a; }
 .statsharks-review-meta {
   margin-top: 2px;
