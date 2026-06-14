@@ -42,26 +42,37 @@ export function AdminNav({
   // "/admin/preview" so the league badges stay inside the preview area.
   leagueBasePath?: string;
 } = {}) {
+  // Grouped by function so related tools sit next to each other in the
+  // wrapped nav. Order: overview → content → ops → metrics → config.
   const items: Array<{ key: AdminNavItem; href: string; label: string }> = [
+    // Overview
     { key: "dashboard", href: "/admin", label: "Dashboard" },
+
+    // Content surface (what's going out)
     { key: "preview", href: "/admin/preview/mlb", label: "Preview" },
     { key: "content", href: "/admin/content/digests", label: "Content" },
     { key: "historical", href: "/admin/historical", label: "Historical" },
     { key: "data-model", href: "/admin/data-model", label: "Data model" },
+    { key: "share-preview", href: "/admin/share-preview", label: "Share preview" },
+
+    // Operations (sending machinery)
     { key: "crons", href: "/admin/operations/crons", label: "Crons" },
     { key: "sends", href: "/admin/operations/sends", label: "Sends" },
     { key: "deliverability", href: "/admin/operations/deliverability", label: "Deliverability" },
     { key: "email-lookup", href: "/admin/operations/email-lookup", label: "Email lookup" },
+
+    // Metrics / analytics
     { key: "subscribers", href: "/admin/metrics/subscribers", label: "Subscribers" },
-    { key: "rss-metrics", href: "/admin/metrics/rss", label: "RSS metrics" },
-    { key: "clicks", href: "/admin/clicks", label: "Click tracking" },
     { key: "demographics", href: "/admin/demographics", label: "Demographics" },
-    { key: "ads", href: "/admin/ads", label: "Ads" },
     { key: "followers", href: "/admin/followers", label: "Followers" },
-    { key: "sports", href: "/admin/sports", label: "Sports" },
+    { key: "clicks", href: "/admin/clicks", label: "Click tracking" },
+    { key: "rss-metrics", href: "/admin/metrics/rss", label: "RSS metrics" },
     { key: "games", href: "/admin/games", label: "Games" },
+
+    // Configuration / external surfaces
+    { key: "sports", href: "/admin/sports", label: "Sports" },
+    { key: "ads", href: "/admin/ads", label: "Ads" },
     { key: "discord", href: "/admin/discord", label: "Discord" },
-    { key: "share-preview", href: "/admin/share-preview", label: "Share preview" },
   ];
   return (
     <>
