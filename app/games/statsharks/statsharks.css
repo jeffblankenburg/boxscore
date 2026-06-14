@@ -334,7 +334,9 @@
   border: 2px solid var(--border-strong);
   border-radius: 8px;
   padding: 14px 16px;
-  min-height: 96px;
+  /* Tall enough to absorb a 2-line wrapped name without the value
+     column jumping when one card wraps and the other doesn't. */
+  min-height: 112px;
   width: 100%;
   min-width: 0;
   cursor: pointer;
@@ -365,28 +367,41 @@
   align-items: baseline;
   gap: 8px;
 }
-/* Neutralize iOS Safari's auto-link styling when format-detection
-   doesn't take effect (cached pages, older WKWebView builds). The
-   blue color comes from -webkit-text-fill-color (which beats `color`
-   on iOS), so we have to override BOTH or the link stays blue. */
+/* Neutralize iOS Safari's auto-link styling. `formatDetection` meta
+   only covers tel/date/address/email/url — iOS still auto-detects
+   names and 4-digit years and wraps them in <a x-apple-data-detectors>
+   tags. The injected styling uses -webkit-text-fill-color (beats plain
+   `color`) so we have to override BOTH. Target the attribute selector
+   directly because Apple sometimes injects the attribute on the
+   wrapping element (not always an <a>). */
+[x-apple-data-detectors],
+[x-apple-data-detectors="true"],
+a[x-apple-data-detectors],
+a[href^="x-apple-data-detectors"],
 .statsharks-card-left a,
-.statsharks-card-left a[x-apple-data-detectors] {
+.statsharks-card-name a,
+.statsharks-card-year a,
+.statsharks-card-team a {
   color: inherit !important;
   -webkit-text-fill-color: inherit !important;
   text-decoration: none !important;
-  pointer-events: none;
-  display: inline;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  font-family: inherit !important;
+  pointer-events: none !important;
 }
 .statsharks-card-name {
   font-size: 20px;
   font-weight: 800;
   line-height: 1.15;
   margin-bottom: 2px;
-  /* Single line max — the 368px-wide card has plenty of room for even
-     "Vlad Guerrero Jr." Names that somehow overflow get truncated. */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Allow wrap so long names (e.g. "Christian Encarnacion-Strand")
+     fit at 400px card width. Most names stay single-line; the
+     bottom-aligned grid + min-height keep the card visually stable
+     whether the name is 1 or 2 lines. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
   max-width: 100%;
 }
 .statsharks-card-year {
