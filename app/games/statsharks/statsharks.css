@@ -326,9 +326,11 @@
 .statsharks-card {
   display: grid;
   grid-template-columns: 1fr auto;
-  /* Bottom-align both columns so the ?/value sits on the same line
-     as the year+team row (the lower line of the left column). */
-  align-items: end;
+  /* Stretch both columns so the left column fills the card height;
+     inside it, justify-content: space-between pins the name to the
+     top and the year/team row to the bottom. The value is bottom-
+     aligned via align-self on its own rule. */
+  align-items: stretch;
   gap: 12px;
   background: var(--bg-paper);
   border: 2px solid var(--border-strong);
@@ -359,6 +361,9 @@
   justify-self: start;
   display: flex;
   flex-direction: column;
+  /* Name pinned to top, year+team pinned to bottom — no dead space
+     above the name regardless of card height. */
+  justify-content: space-between;
   gap: 4px;
   text-align: left;
 }
@@ -430,6 +435,9 @@ a[href^="x-apple-data-detectors"],
   text-align: right;
   line-height: 1;
   min-width: 80px;
+  /* Bottom-align with the year+team row so ? and the revealed
+     number sit on the same baseline as the year. */
+  align-self: end;
 }
 .statsharks-card-value-hidden { color: var(--border-light); }
 
