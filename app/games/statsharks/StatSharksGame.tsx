@@ -793,7 +793,7 @@ function EndScreen({
     if (variant === "daily" && totalRounds != null) {
       return [
         `Stat Sharks (${playedOn})`,
-        `Today: ${stat.label}`,
+        `Statistic: ${stat.label}`,
         ``,
         `${streak}/${totalRounds}${isDailyWin ? " ✨" : ""}`,
         grid,
@@ -803,7 +803,7 @@ function EndScreen({
     }
     return [
       `Stat Sharks endless (${playedOn})`,
-      `Today: ${stat.label}`,
+      `Statistic: ${stat.label}`,
       ``,
       `Streak: ${streak}`,
       grid,
