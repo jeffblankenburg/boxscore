@@ -49,25 +49,28 @@ const COUNTING_TIGHT = 1.15;
 const RATE_LOOSE     = 1.4;
 const RATE_TIGHT     = 1.05;
 
+// Prompts are phrased as "WHO HAD …" to make clear you're picking a
+// player, not a number. Earlier wording ("MORE HOME RUNS?",
+// "HIGHER AVG?") read as if the user were picking a value.
 export const STATS: Record<StatKey, StatDef> = {
-  HR:   { key: "HR",   side: "batter",  label: "Home Runs",       prompt: "MORE HOME RUNS?", column: "hr",      direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  RBI:  { key: "RBI",  side: "batter",  label: "RBI",             prompt: "MORE RBI?",       column: "rbi",     direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  H:    { key: "H",    side: "batter",  label: "Hits",            prompt: "MORE HITS?",      column: "h",       direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  R:    { key: "R",    side: "batter",  label: "Runs",            prompt: "MORE RUNS?",      column: "r",       direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  SB:   { key: "SB",   side: "batter",  label: "Stolen Bases",    prompt: "MORE SB?",        column: "sb",      direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  BB:   { key: "BB",   side: "batter",  label: "Walks",           prompt: "MORE WALKS?",     column: "bb_bat",  direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  "2B": { key: "2B",   side: "batter",  label: "Doubles",         prompt: "MORE DOUBLES?",   column: "doubles", direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  "3B": { key: "3B",   side: "batter",  label: "Triples",         prompt: "MORE TRIPLES?",   column: "triples", direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  AVG:  { key: "AVG",  side: "batter",  label: "Batting Average", prompt: "HIGHER AVG?",     column: "avg",     direction: "higher", decimals: 3, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
-  OBP:  { key: "OBP",  side: "batter",  label: "On-base %",       prompt: "HIGHER OBP?",     column: "obp",     direction: "higher", decimals: 3, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
-  OPS:  { key: "OPS",  side: "batter",  label: "OPS",             prompt: "HIGHER OPS?",     column: "ops",     direction: "higher", decimals: 3, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
+  HR:   { key: "HR",   side: "batter",  label: "Home Runs",       prompt: "WHO HAD MORE HOME RUNS?",      column: "hr",      direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  RBI:  { key: "RBI",  side: "batter",  label: "RBI",             prompt: "WHO HAD MORE RBI?",            column: "rbi",     direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  H:    { key: "H",    side: "batter",  label: "Hits",            prompt: "WHO HAD MORE HITS?",           column: "h",       direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  R:    { key: "R",    side: "batter",  label: "Runs",            prompt: "WHO SCORED MORE RUNS?",        column: "r",       direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  SB:   { key: "SB",   side: "batter",  label: "Stolen Bases",    prompt: "WHO STOLE MORE BASES?",        column: "sb",      direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  BB:   { key: "BB",   side: "batter",  label: "Walks",           prompt: "WHO WALKED MORE?",             column: "bb_bat",  direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  "2B": { key: "2B",   side: "batter",  label: "Doubles",         prompt: "WHO HAD MORE DOUBLES?",        column: "doubles", direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  "3B": { key: "3B",   side: "batter",  label: "Triples",         prompt: "WHO HAD MORE TRIPLES?",        column: "triples", direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  AVG:  { key: "AVG",  side: "batter",  label: "Batting Average", prompt: "WHO HIT FOR A HIGHER AVG?",    column: "avg",     direction: "higher", decimals: 3, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
+  OBP:  { key: "OBP",  side: "batter",  label: "On-base %",       prompt: "WHO HAD A HIGHER OBP?",        column: "obp",     direction: "higher", decimals: 3, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
+  OPS:  { key: "OPS",  side: "batter",  label: "OPS",             prompt: "WHO HAD A HIGHER OPS?",        column: "ops",     direction: "higher", decimals: 3, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
 
-  K:    { key: "K",    side: "pitcher", label: "Strikeouts",      prompt: "MORE K?",         column: "k",       direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  W:    { key: "W",    side: "pitcher", label: "Wins",            prompt: "MORE WINS?",      column: "w",       direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  SV:   { key: "SV",   side: "pitcher", label: "Saves",           prompt: "MORE SAVES?",     column: "sv",      direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  IP:   { key: "IP",   side: "pitcher", label: "Innings Pitched", prompt: "MORE IP?",        column: "ip",      direction: "higher", decimals: 1, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
-  ERA:  { key: "ERA",  side: "pitcher", label: "ERA",             prompt: "LOWER ERA?",      column: "era",     direction: "lower",  decimals: 2, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
-  WHIP: { key: "WHIP", side: "pitcher", label: "WHIP",            prompt: "LOWER WHIP?",     column: "whip",    direction: "lower",  decimals: 2, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
+  K:    { key: "K",    side: "pitcher", label: "Strikeouts",      prompt: "WHO STRUCK OUT MORE BATTERS?", column: "k",       direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  W:    { key: "W",    side: "pitcher", label: "Wins",            prompt: "WHO WON MORE GAMES?",          column: "w",       direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  SV:   { key: "SV",   side: "pitcher", label: "Saves",           prompt: "WHO HAD MORE SAVES?",          column: "sv",      direction: "higher", decimals: 0, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  IP:   { key: "IP",   side: "pitcher", label: "Innings Pitched", prompt: "WHO PITCHED MORE INNINGS?",    column: "ip",      direction: "higher", decimals: 1, isRateStat: false, loosestGap: COUNTING_LOOSE, tightestGap: COUNTING_TIGHT },
+  ERA:  { key: "ERA",  side: "pitcher", label: "ERA",             prompt: "WHO HAD A LOWER ERA?",         column: "era",     direction: "lower",  decimals: 2, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
+  WHIP: { key: "WHIP", side: "pitcher", label: "WHIP",            prompt: "WHO HAD A LOWER WHIP?",        column: "whip",    direction: "lower",  decimals: 2, isRateStat: true,  loosestGap: RATE_LOOSE,     tightestGap: RATE_TIGHT },
 };
 
 // Stats currently surfaced in the game. Used for both the daily

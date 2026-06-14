@@ -47,6 +47,9 @@ export type PersistedRound = {
   rightId:     number;
   pickedSide:  "left" | "right" | "timeout";
   wasCorrect:  boolean;
+  /** Wall-clock ms from pair-mount to pick. Undefined for rounds
+   *  recorded before the 2026-06-14 timing rollout. */
+  elapsedMs?:  number;
 };
 export type PersistedAttempt = {
   stat:    StatKey;

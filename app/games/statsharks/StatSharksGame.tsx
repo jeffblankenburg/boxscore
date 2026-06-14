@@ -286,7 +286,7 @@ function StatChooser({
     <section className="statsharks-chooser">
       <h3 className="statsharks-chooser-h">Pick your stat</h3>
       <p className="statsharks-chooser-sub">
-        Pick higher or lower. Build the longest streak you can.
+        Pick the player. Build the longest streak you can.
       </p>
       <div className="statsharks-chooser-grid">
         {allKeys.map((k) => {
@@ -505,11 +505,18 @@ function RunView({
         pickedSide: side,
       });
       setReveal({ ...score, pickedSide: side });
+      // Elapsed ms from pair-mount to this pick — used by the admin
+      // analytics for avg time-to-answer. timerStartedAtRef is set
+      // whenever a new pair mounts (see the timer effect above).
+      const elapsedMs = timerStartedAtRef.current
+        ? Math.max(0, Date.now() - timerStartedAtRef.current)
+        : undefined;
       const newRound: PersistedRound = {
         leftId:     pair.left.id,
         rightId:    pair.right.id,
         pickedSide: side,
         wasCorrect: score.wasCorrect,
+        elapsedMs,
       };
       const nextSlotIndex = rounds.filter((r) => r.wasCorrect).length;
 
