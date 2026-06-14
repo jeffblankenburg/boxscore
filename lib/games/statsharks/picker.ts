@@ -54,6 +54,17 @@ const PER_SEASON_TOP_N = 50;
 const RATE_MIN_PA = 300;
 const RATE_MIN_IP = 100;
 
+// Seasons we drop entirely. 2020 was 60 games (COVID), so its
+// counting-stat ceiling is ~37% of a normal season — Mookie Betts
+// leads with 80 hits instead of 200. The picker's gap-filter then
+// systematically pairs a normal-season player with a 2020 player to
+// satisfy the 2× gap on round 1, which made "the 2020 answer is
+// wrong" the dominant strategy for counting stats. Beta tester saw
+// 13/14 Endless HITS rounds include a 2020 option. Rate stats from
+// 2020 are also high-variance from the small sample, so we drop the
+// whole season rather than gating by stat type.
+const EXCLUDE_SEASONS: ReadonlySet<number> = new Set([2020]);
+
 // Season floor — matches the rest of the boxscore data universe
 // (historical_games, historical_player_lines all start in 1950). The
 // yearByYear ingest pulled in players' entire careers back to ~1920,
@@ -124,6 +135,7 @@ async function loadPool(stat: StatDef): Promise<PoolRow[]> {
   // Step 2: bucket by season, take the top N per season, flatten.
   const bySeason = new Map<number, PoolRow[]>();
   for (const r of raw) {
+    if (EXCLUDE_SEASONS.has(r.season)) continue;
     const v = r[stat.column];
     if (typeof v !== "number") continue;
     const players = Array.isArray(r.players) ? r.players[0] : r.players;
