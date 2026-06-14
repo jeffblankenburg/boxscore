@@ -1036,21 +1036,21 @@ function ReviewSide({
   /** True when the user lost this round (wrong pick OR timeout). */
   roundWasLost: boolean;
 }) {
-  // Always color the correct answer green. Color the wrong side red
-  // ONLY on lost rounds — that's where the user needs to see what
-  // they missed. On rounds the user got right we just light up the
-  // correct (= picked) side and leave the opponent neutral.
-  const showWrong = roundWasLost && !isCorrect;
+  // Correct rounds: green ✓ on the correct (= picked) side, opponent
+  // neutral. Lost rounds: red ✗ on the wrong side ONLY — no green
+  // on the correct side, so a lost row never lights up both halves.
+  const showGreen = isCorrect && !roundWasLost;
+  const showRed   = !isCorrect && roundWasLost;
   return (
     <div className={
       "statsharks-review-side"
-      + (isCorrect ? " is-correct-pick" : "")
-      + (showWrong ? " is-wrong-pick" : "")
+      + (showGreen ? " is-correct-pick" : "")
+      + (showRed ? " is-wrong-pick" : "")
     }>
       <div className="statsharks-review-name">
         <NoDetect text={card.player_name} />
-        {isCorrect ? <span className="statsharks-review-tag" aria-label="correct answer">✓</span> : null}
-        {showWrong ? <span className="statsharks-review-tag" aria-label="wrong answer">✗</span> : null}
+        {showGreen ? <span className="statsharks-review-tag" aria-label="correct">✓</span> : null}
+        {showRed ? <span className="statsharks-review-tag" aria-label="wrong">✗</span> : null}
       </div>
       <div className="statsharks-review-meta">
         {card.team_abbr ? <span>{card.team_abbr} </span> : null}
