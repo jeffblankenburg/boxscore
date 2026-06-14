@@ -78,19 +78,20 @@ export const STATS: Record<StatKey, StatDef> = {
 // intact so we can switch any stat on later without re-importing or
 // re-typing the chart; we just expand this whitelist.
 //
-// Filter (per Jeff, 2026-06-13):
-//   Batters: HR, RBI, H, SB, AVG
-//   Pitchers: W, K, SV, ERA
+// Filter (per Jeff, 2026-06-14):
+//   Batters: HR, RBI, H, R, SB, AVG  (counting first, then rate)
+//   Pitchers: K, W, ERA              (counting first, then rate)
+// Replaced SV — closers-only stat with too few qualifying rows.
 export const VISIBLE_STATS: ReadonlyArray<StatKey> = [
-  "HR", "RBI", "H", "SB", "AVG",
-  "K",  "W",   "SV", "ERA",
+  "HR", "RBI", "H", "R", "SB", "AVG",
+  "K",  "W",   "ERA",
 ];
 
-// Daily rotation. Interleaved batter / pitcher stats so a player who
-// shows up two days in a row doesn't experience "batter week" or
-// "pitcher week". 9 stats → cycle every 9 days.
+// Daily rotation. Pitchers placed at positions 2, 5, 8 of a 9-day
+// cycle so they're perfectly evenly spaced — no "batter week" or
+// "pitcher week" possible.
 export const ROTATION: ReadonlyArray<StatKey> = [
-  "HR", "K", "RBI", "ERA", "H", "W", "SB", "SV", "AVG",
+  "HR", "K", "RBI", "H", "W", "R", "SB", "ERA", "AVG",
 ];
 
 /**
