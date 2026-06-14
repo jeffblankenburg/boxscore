@@ -897,13 +897,13 @@ function EndScreen({
                     card={lastReview.left}
                     stat={stat}
                     isCorrect={lastReview.correctSide === "left"}
-                    isPicked={lastRound?.pickedSide === "left"}
+                    roundWasLost={!lastRound?.wasCorrect}
                   />
                   <ReviewSide
                     card={lastReview.right}
                     stat={stat}
                     isCorrect={lastReview.correctSide === "right"}
-                    isPicked={lastRound?.pickedSide === "right"}
+                    roundWasLost={!lastRound?.wasCorrect}
                   />
                 </div>
               </li>
@@ -1001,7 +1001,7 @@ function ReviewPanel({
             </li>
           );
         }
-        const picked = round.pickedSide;
+        const roundWasLost = !round.wasCorrect;
         return (
           <li key={i} className="statsharks-review-row">
             <span className="statsharks-review-num">{i + 1}</span>
@@ -1010,13 +1010,13 @@ function ReviewPanel({
                 card={d.left}
                 stat={stat}
                 isCorrect={d.correctSide === "left"}
-                isPicked={picked === "left"}
+                roundWasLost={roundWasLost}
               />
               <ReviewSide
                 card={d.right}
                 stat={stat}
                 isCorrect={d.correctSide === "right"}
-                isPicked={picked === "right"}
+                roundWasLost={roundWasLost}
               />
             </div>
           </li>
@@ -1027,32 +1027,30 @@ function ReviewPanel({
 }
 
 function ReviewSide({
-  card, stat, isCorrect, isPicked,
+  card, stat, isCorrect, roundWasLost,
 }: {
   card: ReviewRound["left"];
   stat: StatDef;
-  /** True when this side was the actual correct answer (independent
-   *  of what the user picked). Used only to compute `correctPick`. */
+  /** True when this side was the actual correct answer. */
   isCorrect: boolean;
-  /** True when the user selected this side. */
-  isPicked: boolean;
+  /** True when the user lost this round (wrong pick OR timeout). */
+  roundWasLost: boolean;
 }) {
-  const correctPick = isPicked && isCorrect;
-  const wrongPick   = isPicked && !isCorrect;
-  // The opponent side (user didn't pick it) stays neutral — green
-  // means "you got this one right", red means "you picked this and
-  // it was wrong". The actual correct answer on a missed round can be
-  // read from the stat values themselves.
+  // Always color the correct answer green. Color the wrong side red
+  // ONLY on lost rounds — that's where the user needs to see what
+  // they missed. On rounds the user got right we just light up the
+  // correct (= picked) side and leave the opponent neutral.
+  const showWrong = roundWasLost && !isCorrect;
   return (
     <div className={
       "statsharks-review-side"
-      + (correctPick ? " is-correct-pick" : "")
-      + (wrongPick ? " is-wrong-pick" : "")
+      + (isCorrect ? " is-correct-pick" : "")
+      + (showWrong ? " is-wrong-pick" : "")
     }>
       <div className="statsharks-review-name">
         <NoDetect text={card.player_name} />
-        {correctPick ? <span className="statsharks-review-tag" aria-label="your correct pick">✓</span> : null}
-        {wrongPick ? <span className="statsharks-review-tag" aria-label="your wrong pick">✗</span> : null}
+        {isCorrect ? <span className="statsharks-review-tag" aria-label="correct answer">✓</span> : null}
+        {showWrong ? <span className="statsharks-review-tag" aria-label="wrong answer">✗</span> : null}
       </div>
       <div className="statsharks-review-meta">
         {card.team_abbr ? <span>{card.team_abbr} </span> : null}
