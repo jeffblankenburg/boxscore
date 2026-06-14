@@ -14,6 +14,16 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Stat Sharks | boxscore games",
   robots: { index: false },
+  // Disable iOS Safari's data detectors — it auto-links player
+  // names and years (as if they were contacts or dates), which
+  // breaks the card flex layout and renders text blue.
+  formatDetection: {
+    telephone: false,
+    date:      false,
+    address:   false,
+    email:     false,
+    url:       false,
+  },
 };
 
 export default async function StatSharksPage() {
