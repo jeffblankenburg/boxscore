@@ -287,7 +287,6 @@ function StatChooser({
       <h3 className="statsharks-chooser-h">Pick your stat</h3>
       <p className="statsharks-chooser-sub">
         Pick higher or lower. Build the longest streak you can.
-        Practice runs don&rsquo;t affect today&rsquo;s daily score.
       </p>
       <div className="statsharks-chooser-grid">
         {allKeys.map((k) => {
