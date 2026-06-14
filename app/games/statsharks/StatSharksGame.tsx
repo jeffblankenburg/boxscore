@@ -17,6 +17,7 @@ import {
   scorePair,
   persistAttempt,
   persistEndlessRun,
+  getReviewData,
 } from "./actions";
 import {
   DAILY_ROUND_COUNT,
@@ -24,6 +25,7 @@ import {
   type DailyPublicPair,
   type PersistedAttempt,
   type PersistedRound,
+  type ReviewRound,
 } from "./types";
 import { STATS, VISIBLE_STATS, formatStatValue, type StatDef, type StatKey } from "@/lib/games/statsharks/stats";
 import { useResetAtMidnightET } from "@/lib/games/use-reset-at-midnight-et";
@@ -364,6 +366,10 @@ function RunView({
     wasCorrect:  boolean;
   } | null>(null);
   const [pending, setPending] = useState(false);
+  // When the user picks wrong we hold the reveal on screen and stash
+  // the "advance to EndScreen" callback here; tapping Continue invokes
+  // it. Null when no advance is pending (regular flow).
+  const [pendingContinue, setPendingContinue] = useState<(() => void) | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SEC);
   // Wall-clock start of the current round's timer. We compute
   // secondsLeft as (TIMER_SEC - elapsed) so a paused tab (mobile
@@ -507,9 +513,6 @@ function RunView({
         pickedSide: side,
       });
       setReveal({ ...score, pickedSide: side });
-      // Elapsed ms from pair-mount to this pick — used by the admin
-      // analytics for avg time-to-answer. timerStartedAtRef is set
-      // whenever a new pair mounts (see the timer effect above).
       const elapsedMs = timerStartedAtRef.current
         ? Math.max(0, Date.now() - timerStartedAtRef.current)
         : undefined;
@@ -522,20 +525,13 @@ function RunView({
       };
       const nextSlotIndex = rounds.filter((r) => r.wasCorrect).length;
 
-      // Dot-flight: launch from the picked card toward the next slot
-      // in the dots row. Lands at exactly REVEAL_MS, the same moment
-      // the permanent dot mounts and the cards swap to the next pair.
-      // The flying dot stays at opacity 1 throughout — the unmount
-      // and the permanent dot's mount happen on the same frame.
-      if (score.wasCorrect && (side === "left" || side === "right")) {
-        setTimeout(() => launchFlyingDot(side, nextSlotIndex), FLIGHT_DELAY_MS);
-      }
-
-      setTimeout(() => {
+      // Closure-captures `rounds`, `score`, `newRound`. Safe to call
+      // later (from a tap) because none of those references can shift.
+      const advance = () => {
+        setPendingContinue(null);
         setReveal(null);
         const nextRounds = [...rounds, newRound];
 
-        // Wrong → end the run (lose in Daily, end in Endless).
         if (!score.wasCorrect) {
           setRounds(nextRounds);
           setFlyingDot(null);
@@ -543,22 +539,13 @@ function RunView({
           setEndlessPair(null);
           return;
         }
-
-        // Daily: cap at DAILY_ROUND_COUNT. If we just hit it, win and
-        // end. Otherwise the derived `pair` updates automatically
-        // because rounds.length changed.
         if (isDaily) {
           const reachedCap = nextRounds.length >= DAILY_ROUND_COUNT;
           setRounds(nextRounds);
           setFlyingDot(null);
-          if (reachedCap) {
-            setEnded(true);
-          }
+          if (reachedCap) setEnded(true);
           return;
         }
-
-        // Endless: swap to the pre-fetched next pair (or fetch on
-        // demand if the pre-fetch was slower than the human).
         setRounds(nextRounds);
         setFlyingDot(null);
         if (nextEndlessPair) {
@@ -583,7 +570,20 @@ function RunView({
             }
           })();
         }
-      }, REVEAL_MS);
+      };
+
+      if (score.wasCorrect) {
+        // Right → fly the dot in (lands at REVEAL_MS) and auto-advance.
+        if (side === "left" || side === "right") {
+          setTimeout(() => launchFlyingDot(side, nextSlotIndex), FLIGHT_DELAY_MS);
+        }
+        setTimeout(advance, REVEAL_MS);
+      } else {
+        // Wrong → hold the reveal on screen and wait for the user to
+        // tap "Continue" so they can absorb what they got wrong before
+        // the EndScreen takes over. Beta-tester feedback 2026-06-14.
+        setPendingContinue(() => advance);
+      }
     } catch (e) {
       console.error("scorePair:", e);
     } finally {
@@ -611,7 +611,7 @@ function RunView({
   if (ended) {
     return (
       <EndScreen
-        stat={stat} rounds={rounds} playedOn={playedOn}
+        stat={stat} statKey={statKey} rounds={rounds} playedOn={playedOn}
         variant={endVariant}
         totalRounds={totalRounds ?? undefined}
         onPlayAgain={onPlayAgain}
@@ -683,6 +683,15 @@ function RunView({
             ["--dy" as keyof React.CSSProperties]: `${flyingDot.dy}px`,
           } as React.CSSProperties}
         />
+      ) : null}
+      {pendingContinue ? (
+        <button
+          type="button"
+          className="statsharks-continue-btn"
+          onClick={() => pendingContinue()}
+        >
+          Continue →
+        </button>
       ) : null}
     </section>
   );
@@ -774,9 +783,10 @@ const Card = function Card({
 };
 
 function EndScreen({
-  stat, rounds, playedOn, variant, totalRounds, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
+  stat, statKey, rounds, playedOn, variant, totalRounds, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
 }: {
   stat: StatDef;
+  statKey: StatKey;
   rounds: PersistedRound[];
   playedOn: string;
   variant: "daily" | "endless";
@@ -788,6 +798,27 @@ function EndScreen({
   bestLifetime?: number;
 }) {
   const [copied, setCopied] = useState(false);
+  const [reviewOpen, setReviewOpen]   = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewData, setReviewData] = useState<Array<ReviewRound | null> | null>(null);
+  const openReview = async () => {
+    if (reviewOpen) { setReviewOpen(false); return; }
+    setReviewOpen(true);
+    if (reviewData || reviewLoading) return;
+    setReviewLoading(true);
+    try {
+      const data = await getReviewData({
+        statKey,
+        rounds: rounds.map((r) => ({ leftId: r.leftId, rightId: r.rightId })),
+      });
+      setReviewData(data);
+    } catch (e) {
+      console.error("getReviewData:", e);
+      setReviewData([]);
+    } finally {
+      setReviewLoading(false);
+    }
+  };
   const streak = rounds.filter((r) => r.wasCorrect).length;
   const isDailyWin = variant === "daily" && totalRounds != null && streak >= totalRounds;
   const grid = rounds.map((r) => r.wasCorrect ? "🟢" : "🔴").join("");
@@ -888,12 +919,110 @@ function EndScreen({
             Pick different stat
           </button>
         ) : null}
+        {rounds.length > 0 ? (
+          <button
+            type="button"
+            className="statsharks-play-again-btn"
+            onClick={openReview}
+          >
+            {reviewOpen ? "Hide review" : "Review puzzle"}
+          </button>
+        ) : null}
       </div>
+      {reviewOpen ? (
+        <ReviewPanel
+          stat={stat}
+          rounds={rounds}
+          data={reviewData}
+          loading={reviewLoading}
+        />
+      ) : null}
       {variant === "daily" ? (
         <p className="statsharks-end-tomorrow">
           New stat tomorrow. Come back at midnight ET, or try Endless mode above.
         </p>
       ) : null}
     </section>
+  );
+}
+
+/** Per-round review list shown after the user taps "Review puzzle"
+ * on the end screen. One row per round: both players with their stat
+ * values, a check on the correct side, and (if it differs) an X on
+ * the side the user picked. */
+function ReviewPanel({
+  stat, rounds, data, loading,
+}: {
+  stat: StatDef;
+  rounds: PersistedRound[];
+  data: Array<ReviewRound | null> | null;
+  loading: boolean;
+}) {
+  if (loading || !data) {
+    return <div className="statsharks-review-loading">Loading review…</div>;
+  }
+  return (
+    <ol className="statsharks-review">
+      {data.map((d, i) => {
+        const round = rounds[i];
+        if (!d || !round) {
+          return (
+            <li key={i} className="statsharks-review-row">
+              <span className="statsharks-review-num">{i + 1}</span>
+              <span className="statsharks-review-missing">data unavailable</span>
+            </li>
+          );
+        }
+        const picked = round.pickedSide;
+        return (
+          <li key={i} className="statsharks-review-row">
+            <span className="statsharks-review-num">{i + 1}</span>
+            <div className="statsharks-review-pair">
+              <ReviewSide
+                card={d.left}
+                stat={stat}
+                isCorrect={d.correctSide === "left"}
+                isPicked={picked === "left"}
+              />
+              <ReviewSide
+                card={d.right}
+                stat={stat}
+                isCorrect={d.correctSide === "right"}
+                isPicked={picked === "right"}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ReviewSide({
+  card, stat, isCorrect, isPicked,
+}: {
+  card: ReviewRound["left"];
+  stat: StatDef;
+  isCorrect: boolean;
+  isPicked: boolean;
+}) {
+  const wrongPick = isPicked && !isCorrect;
+  return (
+    <div className={
+      "statsharks-review-side"
+      + (isCorrect ? " is-correct" : "")
+      + (wrongPick ? " is-wrong-pick" : "")
+    }>
+      <div className="statsharks-review-name">
+        <NoDetect text={card.player_name} />
+        {isCorrect ? <span className="statsharks-review-tag" aria-label="correct">✓</span> : null}
+        {wrongPick ? <span className="statsharks-review-tag" aria-label="your pick">✗</span> : null}
+      </div>
+      <div className="statsharks-review-meta">
+        {card.team_abbr ? <span>{card.team_abbr} </span> : null}
+        <NoDetect text={String(card.season)} />
+        <span className="statsharks-review-value">{formatStatValue(stat, card.value)} {stat.key}</span>
+      </div>
+    </div>
   );
 }

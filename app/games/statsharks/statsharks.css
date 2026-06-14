@@ -511,6 +511,109 @@ a[href^="x-apple-data-detectors"],
   color: var(--text-muted);
 }
 
+/* Continue button shown after a wrong pick — replaces the auto-advance
+   so the user can study the reveal before the EndScreen takes over. */
+.statsharks-continue-btn {
+  display: block;
+  margin: 16px auto 0;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: var(--text-primary);
+  color: #fff;
+  border: 1px solid var(--text-primary);
+  cursor: pointer;
+}
+.statsharks-continue-btn:hover { background: #000; }
+
+/* Post-game review list. One row per round, two columns inside. */
+.statsharks-review-loading {
+  margin: 18px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.statsharks-review {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.statsharks-review-row {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--bg-paper);
+}
+.statsharks-review-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1.2;
+  padding-top: 2px;
+}
+.statsharks-review-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+.statsharks-review-side {
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+.statsharks-review-side.is-correct {
+  border-color: #1f7a3a;
+  background: #f0f8f1;
+}
+.statsharks-review-side.is-wrong-pick {
+  border-color: #c4392a;
+  background: #fdeeec;
+}
+.statsharks-review-name {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.statsharks-review-tag {
+  font-weight: 800;
+  font-size: 12px;
+}
+.statsharks-review-side.is-correct .statsharks-review-tag { color: #1f7a3a; }
+.statsharks-review-side.is-wrong-pick .statsharks-review-tag { color: #c4392a; }
+.statsharks-review-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+.statsharks-review-value {
+  margin-left: 6px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.statsharks-review-missing {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* Container is already locked to 400px; we keep cards side-by-side at
    every viewport. Phones narrower than 400px will compress
    proportionally via box-sizing + min-width: 0 on the cards. */

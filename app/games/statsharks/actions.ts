@@ -28,6 +28,7 @@ import {
   type PersistedRound,
   type PublicCard,
   type PublicPair,
+  type ReviewRound,
   type ScoreResult,
 } from "./types";
 
@@ -230,6 +231,68 @@ export async function persistEndlessRun(opts: {
       played_on:     opts.playedOn,
     });
   if (error) console.error(`persistEndlessRun: ${error.message}`);
+}
+
+/** Review data for the rounds the user just finished. Reads each
+ * (leftId, rightId) pair fresh from player_seasons so the EndScreen
+ * can render a "Review puzzle" table without us having to denormalize
+ * names + values into puzzle_attempts.notes. One query per call,
+ * keyed by stat (the value column is dynamic).
+ *
+ * Returns one entry per input round, indexed the same way. Returns
+ * `null` for any round whose IDs aren't found (shouldn't happen for
+ * rounds the user just played, but safe).
+ */
+export async function getReviewData(opts: {
+  statKey: StatKey;
+  rounds:  Array<{ leftId: number; rightId: number }>;
+}): Promise<Array<ReviewRound | null>> {
+  const stat = STATS[opts.statKey];
+  if (!stat) throw new Error(`unknown stat: ${opts.statKey}`);
+  if (opts.rounds.length === 0) return [];
+
+  const ids = new Set<number>();
+  for (const r of opts.rounds) { ids.add(r.leftId); ids.add(r.rightId); }
+
+  const { data, error } = await supabaseAdmin()
+    .from("player_seasons")
+    .select(`id, season, team_abbr, ${stat.column}, players!inner(full_name)`)
+    .in("id", Array.from(ids));
+  if (error) throw new Error(`getReviewData: ${error.message}`);
+
+  type Row = {
+    id:         number;
+    season:     number;
+    team_abbr:  string | null;
+    players:    { full_name: string } | { full_name: string }[];
+    [k: string]: unknown;
+  };
+  const byId = new Map<number, { name: string; season: number; team: string | null; value: number }>();
+  for (const r of (data ?? []) as unknown as Row[]) {
+    const v = r[stat.column];
+    if (typeof v !== "number") continue;
+    const players = Array.isArray(r.players) ? r.players[0] : r.players;
+    byId.set(r.id, {
+      name:   players?.full_name ?? "(unknown)",
+      season: r.season,
+      team:   r.team_abbr,
+      value:  v,
+    });
+  }
+
+  return opts.rounds.map((round) => {
+    const L = byId.get(round.leftId);
+    const R = byId.get(round.rightId);
+    if (!L || !R) return null;
+    const correctSide: "left" | "right" = stat.direction === "higher"
+      ? (L.value >= R.value ? "left" : "right")
+      : (L.value <= R.value ? "left" : "right");
+    return {
+      left:  { id: round.leftId,  player_name: L.name, season: L.season, team_abbr: L.team,  value: L.value },
+      right: { id: round.rightId, player_name: R.name, season: R.season, team_abbr: R.team, value: R.value },
+      correctSide,
+    };
+  });
 }
 
 /** Server-side initial-state lookup for authed subscribers. Returns

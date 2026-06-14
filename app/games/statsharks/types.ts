@@ -56,3 +56,15 @@ export type PersistedAttempt = {
   rounds:  PersistedRound[];
   ended:   boolean;
 };
+
+// ─── Review (post-game) ──────────────────────────────────────────
+
+/** One round's worth of data the EndScreen needs to render the
+ * "Review puzzle" table: both players with stat values, plus which
+ * side was actually correct. Fetched on demand from player_seasons
+ * — we don't persist enriched data into puzzle_attempts. */
+export type ReviewRound = {
+  left:  PublicCard & { value: number };
+  right: PublicCard & { value: number };
+  correctSide: "left" | "right";
+};
