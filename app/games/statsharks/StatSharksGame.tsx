@@ -163,15 +163,31 @@ function DailyRun({
   mode: Mode;
   onSwitchToEndless: () => void;
 }) {
+  // initialAttempt is a server-side snapshot frozen at page load. If
+  // the user finishes the game in this session, switches mode (which
+  // unmounts DailyRun), then switches back, the remount has to read
+  // the up-to-date state — not the stale initialAttempt prop, which
+  // would let them re-play the locked round. Local storage stays
+  // current because RunView persists every state change. Prefer
+  // whichever source has more progress (more rounds, or same rounds
+  // but already marked ended).
   const initial = useMemo<{ rounds: PersistedRound[]; ended: boolean }>(() => {
-    if (initialAttempt) {
-      return { rounds: initialAttempt.rounds, ended: initialAttempt.ended };
-    }
     const local = loadDailyLocal(playedOn);
-    if (local && local.stat === statKey) {
-      return { rounds: local.rounds, ended: local.ended };
+    const localValid = !!(local && local.stat === statKey);
+    const fromLocal = localValid
+      ? { rounds: local!.rounds, ended: local!.ended }
+      : null;
+    const fromServer = initialAttempt
+      ? { rounds: initialAttempt.rounds, ended: initialAttempt.ended }
+      : null;
+    if (fromLocal && fromServer) {
+      // More rounds wins; tie goes to whichever is already ended.
+      if (fromLocal.rounds.length > fromServer.rounds.length) return fromLocal;
+      if (fromServer.rounds.length > fromLocal.rounds.length) return fromServer;
+      if (fromLocal.ended && !fromServer.ended) return fromLocal;
+      return fromServer;
     }
-    return { rounds: [], ended: false };
+    return fromLocal ?? fromServer ?? { rounds: [], ended: false };
   }, [initialAttempt, playedOn, statKey]);
 
   return (
