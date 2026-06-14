@@ -387,6 +387,10 @@ function RunView({
   } | null>(null);
   const [pending, setPending] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SEC);
+  // Fresh runs wait for the user to tap Start before the timer ticks
+  // and the first pair appears. Resumes (rounds already on disk) skip
+  // the gate so the user picks up where they left off.
+  const [started, setStarted] = useState<boolean>(initialRounds.length > 0);
   // Wall-clock start of the current round's timer. We compute
   // secondsLeft as (TIMER_SEC - elapsed) so a paused tab (mobile
   // backgrounded) doesn't keep the clock alive — when the tab
@@ -487,7 +491,7 @@ function RunView({
   // the clock indefinitely — when the tab returns we recompute from
   // Date.now() and the timeout fires immediately if it should have.
   useEffect(() => {
-    if (ended || !pair || reveal) {
+    if (!started || ended || !pair || reveal) {
       timerStartedAtRef.current = null;
       setSecondsLeft(TIMER_SEC);
       return;
@@ -508,7 +512,7 @@ function RunView({
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [pair?.left.id, pair?.right.id, ended, reveal]);
+  }, [pair?.left.id, pair?.right.id, ended, reveal, started]);
 
   const usedIds = useMemo<number[]>(() => {
     const out: number[] = [];
@@ -612,13 +616,13 @@ function RunView({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (ended) return;
+      if (!started || ended) return;
       if (e.key === "ArrowLeft"  || e.key === "1") { e.preventDefault(); void doPick("left"); }
       if (e.key === "ArrowRight" || e.key === "2") { e.preventDefault(); void doPick("right"); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [doPick, ended]);
+  }, [doPick, ended, started]);
 
   if (ended) {
     return (
@@ -634,10 +638,6 @@ function RunView({
       />
     );
   }
-  if (!pair) {
-    return <p className="statsharks-empty">Loading…</p>;
-  }
-
   const streak = rounds.filter((r) => r.wasCorrect).length;
   return (
     <section className="statsharks-game">
@@ -659,32 +659,48 @@ function RunView({
               <span key={i} className="statsharks-dot is-filled" />
             ))}
       </div>
-      <div className="statsharks-prompt">{stat.prompt}</div>
-      <div className="statsharks-cards">
-        <Card
-          side="left"
-          card={pair.left}
-          cardRef={leftCardRef}
-          reveal={reveal
-            ? { value: reveal.leftValue, wasCorrectSide: reveal.correctSide === "left" }
-            : null}
-          stat={stat}
-          onPick={() => void doPick("left")}
-          disabled={!!reveal || pending}
-        />
-        <div className="statsharks-vs">vs</div>
-        <Card
-          side="right"
-          card={pair.right}
-          cardRef={rightCardRef}
-          reveal={reveal
-            ? { value: reveal.rightValue, wasCorrectSide: reveal.correctSide === "right" }
-            : null}
-          stat={stat}
-          onPick={() => void doPick("right")}
-          disabled={!!reveal || pending}
-        />
-      </div>
+      {!started ? (
+        <div className="statsharks-start-row">
+          <button
+            type="button"
+            className="statsharks-start-btn"
+            onClick={() => setStarted(true)}
+          >
+            Start
+          </button>
+        </div>
+      ) : !pair ? (
+        <p className="statsharks-empty">Loading…</p>
+      ) : (
+        <>
+          <div className="statsharks-prompt">{stat.prompt}</div>
+          <div className="statsharks-cards">
+            <Card
+              side="left"
+              card={pair.left}
+              cardRef={leftCardRef}
+              reveal={reveal
+                ? { value: reveal.leftValue, wasCorrectSide: reveal.correctSide === "left" }
+                : null}
+              stat={stat}
+              onPick={() => void doPick("left")}
+              disabled={!!reveal || pending}
+            />
+            <div className="statsharks-vs">vs</div>
+            <Card
+              side="right"
+              card={pair.right}
+              cardRef={rightCardRef}
+              reveal={reveal
+                ? { value: reveal.rightValue, wasCorrectSide: reveal.correctSide === "right" }
+                : null}
+              stat={stat}
+              onPick={() => void doPick("right")}
+              disabled={!!reveal || pending}
+            />
+          </div>
+        </>
+      )}
       {flyingDot ? (
         <span
           key={flyingDot.id}

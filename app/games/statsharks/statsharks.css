@@ -304,6 +304,28 @@
   100% { transform: translate(var(--dx), var(--dy)) scale(1);  opacity: 1; }
 }
 
+/* Start gate — shown on fresh runs in place of the prompt + cards so
+   the user can see the streak/diamond/timer and choose when to begin. */
+.statsharks-start-row {
+  display: flex;
+  justify-content: center;
+  margin: 22px 0 8px;
+}
+.statsharks-start-btn {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 14px 40px;
+  border-radius: 999px;
+  background: var(--text-primary);
+  color: #fff;
+  border: 1px solid var(--text-primary);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.statsharks-start-btn:hover { background: #000; }
+
 /* Prompt above the cards: "MORE HOME RUNS?" */
 .statsharks-prompt {
   text-align: center;
