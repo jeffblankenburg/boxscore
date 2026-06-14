@@ -326,7 +326,9 @@
 .statsharks-card {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: center;
+  /* Bottom-align both columns so the ?/value sits on the same line
+     as the year+team row (the lower line of the left column). */
+  align-items: end;
   gap: 12px;
   background: var(--bg-paper);
   border: 2px solid var(--border-strong);
@@ -364,9 +366,13 @@
   gap: 8px;
 }
 /* Neutralize iOS Safari's auto-link styling when format-detection
-   doesn't take effect (cached pages, older WKWebView builds). */
-.statsharks-card-left a {
+   doesn't take effect (cached pages, older WKWebView builds). The
+   blue color comes from -webkit-text-fill-color (which beats `color`
+   on iOS), so we have to override BOTH or the link stays blue. */
+.statsharks-card-left a,
+.statsharks-card-left a[x-apple-data-detectors] {
   color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
   text-decoration: none !important;
   pointer-events: none;
   display: inline;
