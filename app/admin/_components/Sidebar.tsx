@@ -49,6 +49,8 @@ const SECTIONS: NavSection[] = [
       { href: "/admin/metrics/rss", label: "RSS" },
       // Chunk 2b: move /admin/clicks → /admin/metrics/clicks
       { href: "/admin/clicks", label: "Clicks" },
+      { href: "/admin/demographics", label: "Demographics" },
+      { href: "/admin/games", label: "Games" },
     ],
   },
   {
@@ -62,6 +64,7 @@ const SECTIONS: NavSection[] = [
   {
     label: "Content",
     links: [
+      { href: "/admin/preview/mlb", label: "Email preview" },
       { href: "/admin/content/digests", label: "Digests" },
       { href: "/admin/historical", label: "Historical" },
       { href: "/admin/historical?today=1", label: "On This Day" },
@@ -69,6 +72,7 @@ const SECTIONS: NavSection[] = [
       { href: "/admin/historical/backfill", label: "Backfill status" },
       // Chunk 2b: move these into /admin/content/*
       { href: "/admin/twitter", label: "Twitter" },
+      { href: "/admin/discord", label: "Discord" },
       { href: "/admin/images", label: "Images" },
       { href: "/admin/share-preview", label: "Share preview" },
     ],
