@@ -708,23 +708,24 @@ function TopBar({ stat, streak, secondsLeft }: {
 }
 
 /**
- * Renders text as a sequence of per-character <span>s so iOS Safari's
- * data detectors can't find a contiguous text node to auto-link.
- * `formatDetection` + every CSS override (`color: inherit !important`,
- * `-webkit-text-fill-color: inherit !important`, `[x-apple-data-detectors]`
- * selectors) failed in the wild — the only reliable defeat is to make
- * sure no detector ever finds a pattern to match in the first place.
+ * Renders text exclusively via CSS pseudo-element content. The DOM
+ * has zero text nodes — the visible string lives in `data-text` and
+ * `.statsharks-nodetect::after { content: attr(data-text) }` paints it.
  *
- * Cost: each character is its own DOM node. Acceptable for short
- * labels (player names, years) but don't use for paragraphs.
+ * iOS Safari's data detectors only scan text nodes in the DOM tree;
+ * pseudo-element content is invisible to them. Every other path
+ * (formatDetection meta, per-character spans, !important CSS,
+ * [x-apple-data-detectors] overrides) was bypassed in the wild.
+ *
+ * `aria-label` on the carrier span gives screen readers the real text.
  */
 function NoDetect({ text }: { text: string }) {
   return (
-    <span aria-label={text}>
-      {Array.from(text).map((c, i) => (
-        <span key={i} aria-hidden="true">{c}</span>
-      ))}
-    </span>
+    <span
+      className="statsharks-nodetect"
+      data-text={text}
+      aria-label={text}
+    />
   );
 }
 
@@ -752,22 +753,20 @@ const Card = function Card({
       disabled={disabled}
       aria-label={`Pick ${card.player_name}, ${card.season}`}
     >
-      <div className="statsharks-card-left">
-        <div className="statsharks-card-name">
-          <NoDetect text={card.player_name} />
-        </div>
-        <div className="statsharks-card-yearteam">
-          <span className="statsharks-card-year">
-            <NoDetect text={String(card.season)} />
-          </span>
-          {card.team_abbr ? <span className="statsharks-card-team">{card.team_abbr}</span> : null}
-        </div>
+      <div className="statsharks-card-name">
+        <NoDetect text={card.player_name} />
       </div>
-      {reveal ? (
-        <div className="statsharks-card-value">{formatStatValue(stat, reveal.value)}</div>
-      ) : (
-        <div className="statsharks-card-value statsharks-card-value-hidden">?</div>
-      )}
+      <div className="statsharks-card-meta">
+        {card.team_abbr ? (
+          <span className="statsharks-card-team">{card.team_abbr}</span>
+        ) : null}
+        <span className="statsharks-card-year">
+          <NoDetect text={String(card.season)} />
+        </span>
+      </div>
+      <div className="statsharks-card-value">
+        {reveal ? formatStatValue(stat, reveal.value) : " "}
+      </div>
     </button>
   );
 };

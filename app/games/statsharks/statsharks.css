@@ -324,53 +324,43 @@
   padding: 2px 0;
 }
 .statsharks-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  /* Stretch both columns so the left column fills the card height;
-     inside it, justify-content: space-between pins the name to the
-     top and the year/team row to the bottom. The value is bottom-
-     aligned via align-self on its own rule. */
-  align-items: stretch;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
   background: var(--bg-paper);
   border: 2px solid var(--border-strong);
   border-radius: 8px;
-  padding: 14px 16px;
-  /* Tall enough to absorb a 2-line wrapped name without the value
-     column jumping when one card wraps and the other doesn't. */
-  min-height: 112px;
+  padding: 14px 16px 16px;
+  /* Name (~24px) + meta (~18px) + reveal slot (~40px) + paddings.
+     Fixed min-height so the bottom reveal area is always visible
+     before the flip, and the two cards stay identical-height. */
+  min-height: 132px;
   width: 100%;
   min-width: 0;
   cursor: pointer;
   font-family: inherit;
-  text-align: left;
   transition: transform 0.15s ease-out, background 0.2s, border-color 0.2s;
   box-sizing: border-box;
 }
 .statsharks-card:hover:not(:disabled) { transform: translateY(-2px); }
 .statsharks-card:active:not(:disabled) { transform: translateY(0); }
 .statsharks-card:disabled { cursor: default; }
-/* Left column of each card: name on top, year + team on the row below.
-   `width: 100%` + `justify-self: start` lock the column to the full
-   grid cell so iOS data-detector links (which wrap names + years in
-   inline-block <a> tags) can't shrink the column and shift the value
-   slot. */
-.statsharks-card-left {
-  min-width: 0;
-  width: 100%;
-  justify-self: start;
-  display: flex;
-  flex-direction: column;
-  /* Name pinned to top, year+team pinned to bottom — no dead space
-     above the name regardless of card height. */
-  justify-content: space-between;
-  gap: 4px;
-  text-align: left;
+/* Centered text via CSS pseudo-element so iOS data detectors never
+   see a real text node to pattern-match. The data-text attribute
+   carries the string; ::after paints it as generated content. */
+.statsharks-nodetect {
+  display: inline;
 }
-.statsharks-card-yearteam {
+.statsharks-nodetect::after {
+  content: attr(data-text);
+}
+.statsharks-card-meta {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
 }
 /* Neutralize iOS Safari's auto-link styling. `formatDetection` meta
    only covers tel/date/address/email/url — iOS still auto-detects
@@ -396,50 +386,41 @@ a[href^="x-apple-data-detectors"],
   pointer-events: none !important;
 }
 .statsharks-card-name {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   line-height: 1.15;
-  margin-bottom: 2px;
-  /* Allow wrap so long names (e.g. "Christian Encarnacion-Strand")
-     fit at 400px card width. Most names stay single-line; the
-     bottom-aligned grid + min-height keep the card visually stable
-     whether the name is 1 or 2 lines. */
+  /* Allow wrap so long names ("Christian Encarnacion-Strand") fit
+     at 400px card width. */
   overflow-wrap: anywhere;
   word-break: break-word;
   hyphens: auto;
   max-width: 100%;
 }
-.statsharks-card-year {
-  font-size: 20px;
-  font-weight: 800;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  display: inline-block;
-}
 .statsharks-card-team {
-  display: inline-block;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text-muted);
   text-transform: uppercase;
-  margin-left: 8px;
+}
+.statsharks-card-year {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
 }
 .statsharks-card-value {
-  /* Right column of the horizontal card. Big right-aligned number
-     that fills on reveal. Stays visually anchored when "?" is the
-     placeholder so the layout doesn't shift on flip. */
+  /* Reserved bottom area for the stat reveal. Always present (with
+     a non-breaking space placeholder before reveal) so the card
+     height never shifts on flip. */
+  margin-top: auto;
   font-size: 32px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  text-align: right;
   line-height: 1;
-  min-width: 80px;
-  /* Bottom-align with the year+team row so ? and the revealed
-     number sit on the same baseline as the year. */
-  align-self: end;
+  min-height: 36px;
+  text-align: center;
 }
-.statsharks-card-value-hidden { color: var(--border-light); }
 
 /* Reveal coloring */
 .statsharks-card-correct {
