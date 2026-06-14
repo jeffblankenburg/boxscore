@@ -140,6 +140,7 @@ export function StatSharksGame({
           initialAttempt={initialAttempt}
           dailySequence={dailySequence}
           mode={mode}
+          onSwitchToEndless={() => setMode("endless")}
         />
       ) : (
         <EndlessRun stat={stat} statKey={statKey} playedOn={playedOn} mode={mode} isAuthed={isAuthed} />
@@ -151,7 +152,7 @@ export function StatSharksGame({
 // ─── Daily mode ──────────────────────────────────────────────────
 
 function DailyRun({
-  stat, statKey, playedOn, isAuthed, initialAttempt, dailySequence, mode,
+  stat, statKey, playedOn, isAuthed, initialAttempt, dailySequence, mode, onSwitchToEndless,
 }: {
   stat: StatDef;
   statKey: StatKey;
@@ -160,6 +161,7 @@ function DailyRun({
   initialAttempt: PersistedAttempt | null;
   dailySequence: DailyPublicPair[];
   mode: Mode;
+  onSwitchToEndless: () => void;
 }) {
   const initial = useMemo<{ rounds: PersistedRound[]; ended: boolean }>(() => {
     if (initialAttempt) {
@@ -188,6 +190,7 @@ function DailyRun({
       }}
       endVariant="daily"
       mode={mode}
+      onSwitchToEndless={onSwitchToEndless}
     />
   );
 }
@@ -326,7 +329,7 @@ function RunView({
   stat, statKey, playedOn,
   initialRounds, initialEnded, initialPair,
   dailySequence,
-  persist, endVariant, mode, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
+  persist, endVariant, mode, onPlayAgain, onChooseDifferent, onSwitchToEndless, bestEndless, bestLifetime,
 }: {
   stat: StatDef;
   statKey: StatKey;
@@ -343,6 +346,7 @@ function RunView({
   mode:          Mode;
   onPlayAgain?:  () => void;
   onChooseDifferent?: () => void;
+  onSwitchToEndless?: () => void;
   bestEndless?:  number;
   bestLifetime?: number;
 }) {
@@ -608,6 +612,7 @@ function RunView({
         totalRounds={totalRounds ?? undefined}
         onPlayAgain={onPlayAgain}
         onChooseDifferent={onChooseDifferent}
+        onSwitchToEndless={onSwitchToEndless}
         bestEndless={bestEndless}
         bestLifetime={bestLifetime}
       />
@@ -766,7 +771,7 @@ const Card = function Card({
 };
 
 function EndScreen({
-  stat, statKey, rounds, playedOn, variant, totalRounds, onPlayAgain, onChooseDifferent, bestEndless, bestLifetime,
+  stat, statKey, rounds, playedOn, variant, totalRounds, onPlayAgain, onChooseDifferent, onSwitchToEndless, bestEndless, bestLifetime,
 }: {
   stat: StatDef;
   statKey: StatKey;
@@ -777,6 +782,7 @@ function EndScreen({
   totalRounds?: number;
   onPlayAgain?: () => void;
   onChooseDifferent?: () => void;
+  onSwitchToEndless?: () => void;
   bestEndless?: number;
   bestLifetime?: number;
 }) {
@@ -967,7 +973,18 @@ function EndScreen({
       ) : null}
       {variant === "daily" ? (
         <p className="statsharks-end-tomorrow">
-          New stat tomorrow. Come back at midnight ET, or try Endless mode above.
+          New stat tomorrow. Resets at midnight ET.<br />
+          Try{" "}
+          {onSwitchToEndless ? (
+            <button
+              type="button"
+              className="statsharks-end-tomorrow-link"
+              onClick={onSwitchToEndless}
+            >
+              Endless Mode
+            </button>
+          ) : "Endless Mode"}
+          {" "}for more!
         </p>
       ) : null}
     </section>

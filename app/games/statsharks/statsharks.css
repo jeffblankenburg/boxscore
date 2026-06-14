@@ -504,6 +504,20 @@ a[href^="x-apple-data-detectors"],
   font-size: 12px;
   color: var(--text-muted);
 }
+/* Inline button styled as a link so "Endless Mode" inside the
+   tomorrow blurb sits flush with the surrounding text. */
+.statsharks-end-tomorrow-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--text-primary);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.statsharks-end-tomorrow-link:hover { text-decoration: none; }
 
 .statsharks-empty {
   padding: 20px;
