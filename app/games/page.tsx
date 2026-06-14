@@ -19,7 +19,8 @@ type GameEntry = {
 // omitted — the difficulty knob isn't right yet (without hints it's
 // brutal; with the autocomplete suggestions it solves in ~4 by
 // brute-force). The route still works for anyone with a bookmark; it
-// just isn't surfaced. Restore the entry when the gameplay tuning lands.
+// just isn't surfaced. Restore the entry when the gameplay tuning
+// lands. See #65 for the redesign options.
 const GAMES: GameEntry[] = [
   {
     slug: "statsharks",

@@ -114,13 +114,21 @@
    for even narrower screens (320px iPhone SE / nested webviews). */
 
 .g-sub-bar {
+  /* Outer wrapper carries the full-width border + background so the
+     divider stretches across the viewport. Inner div constrains the
+     wordmark + pills to the same phone column as .g-main below. */
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.g-sub-bar-inner {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 0 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
 }
 .g-sub-bar-mark {
   display: inline-flex;

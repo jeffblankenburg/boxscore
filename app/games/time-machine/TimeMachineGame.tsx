@@ -103,19 +103,44 @@ export function TimeMachineGame({
   useResetAtMidnightET(playedOn);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
 
-  const hydrated = initialAttempt ?? loadLocal(playedOn) ?? null;
-
-  const [guesses,    setGuesses]    = useState<Guess[]>(hydrated?.guesses    ?? []);
-  const [ended,      setEnded]      = useState<boolean>(hydrated?.ended      ?? false);
-  const [answerYear, setAnswerYear] = useState<number | null>(hydrated?.answerYear ?? null);
+  // Initial state is what the server can compute too — props only.
+  // localStorage gets read in a post-mount effect; reading it here in
+  // a lazy useState initializer would hydrate-mismatch (server sees
+  // empty, client sees the saved streak/attempt).
+  const [guesses,    setGuesses]    = useState<Guess[]>(initialAttempt?.guesses    ?? []);
+  const [ended,      setEnded]      = useState<boolean>(initialAttempt?.ended      ?? false);
+  const [answerYear, setAnswerYear] = useState<number | null>(initialAttempt?.answerYear ?? null);
   const [digits,     setDigits]     = useState<string[]>(["", "", "", ""]);
   const [busy,       setBusy]       = useState<boolean>(false);
-  const [streak,     setStreak]     = useState<Streak>(() => loadStreak());
+  const [streak,     setStreak]     = useState<Streak>(DEFAULT_STREAK);
+  const [hydrated,   setHydrated]   = useState<boolean>(false);
 
   const inputRefs = useRef<Array<HTMLInputElement | null>>([null, null, null, null]);
 
-  // Persist + sync to server on every state change.
+  // Pull localStorage state after mount. Authed users already have
+  // their attempt via initialAttempt (server-rendered); anonymous
+  // users get theirs here. Streak is always localStorage-only, so it
+  // hydrates regardless. The `hydrated` flag gates the persist effect
+  // below so we don't write the empty initial state over real local
+  // data before this runs.
   useEffect(() => {
+    if (!initialAttempt) {
+      const local = loadLocal(playedOn);
+      if (local) {
+        if (local.guesses.length > 0)    setGuesses(local.guesses);
+        if (local.ended)                 setEnded(true);
+        if (local.answerYear != null)    setAnswerYear(local.answerYear);
+      }
+    }
+    setStreak(loadStreak());
+    setHydrated(true);
+  }, [initialAttempt, playedOn]);
+
+  // Persist + sync to server on every state change — but only after
+  // we've hydrated, so the initial empty render doesn't clobber an
+  // anonymous user's saved attempt in localStorage.
+  useEffect(() => {
+    if (!hydrated) return;
     const blob: PersistedAttempt = {
       guesses, ended,
       ...(answerYear != null ? { answerYear } : {}),
@@ -125,7 +150,7 @@ export function TimeMachineGame({
       void persistAttempt({ playedOn, guesses, ended })
         .catch((e) => console.error("persistAttempt:", e));
     }
-  }, [guesses, ended, answerYear, playedOn, isAuthed]);
+  }, [hydrated, guesses, ended, answerYear, playedOn, isAuthed]);
 
   // Apply streak update once when the run ends.
   useEffect(() => {
@@ -218,17 +243,9 @@ export function TimeMachineGame({
 
   return (
     <section className="tm">
-      {/* Boxscore: visible above the grid during play. After the game
-         ends it disappears here and re-appears inside the end-screen
-         accordion. */}
-      {!ended ? (
-        <div
-          className="tm-box"
-          dangerouslySetInnerHTML={{ __html: game.boxHtml }}
-        />
-      ) : null}
-
-      {/* 6×4 grid */}
+      {/* 6×4 grid sits on top so the player sees the actionable area
+         first and the boxscore acts as the reference below. After the
+         game ends the box moves into the end-screen accordion. */}
       <ol className="tm-grid" aria-label="Year guesses">
         {Array.from({ length: MAX_GUESSES }).map((_, rowIdx) => {
           if (rowIdx < guesses.length) {
@@ -293,6 +310,13 @@ export function TimeMachineGame({
             {busy ? "…" : "Guess"}
           </button>
         </div>
+      ) : null}
+
+      {!ended ? (
+        <div
+          className="tm-box"
+          dangerouslySetInnerHTML={{ __html: game.boxHtml }}
+        />
       ) : null}
 
       {ended ? (
