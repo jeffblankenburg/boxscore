@@ -707,6 +707,27 @@ function TopBar({ stat, streak, secondsLeft }: {
   );
 }
 
+/**
+ * Renders text as a sequence of per-character <span>s so iOS Safari's
+ * data detectors can't find a contiguous text node to auto-link.
+ * `formatDetection` + every CSS override (`color: inherit !important`,
+ * `-webkit-text-fill-color: inherit !important`, `[x-apple-data-detectors]`
+ * selectors) failed in the wild — the only reliable defeat is to make
+ * sure no detector ever finds a pattern to match in the first place.
+ *
+ * Cost: each character is its own DOM node. Acceptable for short
+ * labels (player names, years) but don't use for paragraphs.
+ */
+function NoDetect({ text }: { text: string }) {
+  return (
+    <span aria-label={text}>
+      {Array.from(text).map((c, i) => (
+        <span key={i} aria-hidden="true">{c}</span>
+      ))}
+    </span>
+  );
+}
+
 const Card = function Card({
   side, card, reveal, stat, onPick, disabled, cardRef,
 }: {
@@ -732,9 +753,13 @@ const Card = function Card({
       aria-label={`Pick ${card.player_name}, ${card.season}`}
     >
       <div className="statsharks-card-left">
-        <div className="statsharks-card-name">{card.player_name}</div>
+        <div className="statsharks-card-name">
+          <NoDetect text={card.player_name} />
+        </div>
         <div className="statsharks-card-yearteam">
-          <span className="statsharks-card-year">{card.season}</span>
+          <span className="statsharks-card-year">
+            <NoDetect text={String(card.season)} />
+          </span>
           {card.team_abbr ? <span className="statsharks-card-team">{card.team_abbr}</span> : null}
         </div>
       </div>
