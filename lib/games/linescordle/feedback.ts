@@ -96,7 +96,7 @@ export function keyboardState(
 //   🟩🟩🟩🟩🟩🟩⬛⬛⬛⬛🟨⬛⬛
 //   🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 //
-//   boxscore.games/linescordle
+//   boxscore.email/games/linescordle
 //
 // Doesn't include the answer in any form — the grid pattern only
 // reveals letter count + position-by-position feedback, never the

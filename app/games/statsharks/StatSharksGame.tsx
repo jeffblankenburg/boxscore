@@ -800,7 +800,7 @@ function EndScreen({
         `${streak}/${totalRounds}${isDailyWin ? " ✨" : ""}`,
         grid,
         ``,
-        `boxscore.games/statsharks`,
+        `boxscore.email/games/statsharks`,
       ].join("\n");
     }
     return [
@@ -810,7 +810,7 @@ function EndScreen({
       `Streak: ${streak}`,
       grid,
       ``,
-      `boxscore.games/statsharks`,
+      `boxscore.email/games/statsharks`,
     ].join("\n");
   }, [stat.label, streak, grid, playedOn, variant, totalRounds, isDailyWin]);
 
