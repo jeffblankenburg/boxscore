@@ -3,6 +3,7 @@ import { getDigest } from "@/lib/digests";
 import { dailyEmail } from "@/lib/emails/templates";
 import { isValidIsoDate, nextDay, prettyDate } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 import { requireAdmin } from "../../require-admin";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,8 @@ export default async function AdminEmailPreview({
     digestUrl: `${EMAIL_LINK_BASE}/mlb/${nextDay(date)}`,
     unsubscribeUrl: `${EMAIL_LINK_BASE}/u/admin-preview`,
     manageUrl: `${EMAIL_LINK_BASE}/settings`,
+    gamesUrl: `${EMAIL_LINK_BASE}/games`,
+    tipJarUrl: BRAND.tipJarUrl,
     announcementBanner,
     digestEmailHtml: digest.email_html,
   });

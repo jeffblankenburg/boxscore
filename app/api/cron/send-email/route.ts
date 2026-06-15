@@ -6,6 +6,7 @@ import { sendEmailBatch } from "@/lib/email";
 import { dailyEmail } from "@/lib/emails/templates";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
 export const runtime = "nodejs";
@@ -82,15 +83,19 @@ export async function GET(req: Request) {
     let sent = 0, failed = 0;
 
     const manageUrl = `${EMAIL_LINK_BASE}/settings`;
+    const gamesUrl  = `${EMAIL_LINK_BASE}/games`;
+    const tipJarUrl = BRAND.tipJarUrl;
     // Wrap the top-of-email links through /r/e/[src] for first-party
     // click tracking. The destination is HMAC-signed so the URL can't
     // be re-aimed at a different target. Wrapping happens once per
     // batch — the secret is cached in module memory after the first
-    // call, so the second is a no-op.
+    // call, so subsequent are no-ops.
     const { trackedEmailLink } = await import("@/lib/link-tracking");
-    const [digestTrackedUrl, manageTrackedUrl] = await Promise.all([
+    const [digestTrackedUrl, manageTrackedUrl, gamesTrackedUrl, tipJarTrackedUrl] = await Promise.all([
       trackedEmailLink("email-header-digest", digestUrl),
       trackedEmailLink("email-header-manage", manageUrl),
+      trackedEmailLink("email-header-games",  gamesUrl),
+      trackedEmailLink("email-header-tip",    tipJarUrl),
     ]);
     const { getAnnouncement } = await import("@/lib/announcements");
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
@@ -111,6 +116,8 @@ export async function GET(req: Request) {
           digestUrl:  digestTrackedUrl,
           unsubscribeUrl,
           manageUrl:  manageTrackedUrl,
+          gamesUrl:   gamesTrackedUrl,
+          tipJarUrl:  tipJarTrackedUrl,
           announcementBanner,
           digestEmailHtml: digest.email_html!,
         });

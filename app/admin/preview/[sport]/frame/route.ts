@@ -14,6 +14,7 @@ import {
 } from "@/lib/render-basketball";
 import { dailyEmail } from "@/lib/emails/templates";
 import { BRAND } from "@/lib/brand";
+import { SOCIAL_ICON_DATA_BY_SLUG } from "@/lib/brand-icon-data";
 import { isValidIsoDate } from "@/lib/dates";
 import { MLB_PREVIEW_FIXTURES } from "@/lib/mlb-preview-fixtures";
 import { basketballFixtureDate } from "@/lib/basketball-preview-fixtures";
@@ -28,9 +29,18 @@ async function isAdmin(): Promise<boolean> {
   return false;
 }
 
+function socialIconSvg(slug: string): string {
+  const data = SOCIAL_ICON_DATA_BY_SLUG[slug];
+  if (!data) return "";
+  return `<svg viewBox="${data.viewBox}" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="${data.path}"/></svg>`;
+}
+
 function siteHeaderHtml(iconUrl: string): string {
   const socialLinks = BRAND.social
-    .map((s) => `<a href="${s.href}">${s.label}</a>`)
+    .map(
+      (s) =>
+        `<a href="${s.href}" class="social-icon" aria-label="${s.label}" target="_blank" rel="noopener noreferrer">${socialIconSvg(s.slug)}</a>`,
+    )
     .join("");
   return `<header class="site-header">
   <div class="brand">
@@ -39,8 +49,9 @@ function siteHeaderHtml(iconUrl: string): string {
       <span>boxscore</span>
     </a>
   </div>
-  <nav class="social">${socialLinks}</nav>
+  <nav class="social" aria-label="Social">${socialLinks}</nav>
   <div class="header-cta">
+    <a class="games-pill" href="/games">Games</a>
     <a class="support" href="/r/support?src=web-header">Tip Jar</a>
     <a class="subscribe" href="${BRAND.subscribeUrl}">Subscribe →</a>
   </div>
@@ -132,6 +143,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
       digestUrl: "#",
       unsubscribeUrl: "#",
       manageUrl: "#",
+      gamesUrl: "#",
+      tipJarUrl: "#",
       announcementBanner,
       digestEmailHtml: emailBody,
     }).html;

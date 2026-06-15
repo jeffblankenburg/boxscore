@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { nextDay, yesterdayInET, prettyDate } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 import { findTeam, teamsBySport, type Team } from "@/lib/teams";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
 import { teamDailyEmail } from "@/lib/emails/templates";
@@ -44,6 +45,8 @@ export default async function AdminTeamEmailPreview({
     digestUrl: `${EMAIL_LINK_BASE}/mlb/${team.slug}/${nextDay(date)}`,
     unsubscribeUrl: `${EMAIL_LINK_BASE}/u/admin-preview`,
     manageUrl: `${EMAIL_LINK_BASE}/settings`,
+    gamesUrl: `${EMAIL_LINK_BASE}/games`,
+    tipJarUrl: BRAND.tipJarUrl,
     announcementBanner,
     digestEmailHtml: body,
   });

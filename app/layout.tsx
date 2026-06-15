@@ -12,6 +12,7 @@ import {
   validateSession,
   SUBSCRIBER_SESSION_COOKIE,
 } from "@/lib/subscriber-auth";
+import { SOCIAL_ICON_BY_SLUG } from "./brand-icons";
 
 export const metadata = {
   title: "boxscore",
@@ -117,12 +118,25 @@ async function SiteHeader() {
           <span>boxscore</span>
         </a>
       </div>
-      <nav className="social">
-        {BRAND.social.map((s) => (
-          <a key={s.label} href={s.href}>{s.label}</a>
-        ))}
+      <nav className="social" aria-label="Social">
+        {BRAND.social.map((s) => {
+          const Icon = SOCIAL_ICON_BY_SLUG[s.slug];
+          return (
+            <a
+              key={s.slug}
+              href={s.href}
+              className="social-icon"
+              aria-label={s.label}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {Icon ? <Icon /> : s.label}
+            </a>
+          );
+        })}
       </nav>
       <div className="header-cta">
+        <a className="games-pill" href="/games">Games</a>
         <a className="support" href="/r/support?src=web-header" target="_blank" rel="noopener noreferrer">Tip Jar</a>
         {isAuthed ? (
           <a className="subscribe" href="/settings">

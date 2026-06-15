@@ -11,6 +11,7 @@ import { dailyEmail } from "@/lib/emails/templates";
 import { MLB_PREVIEW_FIXTURES } from "@/lib/mlb-preview-fixtures";
 import { nextDay, prettyDate } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 import { PageHeader } from "../../../../_components/primitives";
 import { PreviewSwitcher } from "../../../_components/PreviewSwitcher";
 
@@ -141,6 +142,8 @@ export default async function CreativePreviewPage({
     digestUrl: `${EMAIL_LINK_BASE}/mlb/${nextDay(gamesDate)}`,
     unsubscribeUrl: `${EMAIL_LINK_BASE}/u/preview`,
     manageUrl: `${EMAIL_LINK_BASE}/settings`,
+    gamesUrl: `${EMAIL_LINK_BASE}/games`,
+    tipJarUrl: BRAND.tipJarUrl,
     digestEmailHtml: renderEmailContent(data),
   });
 

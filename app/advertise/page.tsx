@@ -13,7 +13,15 @@ import {
   type AdFormat,
   type AdSample,
 } from "@/lib/ads-samples";
+import {
+  AGE_BANDS,
+  COUNTRIES,
+  GENDERS,
+  INCOME_BANDS,
+} from "@/lib/demographics";
+import { supabaseAdmin } from "@/lib/supabase";
 import { InquiryForm } from "./InquiryForm";
+import { CountUp, DemographicBars, Reveal } from "./Animations";
 
 // Public advertiser-facing page. Stats normally come from the daily
 // ad_stats_snapshot table (written by /api/cron/ad-stats-snapshot) — reading
@@ -42,6 +50,67 @@ async function loadAdStats(): Promise<PublicAdStats> {
     );
   }
   return getPublicAdStatsSnapshot("mlb", 30);
+}
+
+// Subscribers who finished the welcome demographics form. Form fields
+// are optional, so per-field counts gate on field != null separately.
+type DemoRow = {
+  country:     string | null;
+  region:      string | null;
+  age_band:    string | null;
+  income_band: string | null;
+  gender:      string | null;
+};
+
+async function loadDemographics(): Promise<DemoRow[]> {
+  const db = supabaseAdmin();
+  const out: DemoRow[] = [];
+  const PAGE = 1000;
+  let from = 0;
+  for (;;) {
+    const { data, error } = await db
+      .from("subscribers")
+      .select("country, region, age_band, income_band, gender")
+      .eq("status", "active")
+      .not("demographics_completed_at", "is", null)
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`advertise demographics: ${error.message}`);
+    if (!data || data.length === 0) break;
+    out.push(...(data as DemoRow[]));
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
+// Per-field % distribution of respondents. The denominator excludes
+// nulls and "prefer-not-to-say" so each bar reads as "share of those
+// who actually answered". "Other" (the country catch-all) is dropped
+// the same way since it's labelled "Other / Prefer not to say".
+const DEMO_OPT_OUTS = new Set(["prefer-not-to-say", "Other"]);
+type Bucket = { label: string; pct: number };
+function bucketPct(
+  rows: DemoRow[],
+  field: keyof DemoRow,
+  options: ReadonlyArray<{ value: string; label: string }>,
+): Bucket[] {
+  const valid = rows.filter((r) => {
+    const v = r[field];
+    return v != null && !DEMO_OPT_OUTS.has(v);
+  });
+  const total = valid.length;
+  if (!total) return [];
+  const counts = new Map<string, number>();
+  for (const r of valid) {
+    const v = r[field] as string;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  return options
+    .filter((o) => !DEMO_OPT_OUTS.has(o.value))
+    .map((o) => ({
+      label: o.label,
+      pct: ((counts.get(o.value) ?? 0) / total) * 100,
+    }));
 }
 
 // 2026 industry benchmarks we compare against in the stats slab. Sources:
@@ -74,7 +143,18 @@ export default async function AdvertisePage() {
   // advertiser would be sponsoring placements in via this page). Team
   // digests are a separate inventory called out further down. Snapshot read
   // with live-compute fallback — see loadAdStats above.
-  const rolling = await loadAdStats();
+  const [rolling, demoRows] = await Promise.all([loadAdStats(), loadDemographics()]);
+
+  // Demographic breakdowns. Per-field denominator is rows that answered
+  // (non-null + non opt-out), so they're truly "share of respondents".
+  // Country shows only options that have at least one respondent so the
+  // panel doesn't list zeros for every country we don't reach.
+  const ageDist     = bucketPct(demoRows, "age_band",    AGE_BANDS);
+  const incomeDist  = bucketPct(demoRows, "income_band", INCOME_BANDS);
+  const genderDist  = bucketPct(demoRows, "gender",      GENDERS);
+  const countryDist = bucketPct(demoRows, "country",     COUNTRIES).filter((c) => c.pct > 0);
+  const hasDemographics =
+    ageDist.length > 0 || incomeDist.length > 0 || genderDist.length > 0 || countryDist.length > 0;
 
   // Forward-looking "what an advertiser actually sees per day" — the sum of
   // (1) email opens on the daily league send: subscribers × delivery rate
@@ -115,15 +195,17 @@ export default async function AdvertisePage() {
         </p>
         <dl className="advertise-stats">
           <Stat
-            value={rolling.activeSubscribers.toLocaleString()}
+            value={<CountUp to={rolling.activeSubscribers} />}
             label="MLB Subscribers"
           />
           <Stat
-            value={avgDailyImpressions.toLocaleString()}
+            value={<CountUp to={avgDailyImpressions} />}
             label="Avg daily impressions"
           />
           <Stat
-            value={rolling.tracked ? pct(rolling.openRate) : "—"}
+            value={rolling.tracked
+              ? <CountUp to={rolling.openRate * 100} format="percent" />
+              : "—"}
             label="Open rate"
             note={
               !rolling.tracked
@@ -138,7 +220,7 @@ export default async function AdvertisePage() {
               activation-link breakage, so the prior click rate signal is
               gone and would read "—" until we wire the new tracker. */}
           <Stat
-            value={pct(rolling.deliveryRate)}
+            value={<CountUp to={rolling.deliveryRate * 100} format="percent" />}
             label="Delivery rate"
             note={
               rolling.deliveryRate > INDUSTRY.deliveryRateThreshold
@@ -147,7 +229,7 @@ export default async function AdvertisePage() {
             }
           />
           <Stat
-            value={rolling.sends.toLocaleString()}
+            value={<CountUp to={rolling.sends} />}
             label={`Sends in last ${rolling.windowDays} days`}
           />
         </dl>
@@ -179,6 +261,42 @@ export default async function AdvertisePage() {
           </Column>
         </div>
       </Section>
+
+      {hasDemographics && (
+        <Section eyebrow="Who reads it" title="The audience, by self-report">
+          <p className="advertise-meta">
+            Pulled from the welcome form subscribers fill out after they confirm.
+            Percentages are share of respondents who answered each question.
+            &ldquo;Prefer not to say&rdquo; is excluded from every denominator.
+          </p>
+          <div className="advertise-demographics">
+            {ageDist.length > 0 && (
+              <div className="advertise-demographic">
+                <h3>Age</h3>
+                <DemographicBars rows={ageDist} />
+              </div>
+            )}
+            {incomeDist.length > 0 && (
+              <div className="advertise-demographic">
+                <h3>Household income</h3>
+                <DemographicBars rows={incomeDist} />
+              </div>
+            )}
+            {genderDist.length > 0 && (
+              <div className="advertise-demographic">
+                <h3>Gender / identity</h3>
+                <DemographicBars rows={genderDist} />
+              </div>
+            )}
+            {countryDist.length > 0 && (
+              <div className="advertise-demographic">
+                <h3>Country</h3>
+                <DemographicBars rows={countryDist} />
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
       <Section eyebrow="The inventory" title="Four formats">
         <p className="advertise-meta">
@@ -255,7 +373,7 @@ export default async function AdvertisePage() {
               <td data-label="Weekly (7 sends)">$85 each</td>
               <td data-label="Monthly (28+ sends)">$70 each</td>
             </tr>
-            <tr className="advertise-rate-emphasis">
+            <tr>
               <td>Dedicated send <span className="advertise-rate-note">(full edition, one sponsor)</span></td>
               <td data-label="Single send">$750</td>
               <td data-label="Weekly (7 sends)">$675 each</td>
@@ -374,18 +492,20 @@ function Section({
 }) {
   return (
     <section className="advertise-section">
-      <div className="advertise-section-head">
-        <span className="advertise-section-eyebrow">{eyebrow}</span>
-        <h2 className="advertise-section-title">{title}</h2>
-      </div>
-      {children}
+      <Reveal>
+        <div className="advertise-section-head">
+          <span className="advertise-section-eyebrow">{eyebrow}</span>
+          <h2 className="advertise-section-title">{title}</h2>
+        </div>
+      </Reveal>
+      <Reveal delay={120}>{children}</Reveal>
     </section>
   );
 }
 
 function Stat({
   value, label, note,
-}: { value: string; label: string; note?: string }) {
+}: { value: React.ReactNode; label: string; note?: string }) {
   return (
     <div className="advertise-stat">
       <dt>{label}</dt>
@@ -437,8 +557,4 @@ function FormatBlock({
       </div>
     </div>
   );
-}
-
-function pct(n: number): string {
-  return `${(n * 100).toFixed(1)}%`;
 }

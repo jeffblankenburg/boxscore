@@ -1,11 +1,31 @@
 import { GAME_ICONS } from "./icons";
 import { DailyStatus } from "./daily-status";
 import { todayInET } from "@/lib/dates";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
+
+const META_DESC = "Daily MLB box-score puzzles from boxscore.";
+const META_IMG  = `${EMAIL_LINK_BASE}/icon.png`;
+const META_URL  = `${EMAIL_LINK_BASE}/games`;
+
 export const metadata = {
-  title: "Games | boxscore",
-  robots: { index: false },          // unindex while in development
+  title:       "Games | boxscore",
+  description: META_DESC,
+  openGraph: {
+    title:       "boxscore games",
+    description: META_DESC,
+    url:         META_URL,
+    siteName:    "boxscore games",
+    type:        "website",
+    images: [{ url: META_IMG, alt: "boxscore games" }],
+  },
+  twitter: {
+    card:        "summary",
+    title:       "boxscore games",
+    description: META_DESC,
+    images:      [META_IMG],
+  },
 };
 
 type GameEntry = {

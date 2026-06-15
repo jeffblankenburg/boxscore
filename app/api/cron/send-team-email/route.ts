@@ -9,6 +9,7 @@ import { getAnnouncement } from "@/lib/announcements";
 import { findTeam, type Sport } from "@/lib/teams";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 
 // Team-digest send cron. One run iterates every team that has at least one
@@ -161,13 +162,17 @@ export async function GET(req: Request) {
         // from team_digests.html (no request-time rendering).
         const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${team.slug}/${nextDay(date)}`;
         const manageUrl = `${EMAIL_LINK_BASE}/settings`;
+        const gamesUrl  = `${EMAIL_LINK_BASE}/games`;
+        const tipJarUrl = BRAND.tipJarUrl;
         // Same /r/e/[src] tracking as the league digest cron. Distinct
         // src tags so we can read per-team vs per-league click rates
         // independently in the admin dashboard.
         const { trackedEmailLink } = await import("@/lib/link-tracking");
-        const [digestTrackedUrl, manageTrackedUrl] = await Promise.all([
+        const [digestTrackedUrl, manageTrackedUrl, gamesTrackedUrl, tipJarTrackedUrl] = await Promise.all([
           trackedEmailLink("team-email-header-digest", digestUrl),
           trackedEmailLink("team-email-header-manage", manageUrl),
+          trackedEmailLink("team-email-header-games",  gamesUrl),
+          trackedEmailLink("team-email-header-tip",    tipJarUrl),
         ]);
 
         for (const group of chunk(toSend, BATCH_SIZE)) {
@@ -184,6 +189,8 @@ export async function GET(req: Request) {
               digestUrl:  digestTrackedUrl,
               unsubscribeUrl,
               manageUrl:  manageTrackedUrl,
+              gamesUrl:   gamesTrackedUrl,
+              tipJarUrl:  tipJarTrackedUrl,
               announcementBanner,
               digestEmailHtml: body,
             });

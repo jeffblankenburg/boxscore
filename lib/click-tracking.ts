@@ -1,8 +1,20 @@
 import { supabaseAdmin } from "./supabase";
 
+// Row + summary shapes for email_link_clicks. Every entry records the
+// resolved destination URL (link_target), so the admin page can show
+// what the user actually went to without cross-referencing the email
+// template.
+//
+// support_clicks still receives writes (web-header and footer Tip Jar
+// paths route through /r/support), but the in-email Tip Jar click
+// moved to email_link_clicks (email-header-tip / team-email-header-tip
+// / welcome-header-tip). If a support_clicks view is needed later,
+// restore the helper from git history.
+
 export type ClickRow = {
   id: number;
   src: string;
+  link_target: string | null;
   clicked_at: string;
   referer: string | null;
 };
@@ -27,23 +39,23 @@ const MS_DAY = 24 * 60 * 60 * 1000;
 // Per-table summary. While volumes are low (likely months) this fetches every
 // row to compute lifetime totals. If a table ever exceeds PostgREST's 1000-row
 // default cap, promote to a DB view or RPC aggregation.
-export async function getSupportClicksSummary(): Promise<ClickSummary> {
+export async function getEmailLinkClicksSummary(): Promise<ClickSummary> {
   const supa = supabaseAdmin();
   const now = Date.now();
   const d1 = new Date(now - MS_DAY).toISOString();
   const d7 = new Date(now - 7 * MS_DAY).toISOString();
 
   const { data: allRows, error: e1 } = await supa
-    .from("support_clicks")
+    .from("email_link_clicks")
     .select("src");
-  if (e1) throw new Error(`support_clicks total: ${e1.message}`);
+  if (e1) throw new Error(`email_link_clicks total: ${e1.message}`);
 
   const { data: recent7Rows, error: e2 } = await supa
-    .from("support_clicks")
-    .select("id, src, clicked_at, referer")
+    .from("email_link_clicks")
+    .select("id, src, link_target, clicked_at, referer")
     .gte("clicked_at", d7)
     .order("clicked_at", { ascending: false });
-  if (e2) throw new Error(`support_clicks 7d: ${e2.message}`);
+  if (e2) throw new Error(`email_link_clicks 7d: ${e2.message}`);
 
   const total = allRows?.length ?? 0;
   const totalBySrc = new Map<string, number>();
@@ -65,14 +77,16 @@ export async function getSupportClicksSummary(): Promise<ClickSummary> {
     }
   }
 
+  // Sort by 7-day count descending so busy sources are on top; fall back to
+  // alphabetical for ties so the long tail of zeros stays stable across loads.
   const bySrc: ClickSourceSummary[] = Array.from(totalBySrc.keys())
-    .sort()
     .map((src) => ({
       src,
       total: totalBySrc.get(src) ?? 0,
       last7d: recent7dBySrc.get(src) ?? 0,
       last24h: recent24hBySrc.get(src) ?? 0,
-    }));
+    }))
+    .sort((a, b) => b.last7d - a.last7d || a.src.localeCompare(b.src));
 
   return {
     total,

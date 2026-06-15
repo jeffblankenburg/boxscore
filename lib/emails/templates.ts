@@ -132,6 +132,8 @@ export function welcomeEmail(opts: {
   digestUrl: string;
   unsubscribeUrl: string;
   manageUrl: string;
+  gamesUrl: string;
+  tipJarUrl: string;
   digestEmailHtml: string;
 }): { subject: string; html: string; text: string } {
   const subject = `Welcome — boxscore · ${opts.digestPrettyDate}`;
@@ -143,6 +145,8 @@ export function welcomeEmail(opts: {
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
     manageUrl: opts.manageUrl,
+    gamesUrl: opts.gamesUrl,
+    tipJarUrl: opts.tipJarUrl,
     previewText: `Welcome — your boxscore digest for ${opts.digestPrettyDate} is below.`,
   });
   const text = `Welcome to boxscore!\n\nThe full digest for ${opts.digestPrettyDate} is in this email. You'll get one every morning at 5am ET.\n\nRead online: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
@@ -163,6 +167,8 @@ export function dailyEmail(opts: {
   digestUrl: string;
   unsubscribeUrl: string;
   manageUrl: string;
+  gamesUrl: string;
+  tipJarUrl: string;
   digestEmailHtml: string;
   announcementBanner?: string; // optional product/feature note prepended
                                 // above the digest body
@@ -178,6 +184,8 @@ export function dailyEmail(opts: {
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
     manageUrl: opts.manageUrl,
+    gamesUrl: opts.gamesUrl,
+    tipJarUrl: opts.tipJarUrl,
     announcementBanner: opts.announcementBanner,
     previewText: `${prettyDate(editionDateIso)} · ${sportTag} digest from boxscore.`,
   });
@@ -197,6 +205,8 @@ export function teamDailyEmail(opts: {
   digestUrl: string;
   unsubscribeUrl: string;
   manageUrl: string;
+  gamesUrl: string;
+  tipJarUrl: string;
   digestEmailHtml: string;
   announcementBanner?: string;
 }): { subject: string; html: string; text: string } {
@@ -211,6 +221,8 @@ export function teamDailyEmail(opts: {
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
     manageUrl: opts.manageUrl,
+    gamesUrl: opts.gamesUrl,
+    tipJarUrl: opts.tipJarUrl,
     announcementBanner: opts.announcementBanner,
     previewText: `${prettyDate(editionDateIso)} · ${opts.teamName} digest from boxscore.`,
   });
@@ -234,6 +246,8 @@ function wrapWithDigest(opts: {
   unsubscribeUrl: string;
   digestUrl: string;
   manageUrl: string;
+  gamesUrl: string;
+  tipJarUrl: string;
   previewText?: string;
 }): string {
   const preview = opts.previewText
@@ -264,8 +278,8 @@ ${preview}
               </a>
             </td>
             <td align="right" style="vertical-align:bottom; white-space:nowrap;">
-              <a href="https://boxscore.email/r/support?src=email-header" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; font-weight:700; background:#fff; color:${INK}; padding:3px 10px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em; margin-right:4px;">Tip Jar</a>
-              <a href="${opts.manageUrl}" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; font-weight:700; background:#fff; color:${INK}; padding:3px 10px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em;">Manage Subscriptions</a>
+              <a href="${opts.gamesUrl}" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; font-weight:700; background:#fff; color:${INK}; padding:3px 10px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em; margin-right:4px;">Games</a><a href="${opts.tipJarUrl}" style="display:inline-block; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; font-weight:700; background:#fff; color:${INK}; padding:3px 10px; border:1px solid ${INK}; border-radius:999px; text-decoration:none; letter-spacing:0.02em; margin-right:4px;">Tip Jar</a>
+              <a href="${opts.manageUrl}" aria-label="Manage Subscriptions" title="Manage Subscriptions" style="display:inline-block; color:${INK}; text-decoration:none; vertical-align:middle; padding:0; line-height:0;"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:block;"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></a>
             </td>
           </tr>
         </table>

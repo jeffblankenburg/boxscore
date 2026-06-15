@@ -14,12 +14,32 @@ import {
 } from "@/lib/subscriber-auth";
 import { LinescordleGame, type HintValues, type InitialAttempt } from "./LinescordleGame";
 import type { RevealPayload } from "./actions";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import "./linescordle.css";
 
 export const dynamic = "force-dynamic";
+
+const META_DESC = "Guess the MLB player from their box-score line. Wordle-style letter feedback. A daily puzzle from boxscore.";
+const META_IMG  = `${EMAIL_LINK_BASE}/linescordle_icon.png`;
+const META_URL  = `${EMAIL_LINK_BASE}/games/linescordle`;
+
 export const metadata = {
-  title: "Linescordle | boxscore games",
-  robots: { index: false },     // unindex while in development
+  title:       "Linescordle | boxscore games",
+  description: META_DESC,
+  openGraph: {
+    title:       "Linescordle",
+    description: META_DESC,
+    url:         META_URL,
+    siteName:    "boxscore games",
+    type:        "website",
+    images: [{ url: META_IMG, width: 469, height: 489, alt: "Linescordle" }],
+  },
+  twitter: {
+    card:        "summary",
+    title:       "Linescordle",
+    description: META_DESC,
+    images:      [META_IMG],
+  },
 };
 
 export default async function LinescordlePage({

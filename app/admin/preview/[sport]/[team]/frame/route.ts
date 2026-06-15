@@ -9,6 +9,7 @@ import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-ema
 import { teamDailyEmail } from "@/lib/emails/templates";
 import { getAnnouncement } from "@/lib/announcements";
 import { siteOrigin } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,8 @@ export async function GET(
     digestUrl: `${origin}/${sport}/${team.slug}/${nextDay(date)}`,
     unsubscribeUrl: `${origin}/u/admin-preview`,
     manageUrl: `${origin}/settings`,
+    gamesUrl: `${origin}/games`,
+    tipJarUrl: BRAND.tipJarUrl,
     announcementBanner,
     digestEmailHtml: body,
   });

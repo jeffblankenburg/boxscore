@@ -4,11 +4,13 @@ export const BRAND = {
   tagline: "the sports page for your inbox",
   subscribeUrl: "/subscribe",
   tipJarUrl: "https://ko-fi.com/jeffblankenburg",
+  // `slug` keys the brand-icon lookup in app/brand-icons.tsx. `label`
+  // stays human-readable for aria-label and the JSON-LD sameAs[].
   social: [
-    { label: "Twitter", href: "https://twitter.com/boxscoreemail" },
-    { label: "Bluesky", href: "https://bsky.app/profile/boxscore.email" },
-    { label: "Facebook", href: "https://facebook.com/boxscore.email" },
-    { label: "Discord", href: "https://discord.gg/ZskVxQq7yk" },
+    { slug: "x",        label: "X",        href: "https://twitter.com/boxscoreemail" },
+    { slug: "bluesky",  label: "Bluesky",  href: "https://bsky.app/profile/boxscore.email" },
+    { slug: "facebook", label: "Facebook", href: "https://facebook.com/boxscore.email" },
+    { slug: "discord",  label: "Discord",  href: "https://discord.gg/ZskVxQq7yk" },
   ],
   // Footer "legal" links. Single source of truth for both the real site
   // (rendered as JSX in app/layout.tsx) and the admin preview frame

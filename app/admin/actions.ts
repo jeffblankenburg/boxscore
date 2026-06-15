@@ -9,6 +9,7 @@ import { nextDay, prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates"
 import { renderScoreboardShareImage, renderShareImages } from "@/lib/render-images";
 import { uploadScoreboardShareImage, uploadShareImages } from "@/lib/share-storage";
 import { EMAIL_LINK_BASE, siteOrigin } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 import { supabaseAdmin } from "@/lib/supabase";
 import { findTeam, type Sport } from "@/lib/teams";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
@@ -47,6 +48,8 @@ export async function sendAdminPreview(
       digestUrl: `${EMAIL_LINK_BASE}/${sport}/${nextDay(date)}`,
       unsubscribeUrl: `${EMAIL_LINK_BASE}/u/admin-preview`,
       manageUrl: `${EMAIL_LINK_BASE}/settings`,
+      gamesUrl: `${EMAIL_LINK_BASE}/games`,
+      tipJarUrl: BRAND.tipJarUrl,
       announcementBanner,
       digestEmailHtml: digest.email_html,
     });
@@ -98,6 +101,8 @@ export async function sendTeamAdminPreview(
       digestUrl: `${EMAIL_LINK_BASE}/${sport}/${team.slug}/${nextDay(date)}`,
       unsubscribeUrl: `${EMAIL_LINK_BASE}/u/admin-preview`,
       manageUrl: `${EMAIL_LINK_BASE}/settings`,
+      gamesUrl: `${EMAIL_LINK_BASE}/games`,
+      tipJarUrl: BRAND.tipJarUrl,
       announcementBanner,
       digestEmailHtml: body,
     });

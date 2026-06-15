@@ -46,6 +46,7 @@ import {
 import { sendEmail } from "@/lib/email";
 import { welcomeEmail } from "@/lib/emails/templates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 import { getDigest } from "@/lib/digests";
 import { nextDay, yesterdayInET, prettyDate } from "@/lib/dates";
 
@@ -96,16 +97,22 @@ export async function GET(
       const digestUrl = `${EMAIL_LINK_BASE}/mlb/${nextDay(digestDate)}`;
       const unsubscribeUrl = `${EMAIL_LINK_BASE}/u/${justActivated.unsubscribe_token}`;
       const manageUrl = `${EMAIL_LINK_BASE}/settings`;
+      const gamesUrl  = `${EMAIL_LINK_BASE}/games`;
+      const tipJarUrl = BRAND.tipJarUrl;
       const { trackedEmailLink } = await import("@/lib/link-tracking");
-      const [digestTrackedUrl, manageTrackedUrl] = await Promise.all([
+      const [digestTrackedUrl, manageTrackedUrl, gamesTrackedUrl, tipJarTrackedUrl] = await Promise.all([
         trackedEmailLink("welcome-header-digest", digestUrl),
         trackedEmailLink("welcome-header-manage", manageUrl),
+        trackedEmailLink("welcome-header-games",  gamesUrl),
+        trackedEmailLink("welcome-header-tip",    tipJarUrl),
       ]);
       const { subject, html, text } = welcomeEmail({
         digestPrettyDate: prettyDate(digestDate),
         digestUrl:  digestTrackedUrl,
         unsubscribeUrl,
         manageUrl:  manageTrackedUrl,
+        gamesUrl:   gamesTrackedUrl,
+        tipJarUrl:  tipJarTrackedUrl,
         digestEmailHtml: digest.email_html,
       });
       await sendEmail({ to: justActivated.email, subject, html, text });

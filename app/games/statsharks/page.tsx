@@ -7,13 +7,33 @@ import { getDailySequence, loadAttempt } from "./actions";
 import type { PersistedAttempt } from "./types";
 import { statForDate } from "@/lib/games/statsharks/stats";
 import { todayInET } from "@/lib/dates";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { StatSharksGame } from "./StatSharksGame";
 import "./statsharks.css";
 
 export const dynamic = "force-dynamic";
+
+const META_DESC = "Two players, two seasons. Pick whose stat is higher. Build a streak. A daily puzzle from boxscore.";
+const META_IMG  = `${EMAIL_LINK_BASE}/statsharks_icon.png`;
+const META_URL  = `${EMAIL_LINK_BASE}/games/statsharks`;
+
 export const metadata = {
-  title: "Stat Sharks | boxscore games",
-  robots: { index: false },
+  title:       "Stat Sharks | boxscore games",
+  description: META_DESC,
+  openGraph: {
+    title:       "Stat Sharks",
+    description: META_DESC,
+    url:         META_URL,
+    siteName:    "boxscore games",
+    type:        "website",
+    images: [{ url: META_IMG, width: 451, height: 490, alt: "Stat Sharks" }],
+  },
+  twitter: {
+    card:        "summary",
+    title:       "Stat Sharks",
+    description: META_DESC,
+    images:      [META_IMG],
+  },
   // Disable iOS Safari's data detectors — it auto-links player
   // names and years (as if they were contacts or dates), which
   // breaks the card flex layout and renders text blue.

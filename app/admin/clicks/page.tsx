@@ -1,24 +1,43 @@
 import { requireAdmin } from "../require-admin";
-import { getSupportClicksSummary } from "@/lib/click-tracking";
+import { getEmailLinkClicksSummary } from "@/lib/click-tracking";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Click tracking · admin · boxscore", robots: { index: false } };
+export const metadata = { title: "Email link clicks · admin · boxscore", robots: { index: false } };
+
+// Truncates a URL for inline display in the recent-clicks table. Long
+// HMAC redirect targets (/r/e/...) and ko-fi destinations otherwise blow
+// out the row width. Full URL is in the title attribute on hover.
+function shortenUrl(u: string | null): string {
+  if (!u) return "—";
+  try {
+    const parsed = new URL(u);
+    const path = parsed.pathname + parsed.search;
+    return `${parsed.host}${path.length > 40 ? path.slice(0, 40) + "…" : path}`;
+  } catch {
+    return u.length > 60 ? u.slice(0, 60) + "…" : u;
+  }
+}
 
 export default async function AdminClicksView() {
   await requireAdmin();
-  const support = await getSupportClicksSummary();
+  const summary = await getEmailLinkClicksSummary();
 
   return (
     <main className="admin">
-      <h1>Click tracking</h1>
+      <h1>Email link clicks</h1>
+      <p className="admin-meta">
+        Clicks on tracked links wrapped through <code>/r/e/[src]</code> — digest
+        title, Manage Subscriptions, Games, Tip Jar. Web-header and footer Tip
+        Jar still write to <code>support_clicks</code>; that table no longer has
+        an admin view.
+      </p>
 
       <section>
-        <h2>Support / Tip Jar</h2>
         <p className="admin-meta">
-          {support.total} total — {support.last7d} in the last 7 days, {support.last24h} in the last 24h.
+          {summary.total} total — {summary.last7d} in the last 7 days, {summary.last24h} in the last 24h.
         </p>
 
-        {support.bySrc.length > 0 && (
+        {summary.bySrc.length > 0 && (
           <table className="admin-clicks-table">
             <thead>
               <tr>
@@ -29,7 +48,7 @@ export default async function AdminClicksView() {
               </tr>
             </thead>
             <tbody>
-              {support.bySrc.map((r) => (
+              {summary.bySrc.map((r) => (
                 <tr key={r.src}>
                   <td><code>{r.src}</code></td>
                   <td>{r.total}</td>
@@ -42,7 +61,7 @@ export default async function AdminClicksView() {
         )}
 
         <h3 className="admin-clicks-subhead">Recent</h3>
-        {support.recent.length === 0 ? (
+        {summary.recent.length === 0 ? (
           <p className="admin-meta">No clicks yet.</p>
         ) : (
           <table className="admin-clicks-table">
@@ -50,14 +69,18 @@ export default async function AdminClicksView() {
               <tr>
                 <th>When</th>
                 <th>Source</th>
+                <th>Target</th>
                 <th>Referer</th>
               </tr>
             </thead>
             <tbody>
-              {support.recent.map((r) => (
+              {summary.recent.map((r) => (
                 <tr key={r.id}>
                   <td className="admin-meta">{new Date(r.clicked_at).toLocaleString()}</td>
                   <td><code>{r.src}</code></td>
+                  <td title={r.link_target ?? ""}>
+                    <code>{shortenUrl(r.link_target)}</code>
+                  </td>
                   <td><code>{r.referer ?? "—"}</code></td>
                 </tr>
               ))}

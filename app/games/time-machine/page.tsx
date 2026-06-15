@@ -4,15 +4,35 @@ import {
   SUBSCRIBER_SESSION_COOKIE,
 } from "@/lib/subscriber-auth";
 import { todayInET } from "@/lib/dates";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { getDailyGame, loadAttempt } from "./actions";
 import type { PersistedAttempt } from "./types";
 import { TimeMachineGame } from "./TimeMachineGame";
 import "./time-machine.css";
 
 export const dynamic = "force-dynamic";
+
+const META_DESC = "Guess the year of a real MLB box score. Six tries, higher / lower hints. A daily puzzle from boxscore.";
+const META_IMG  = `${EMAIL_LINK_BASE}/timemachine_icon.png`;
+const META_URL  = `${EMAIL_LINK_BASE}/games/time-machine`;
+
 export const metadata = {
-  title: "Time Machine | boxscore games",
-  robots: { index: false },
+  title:       "Time Machine | boxscore games",
+  description: META_DESC,
+  openGraph: {
+    title:       "Time Machine",
+    description: META_DESC,
+    url:         META_URL,
+    siteName:    "boxscore games",
+    type:        "website",
+    images: [{ url: META_IMG, width: 464, height: 492, alt: "Time Machine" }],
+  },
+  twitter: {
+    card:        "summary",
+    title:       "Time Machine",
+    description: META_DESC,
+    images:      [META_IMG],
+  },
 };
 
 export default async function TimeMachinePage() {

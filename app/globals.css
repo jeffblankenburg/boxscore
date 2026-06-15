@@ -44,18 +44,27 @@ a { color: inherit; }
   border-radius: 4px; flex-shrink: 0;
 }
 .site-header .brand .dot { color: var(--text-muted); }
-.site-header .social { font-size: 13px; justify-self: center; }
+.site-header .social {
+  justify-self: center;
+  display: inline-flex; align-items: center; gap: 2px;
+}
 .site-header .header-cta { justify-self: end; display: inline-flex; align-items: center; gap: 6px; }
 /* Gear glyph in the signed-in "⚙ Settings" CTA — pulled up a touch so the
    symbol baselines with the label visually. */
 .auth-gear { display: inline-block; margin-right: 2px; transform: translateY(-1px); font-size: 0.95em; }
-.site-header .social a {
-  color: var(--text-secondary); text-decoration: none;
-  margin-right: 6px; padding-right: 6px;
-  border-right: 1px solid var(--border-light);
+/* Social icon buttons. Square hit target, ink-colored glyph, subtle
+   hover wash. Border-right separators dropped — the icon cluster is
+   tight enough on its own. */
+.site-header .social-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  color: var(--text-primary);
+  text-decoration: none;
+  border-radius: 999px;
+  transition: background 0.1s ease;
 }
-.site-header .social a:last-of-type { border-right: none; }
-.site-header .social a:hover { text-decoration: underline; }
+.site-header .social-icon:hover { background: var(--surface-muted, #f0ebde); }
+.site-header .social-icon svg { display: block; width: 16px; height: 16px; }
 .site-header .subscribe {
   display: inline-block; font-size: 13px; font-weight: 700;
   background: #000; color: #fff; padding: 5px 12px;
@@ -70,6 +79,16 @@ a { color: inherit; }
   text-decoration: none; letter-spacing: 0.02em;
 }
 .site-header .support:hover { background: var(--surface-muted, #f0ebde); }
+/* Games pill — outlined pill like Tip Jar so it reads as a peer
+   destination rather than competing with the filled Subscribe CTA.
+   Sits leftmost in the right cluster. */
+.site-header .games-pill {
+  display: inline-block; font-size: 13px; font-weight: 700;
+  background: transparent; color: inherit; padding: 4px 11px;
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  text-decoration: none; letter-spacing: 0.02em;
+}
+.site-header .games-pill:hover { background: var(--surface-muted, #f0ebde); }
 
 .dateline {
   border-top: 3px double var(--border-strong);
@@ -1889,12 +1908,42 @@ body:has(.paper-mode) .paper-toggle {
   .standings-table th, .standings-table td { padding: 0 1px; }
   .asg-standings-table { font-size: 9px; }
   .asg-standings-table th, .asg-standings-table td { padding: 1px 1px; }
+}
+
+/* Header collapses to a two-row layout earlier than the digest tables
+   need to. The desktop `1fr auto 1fr` grid squeezes the right column
+   between ~600–720px, which makes the Tip Jar / Settings pills wrap
+   their labels onto two lines. Below 720px, switch to a stacked
+   layout: brand + CTAs on row 1, social icons right-aligned on row 2. */
+@media (max-width: 720px) {
   .site-header {
-    display: flex; flex-wrap: wrap;
-    justify-content: space-between; gap: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 6px;
   }
+  /* CSS `order` + flex-basis 100% relocates .social below without
+     touching DOM order (which the desktop grid still needs). */
+  .site-header .brand      { order: 0; }
+  .site-header .header-cta { order: 1; margin-left: auto; }
+  .site-header .social {
+    order: 2;
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+  /* Pills should never wrap their labels — the band right above the
+     stacking breakpoint is tight; nowrap stops any partial collapse. */
+  .site-header .subscribe,
+  .site-header .support,
+  .site-header .games-pill { white-space: nowrap; }
+}
+@media (max-width: 480px) {
   .site-header .subscribe { padding: 4px 10px; font-size: 12px; }
   .site-header .support { padding: 3px 9px; font-size: 12px; }
+  .site-header .games-pill { padding: 3px 9px; font-size: 12px; }
+  .site-header .social-icon { width: 26px; height: 26px; }
+  .site-header .social-icon svg { width: 15px; height: 15px; }
 }
 
 /* ─── Ad stats cards (top of /admin/ads) ─────────────────────────────── */
@@ -2596,7 +2645,6 @@ body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !impo
   font-style: italic;
   margin-left: 6px;
 }
-.advertise-rate-emphasis td { background: #faf6ec; }
 .advertise-rate-fineprint { margin-top: 12px; }
 
 /* Narrow viewport: collapse the rate card to stacked per-format cards.
@@ -2635,9 +2683,6 @@ body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !impo
     font-weight: 700;
     font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
   }
-  /* Dedicated-send row keeps its highlight as a card-wide background. */
-  .advertise-rate-emphasis { background: #faf6ec; }
-  .advertise-rate-emphasis td { background: transparent; }
 }
 
 /* Team-digest sales section — three-up grid of why-local pitches. Same
@@ -2689,6 +2734,103 @@ body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !impo
 .advertise-rules li { margin-bottom: 4px; }
 .advertise-rules > div:first-child h3 { border-bottom: 1px solid var(--border-light); padding-bottom: 4px; }
 .advertise-rules > div:last-child h3 { border-bottom: 1px solid var(--border-strong); padding-bottom: 4px; }
+
+/* Demographics — three column-tabular breakdowns above a full-width
+   states block. Each row is "label | bar | percentage" so the eye can
+   skim either the labels or the bars on their own. */
+.advertise-demographics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0;
+  column-gap: 28px;
+  margin: 0 0 22px;
+}
+.advertise-demographic + .advertise-demographic {
+  border-left: 1px solid var(--border-light);
+  padding-left: 28px;
+}
+@media (max-width: 760px) {
+  .advertise-demographic + .advertise-demographic {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--border-light);
+    padding-top: 16px;
+    margin-top: 8px;
+  }
+}
+.advertise-demographic h3 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+.advertise-demo-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.advertise-demo-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.2fr) minmax(80px, 3fr) 56px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.advertise-demo-label {
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.advertise-demo-track {
+  position: relative;
+  display: block;
+  height: 10px;
+  background: var(--border-light);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.advertise-demo-fill {
+  display: block;
+  height: 100%;
+  background: var(--text-primary);
+  border-radius: 1px;
+  transition: width 80ms linear;
+}
+.advertise-demo-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+/* Scroll reveal — sections fade and lift into place once. Reduced
+   motion users skip the animation; section heads cascade ahead of
+   their bodies via a 120ms delay applied per-instance. */
+.advertise-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity   620ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.advertise-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .advertise-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
 
 /* Inquiry form — looks like a "letters to the editor" coupon. Tight
    typography, hairline-ruled inputs, single dark submit pill. */
