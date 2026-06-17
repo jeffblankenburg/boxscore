@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "../require-admin";
 import { SubmitButton } from "../SubmitButton";
-import { sendAdminPreview, sendTeamAdminPreview, setAnnouncement, removeAnnouncement } from "../actions";
+import { sendAdminPreview, sendTeamAdminPreview, setAnnouncement, removeAnnouncement, setSportSends } from "../actions";
 import { RegenerateAllRunner } from "./RegenerateAllRunner";
 import { CronPanel } from "./CronPanel";
 import { CopyButton } from "./CopyButton";
@@ -72,10 +72,11 @@ export default async function LeagueDashboard({
   const emailBytes = generateResult?.email_bytes ?? null;
 
   const sendResult = (lastSend?.result ?? null) as
-    | { sent?: number; failed?: number; total_active_subscribers?: number } | null;
+    | { sent?: number; failed?: number; total_active_subscribers?: number; skipped_reason?: string } | null;
   const sendOk = sendResult?.sent ?? null;
   const sendFailed = sendResult?.failed ?? null;
   const sendTotal = sendResult?.total_active_subscribers ?? null;
+  const sendSkippedReason = sendResult?.skipped_reason ?? null;
 
   return (
     <main className="admin admin-wide">
@@ -83,6 +84,13 @@ export default async function LeagueDashboard({
 
       {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}
       {error && <p className="admin-error"><strong>Failed:</strong> {error}</p>}
+
+      <SendsToggleBanner
+        sport={sport}
+        sportName={sportRow.name}
+        sendsEnabled={sportRow.sends_enabled}
+        returnTo={returnTo}
+      />
 
       <section className="admin-kpis">
         <KpiCard
@@ -106,13 +114,16 @@ export default async function LeagueDashboard({
           label="Last send"
           value={lastSend?.date ?? "—"}
           sub={lastSend
-            ? sendOk != null && sendFailed != null
+            ? sendSkippedReason
+              ? `skipped (${sendSkippedReason})`
+              : sendOk != null && sendFailed != null
               ? `${sendOk}/${(sendOk + sendFailed) || sendTotal || 0} delivered${sendFailed > 0 ? ` · ${sendFailed} failed` : ""}`
               : lastSend.status === "failed" ? `failed: ${lastSend.error?.slice(0, 60) ?? "(no message)"}`
               : lastSend.status
             : features.expectedRoutes.includes("send-email") ? "no sends yet" : "send not wired"}
           deltaTone={lastSend
-            ? lastSend.status === "ok" && (sendFailed ?? 0) === 0 ? "good"
+            ? sendSkippedReason ? "neutral"
+            : lastSend.status === "ok" && (sendFailed ?? 0) === 0 ? "good"
             : lastSend.status === "failed" || (sendFailed ?? 0) > 0 ? "bad"
             : "neutral"
             : "neutral"}
@@ -516,6 +527,58 @@ async function getCronPulseForDate(
 }
 
 // ---- components -----------------------------------------------------------
+
+function SendsToggleBanner({
+  sport,
+  sportName,
+  sendsEnabled,
+  returnTo,
+}: {
+  sport: string;
+  sportName: string;
+  sendsEnabled: boolean;
+  returnTo: string;
+}) {
+  // Two-step confirm via <details>. First click opens the panel; the inner
+  // submit (with hidden confirmed=1) is the actual state change. No JS
+  // modal — works in noscript admin sessions too. The pause direction is
+  // a soft action (it stops mail), but resume during off-season would
+  // silently send mail tomorrow, so both directions get the same guard.
+  const cls = sendsEnabled ? "admin-sends-on" : "admin-sends-off";
+  const stateLabel = sendsEnabled ? "SENDS ENABLED" : "SENDS PAUSED";
+  const explainer = sendsEnabled
+    ? `Daily ${sportName} emails will go out at the next scheduled cron.`
+    : `Daily ${sportName} emails are paused. generate still runs so the archive page stays populated; the send crons skip.`;
+  const buttonLabel = sendsEnabled ? "Pause sends…" : "Resume sends…";
+  const confirmHeading = sendsEnabled ? `Pause daily ${sportName} sends?` : `Resume daily ${sportName} sends?`;
+  const confirmBody = sendsEnabled
+    ? `No daily ${sportName} email will go out until you resume. The send cron will record a "skipped: sends_disabled" run each day so it's clear the skip is intentional.`
+    : `The next scheduled cron will send the ${sportName} digest to every active subscriber. Make sure today's generate produced a real digest (KPI above).`;
+  const confirmLabel = sendsEnabled ? `Confirm: Pause ${sportName} sends` : `Confirm: Resume ${sportName} sends`;
+
+  return (
+    <section className={`admin-sends-banner ${cls}`}>
+      <div className="admin-sends-banner-row">
+        <div>
+          <div className="admin-sends-banner-state">{stateLabel}</div>
+          <div className="admin-sends-banner-explain">{explainer}</div>
+        </div>
+        <details className="admin-sends-banner-action">
+          <summary className="admin-btn">{buttonLabel}</summary>
+          <form action={setSportSends} className="admin-sends-confirm">
+            <input type="hidden" name="sport" value={sport} />
+            <input type="hidden" name="enable" value={sendsEnabled ? "0" : "1"} />
+            <input type="hidden" name="confirmed" value="1" />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <p className="admin-sends-confirm-heading"><strong>{confirmHeading}</strong></p>
+            <p className="admin-sends-confirm-body">{confirmBody}</p>
+            <SubmitButton idleLabel={confirmLabel} pendingLabel="Saving…" />
+          </form>
+        </details>
+      </div>
+    </section>
+  );
+}
 
 function KpiCard({
   label,
@@ -996,6 +1059,9 @@ function statusLabel(s: CronRun["status"]): string {
 function summarizeResult(result: unknown): string {
   if (!result || typeof result !== "object") return "";
   const r = result as Record<string, unknown>;
+  // Kill-switch skips win the summary — otherwise it'd render as "0 sent"
+  // which reads identical to a real-failure zero.
+  if (typeof r.skipped_reason === "string") return `skipped: ${r.skipped_reason}`;
   const parts: string[] = [];
   if (typeof r.game_count === "number") parts.push(`${r.game_count} games`);
   if (typeof r.final_count === "number") parts.push(`${r.final_count} final`);

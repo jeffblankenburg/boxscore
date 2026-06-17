@@ -1260,6 +1260,33 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
                  padding: 10px 12px; margin: 12px 0;
                  font-size: 14px; color: #1f5f1f;
                  border-radius: 4px; }
+
+/* Per-sport send kill-switch banner. Two-step confirm via <details> —
+   the summary is the trigger button, expanding it reveals the actual
+   submit. The ON / OFF colors mirror admin-success / admin-error so the
+   operator can spot the state at a glance from the page header. */
+.admin-sends-banner { border-radius: 4px; padding: 12px 14px; margin: 12px 0; }
+.admin-sends-on  { background: #e6f7e6; border: 1px solid #2a7a2a; color: #1f5f1f; }
+.admin-sends-off { background: #ffe6e6; border: 1px solid #a40000; color: #a40000; }
+.admin-sends-banner-row { display: flex; gap: 16px; align-items: center;
+                          justify-content: space-between; flex-wrap: wrap; }
+.admin-sends-banner-state { font-weight: 800; letter-spacing: 0.04em;
+                            font-size: 13px; text-transform: uppercase; }
+.admin-sends-banner-explain { font-size: 13px; margin-top: 2px;
+                              color: inherit; opacity: 0.85; }
+.admin-sends-banner-action { margin: 0; }
+.admin-sends-banner-action > summary { list-style: none; cursor: pointer;
+                                       display: inline-flex; }
+.admin-sends-banner-action > summary::-webkit-details-marker { display: none; }
+.admin-sends-confirm { margin-top: 10px; padding: 10px 12px;
+                       background: rgba(255,255,255,0.7);
+                       border: 1px solid rgba(0,0,0,0.15);
+                       border-radius: 4px; max-width: 480px;
+                       color: var(--text-primary); }
+.admin-sends-confirm-heading { margin: 0 0 6px; font-size: 14px; }
+.admin-sends-confirm-body { margin: 0 0 10px; font-size: 13px;
+                            color: var(--text-muted); }
+
 .admin-regen-form { display: flex; gap: 12px; align-items: center;
                     margin: 12px 0; flex-wrap: wrap; }
 .admin-auth { max-width: 440px; }

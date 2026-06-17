@@ -226,6 +226,39 @@ export async function setAnnouncement(formData: FormData): Promise<void> {
   redirect(target);
 }
 
+// Toggle a sport's daily-send kill switch (sports.sends_enabled). When
+// false, send-email and send-team-email crons short-circuit with a
+// recorded skip; generate keeps running so the archive page still gets a
+// row. Two-step confirm-then-act lives in the page form (open details +
+// hidden confirmed=1) — this action only fires on a real submission. The
+// guard preserves the spirit of the customer-email rule without forcing
+// typed confirmation: pausing doesn't send mail, but accidentally
+// resuming during off-season WOULD send mail tomorrow.
+export async function setSportSends(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const sport = String(formData.get("sport") ?? "");
+  const enable = formData.get("enable") === "1";
+  const confirmed = formData.get("confirmed") === "1";
+  const returnToRaw = formData.get("returnTo");
+  const returnTo =
+    typeof returnToRaw === "string" && returnToRaw.startsWith("/") ? returnToRaw : `/admin/${sport}`;
+
+  let target: string;
+  try {
+    if (!sport) throw new Error("missing sport");
+    if (!confirmed) throw new Error("not confirmed");
+    const { getSportById, setSportSendsEnabled } = await import("@/lib/sports");
+    const row = await getSportById(sport);
+    if (!row) throw new Error(`Unknown sport: ${sport}`);
+    await setSportSendsEnabled(sport, enable);
+    const verb = enable ? "resumed" : "paused";
+    target = `${returnTo}?ok=${encodeURIComponent(`${row.name} daily sends ${verb}.`)}`;
+  } catch (err) {
+    target = `${returnTo}?error=${encodeURIComponent(`sends-toggle: ${(err as Error).message}`)}`;
+  }
+  redirect(target);
+}
+
 // Direct delete from the announcements list on /admin/[sport]. Takes the
 // row's (sport, date) — sport may be "*" for a global row — and removes
 // it. Avoids forcing the operator to switch the form's date input and

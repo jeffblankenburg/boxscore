@@ -11,11 +11,16 @@ export type Sport = {
   id: string;
   name: string;
   visibility: SportVisibility;
+  // When false, the send-email and send-team-email crons short-circuit for
+  // this sport with a recorded "skipped: sends_disabled" run. Independent
+  // of `visibility`: an off-season sport stays visible on /subscribe so
+  // new signups still work, but sends pause. Defaults to true.
+  sends_enabled: boolean;
   created_at: string;
   updated_at: string;
 };
 
-const COLS = "id, name, visibility, created_at, updated_at";
+const COLS = "id, name, visibility, sends_enabled, created_at, updated_at";
 
 /**
  * Returns sports filtered by visibility. Pass `includeAdminOnly: true` for
@@ -82,5 +87,24 @@ export async function setSportVisibility(
     .select(COLS)
     .single<Sport>();
   if (error) throw new Error(`setSportVisibility: ${error.message}`);
+  return data;
+}
+
+/**
+ * Admin-only: flip a sport's daily-send state. When false, the send-email
+ * and send-team-email crons skip this sport with a recorded "sends_disabled"
+ * skip; generate keeps running so the archive/preview pages still cache.
+ */
+export async function setSportSendsEnabled(
+  id: string,
+  enabled: boolean,
+): Promise<Sport> {
+  const { data, error } = await supabaseAdmin()
+    .from("sports")
+    .update({ sends_enabled: enabled, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select(COLS)
+    .single<Sport>();
+  if (error) throw new Error(`setSportSendsEnabled: ${error.message}`);
   return data;
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSportById } from "@/lib/sports";
 import { getActiveTeamIds } from "@/lib/email-subscriptions";
 import { getActiveSubscribers, getTeamOptInSubscriberIds, type Subscriber } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
@@ -80,6 +81,20 @@ export async function GET(req: Request) {
   let runId: string | null = null;
   try {
     runId = await startCronRun({ route: "send-team-email", sport, date, trigger });
+
+    // Per-sport send kill switch — same gate as the league send. See
+    // app/api/cron/send-email/route.ts for the operator-confidence framing.
+    const sportRow = await getSportById(sport);
+    if (sportRow && sportRow.sends_enabled === false) {
+      const result = {
+        sport, date,
+        teams: 0, sent: 0, skipped: 0, failed: 0, empty: 0,
+        skipped_reason: "sends_disabled",
+      };
+      console.log(`[send-team-email] sport=${sport} date=${date} status=skipped reason=sends_disabled`);
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
 
     const teamIds = await getActiveTeamIds(sport);
     if (teamIds.length === 0) {

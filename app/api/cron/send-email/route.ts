@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDigest } from "@/lib/digests";
+import { getSportById } from "@/lib/sports";
 import { getActiveSubscribersForSport } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
@@ -53,6 +54,24 @@ export async function GET(req: Request) {
   let runId: string | null = null;
   try {
     runId = await startCronRun({ route: "send-email", sport, date, trigger });
+
+    // Per-sport send kill switch (sports.sends_enabled). Independent of
+    // visibility — an off-season sport stays public so new signups still
+    // work, but the daily send pauses. Operator flips this on
+    // /admin/[sport]. Record an ok run with skipped_reason so the dashboard
+    // cron pulse stays green and the recent-runs table shows the intent.
+    const sportRow = await getSportById(sport);
+    if (sportRow && sportRow.sends_enabled === false) {
+      const result = {
+        sport, date,
+        total_active_subscribers: 0,
+        sent: 0, skipped: 0, failed: 0,
+        skipped_reason: "sends_disabled",
+      };
+      console.log(`[send-email] sport=${sport} date=${date} status=skipped reason=sends_disabled`);
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
 
     const digest = await getDigest(sport, date);
     if (!digest || !digest.email_html) {
