@@ -3,7 +3,7 @@
 A starter guide for selling advertising in the boxscore daily email. Written for
 someone brand new to this. You do **not** need to be technical. You need to
 understand the product, be honest about where it is, and have a real conversation
-with a local business owner.
+with a business owner.
 
 Read this once top to bottom, then keep it open during your first few calls.
 
@@ -51,7 +51,7 @@ it:
   machine.
 
 What this means for you: you are not closing big deals on day one. You are having
-friendly conversations, finding 3–5 local businesses willing to try it, and
+friendly conversations, finding 3–5 fan-affinity businesses willing to try it, and
 learning what questions come up. That's success right now.
 
 **Never make up numbers, never promise results we can't prove.** If you don't know
@@ -63,17 +63,48 @@ boxscore is data, not hype.)
 
 ## 3. Who to talk to first
 
-Local, sports-adjacent, owner-operated businesses are the natural fit — the same
-kinds of businesses that advertised in newspaper sports sections for a hundred
-years:
+**Important: boxscore is a *national* list.** Our ~6,000 readers are spread across
+the whole country — no single city or state holds even 10% of them (we checked the
+data). That changes who we should sell to. A neighborhood batting cage paying to
+reach 6,000 people scattered nationwide — five of whom could ever walk in — is
+wasting money, and they'll figure that out and quit. Don't sell anyone something
+that won't work for them. That's the brand.
 
-- Sporting goods stores, batting cages, card & memorabilia shops
-- Bars and restaurants near a ballpark or that show every game
-- Local radio stations, ticket resellers, custom uniform / screen-print shops
-- Anything owner-run where you can get the decision-maker in one conversation
+So we sell **two different things to two different kinds of advertiser:**
 
-Skip national chains for now — they buy ads through agencies and won't take a
-cold call from a new program. Stay local, stay personal.
+**A) The daily league digest → national, fan-affinity advertisers.**
+The whole list, every morning. The right fit is any business whose customer is
+"a baseball fan, anywhere":
+
+- Online sports-card & memorabilia marketplaces (ship nationwide)
+- Direct-to-consumer baseball gear (bats, gloves, apparel brands)
+- Sports media — podcasts, newsletters, baseball book publishers
+- Ticket marketplaces (SeatGeek, Gametime, StubHub-style)
+- Prediction markets / fantasy / sportsbooks (Kalshi is already interested — that's
+  exactly the right profile)
+
+**B) Team digests → team-affinity advertisers.**
+Some subscribers opt into a *specific team's* digest. These are smaller, focused
+lists (roughly 30–160 people per team — see Section 5 for the real sizes). The key
+thing to understand: **a team digest reaches fans of that team *wherever they
+live* — it is NOT everyone-in-that-city.** So the right buyer is someone who wants
+that *fanbase*, not that *zip code*:
+
+- A team-themed merch / apparel shop that ships to fans anywhere
+- A regional sportsbook or brand active in that team's market
+- A bar or venue that's a known gathering spot for that team's fans
+
+**What we are NOT ready to sell yet: true local, "people-in-my-city" targeting.**
+We don't reliably know where each subscriber lives, so we can't promise a business
+"your ad only goes to people in Columbus." If a prospect needs that, be honest:
+*"We're not set up for city-level targeting yet — let me flag it."* (Tell Jeff;
+it's a data project, not something to fake.)
+
+**Skip national chains and big brands' agencies for now** — long cycles, won't take
+a cold call from a brand-new program. Start with **owner-run or
+founder-run** national niche businesses (a card shop owner, a podcast host, a DTC
+gear founder) — same friendly, person-to-person conversation, just a business
+whose customer actually matches our audience.
 
 ---
 
@@ -85,7 +116,7 @@ in the email.
 
 | Format | What it looks like | Where it sits | Sold as |
 |---|---|---|---|
-| **Classified** | A few lines of typed text under a "CLASSIFIEDS" header, like a newspaper classified | Near the bottom | Cheapest, sold in bulk to local shops |
+| **Classified** | A few lines of typed text under a "CLASSIFIEDS" header, like a newspaper classified | Near the bottom | Cheapest, sold in bulk |
 | **Standings strip** | A thin one-line band with the business name + tagline | Between sections | One advertiser per strip |
 | **Display box** | A bordered box with a headline and a couple lines, like a small newspaper display ad | Between major sections | More premium, more visual weight |
 | **Sponsor line** | One elegant italic line: *"Today's edition brought to you by ___"* | Very top, under the date | **Most premium** — only one per day, no competition |
@@ -143,15 +174,62 @@ Always quote the current figure, not a stale one.*
    People read the box scores right inside the email; they're not here to click
    away. So sell boxscore as a **daily-visibility / brand play in front of a loyal
    audience**, not a click-machine. (If an advertiser only cares about clicks,
-   they're a worse fit than one who wants to be seen by 6,000 local fans every
+   they're a worse fit than one who wants to be seen by 6,000 engaged fans every
    morning.)
 
-**What we do NOT know yet — don't claim it:**
+### Where they are (geography)
 
-- **Reader location.** We don't track where subscribers live, so don't promise a
-  specific city or region. It's US baseball, so it's US baseball fans — but don't
-  invent a "mostly [city]" number. If an advertiser needs local targeting, flag
-  it to Jeff; everyone currently gets the same edition.
+The list is **national and overwhelmingly U.S.** — and *spread out*, not
+concentrated in any one place:
+
+- ~85–90% of readers are in the U.S. (both the signup survey and our website
+  traffic agree on this).
+- The U.S. readers are scattered across **24+ states with no dominant one** — the
+  biggest single state is only a handful of percent. There is **no "boxscore city."**
+
+What this means for selling: **lead with national reach, not local.** Don't promise
+"people in your town." If someone needs a specific metro, the closest we have today
+is a **team digest** (Section: team markets below) — and even that reaches a team's
+fans *nationwide*, not just its city.
+
+### Who they are (demographics) — ⚠️ thin sample, use with care
+
+We have a demographic survey running, but only **~60 people (about 1% of the list)
+have answered so far.** That's *directional*, not fact. **Do not quote these as
+hard numbers** — say "early survey data suggests…" if you mention them at all.
+With that caveat, the early lean is a genuinely *premium* audience:
+
+- **Older:** skews 45 and up.
+- **Affluent:** of those who shared income, the largest group reported **$250k+**.
+- **Mostly men:** ~9 in 10 respondents.
+
+If this holds as more people answer, "affluent, older, engaged male sports fans" is
+a strong story for premium advertisers (financial, travel, premium goods). But
+**it's 60 people today** — firming this up (more survey responses) is one of the
+most valuable things we can do for sales. Until then, don't build a pitch on it.
+
+### Team markets (the "team digest" inventory)
+
+Subscribers can opt into a single team's digest. About **1,920 total team opt-ins**
+today. The biggest team lists (as of June 17, 2026):
+
+| Team | Opt-ins | | Team | Opt-ins |
+|---|---|---|---|---|
+| Yankees | 157 | | Mets | 77 |
+| Twins | 150 | | Guardians | 77 |
+| Red Sox | 118 | | Brewers | 76 |
+| Cubs | 98 | | Mariners | 69 |
+| Reds | 90 | | Orioles | 63 |
+| Dodgers | 85 | | Blue Jays | 62 |
+| Cardinals | 85 | | Pirates | 61 |
+| Braves | 83 | | Nationals | 55 |
+| Phillies | 79 | | *(most others)* | 20–55 |
+
+**Read these honestly:** a team digest reaches that team's *fans, wherever they
+live* — the 150 Twins-digest readers are not 150 people in Minneapolis. So these
+are great for **team-affinity advertisers** (a team-merch shop, a regional brand,
+a fan-hangout bar) and only loosely a "local" buy. They're small but focused — sell
+them on *who's reading*, not how many.
 
 ---
 
@@ -187,9 +265,16 @@ caught off guard.
 > what we can and can't measure yet — but a daily email to engaged fans is a real
 > touchpoint." *(Don't promise tracking we don't have live yet — be straight.)*
 
-**"Can I target just my city / just my sport?"**
-> "Today everyone gets the same edition, so your ad reaches the whole list. More
-> targeting is on the roadmap." *(True today — don't oversell targeting.)*
+**"Can I target just my city?"**
+> "We can't do city-level targeting yet — the list is national. The closest thing
+> is our team digests: if you want, say, Yankees fans, we have a focused list for
+> that — but those are fans of the team wherever they live, not just in New York."
+> *(Honest. Don't promise zip-code targeting — see Section 5.)*
+
+**"Can I reach just fans of one team?"**
+> "Yes — that's our team-digest inventory. It's a smaller, focused list of one
+> team's fans. Great if you sell to that fanbase." *(Sizes are in Section 5;
+> they're small — 30–160 people — so set expectations.)*
 
 **"How long do I have to commit?"**
 > "No long contract. Let's start with a short run — a week or a month — and see
@@ -197,8 +282,8 @@ caught off guard.
 
 **"Why should I do this instead of Facebook/Instagram ads?"**
 > "On social you're one of fifty things flying by. Here you're in a calm daily
-> email that people actually open and read, next to content they came for — and
-> you're supporting something local. It's the newspaper sports page, not a feed."
+> email that people actually open and read, next to content they came for. It's
+> the newspaper sports page in their inbox, not a feed."
 
 **"Is this just baseball? What about other sports?"**
 > "It's built around baseball today, and built to grow into other sports."
@@ -216,25 +301,26 @@ caught off guard.
 
 ## 7. A basic script for a first conversation
 
-This is a *guide*, not a word-for-word read. Sound like yourself. The goal of the
-first conversation is **not to close** — it's to spark interest and earn a second
-conversation or a mockup.
+This is a *guide*, not a word-for-word read. Sound like yourself. Because we're
+national, most of these will be a **phone call, email, or DM** to a business whose
+customer is baseball fans (a card shop, a podcast, a gear brand) — not a walk-in.
+The goal of the first conversation is **not to close** — it's to spark interest
+and earn a second conversation or a mockup.
 
-**Opening (warm, local, low-pressure):**
-> "Hi, I'm [name]. I help with a daily email called boxscore — it's the baseball
-> box scores and standings, made to feel like the old newspaper sports page, and
-> it goes out every morning to fans around [area]. Do you have two minutes?"
+**Opening (warm, specific, low-pressure):**
+> "Hi, I'm [name]. I help with boxscore — a daily email of baseball box scores and
+> standings, made to feel like the old newspaper sports page. It goes to about
+> 6,000 fans across the country every morning. Do you have two minutes?"
 
 **The hook (why them):**
-> "We're just starting to offer advertising, and I thought of [business] because
-> you're exactly the kind of local spot that used to live in the newspaper sports
-> section. I wanted to see if you'd be open to being one of our first
-> advertisers."
+> "I reached out because [their business] sells to exactly the people who read us —
+> baseball fans. We're just opening up advertising, and I'd love for you to be one
+> of our first advertisers."
 
 **What it is (keep it short):**
-> "It's a clean, text-style ad — looks like a classy newspaper sponsor line or
-> classified, not a flashy banner. It links right to your site. Every reader
-> opted in, so these are real fans, not random clicks."
+> "It's a clean, text-style ad — a classy newspaper sponsor line or classified,
+> not a flashy banner. It links right to your site. Every reader opted in and
+> opens it daily, so these are real fans, not random impressions."
 
 **The low-risk offer:**
 > "Because you'd be a founding advertiser, the pricing is ground-floor and there's
@@ -243,12 +329,16 @@ conversation or a mockup.
 > decide anything."
 
 **The ask (small, concrete next step):**
-> "Could I put together a quick mockup of [business] in tomorrow's style and send
-> it over? If you like it, we go from there. No pressure either way."
+> "Could I put together a quick mockup of [business] in our style and send it over?
+> If you like it, we go from there. No pressure either way."
+
+**For a team-affinity business** (e.g., a team-merch shop or fan bar), swap the hook:
+> "We also have a focused list of just [team] fans — smaller, but every one of them
+> follows that team on purpose. That might be an even better match for you."
+> *(Remember the team lists are small — 30–160 people. Be honest about size.)*
 
 **If they say yes:** Get their **email**, their **website**, and one line about
-**what they'd want to promote** (a sale, their hours, a discount). Bring that to
-Jeff for a mockup.
+**what they'd want to promote**. Bring that to Jeff for a mockup.
 
 **If they're hesitant:**
 > "Totally fair. Can I email you a one-pager and a sample so you can look on your
@@ -265,11 +355,14 @@ Jeff for a mockup.
 
 You are new and this program is new. "Success" right now is small and concrete:
 
-1. Be able to explain boxscore in two sentences without notes.
-2. Get the real audience numbers and pricing from Jeff and write them into
-   Section 5.
-3. Have 5 friendly conversations with local businesses — calls or walk-ins.
-4. Collect 3 emails of businesses willing to see a mockup.
+1. Be able to explain boxscore in two sentences without notes — and explain *why
+   it's national*, not local.
+2. Get current pricing from Jeff (the audience numbers in Section 5 are already
+   filled in — just keep them fresh).
+3. Build a short list of 10 *fan-affinity* businesses to approach — card shops,
+   gear brands, baseball podcasts, ticket sites, team-merch shops.
+4. Have 5 friendly conversations and collect 3 emails of businesses willing to see
+   a mockup.
 5. Bring Jeff a list of the questions you got that you *couldn't* answer — those
    make this playbook better.
 
@@ -282,8 +375,8 @@ seeds.
 
 - **Never invent a number or promise a result.** "Let me find out" always beats a
   guess. This is the whole brand — we sell data, not hype.
-- **Stay local and personal.** This program wins one owner-to-owner conversation
-  at a time.
+- **Stay personal.** This program wins one owner-to-owner conversation at a time —
+  the audience is national, but the *selling* is still person-to-person.
 - **Lead with the mockup.** Showing a business their own ad in a real edition is
   worth more than any pitch.
 - **Honesty about being early is a feature**, not something to hide. Ground floor,

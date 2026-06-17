@@ -205,6 +205,12 @@ type SdioPlayerSeason = {
   Name: string;
   Position: string;
   PlateAppearances: number;
+  AtBats:         number | null;
+  Hits:           number | null;
+  Walks:          number | null;
+  HitByPitch:     number | null;
+  SacrificeFlies: number | null;
+  TotalBases:     number | null;
   Doubles: number;
   Triples: number;
   HomeRuns: number;
@@ -213,6 +219,9 @@ type SdioPlayerSeason = {
   BattingAverage:     number | null;
   OnBasePercentage:   number | null;
   SluggingPercentage: number | null;
+  // Precomputed by SDIO but unreliable — see computeOps() for the
+  // canonical from-raw replacement. Keep typed so the field stays
+  // documented; just don't read it.
   OnBasePlusSlugging: number | null;
   Wins: number;
   Losses: number;
@@ -399,6 +408,36 @@ function record(wins: number, losses: number): MlbRecord {
 function streakOrDash(s: string | null | undefined): string {
   if (!s) return "-";
   return s;
+}
+
+// Canonical OPS from raw components. SDIO's precomputed
+// OnBasePlusSlugging is unreliable: a 2026-06-16 sweep of 411 qualifying
+// batters found 133 (32%) where vendor OPS matched NEITHER the
+// raw-sum-then-round nor the round-each-then-sum value derivable from
+// SDIO's own AB/H/BB/HBP/SF/TB (e.g. Christian Vázquez vendor 0.613 vs
+// correct 0.617, Miguel Rojas vendor 0.693 vs correct 0.699). So we
+// recompute per MLB's official formula:
+//   OBP = (H + BB + HBP) / (AB + BB + HBP + SF)
+//   SLG = TB / AB
+//   OPS = round3(OBP) + round3(SLG)
+// MLB Stats API publishes OPS this way (round each component to 3
+// decimals independently, then sum) — confirmed against Aaron Judge
+// 2026 where raw sum gives 0.907 but statsapi and MLB.com both show
+// .908. Renderer handles final display formatting.
+// Returns null when AB=0 (no qualifying ABs) or the OBP denominator is 0.
+function computeOps(s: SdioPlayerSeason | undefined): number | null {
+  if (!s) return null;
+  const ab  = s.AtBats         ?? 0;
+  const h   = s.Hits           ?? 0;
+  const bb  = s.Walks          ?? 0;
+  const hbp = s.HitByPitch     ?? 0;
+  const sf  = s.SacrificeFlies ?? 0;
+  const tb  = s.TotalBases     ?? 0;
+  const obpDen = ab + bb + hbp + sf;
+  if (ab === 0 || obpDen === 0) return null;
+  const obp = (h + bb + hbp) / obpDen;
+  const slg = tb / ab;
+  return Math.round(obp * 1000) / 1000 + Math.round(slg * 1000) / 1000;
 }
 
 // ─── Section adapters ────────────────────────────────────────────────────
@@ -606,7 +645,7 @@ function adaptPlayer(
     // "(N)" annotation in the box-score notes shows real numbers.
     seasonBatting:  bat ? {
       battingAverage: s?.BattingAverage     ?? null,
-      ops:            s?.OnBasePlusSlugging ?? null,
+      ops:            computeOps(s),
       doubles:        s?.Doubles            ?? 0,
       triples:        s?.Triples            ?? 0,
       homeRuns:       s?.HomeRuns           ?? 0,
