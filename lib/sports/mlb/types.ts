@@ -21,17 +21,45 @@
 
 // ─── Reference types ──────────────────────────────────────────────────────
 
-/** Lightweight team reference used inside game/standings/leader rows. */
+/** Lightweight team reference used inside game/standings/leader rows.
+ *  `id` is the CANONICAL slug from lib/teams.ts ("nyy", "cws", "lad") —
+ *  source-agnostic. Vendor team ids never make it past the adapter
+ *  boundary. Adapters resolve via canonicalTeamSlugForRef. */
 export type MlbTeamRef = {
-  id: number;       // vendor-stable team identifier (statsapi teamId or SDIO TeamID)
+  id: string;       // canonical slug — matches lib/teams.ts Team.slug
   name: string;     // "New York Yankees"
   abbr: string;     // "NYY"
 };
 
-/** Lightweight player reference used inside leader/decision rows. */
+/** Lightweight player reference used inside leader/decision rows.
+ *  TODO: build a canonical player registry (cross-vendor id mapping)
+ *  and rename this to a slug-style canonical id, mirroring MlbTeamRef.
+ *  Today the id is the vendor's player id — the only field we leak
+ *  through canonical from the adapter, and the reason cross-vendor
+ *  player matching in the diff is brittle. */
 export type MlbPlayerRef = {
-  id: number;       // vendor-stable player identifier
+  /** Canonical player slug — the `name_slug` value from the players
+   *  table. Cross-vendor; both statsapi and SDIO adapters resolve their
+   *  native PlayerID to this slug at the canonical boundary. Used as
+   *  the URL component for /mlb/player/{slug}. */
+  id: string;
   fullName: string;
+  /** MLBAMID, populated for any player we have in the players table.
+   *  Null only for players the lookup didn't resolve (e.g. a SDIO sub
+   *  we haven't backfilled yet). Used by the legacy DailyData bridge
+   *  to populate its numeric playerId; once that bridge is deleted the
+   *  field can come out. */
+  mlbId?: number | null;
+};
+
+/** Probable starting pitcher with season-to-date W-L and ERA. Renderer
+ *  shows the trailing "(W-L, ERA)" pair after the pitcher's name in the
+ *  Today's Games strip. Any stat is null when the pitcher has no stats
+ *  yet — rookie callups, opening day, etc. */
+export type MlbProbablePitcher = MlbPlayerRef & {
+  wins:   number | null;
+  losses: number | null;
+  era:    number | null;
 };
 
 // ─── Game (schedule entry — covers scheduled, in-progress, and final) ─────
@@ -93,9 +121,10 @@ export type MlbGame = {
   homeErrors: number | null;
 
   // Probable starters for scheduled games. Null when TBD or in-progress
-  // (use boxscore for in-progress starters).
-  awayProbablePitcher: MlbPlayerRef | null;
-  homeProbablePitcher: MlbPlayerRef | null;
+  // (use boxscore for in-progress starters). Carries season W-L + ERA
+  // so the Today's Games strip can render "LastName (W-L, ERA)".
+  awayProbablePitcher: MlbProbablePitcher | null;
+  homeProbablePitcher: MlbProbablePitcher | null;
 
   // Decisions. All null on non-final games.
   decisions: MlbDecisions | null;
@@ -134,17 +163,36 @@ export type MlbBoxPitching = {
   strikes: number;
   battersFaced: number;
   era: number | null;               // season-to-date ERA through this game
+  /** Pre-formatted decision note: "(W, 2-1)", "(L, 0-3)", "(S, 7)", "(H, 4)",
+   *  "(BS, 2)". Renders next to the pitcher's name in the box score. Null
+   *  when no decision applied. Sources that don't carry it (SDIO) leave null. */
+  decisionNote: string | null;
 };
 
-/** Season-to-date batting summary shown next to a player's game line. */
+/** Season-to-date batting summary shown next to a player's game line.
+ *  The counting stats (doubles / triples / homeRuns / stolenBases) are
+ *  used by the renderer's "Player (N)" running-total annotation in the
+ *  box-score extras block. Sources that don't carry season counting
+ *  stats on the box-score line leave them at 0 — the renderer renders
+ *  `Player (0)` rather than crashing. */
 export type MlbSeasonBattingSummary = {
   battingAverage: number | null;
   ops: number | null;
+  doubles: number;
+  triples: number;
+  homeRuns: number;
+  stolenBases: number;
+  rbi: number;
 };
 
-/** Season-to-date pitching summary shown next to a player's game line. */
+/** Season-to-date pitching summary shown next to a player's game line.
+ *  Wins/losses/saves let decision-pitcher labels render "Wacha (4-5)"
+ *  for W/L and "Clase (12)" for SV without a separate lookup. */
 export type MlbSeasonPitchingSummary = {
-  era: number | null;
+  era:    number | null;
+  wins:   number | null;
+  losses: number | null;
+  saves:  number | null;
 };
 
 /** Lineup slot for a starting position player. 1–9 = lineup order; null = pitcher/sub. */
@@ -161,6 +209,11 @@ export type MlbBoxPlayer = {
   /** True if this player started the game (in starting lineup or starting pitcher). */
   isStarter: boolean;
 
+  /** Every position the player played in this game, in appearance order
+   *  ("CF", then "LF" after a switch). Empty/null when source only carries
+   *  the primary position — renderer falls back to positionAbbr. */
+  allPositionsAbbr: string[] | null;
+
   batting: MlbBoxBatting | null;    // null for pitchers who didn't bat (AL DH games)
   pitching: MlbBoxPitching | null;  // null for non-pitchers
 
@@ -174,6 +227,7 @@ export type MlbBoxTeamTotals = {
   atBats: number;
   runs: number;
   hits: number;
+  rbi: number;
   homeRuns: number;
   baseOnBalls: number;
   strikeOuts: number;

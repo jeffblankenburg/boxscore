@@ -2953,3 +2953,22 @@ body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !impo
   width: 1px; height: 1px;
   overflow: hidden;
 }
+
+/* Canonical-preview diff highlight. Applied by the canonical web
+   renderer when ?highlight=1 is on the frame request — flags rows /
+   cards whose values differ between the two data sources. The native
+   title attribute carries a short summary so hover shows the diff
+   inline without any extra JS. */
+.cx-diff-hl {
+  background: #fff3a3 !important;
+  outline: 1px solid #c89a00;
+  outline-offset: -1px;
+}
+.cx-diff-hl:hover {
+  background: #ffec80 !important;
+}
+/* Standalone rows in standings/leaders tables — softer fill so the
+   surrounding table chrome stays readable. */
+tr.cx-diff-hl { background: #fff3a3 !important; }
+tr.cx-diff-hl > td { background: transparent; }
+

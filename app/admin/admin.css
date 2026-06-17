@@ -808,3 +808,302 @@
   font-family: var(--a-mono);
   font-size: 12px;
 }
+
+/* ─── Canonical preview tool ────────────────────────────────────────── */
+/* Side-by-side SDIO-vs-statsapi validation surface. Styles are tight on
+   purpose — this isn't the production digest, it's a confidence tool. */
+
+.cx-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cx-source-toggle {
+  display: inline-flex;
+  border: 1px solid var(--a-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cx-source-tab {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 14px;
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+  border-right: 1px solid var(--a-border);
+  min-width: 160px;
+}
+.cx-source-tab:last-child { border-right: none; }
+.cx-source-tab.is-active {
+  background: var(--a-bg-sidebar);
+  font-weight: 700;
+}
+.cx-source-tab.is-missing .cx-source-hint { color: #b14a4a; }
+.cx-source-label { font-size: 13px; }
+.cx-source-hint { font-size: 11px; color: #555; font-style: italic; }
+.cx-date-nav { display: inline-flex; gap: 6px; }
+.cx-fetch-form { margin-left: auto; }
+.cx-meta {
+  font-size: 13px;
+  color: #444;
+  padding: 6px 0 0;
+  border-top: 1px dashed var(--a-border);
+}
+
+/* preview body styles — newspaper-y but minimal */
+.cx-preview { font-family: 'Source Sans 3', system-ui, sans-serif; color: #111; }
+.cx-preview h2 {
+  font-size: 18px;
+  font-weight: 900;
+  margin: 24px 0 8px;
+  padding-top: 12px;
+  border-top: 2px solid #111;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cx-preview h3 {
+  font-size: 14px;
+  font-weight: 800;
+  margin: 14px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cx-preview h4 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 10px 0 4px;
+}
+.cx-section { margin-bottom: 16px; }
+.cx-empty { font-style: italic; color: #666; }
+
+.cx-games { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.cx-game {
+  border: 1px solid var(--a-border);
+  padding: 10px 12px;
+  background: #fff;
+}
+.cx-game-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+.cx-game-teams { display: flex; flex-direction: column; gap: 2px; }
+.cx-team-line { display: flex; gap: 10px; align-items: baseline; }
+.cx-team-name { font-weight: 700; min-width: 200px; }
+.cx-team-score { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 16px; }
+.cx-game-status { font-size: 12px; color: #555; font-style: italic; }
+
+.cx-linescore {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  margin: 6px 0;
+}
+.cx-linescore th, .cx-linescore td {
+  padding: 2px 6px;
+  text-align: center;
+  border-bottom: 1px solid var(--a-border);
+}
+.cx-linescore th { font-weight: 700; }
+.cx-rhe { font-weight: 700; }
+
+.cx-decisions { font-size: 12px; color: #333; margin: 4px 0 8px; }
+
+.cx-box-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+@media (max-width: 960px) { .cx-box-grid { grid-template-columns: 1fr; } }
+.cx-box-team { font-size: 11px; }
+.cx-box {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 6px;
+}
+.cx-box th, .cx-box td {
+  padding: 2px 4px;
+  text-align: right;
+  border-bottom: 1px solid var(--a-border);
+}
+.cx-box th.cx-name, .cx-box td.cx-name { text-align: left; }
+.cx-pos { color: #888; font-size: 10px; }
+
+.cx-standings { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .cx-standings { grid-template-columns: 1fr; } }
+.cx-division { margin-bottom: 8px; }
+.cx-standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cx-standings-table th, .cx-standings-table td {
+  padding: 2px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--a-border);
+}
+.cx-standings-table th.cx-name, .cx-standings-table td.cx-name { text-align: left; }
+
+.cx-leaders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.cx-leaderboard { font-size: 12px; }
+.cx-leaders-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.cx-leaders-table th, .cx-leaders-table td {
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--a-border);
+  text-align: right;
+}
+.cx-leaders-table th.cx-name, .cx-leaders-table td.cx-name { text-align: left; }
+.cx-team-abbr { color: #555; font-size: 11px; }
+
+.cx-txns { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+.cx-txns li {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--a-border);
+}
+.cx-txn-type { font-weight: 700; color: #444; }
+.cx-txn-desc { color: #111; }
+
+/* Surface toggle (web vs email) — sits next to the source toggle */
+.cx-surface-toggle {
+  display: inline-flex;
+  border: 1px solid var(--a-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cx-surface-tab {
+  display: block;
+  padding: 10px 14px;
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+  border-right: 1px solid var(--a-border);
+  font-size: 13px;
+}
+.cx-surface-tab:last-child { border-right: none; }
+.cx-surface-tab.is-active {
+  background: var(--a-bg-sidebar);
+  font-weight: 700;
+}
+
+/* iframe carrying the production renderer output. Tall enough to show
+   a typical 15-game day without inner scroll; the iframe scrolls if a
+   given day overflows. */
+.cx-iframe {
+  width: 100%;
+  height: 90vh;
+  border: 1px solid var(--a-border);
+  background: #fff;
+}
+
+/* ─── Canonical diff page ───────────────────────────────────────────── */
+
+.cx-diff-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--a-border);
+  background: var(--a-bg-sidebar);
+  font-size: 14px;
+}
+.cx-diff-tone-match  { color: #1f7a3a; font-weight: 700; }
+.cx-diff-tone-differ { color: #b14a4a; font-weight: 700; }
+.cx-diff-tone-only   { color: #b08020; font-weight: 700; }
+
+.cx-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.cx-diff-table thead th {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 2px solid var(--a-border);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--a-text-muted);
+}
+.cx-diff-table td {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--a-border);
+  vertical-align: top;
+}
+.cx-diff-row-differ      td:first-child { color: #b14a4a; font-weight: 600; }
+.cx-diff-row-left-only   td:first-child { color: #b08020; font-weight: 600; }
+.cx-diff-row-right-only  td:first-child { color: #b08020; font-weight: 600; }
+.cx-diff-path code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #444;
+}
+.cx-diff-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.cx-diff-empty { color: var(--a-text-muted); font-style: italic; }
+
+.cx-diff-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.cx-diff-badge-match      { background: #e7f3eb; color: #1f7a3a; }
+.cx-diff-badge-differ     { background: #f7e3e3; color: #b14a4a; }
+.cx-diff-badge-left-only  { background: #f7eccd; color: #8a6420; }
+.cx-diff-badge-right-only { background: #f7eccd; color: #8a6420; }
+
+/* ─── Side-by-side preview panes ────────────────────────────────────── */
+.cx-sxs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 960px) {
+  .cx-sxs-grid { grid-template-columns: 1fr; }
+}
+.cx-sxs-pane {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--a-border);
+  background: #fff;
+  min-width: 0;          /* allow shrink so neither pane overflows */
+}
+.cx-sxs-label {
+  padding: 6px 10px;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--a-text-muted);
+  border-bottom: 1px solid var(--a-border);
+  background: var(--a-bg-sidebar);
+}
+.cx-sxs-iframe {
+  width: 100%;
+  /* Height is auto-sized by AutoSize.tsx to the taller of the two
+     rendered docs, so the iframe scrollbar disappears and the parent
+     page scrolls instead. Fallback height for the brief moment before
+     hydration runs / if JS is disabled. */
+  height: 90vh;
+  border: 0;
+  display: block;
+}

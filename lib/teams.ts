@@ -123,3 +123,36 @@ export function findTeamByMlbApiId(id: number): Team | undefined {
 export function teamsBySport(sport: Sport): Team[] {
   return TEAMS.filter((t) => t.sport === sport).slice().sort((a, b) => a.name.localeCompare(b.name));
 }
+
+// Cross-vendor canonical slug for a team reference. statsapi gives us its
+// MLB Stats API id; SDIO uses its own TeamID (e.g. White Sox: statsapi 145
+// vs SDIO 16). Anything that needs a stable identifier across data sources
+// — the canonical diff's team-matching key, the renderer's data-diff-key
+// attribute, future feed adapters — resolves through this helper.
+//
+// Resolution order: mlbApiId first (cheap, exact for statsapi-source
+// refs), then exact name match (catches SDIO refs, whose name strings
+// agree with TEAMS.name on every current MLB team), then a last-ditch
+// lowercased vendor abbreviation. The fallback won't cross-match but
+// stays stable per-side so the diff at least groups its own rows.
+export function canonicalTeamSlugForRef(ref: { id: number; name: string; abbr: string }): string {
+  const byId = findTeamByMlbApiId(ref.id);
+  if (byId) return byId.slug;
+  const byName = TEAMS.find((t) => t.sport === "mlb" && t.name === ref.name);
+  if (byName) return byName.slug;
+  return ref.abbr.toLowerCase();
+}
+
+// Canonical (id, name, abbr) for a vendor team ref. The adapters call
+// this when constructing MlbTeamRefs so both vendors hand us the
+// REGISTRY'S canonical name and abbreviation — not statsapi's "AZ" or
+// SDIO's "CHW". If we don't know the team (rare; mostly Spring Training
+// exhibition opponents), pass through the vendor's name/abbr with the
+// lowercased abbr as the slug fallback.
+export function canonicalTeamRefForRef(ref: { id: number; name: string; abbr: string }): { id: string; name: string; abbr: string } {
+  const byId = findTeamByMlbApiId(ref.id);
+  if (byId) return { id: byId.slug, name: byId.name, abbr: byId.abbreviation };
+  const byName = TEAMS.find((t) => t.sport === "mlb" && t.name === ref.name);
+  if (byName) return { id: byName.slug, name: byName.name, abbr: byName.abbreviation };
+  return { id: ref.abbr.toLowerCase(), name: ref.name, abbr: ref.abbr };
+}

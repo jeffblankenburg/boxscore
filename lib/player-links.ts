@@ -1,19 +1,25 @@
 import { EMAIL_LINK_BASE } from "./site";
 import { lastName } from "./names";
 
-// Wraps a player's display name in a link to /mlb/player/{id}. Shared
-// across the MLB web and email renderers — same DOM shape as the team
-// link, just for players. Falls back to plain text when no id is in the
-// person object (defensive — statsapi always returns one for batters,
-// pitchers, decisions, and leaders).
+// Wraps a player's display name in a link to /mlb/player/{slug}. Shared
+// across the MLB web and email renderers. Slug is the canonical
+// name_slug from the players table (e.g. "aaron-judge"), resolved at
+// the adapter boundary.
+//
+// Falls back to plain text when no id/slug is in the person object —
+// defensive only; production adapters always populate the slug (with a
+// "unknown-{vendor}-{id}" placeholder when the lookup misses).
 
+// PersonRef accepts string OR number for id during the slug rollout.
+// Number = legacy DailyData numeric mlb_id; string = canonical name_slug.
+// The /mlb/player/[id] route handler resolves both to the same player.
 type PersonRef = {
-  id?: number | null;
-  personId?: number | null;
+  id?: string | number | null;
   fullName?: string | null;
 };
 
-const idOf = (p: PersonRef): number | null => p.personId ?? p.id ?? null;
+const slugOf = (p: PersonRef): string | null =>
+  p.id == null ? null : String(p.id);
 
 const esc = (s: string): string =>
   s.replace(/&/g, "&amp;")
@@ -24,21 +30,19 @@ const esc = (s: string): string =>
 
 export function lastNameLinkWeb(p: PersonRef): string {
   const text = esc(lastName(p.fullName ?? ""));
-  const id = idOf(p);
-  return id
-    ? `<a class="player-link" href="/mlb/player/${id}">${text}</a>`
+  const slug = slugOf(p);
+  return slug
+    ? `<a class="player-link" href="/mlb/player/${encodeURIComponent(slug)}">${text}</a>`
     : text;
 }
 
-// Email variant carries inline styles because many clients strip <style>
-// blocks. Absolute URL because relative links break when the email is
-// rendered outside the site origin (Gmail web, Apple Mail offline cache).
-// Hover-underline is intentionally web-only; most email clients don't
-// honour :hover anyway.
+// Email variant: absolute URL + inline color/decoration overrides since
+// many mail clients strip <style> blocks and the underline default reads
+// wrong against the digest's text-forward aesthetic.
 export function lastNameLinkEmail(p: PersonRef): string {
   const text = esc(lastName(p.fullName ?? ""));
-  const id = idOf(p);
-  return id
-    ? `<a class="es-player-link" href="${EMAIL_LINK_BASE}/mlb/player/${id}" style="color:inherit;text-decoration:none">${text}</a>`
+  const slug = slugOf(p);
+  return slug
+    ? `<a class="es-player-link" href="${EMAIL_LINK_BASE}/mlb/player/${encodeURIComponent(slug)}" style="color:inherit;text-decoration:none">${text}</a>`
     : text;
 }

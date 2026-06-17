@@ -535,8 +535,8 @@ function renderBatting(team: BoxTeam, cityName: string): string {
       <td align="right">${pad(b.rbi)}</td>
       <td align="right">${pad(b.baseOnBalls)}</td>
       <td align="right">${pad(b.strikeOuts)}</td>
-      <td align="right">${ops}</td>
       <td align="right">${avg}</td>
+      <td align="right">${ops}</td>
     </tr>`;
   }).join("");
   const ts = team.teamStats.batting;
@@ -556,7 +556,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
         <col width="30%"><col width="8%"><col width="8%"><col width="8%">
-        <col width="8%"><col width="8%"><col width="8%"><col width="12%"><col width="10%">
+        <col width="8%"><col width="8%"><col width="8%"><col width="10%"><col width="12%">
       </colgroup>
       <thead><tr>
         <th align="left">Batter</th>
@@ -566,8 +566,8 @@ function renderBatting(team: BoxTeam, cityName: string): string {
         <th align="right">RBI</th>
         <th align="right">BB</th>
         <th align="right">SO</th>
-        <th align="right">OPS</th>
         <th align="right">Avg</th>
+        <th align="right">OPS</th>
       </tr></thead>
       <tbody>${rows}${totals}</tbody>
     </table>

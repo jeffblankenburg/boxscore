@@ -5,6 +5,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/generate-sdio?sport=mlb",
+      "schedule": "5 9 * * *"
+    },
+    {
       "path": "/api/cron/generate?sport=nba&refetch=true",
       "schedule": "0 9 * * *"
     },

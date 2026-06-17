@@ -348,6 +348,121 @@ export async function getSubscriberSeries(w: Window): Promise<SubscriberSeries> 
   return { buckets, active, newSubs, unsubs, unsubsReal, unsubsAuto };
 }
 
+// ---- Open stickiness histogram -----------------------------------------
+
+// "Of subscribers who received every league send in the last N days, how
+// many days did they actually open?" The histogram answers a question
+// neither open rate (per-send) nor active-list size (per-subscriber)
+// covers: how *sticky* the audience is on a per-reader basis.
+//
+// Denominator gates on receiving all N sends (eligible base) so the
+// metric isn't dragged down by mid-window signups. Numerator is per-day
+// distinct opens — multiple opens of the same email collapse to 1 day.
+//
+// MPP caveat: Apple Mail Privacy Protection silently prefetches the
+// open pixel, so "opened" is an upper bound on real reads. The admin
+// surface surfaces this as a footnote rather than adjusting the number.
+
+export type OpenStickiness = {
+  sport:        string;
+  windowDays:   number;
+  windowStart:  string;        // YYYY-MM-DD ET
+  windowEnd:    string;        // YYYY-MM-DD ET (yesterday)
+  eligible:     number;        // subscribers who received all N sends
+  // histogram[k] = # of eligible subscribers who opened exactly k of N.
+  histogram:    number[];
+};
+
+function ymdInET(d: Date): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+export async function getOpenStickiness(
+  sport:      string,
+  windowDays: number,
+): Promise<OpenStickiness> {
+  if (windowDays < 1) throw new Error(`windowDays must be ≥1, got ${windowDays}`);
+
+  // Last N ET dates ending yesterday. Today is excluded — its open window
+  // is still partial and would understate stickiness.
+  const dates: string[] = [];
+  for (let i = 1; i <= windowDays; i++) {
+    dates.push(ymdInET(new Date(Date.now() - i * 86_400_000)));
+  }
+  dates.reverse();
+  const windowStart = dates[0]!;
+  const windowEnd   = dates[dates.length - 1]!;
+
+  // Successful league sends in the window (no team_id, no error).
+  type SendRow = { subscriber_id: string; digest_date: string; resend_id: string | null };
+  const sends = await fetchAll<SendRow>(
+    () => supabaseAdmin().from("sends")
+      .select("subscriber_id, digest_date, resend_id")
+      .eq("digest_sport", sport)
+      .is("team_id", null)
+      .is("error", null)
+      .gte("digest_date", windowStart)
+      .lte("digest_date", windowEnd) as unknown as QueryBuilder<SendRow>,
+    "getOpenStickiness sends",
+  );
+
+  // Per-subscriber set of distinct dates received + sub|date → resend_id.
+  const subDates = new Map<string, Set<string>>();
+  const ridByPair = new Map<string, string>();
+  for (const s of sends) {
+    (subDates.get(s.subscriber_id) ?? subDates.set(s.subscriber_id, new Set()).get(s.subscriber_id)!)
+      .add(s.digest_date);
+    if (s.resend_id) ridByPair.set(`${s.subscriber_id}|${s.digest_date}`, s.resend_id);
+  }
+
+  const eligibleSubs: string[] = [];
+  for (const [sub, ds] of subDates) {
+    if (ds.size === windowDays) eligibleSubs.push(sub);
+  }
+  const histogram = new Array<number>(windowDays + 1).fill(0);
+  if (eligibleSubs.length === 0) {
+    return { sport, windowDays, windowStart, windowEnd, eligible: 0, histogram };
+  }
+
+  // Resend ids that belong to eligible subscribers. Reusing the same
+  // date-bounded events query the rolling stats uses — see eventsByResendId
+  // for why we don't pass ids through `.in()` at this scale.
+  const eligibleSet = new Set(eligibleSubs);
+  const candidateIds: string[] = [];
+  for (const s of sends) {
+    if (s.resend_id && eligibleSet.has(s.subscriber_id)) candidateIds.push(s.resend_id);
+  }
+  // Late opens can land a few days after the send (MPP staggers them).
+  // Window the events query to start of stickiness window and pad a
+  // little to catch trailing fires.
+  const sinceIso = new Date(new Date(windowStart + "T00:00:00Z").getTime() - 2 * 86_400_000).toISOString();
+  const byId = await eventsByResendId(candidateIds, sinceIso);
+
+  for (const sub of eligibleSubs) {
+    let opens = 0;
+    for (const date of dates) {
+      const rid = ridByPair.get(`${sub}|${date}`);
+      if (rid && byId[rid]?.has("email.opened")) opens++;
+    }
+    histogram[opens]!++;
+  }
+
+  return {
+    sport,
+    windowDays,
+    windowStart,
+    windowEnd,
+    eligible: eligibleSubs.length,
+    histogram,
+  };
+}
+
 // ---- Send health series ------------------------------------------------
 
 export type SendSeries = {

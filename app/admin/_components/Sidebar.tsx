@@ -65,6 +65,7 @@ const SECTIONS: NavSection[] = [
     label: "Content",
     links: [
       { href: "/admin/preview/mlb", label: "Email preview" },
+      { href: "/admin/preview/canonical", label: "Canonical preview" },
       { href: "/admin/content/digests", label: "Digests" },
       { href: "/admin/historical", label: "Historical" },
       { href: "/admin/historical?today=1", label: "On This Day" },
