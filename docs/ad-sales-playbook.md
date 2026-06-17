@@ -11,7 +11,7 @@ Read this once top to bottom, then keep it open during your first few calls.
 
 ## 1. What boxscore is (in plain English)
 
-boxscore is a **daily email** that goes out every morning during the season. It's
+boxscore is a **daily email** that goes out every morning during a sports season. It's
 the sports box scores — standings, league leaders, and the full line-by-line
 results of yesterday's games — delivered to your inbox instead of you hunting for
 them in a newspaper or app.
@@ -24,13 +24,14 @@ the numbers with their coffee.
 A few things that matter for selling:
 
 - It's **free** for readers. Always will be.
+- Today, it is only MLB.  This fall, there will also be lists for NFL, NHL, NBA, and college football.
 - It goes out **every day during the season** — that's a daily touchpoint, not a
   once-a-month thing.
 - The audience is **self-selected sports fans** who opted in and open it on
   purpose. Nobody is here by accident.
 - The look is **classy and quiet**. That's the brand. Our ads look like
   tasteful classified or sponsor lines in a real newspaper — never banner-ad
-  garbage. (More on formats below.)
+  noise. (More on formats below.)
 
 > One-line version you can say out loud: *"boxscore is a daily email of baseball
 > box scores and standings, made to feel like the old newspaper sports page,
@@ -112,7 +113,7 @@ whose customer actually matches our audience.
 
 There are **four** formats, listed cheapest/least-intrusive to most premium. You
 do not need to memorize the HTML — just know what each one *is* and where it sits
-in the email.
+in the email.  You can see examples of these at https://boxscore.email/advertise
 
 | Format | What it looks like | Where it sits | Sold as |
 |---|---|---|---|
@@ -382,6 +383,185 @@ seeds.
 - **Honesty about being early is a feature**, not something to hide. Ground floor,
   low risk, founding advertiser.
 - **When in doubt, ask Jeff.** Better a slightly slower answer than a wrong one.
+
+---
+
+## 10. The Target List — 100 companies to approach
+
+*Researched June 17, 2026 via web search. Every company here was verified to be a
+real business with a working website at that time — but **check the site is still
+live before you reach out**, and confirm who to contact. This list is a starting
+point, not gospel.*
+
+**How to read it:**
+- **Tier** tells you how reachable they are:
+  - **SMB** = small / founder-run. **Start here.** Most likely to answer a friendly
+    cold email from a brand-new program. These are your bread and butter.
+  - **Mid** = established but not giant. Reachable with a little persistence.
+  - **Enterprise** = big names (DraftKings, PSA, '47, etc.). **Aspirational** — they
+    usually buy through agencies and won't move fast. Don't lead your week with
+    these; they're here so we know the ceiling.
+- **⚠️ Sensitive** marks categories that need **Jeff's sign-off before you contact
+  them** — betting/gambling (state-by-state legal rules), men's health, alcohol,
+  and financial/investing (compliance disclaimers). Don't pitch these on your own.
+- A few entries are better as **cross-promo partners** (a podcast or newsletter that
+  swaps mentions to grow each other) than as paying advertisers — noted inline.
+
+Work top to bottom within a group, favoring SMB/Mid. If you get one founding
+advertiser per group, that's a huge first quarter.
+
+### A. Sports cards, memorabilia & collectibles (15)
+
+| Company | What they sell | Tier | Angle |
+|---|---|---|---|
+| Dean's Cards (deanscards.com) | 1M+ vintage & modern cards; buys collections | SMB | "Your vintage-buyer demo *is* our reader demo — older, affluent fans." |
+| Kruk Cards (krukcards.com) | Buys/sells cards, sets, memorabilia; auctions | SMB | "Our readers have shoeboxes to sell — put your 'we buy collections' pitch in front of them." |
+| Steel City Collectibles (steelcitycollectibles.com) | Sealed hobby boxes, cases, singles, supplies | Mid | "Tie an ad to each new Topps/Bowman release drop." |
+| Columbia Hobby (columbiasportscard.com) | Sealed baseball hobby boxes, blasters, supplies | SMB | "Our timing matches the wax-buying cycle." |
+| Giant Sports Cards (giantsportscards.com) | Sealed hobby boxes at competitive prices | SMB | "A low-cost national channel for price-sensitive box buyers." |
+| Wax Pack World (waxpackworld.com) | Unopened vintage '80s–'90s wax | SMB | "Our readers ARE the kids who collected your '89 Upper Deck — sell them nostalgia." |
+| Dynasty Breaks (dynastybreaks.com) | Live group breaks of boxes/cases | SMB | "Drive break sign-ups from engaged daily-email fans." |
+| Bomber Breaks (bomberbreaks.com) | Live card breaks & box sales | SMB | "Promote tonight's baseball break to a warm audience." |
+| Card Shellz (cardshellz.com) | Toploaders, sleeves, supplies | SMB | "Supplies are the razor-blades of the hobby — recurring buyers." |
+| The Pennysleever (thepennysleever.com) | Sleeves, holders, graded storage | SMB | "Cheap, targeted reach for a collector-built brand with no ad spend yet." |
+| Zion Cases (zioncases.com) | Premium slab cases for graded cards | SMB | "Our affluent readers grade cards — sell them the case to show them off." |
+| BCW Supplies (bcwsupplies.com) | Card storage, protection, display | Mid | "Be the supplies sponsor of a daily baseball read." |
+| Pristine Auction (pristineauction.com) | Daily no-reserve memorabilia auctions | Mid | "Daily auctions + daily email — promote each day's baseball lots." |
+| Mile High Card Co. (milehighcardco.com) | Vintage card/memorabilia auctions & consignment | Mid | "Source vintage consignments from our older, affluent readers." |
+| COMC (comc.com) | Buy/sell/consign individual cards | Mid | "Reach 6K active collectors in their inbox every morning." |
+| PSA (psacard.com) | Card grading & authentication | Enterprise | Aspirational: grading exposure to 6K collectors (likely agency-run). |
+
+### B. Baseball equipment & apparel — DTC (18)
+
+| Company | What they sell | Tier | Angle |
+|---|---|---|---|
+| Chandler Bats (chandlerbats.com) | American-made pro wood bats | SMB | "Your DTC craft-bat story lands with gear-appreciating older fans." |
+| Dove Tail Bats (dovetailbats.com) | Hand-made Maine wood bats | SMB | "Founder-to-founder: a tasteful ad in front of 6K purists." |
+| Tater Baseball (taterbaseball.com) | Wood/training bats, gloves, apparel | SMB | "Family-run, made-in-USA, full line to feature." |
+| Grace Glove Co. (graceglovecompany.com) | Custom gloves + relacing | SMB | "Custom gloves and relacing for serious adult players & collectors." |
+| GloveSurgeon (glovesurgeon.com) | Mail-in glove relacing/repair | SMB | "Mail-in relacing is a perfect service pitch to a national base." |
+| GloveRelace.com (gloverelace.com) | Glove relacing, repair, conditioning | SMB | "A founder running a relace shop can test a cheap, targeted ad." |
+| Plate Crate (platecrate.com) | Lifestyle apparel + subscription gear box | SMB | "Apparel + gift-box model fits a diehard audience." |
+| Ebbets Field Flannels (ebbets.com) | Vintage throwback jerseys & wool caps | SMB | "Vintage-baseball nostalgia, tailor-made for our older readership." |
+| Neven Eyewear (neveneyewear.com) | Polarized baseball sunglasses | SMB | "You already target baseball players — our list is your exact buyer." |
+| Triton Custom Sports (teamtriton.com) | Custom sublimated uniforms & apparel | SMB | "Many readers coach/run teams — reach them directly." |
+| Warstic (warstic.com) | Wood/metal bats, gloves, apparel | Mid | "Reach affluent adult fans who buy premium gear, not just LL parents." |
+| BRUCE BOLT (brucebolt.us) | Premium batting gloves + apparel | Mid | "Our readers skew the affluent fan who buys premium gloves." |
+| Baseballism (baseballism.com) | Premium baseball lifestyle apparel | Mid | "Pure fan-affinity apparel for fans who live it year-round." |
+| Baseball Lifestyle 101 (bl101.com) | Fan lifestyle hats, tees, hoodies | Mid | "Your viral fan apparel meets an engaged daily audience." |
+| Nokona (nokona.com) | American-made gloves (Texas) | Mid | "American-made heritage resonates with gear-loving older readers." |
+| Bownet Sports (bownet.net) | Portable training nets, tees, gear | Mid | "Training gear for the player-fans and coaches who read us." |
+| goodr (goodr.com) | Affordable polarized sport sunglasses | Mid | "An easy impulse buy for 6K baseball fans." |
+| '47 Brand (47brand.com) | Vintage/retro MLB caps & apparel | Enterprise | Aspirational: broadest cap affinity (likely needs their agency). |
+
+### C. Baseball media & cross-promo partners (16)
+
+| Company | What they are | Tier | Angle |
+|---|---|---|---|
+| The Cycle — Cliff Corcoran (cyclenewsletter.substack.com) | Indie MLB Substack | SMB | Cross-promo: newsletter recommendation swap. |
+| Molly Knight — The Long Game (mollyknight.substack.com) | Paid baseball Substack | SMB | Cross-promo; could advertise to grow paid subs. |
+| Here's the Pitch — IBWAA (ibwaa.substack.com) | Indie baseball-writers' daily | SMB | Cross-promo — they champion independent baseball writing. |
+| Foolish Baseball (youtube.com/@FoolishBB) | Sabermetric YouTube (~357K subs) | SMB | Cross-promo audience swap; merch/Patreon plug. |
+| Pitcher List (pitcherlist.com) | Fantasy-baseball site + podcast | SMB | Advertiser to fantasy crowd; or content swap. |
+| FanGraphs (fangraphs.com) | Sabermetrics + memberships | Mid | Cross-promo first; could buy ads to push memberships. |
+| Baseball Prospectus (baseballprospectus.com) | Subscription sabermetrics + books | Mid | Advertiser for a subscription drive; or content swap. |
+| Baseball America (baseballamerica.com) | Prospect/draft authority + newsletter | Mid | Newsletter swap most natural; also a paid-sub advertiser. |
+| SABR (sabr.org) | Baseball research society + memberships | Mid | Cross-promo to drive memberships; ideal demo overlap. |
+| Beckett Media (beckettmedia.com) | Card price-guide + hobby news | Mid | Advertiser for subscriptions; affiliate on price guides. |
+| Sports Collectors Digest (sportscollectorsdigest.com) | "Voice of the Hobby" weekly | Mid | Advertiser (events/auctions); cross-promo to collectors. |
+| Univ. of Nebraska Press (nebraskapress.unl.edu) | Leading baseball-history publisher | Mid | Advertiser for seasonal book releases; affiliate. |
+| Triumph Books (triumphbooks.com) | Trade sports/baseball book publisher | Mid | Advertiser for book launches; affiliate cross-promo. |
+| Céspedes Family BBQ (cespedesfamilybarbecue.com) | Baseball brand/podcast (Yahoo-affiliated) | Mid | Cross-promo; Yahoo tie may complicate ad buys. |
+| Jomboy Media (jomboymedia.com) | Baseball content studio | Enterprise | Big/MLB-tied — pitch as sponsor of their shop/shows. |
+
+### D. Betting, fantasy & prediction markets — ⚠️ Sensitive, Jeff approves first (13)
+
+*All real-money sportsbooks/DFS carry state-by-state legal rules. Tools & content
+subscriptions (OddsJam, Action Network, RotoWire, Fantasy Alarm) are lower-risk.
+None of this is a legality ruling — it's a flag for Jeff.*
+
+| Company | What they sell | Tier | Flag |
+|---|---|---|---|
+| RotoWire (rotowire.com) | Fantasy subscription: projections, tools | SMB | Low risk (content/tools) |
+| Fantasy Alarm (fantasyalarm.com) | Fantasy/DFS + MLB props tools | SMB | Low risk (content/tools) |
+| Kalshi (kalshi.com) | CFTC-regulated prediction market | Enterprise | Prediction markets under state challenge — **already interested** |
+| OddsJam (oddsjam.com) | Odds comparison & betting tools | Mid | Low risk (SaaS tool, not a book) |
+| The Action Network (actionnetwork.com) | Betting analytics + picks subscription | Mid | Low risk (media/picks) |
+| Underdog Fantasy (underdogfantasy.com) | DFS pick'em, best-ball, drafts | Mid | Pick'em/DFS state restrictions |
+| Sleeper (sleeper.com) | Fantasy app + picks/markets | Mid | Picks carry DFS-style state rules |
+| DraftKings (draftkings.com) | National sportsbook + DFS | Enterprise | Real-money, state rules |
+| FanDuel (fanduel.com) | National sportsbook + DFS | Enterprise | Real-money, state rules |
+| PrizePicks (prizepicks.com) | Player-prop pick'em | Enterprise | Pick'em legal scrutiny in some states |
+| BetMGM (betmgm.com) | National sportsbook | Enterprise | Real-money, state rules |
+| Fanatics Sportsbook (sportsbook.fanatics.com) | National sportsbook | Enterprise | Real-money, state rules |
+| Polymarket (polymarket.com) | Prediction market (event contracts) | Enterprise | Regulatory uncertainty post-relaunch |
+
+### E. Tickets, travel & live experiences (11)
+
+| Company | What they sell | Tier | Angle |
+|---|---|---|---|
+| Sports Travel and Tours (sportstravelandtours.com) | Multi-stadium road trips, Cooperstown packages | SMB | "Your all-30-ballparks crowd is literally our readership." |
+| Big League Tours (bigleaguetours.com) | Luxury MLB stadium tours, BP & meet-greets | SMB | "Premium trips for affluent fans who'd rather book than plan." |
+| Jay Buckley Baseball Tours (jaybuckley.com) | Guided multi-ballpark bus tours | SMB | "Old-school multi-park tours for die-hards." |
+| Bob's Baseball Tours (bobsbaseballtours.com) | Group ballpark bus tours | SMB | "A small travel shop reaching 6K fans for the price of a few bus seats." |
+| Sports Traveler (sportstraveler.net) | Tickets, suites, All-Star/World Series packages | SMB | "Luxury suites for the fan who reads box scores over coffee." |
+| Legends of Baseball Cruise (legendsofbaseballcruise.com) | Themed cruises with former MLB players | SMB | "A legends cruise for nostalgic older superfans — our core." |
+| Cubs Fantasy Camp / Waveland (cubsfantasycamp.com) | Adult MLB-style fantasy camps | SMB | "Live-the-dream camp for fans with the means and the itch." |
+| TickPick (tickpick.com) | No-fee secondary ticket marketplace | Mid | "Reach fans right when they're deciding to go — no hidden fees." |
+| Major League Vacations (mlv.com) | Bundled MLB travel packages | Mid | "Spring-training & World Series packages the morning they crave a trip." |
+| Elite Sports Tours (elitesportstours.com) | Ticket + hotel + flight packages | Mid | "Follow-your-team road trips for fans tracking the standings daily." |
+| On Location (onlocationexp.com) | Official MLB VIP hospitality | Enterprise | Aspirational: official premium experiences (large). |
+
+### F. DTC brands targeting affluent older men (14)
+
+*Many here are proven podcast/newsletter sponsors. ⚠️ = needs Jeff's sign-off
+(men's health, financial). Alcohol/tobacco were intentionally left off the final
+100 — raise with Jeff separately.*
+
+| Company | What they sell | Tier | Flag / Angle |
+|---|---|---|---|
+| Smackin' Sunflower Seeds (smackinsunflowerseeds.com) | Flavored jumbo sunflower seeds | SMB | Direct dugout-snack tie-in; founder-led. |
+| People's Choice Beef Jerky (peopleschoicebeefjerky.com) | Premium DTC jerky | SMB | Family-run; promo-code/affiliate. |
+| Meat Church (meatchurch.com) | BBQ rubs & seasonings | SMB | Summer grilling + baseball overlap; founder-accessible. |
+| Beardbrand (beardbrand.com) | Men's grooming, DTC | SMB | Content-first brand; affiliate/promo-code. |
+| Vortic Watch Co. (vorticwatches.com) | American-made mechanical watches | SMB | Heritage/craft story for affluent older men. |
+| BIGS Sunflower Seeds (bigsseeds.com) | In-shell sunflower seeds | Mid | "Seeds + baseball" native fit; promo-code test. |
+| Black Rifle Coffee (blackriflecoffee.com) | Coffee subscription | Mid | Heavy podcast sponsor; daily-habit product (note: politically coded brand). |
+| Country Archer (archerjerky.com) | Grass-fed jerky & meat sticks | Mid | "Snack-during-the-game"; marketing-savvy team. |
+| MANSCAPED (manscaped.com) | Men's grooming/trimmers | Mid | Proven sports/podcast buyer; offer-code test. |
+| Tecovas (tecovas.com) | Western boots & leather goods | Mid | Heavy podcast spender; affluent older-male buyer. |
+| Huckberry (huckberry.com) | Men's apparel & gear | Mid | Content-native; audience-overlap story. |
+| Shady Rays (shadyrays.com) | Polarized sunglasses, DTC | Mid | Proven offer-code advertiser; summer + baseball. |
+| Keeps (keeps.com) | Hair-loss telehealth | Mid | ⚠️ Men's health; promo-code performance buyer. |
+| Hims (hims.com) | Men's telehealth (hair/ED/T) | Enterprise | ⚠️ Men's health; large buyer, creative-sensitive. |
+
+### G. Baseball tech, training & youth (13)
+
+*Skews to the coaches, players, and baseball parents in our list.*
+
+| Company | What they sell | Tier | Angle |
+|---|---|---|---|
+| Diamond Kinetics (diamondkinetics.com) | SwingTracker bat sensor + app | SMB | "Reach the youth-baseball parents who buy their first bat sensor." |
+| Pocket Radar (pocketradar.com) | Handheld radar gun (~$300) | SMB | "The radar gun every coach and baseball dad wants." |
+| OnForm (onform.com) | Sports video-analysis coaching app | SMB | "Get in front of coaches reviewing film on their phones." |
+| Crossover Symmetry (crossoversymmetry.com) | Arm-care/shoulder band systems | SMB | "Reach every pitcher and coach worried about throwing arms." |
+| Blast Motion (blastmotion.com) | Bat sensor + coaching workflow | Mid | "Put the best bat sensor in front of travel-ball coaches." |
+| Rapsodo (rapsodo.com) | Camera+radar ball-flight monitor | Mid | "Reach serious players/parents investing in pro-level data." |
+| HitTrax (hittrax.com) | Cage batting-analysis system | Mid | "Reach coaches and facility owners shopping cage tech." |
+| Driveline Baseball (drivelinebaseball.com) | Data-driven player development | Mid | "Reach the data-obsessed coaches and players who idolize them." |
+| WIN Reality (winreality.com) | VR pitch-recognition training | Mid | "Reach hitters who want reps vs. real big-league pitch data." |
+| Klean Athlete (kleanathlete.com) | NSF-certified sport supplements | Mid | "NSF-certified fuel for players and parents." |
+| GameChanger (gc.com) | Youth scorekeeping/streaming app | Enterprise | "Tap the same scorekeeping-parent base that lives in their app." |
+| TeamSnap (teamsnap.com) | Team management app | Enterprise | "Reach coaches who organize the teams our readers coach." |
+| Perfect Game (perfectgame.org) | Youth tournaments & showcases | Enterprise | "Reach the travel-ball families on the showcase circuit." |
+
+### Honorable mentions (researched, trimmed to keep this at 100)
+
+Real and worth keeping in reserve — cut only for redundancy or weaker fit:
+**Old Cardboard** (vintage-card eMagazine), **QuintEvents** (premium event hospitality),
+**Indochino** (made-to-measure menswear), **The Beard Club** (grooming),
+**Roka** (performance eyewear), **Public.com** (⚠️ investing app),
+**NCSA** (college recruiting), **Marc Pro** (recovery device).
 
 ---
 
