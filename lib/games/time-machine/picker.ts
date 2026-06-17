@@ -2,71 +2,82 @@
 // pick one historical regular-season MLB game. Two paths:
 //
 //   1. MM-DD match — every regular-season game played on this calendar day
-//      across 1950+ is eligible; pick one by hashing playedOn.
+//      across 1950+ is eligible; pick one uniformly by hashing playedOn.
 //   2. Off-season fallback — if no real game was played on this MM-DD (Dec/
-//      Jan/Feb), pick a deterministically-random regular-season game from
-//      any historical date so the daily puzzle never goes dark.
+//      Jan/Feb), pick uniformly from every regular-season game in the table
+//      so the daily puzzle never goes dark.
 //
 // Stays pure (no caching). actions.ts wraps this with a puzzle_picks
 // read-or-create so the chosen gamePk is frozen once the first subscriber
 // of the day loads the page.
 
-import { listHistoricalGames } from "@/lib/historical/queries";
+import { createHash } from "node:crypto";
+import { supabaseAdmin } from "@/lib/supabase";
 
 const MIN_SEASON = 1950;
 
-// djb2 — small, deterministic, dependency-free.
-function hashSeed(seed: string): number {
-  let h = 5381;
-  for (let i = 0; i < seed.length; i++) {
-    h = ((h << 5) + h + seed.charCodeAt(i)) | 0;
-  }
-  return h >>> 0;
+// SHA-256 has strong avalanche, so consecutive puzzle dates land in
+// completely different parts of the eligible set. djb2 + mod N produced
+// near-sequential indexes for consecutive days, clustering picks within a
+// few seasons of each other.
+function seedToInt(seed: string): number {
+  const hex = createHash("sha256").update(seed).digest("hex").slice(0, 12);
+  return Number.parseInt(hex, 16);
 }
 
 /** Pick today's gamePk. Throws only if even the fallback finds nothing,
  * which would mean the historical_games table is empty. */
 export async function pickDailyGame(playedOn: string): Promise<number> {
   const [, mm, dd] = playedOn.split("-");
-  const mmdd = `${mm}-${dd}`;
-
-  const { rows: sameDay } = await listHistoricalGames({
-    calendarDay: mmdd,
-    gameType:    "R",
-    sort:        "date_desc",
-    limit:       200,
-  });
-  if (sameDay.length > 0) {
-    const row = sameDay[hashSeed(playedOn) % sameDay.length];
-    if (row) return row.game_pk;
-  }
-
-  // Off-season fallback. Probe random regular-season dates until we
-  // find one with games. 50 attempts is overkill — any seeded April–Oct
-  // date from 1950+ almost certainly has games.
+  const db = supabaseAdmin();
   const currentYear = new Date().getUTCFullYear();
-  const yearsAvailable = currentYear - MIN_SEASON + 1;
-  const regularMonths = [4, 5, 6, 7, 8, 9, 10];
 
-  for (let attempt = 0; attempt < 50; attempt++) {
-    const s = hashSeed(`${playedOn}|${attempt}`);
-    const year  = MIN_SEASON + (s % yearsAvailable);
-    const month = regularMonths[(s >>> 16) % regularMonths.length];
-    const day   = 1 + ((s >>> 8) % 28);
-    const date  = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const { rows } = await listHistoricalGames({
-      fromDate: date, toDate: date, gameType: "R", limit: 50,
-    });
-    if (rows.length > 0) {
-      const row = rows[s % rows.length];
-      if (row) return row.game_pk;
-    }
+  const dates: string[] = [];
+  for (let y = MIN_SEASON; y <= currentYear; y++) {
+    dates.push(`${y}-${mm}-${dd}`);
+  }
+  const { count, error: cErr } = await db
+    .from("historical_games")
+    .select("game_pk", { count: "exact", head: true })
+    .eq("game_type", "R")
+    .in("game_date", dates);
+  if (cErr) throw new Error(`pickDailyGame count: ${cErr.message}`);
+  if (count && count > 0) {
+    const idx = seedToInt(playedOn) % count;
+    const { data, error } = await db
+      .from("historical_games")
+      .select("game_pk")
+      .eq("game_type", "R")
+      .in("game_date", dates)
+      .order("game_pk", { ascending: true })
+      .range(idx, idx)
+      .maybeSingle<{ game_pk: number }>();
+    if (error) throw new Error(`pickDailyGame fetch: ${error.message}`);
+    if (data?.game_pk) return data.game_pk;
   }
 
-  // Last resort — grab any regular-season game.
-  const { rows } = await listHistoricalGames({ gameType: "R", limit: 50, sort: "date_desc" });
-  if (rows.length === 0) throw new Error("pickDailyGame: no historical games available");
-  const row = rows[hashSeed(playedOn) % rows.length];
-  if (!row) throw new Error("pickDailyGame: index out of bounds");
-  return row.game_pk;
+  // Off-season fallback — uniform pick across every regular-season
+  // game in the table, seeded with a different domain to avoid colliding
+  // with MM-DD picks.
+  const { count: total, error: tErr } = await db
+    .from("historical_games")
+    .select("game_pk", { count: "exact", head: true })
+    .eq("game_type", "R");
+  if (tErr) throw new Error(`pickDailyGame fallback count: ${tErr.message}`);
+  if (!total || total === 0) {
+    throw new Error("pickDailyGame: no historical games available");
+  }
+  const idx = seedToInt(`${playedOn}|fallback`) % total;
+  const { data, error } = await db
+    .from("historical_games")
+    .select("game_pk")
+    .eq("game_type", "R")
+    .order("game_pk", { ascending: true })
+    .range(idx, idx)
+    .maybeSingle<{ game_pk: number }>();
+  if (error) throw new Error(`pickDailyGame fallback fetch: ${error.message}`);
+  if (!data?.game_pk) {
+    throw new Error("pickDailyGame: fallback fetch returned no row");
+  }
+  return data.game_pk;
 }
