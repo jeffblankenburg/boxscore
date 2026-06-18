@@ -1212,7 +1212,12 @@ export type YesterdayAdStats = {
   tracked: boolean;
 };
 
-export type AdStatsDailyPoint = { date: string; opened: number; clicked: number };
+export type AdStatsDailyPoint = {
+  date: string;
+  delivered: number;
+  opened: number;
+  clicked: number;
+};
 
 export type RollingAdStats = {
   days: number;
@@ -1343,7 +1348,7 @@ export async function getRollingAdStats(days: number): Promise<RollingAdStats> {
     }).format(d));
   }
   const dailyMap = new Map<string, AdStatsDailyPoint>(
-    axis.map((date) => [date, { date, opened: 0, clicked: 0 }]),
+    axis.map((date) => [date, { date, delivered: 0, opened: 0, clicked: 0 }]),
   );
 
   type SendRow = {
@@ -1373,10 +1378,12 @@ export async function getRollingAdStats(days: number): Promise<RollingAdStats> {
   for (const id of liveIds) {
     const evts = byId[id];
     if (!evts) continue;
-    if (evts.has("email.delivered")) totalDelivered++;
     const day = dateByResendId.get(id);
-    if (!day) continue;
-    const point = dailyMap.get(day);
+    const point = day ? dailyMap.get(day) : undefined;
+    if (evts.has("email.delivered")) {
+      totalDelivered++;
+      if (point) point.delivered++;
+    }
     if (!point) continue; // event outside the axis window
     if (evts.has("email.opened")) { point.opened++; totalOpened++; }
     if (evts.has("email.clicked")) { point.clicked++; totalClicked++; }

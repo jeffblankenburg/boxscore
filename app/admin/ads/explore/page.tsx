@@ -81,6 +81,7 @@ export default async function AdsPage() {
           <RollingCard stats={rolling} />
         </div>
         <OpensClicksChart daily={rolling.daily} tracked={rolling.tracked} />
+        <OpenRateChart daily={rolling.daily} tracked={rolling.tracked} />
       </section>
 
       <section>
@@ -335,6 +336,86 @@ function Stat({ label, value }: { label: string; value: string }) {
 function pct(n: number, tracked: boolean): string {
   if (!tracked) return "—";
   return `${(n * 100).toFixed(1)}%`;
+}
+
+// Daily open-rate trend: opened / delivered for each day in the window.
+// Days with zero deliveries (no league send) are skipped — they render as
+// a gap in the line rather than a misleading 0%. The y-axis is auto-scaled
+// to the observed range so a small slope is still readable; absolute scale
+// (0–100%) hides the trend Jeff cares about when the rates cluster.
+function OpenRateChart({
+  daily, tracked,
+}: { daily: AdStatsDailyPoint[]; tracked: boolean }) {
+  if (!tracked) return null;
+  // Only days with at least one delivered email are plotted.
+  const points = daily
+    .map((d) => ({
+      date: d.date,
+      rate: d.delivered > 0 ? d.opened / d.delivered : null,
+    }))
+    .filter((p): p is { date: string; rate: number } => p.rate !== null);
+  if (points.length === 0) {
+    return (
+      <p className="admin-meta ad-stats-chart-empty">
+        No delivered sends in the window yet — rate chart will appear once
+        events accumulate.
+      </p>
+    );
+  }
+  const rates = points.map((p) => p.rate);
+  const max = Math.max(...rates);
+  const min = Math.min(...rates);
+  // Pad the y-range by ~10% above and below so the line doesn't ride the
+  // edges. Floor min at 0 so we never show a negative axis.
+  const span = Math.max(max - min, 0.01);
+  const yMax = Math.min(1, max + span * 0.15);
+  const yMin = Math.max(0, min - span * 0.15);
+
+  const W = 900, H = 200;
+  const padL = 48, padR = 12, padT = 12, padB = 24;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const xAt = (i: number) =>
+    points.length === 1 ? padL + innerW / 2 : padL + (i / (points.length - 1)) * innerW;
+  const yAt = (v: number) => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+  const path = rates
+    .map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`)
+    .join(" ");
+  const firstDate = points[0]!.date;
+  const lastDate = points[points.length - 1]!.date;
+  const avg = rates.reduce((s, v) => s + v, 0) / rates.length;
+
+  return (
+    <div className="ad-stats-chart" style={{ marginTop: 16 }}>
+      <div className="ad-stats-chart-legend">
+        <span className="ad-stats-chart-swatch ad-stats-chart-swatch-opens" /> Daily open rate
+        <span className="a-muted" style={{ marginLeft: 12 }}>
+          window avg {(avg * 100).toFixed(1)}%
+        </span>
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label={`Daily open rate over ${points.length} days, ranging ${(min * 100).toFixed(1)}% to ${(max * 100).toFixed(1)}%`}
+      >
+        {[0, 0.5, 1].map((t, i) => {
+          const y = padT + innerH * t;
+          const v = yMax - (yMax - yMin) * t;
+          return (
+            <g key={i}>
+              <line x1={padL} x2={W - padR} y1={y} y2={y} className="admin-chart-grid" />
+              <text x={padL - 6} y={y + 4} textAnchor="end" className="admin-chart-axis">
+                {(v * 100).toFixed(0)}%
+              </text>
+            </g>
+          );
+        })}
+        <path d={path} className="ad-stats-chart-opens" />
+        <text x={padL} y={H - 6} textAnchor="start" className="admin-chart-axis">{firstDate.slice(5)}</text>
+        <text x={W - padR} y={H - 6} textAnchor="end" className="admin-chart-axis">{lastDate.slice(5)}</text>
+      </svg>
+    </div>
+  );
 }
 
 // Two-line SVG chart: opens (blue) and clicks (green) per day for the rolling
