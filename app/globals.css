@@ -2981,6 +2981,46 @@ body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !impo
   overflow: hidden;
 }
 
+/* Advertiser portal creative previews. The inner `.advertise-creative-frame`
+   contains rendered .ad-* HTML straight from the digest renderer; we wrap it
+   in a soft-bordered box so the preview reads as "here's what your ad looks
+   like" rather than as part of the portal chrome. Display-box and classified
+   formats have their own decoration; sponsor-line and standings-strip have
+   hairline borders that would sit awkwardly without container padding. */
+.advertise-creatives {
+  margin-top: 18px;
+}
+.advertise-creatives-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin: 0 0 10px;
+  color: var(--text-muted);
+}
+.advertise-creative-preview {
+  margin: 0 0 16px;
+}
+.advertise-creative-preview:last-child {
+  margin-bottom: 0;
+}
+.advertise-creative-label {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.advertise-creative-frame {
+  background: #fafaf6;
+  border: 1px solid var(--border-subtle, #e0d8c4);
+  padding: 12px 16px;
+}
+/* Inside the preview frame the live ad has its own margins; null them out
+   so the frame's own padding controls spacing. */
+.advertise-creative-frame .ad {
+  margin: 0;
+}
+
 /* Canonical-preview diff highlight. Applied by the canonical web
    renderer when ?highlight=1 is on the frame request — flags rows /
    cards whose values differ between the two data sources. The native

@@ -13,8 +13,9 @@ import {
   type InfoRow,
 } from "../../../_components/primitives";
 import { FormButton } from "../../../_components/FormButton";
-import { nextDay, yesterdayInET } from "@/lib/dates";
+import { nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { SLOTS, type AdFormat } from "@/lib/ads-render";
+import { loadImpressionsByPair } from "@/lib/ad-impressions";
 import { CreativeForm } from "../../_components/CreativeForm";
 import { NewCreativeButton } from "../../_components/NewCreativeButton";
 import {
@@ -199,12 +200,33 @@ export default async function CampaignDetailPage({
   const creatives = await loadCreatives(campaign.id);
   const placements = await loadPlacements(creatives.map((c) => c.id));
   const clicksByPlacement = await loadClickCounts(placements.map((p) => p.id));
+  const impressionsByPair = await loadImpressionsByPair(
+    placements.map((p) => ({ sport: p.sport, date: p.date })),
+  );
   const placementsByCreative = new Map<string, Placement[]>();
   for (const p of placements) {
     const list = placementsByCreative.get(p.creative_id) ?? [];
     list.push(p);
     placementsByCreative.set(p.creative_id, list);
   }
+
+  // Campaign-wide performance totals for the Performance section. Clicks are
+  // the human count only — bots are tracked but excluded from the headline
+  // CTR because they don't represent commercial attention. The per-placement
+  // breakout below still surfaces bot counts so the admin can spot anomalies.
+  let emailImpressions = 0;
+  let webImpressions   = 0;
+  let totalHumanClicks = 0;
+  for (const p of placements) {
+    const imp = impressionsByPair.get(`${p.sport}|${p.date}`);
+    emailImpressions += imp?.email ?? 0;
+    webImpressions   += imp?.web   ?? 0;
+    totalHumanClicks += clicksByPlacement.get(p.id)?.humans ?? 0;
+  }
+  const totalImpressions = emailImpressions + webImpressions;
+  const overallCtr = totalImpressions > 0
+    ? (totalHumanClicks / totalImpressions) * 100
+    : 0;
 
   const returnPath = `/admin/ads/campaigns/${campaign.id}`;
   // Tomorrow's date (in ET) as the default placement target — matches the
@@ -352,6 +374,81 @@ export default async function CampaignDetailPage({
                 <FormButton idleLabel="Clear" pendingLabel="Clearing…" variant="danger" />
               </form>
             </div>
+          )}
+        </Card>
+      </Section>
+
+      <Section title="Performance">
+        <Card>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: 16,
+              marginBottom: placements.length > 0 ? 16 : 0,
+            }}
+          >
+            <PerfStat label="Impressions" value={totalImpressions.toLocaleString()} />
+            <PerfStat label="Email opens" value={emailImpressions.toLocaleString()} />
+            <PerfStat label="Web views"   value={webImpressions.toLocaleString()} />
+            <PerfStat label="Clicks"      value={totalHumanClicks.toLocaleString()} />
+            <PerfStat
+              label="CTR"
+              value={totalImpressions > 0 ? `${overallCtr.toFixed(2)}%` : "—"}
+            />
+            <PerfStat label="Placements" value={String(placements.length)} />
+          </div>
+          {placements.length > 0 && (
+            <table className="a-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Sport</th>
+                  <th>Format</th>
+                  <th>Slot</th>
+                  <th style={{ textAlign: "right" }}>Email opens</th>
+                  <th style={{ textAlign: "right" }}>Web views</th>
+                  <th style={{ textAlign: "right" }}>Clicks</th>
+                  <th style={{ textAlign: "right" }}>CTR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...placements]
+                  .sort((a, b) => a.date.localeCompare(b.date))
+                  .map((p) => {
+                    const imp    = impressionsByPair.get(`${p.sport}|${p.date}`);
+                    const email  = imp?.email ?? 0;
+                    const web    = imp?.web   ?? 0;
+                    const clicks = clicksByPlacement.get(p.id);
+                    const humans = clicks?.humans ?? 0;
+                    const bots   = clicks?.bots   ?? 0;
+                    const slot   = SLOTS[p.format]?.[p.slot_index - 1];
+                    const impTotal = email + web;
+                    const ctr = impTotal > 0 ? (humans / impTotal) * 100 : 0;
+                    return (
+                      <tr key={p.id}>
+                        <td>{prettyDate(p.date)}</td>
+                        <td>{p.sport.toUpperCase()}</td>
+                        <td>{p.format}</td>
+                        <td>{slot ? slot.label : `slot ${p.slot_index}`}</td>
+                        <td style={{ textAlign: "right" }}>{email.toLocaleString()}</td>
+                        <td style={{ textAlign: "right" }}>{web.toLocaleString()}</td>
+                        <td style={{ textAlign: "right" }}>
+                          {humans.toLocaleString()}
+                          {bots > 0 && (
+                            <span className="a-muted">
+                              {" "}({bots.toLocaleString()} bot{bots === 1 ? "" : "s"})
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {impTotal > 0 ? `${ctr.toFixed(2)}%` : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
           )}
         </Card>
       </Section>
@@ -507,5 +604,31 @@ function CreativeBlock({
         </form>
       </div>
     </Card>
+  );
+}
+
+function PerfStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        border: "1px solid var(--a-border)",
+        borderRadius: 4,
+        padding: "10px 12px",
+        background: "var(--a-bg-soft, transparent)",
+      }}
+    >
+      <div
+        className="a-muted"
+        style={{
+          fontSize: 11,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700 }}>{value}</div>
+    </div>
   );
 }

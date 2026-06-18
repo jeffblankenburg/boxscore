@@ -475,7 +475,8 @@ function Masthead({ date }: { date: string }) {
     <div className="advertise-masthead">
       <div className="advertise-masthead-section">Advertise</div>
       <div className="advertise-masthead-edition">
-        Media kit · Updated {prettyDate(date)}
+        Media kit · Updated {prettyDate(date)} ·{" "}
+        <a href="/advertise/login">Advertiser sign-in</a>
       </div>
     </div>
   );

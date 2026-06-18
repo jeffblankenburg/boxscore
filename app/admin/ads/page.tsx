@@ -2,6 +2,7 @@ import { requireAdmin } from "../require-admin";
 import { supabaseAdmin } from "@/lib/supabase";
 import { ADS_ENABLED_FLAG } from "@/lib/ad-placements";
 import { isFlagEnabled } from "@/lib/admin-settings";
+import { loadImpressionsByPair } from "@/lib/ad-impressions";
 import {
   Alert,
   Card,
@@ -41,15 +42,18 @@ type CampaignRow = {
   advertiser_name: string;
   advertiser_email: string;
   placement_count: number;
+  email_opens: number;
+  web_views: number;
+  clicks: number;
 };
 
 async function loadCampaignRows(): Promise<CampaignRow[]> {
   const db = supabaseAdmin();
-  // Single round-trip via embedded select: ad_campaigns joined with their
-  // advertiser. Placement count comes from a separate aggregation so the
-  // primary list query stays cheap; nesting count via PostgREST inflates
-  // payload per row.
-  const [{ data: rows, error: rowsErr }, { data: placements, error: pErr }] =
+  // Campaigns + advertisers, plus the placements list with campaign_id via
+  // creative join. We pull (id, sport, date) on the placement so the
+  // aggregation step downstream can look up impressions and clicks without
+  // a second placement fetch.
+  const [{ data: rows, error: rowsErr }, { data: placementRows, error: pErr }] =
     await Promise.all([
       db
         .from("ad_campaigns")
@@ -58,21 +62,71 @@ async function loadCampaignRows(): Promise<CampaignRow[]> {
             "advertiser:ad_advertisers!inner ( id, name, email )",
         )
         .order("created_at", { ascending: false }),
-      db.from("ad_placements").select("creative_id, ad_creatives!inner ( campaign_id )"),
+      db
+        .from("ad_placements")
+        .select("id, sport, date, ad_creatives!inner ( campaign_id )"),
     ]);
   if (rowsErr) throw new Error(`load campaigns: ${rowsErr.message}`);
-  if (pErr) throw new Error(`load placement counts: ${pErr.message}`);
+  if (pErr) throw new Error(`load placements: ${pErr.message}`);
 
-  // Placement count per campaign — join placements → creative → campaign.
-  const countByCampaign = new Map<string, number>();
-  for (const p of (placements ?? []) as Array<{
+  type RawPlacement = {
+    id: string;
+    sport: string;
+    date: string;
     ad_creatives: { campaign_id: string } | { campaign_id: string }[] | null;
-  }>) {
-    // PostgREST returns either an object or an array depending on the relationship
-    // cardinality. We modeled it as a single FK so it's an object; coerce defensively.
+  };
+  const placements: Array<{ id: string; sport: string; date: string; campaign_id: string }> = [];
+  for (const p of (placementRows ?? []) as RawPlacement[]) {
     const c = Array.isArray(p.ad_creatives) ? p.ad_creatives[0] : p.ad_creatives;
     if (!c) continue;
-    countByCampaign.set(c.campaign_id, (countByCampaign.get(c.campaign_id) ?? 0) + 1);
+    placements.push({ id: p.id, sport: p.sport, date: p.date, campaign_id: c.campaign_id });
+  }
+
+  // Impressions (email + web) for every (sport, date) the list touches —
+  // batched once so the page makes a single sends-scan + opens-scan +
+  // pageviews-scan instead of per-campaign round trips.
+  const impressions = await loadImpressionsByPair(
+    placements.map((p) => ({ sport: p.sport, date: p.date })),
+  );
+
+  // Click counts per placement_id. Humans only — bots are tracked on the
+  // detail page but don't belong on a row-level CTR-adjacent metric here.
+  const clicksByPlacement = new Map<string, number>();
+  if (placements.length > 0) {
+    const placementIds = placements.map((p) => p.id);
+    // Chunk IN to stay under PostgREST URL cap — UUIDs are 36 chars so
+    // 200 per chunk keeps us comfortably under 8 KB.
+    for (let i = 0; i < placementIds.length; i += 200) {
+      const chunk = placementIds.slice(i, i + 200);
+      const { data, error } = await db
+        .from("link_clicks")
+        .select("placement_id")
+        .in("placement_id", chunk)
+        .eq("is_bot", false);
+      if (error) {
+        console.error(`load clicks: ${error.message}`);
+        continue;
+      }
+      for (const c of (data ?? []) as Array<{ placement_id: string }>) {
+        clicksByPlacement.set(
+          c.placement_id,
+          (clicksByPlacement.get(c.placement_id) ?? 0) + 1,
+        );
+      }
+    }
+  }
+
+  // Aggregate per campaign.
+  type Agg = { email: number; web: number; clicks: number; placements: number };
+  const aggByCampaign = new Map<string, Agg>();
+  for (const p of placements) {
+    const cur = aggByCampaign.get(p.campaign_id) ?? { email: 0, web: 0, clicks: 0, placements: 0 };
+    const imp = impressions.get(`${p.sport}|${p.date}`);
+    cur.email     += imp?.email ?? 0;
+    cur.web       += imp?.web   ?? 0;
+    cur.clicks    += clicksByPlacement.get(p.id) ?? 0;
+    cur.placements += 1;
+    aggByCampaign.set(p.campaign_id, cur);
   }
 
   type RawRow = {
@@ -86,11 +140,9 @@ async function loadCampaignRows(): Promise<CampaignRow[]> {
     advertiser: { id: string; name: string; email: string } | { id: string; name: string; email: string }[];
   };
 
-  // Supabase's generated types can't infer the embedded shape correctly when
-  // it doesn't have a generated DB schema for the new ad_* tables yet; cast
-  // through unknown so we own the runtime shape.
   return ((rows ?? []) as unknown as RawRow[]).map((r) => {
     const adv = Array.isArray(r.advertiser) ? r.advertiser[0] : r.advertiser;
+    const agg = aggByCampaign.get(r.id);
     return {
       id: r.id,
       name: r.name,
@@ -102,7 +154,10 @@ async function loadCampaignRows(): Promise<CampaignRow[]> {
       advertiser_id: adv?.id ?? "",
       advertiser_name: adv?.name ?? "(unknown)",
       advertiser_email: adv?.email ?? "",
-      placement_count: countByCampaign.get(r.id) ?? 0,
+      placement_count: agg?.placements ?? 0,
+      email_opens:     agg?.email      ?? 0,
+      web_views:       agg?.web        ?? 0,
+      clicks:          agg?.clicks     ?? 0,
     };
   });
 }
@@ -164,6 +219,33 @@ export default async function CampaignsListPage({
       className: "numeric",
       cell: (r) => formatCents(r.paid_amount_cents),
       width: "100px",
+    },
+    {
+      header: "Email opens",
+      className: "numeric",
+      cell: (r) => r.email_opens.toLocaleString(),
+      width: "110px",
+    },
+    {
+      header: "Web views",
+      className: "numeric",
+      cell: (r) => r.web_views.toLocaleString(),
+      width: "100px",
+    },
+    {
+      header: "Clicks",
+      className: "numeric",
+      cell: (r) => r.clicks.toLocaleString(),
+      width: "80px",
+    },
+    {
+      header: "CTR",
+      className: "numeric",
+      cell: (r) => {
+        const imp = r.email_opens + r.web_views;
+        return imp > 0 ? `${((r.clicks / imp) * 100).toFixed(2)}%` : "—";
+      },
+      width: "80px",
     },
     {
       header: "Placements",
