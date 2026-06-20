@@ -11,6 +11,7 @@
 import { existsSync } from "node:fs";
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
 import { nextDay, prettyDate } from "./dates";
+import { BRAND } from "./brand";
 
 export type ManifestEntry =
   | { file: string; subId: string; type: "standings"; league: "AL" | "NL" }
@@ -127,6 +128,20 @@ const SHARE_CSS = `
   .share-header .brand .dot { color: #6a6354; }
   .share-header .share-date { font-size: 13px; font-style: italic; color: #6a6354; }
 
+  /* Footer for per-section share images. Stacked vertically (tagline above
+     URL) because the leaders column is only 360 CSS px wide — the
+     space-between layout used on the scoreboard image (1200 px) caused the
+     tagline to wrap to two lines and look broken on the narrower cols. */
+  .share-footer {
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: 10px; margin-top: 12px !important;
+    border-top: 1px solid #c4baa5;
+    font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
+    text-align: center;
+  }
+  .share-footer .tagline { font-size: 13px; font-style: italic; color: #6a6354; margin-bottom: 4px; }
+  .share-footer .url { font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; color: #161410; }
+
   .col-standings .boxscores-title,
   .col-leaders .boxscores-title,
   .game-container .game-header {
@@ -139,38 +154,52 @@ async function injectShareChrome(
   page: Page,
   editionDateStr: string,
   gamesDateStr: string,
+  tagline: string,
 ): Promise<void> {
   await page.addStyleTag({ content: SHARE_CSS });
-  await page.evaluate((dates: { edition: string; games: string }) => {
-    const header = (d: string) => `
-      <div class="share-header">
-        <div class="brand-cell">
-          <img src="/icon.png" alt="">
-          <span class="brand">boxscore</span>
-        </div>
-        <div class="share-date">${d}</div>
-      </div>`;
-    // Standings + leaders are a snapshot of the morning the digest ships, so
-    // they get stamped with the edition date.
-    const standings = Array.from(document.querySelectorAll(".col-standings"));
-    standings.forEach((el, i) => {
-      const league = i === 0 ? "American League" : "National League";
-      const title = el.querySelector(".boxscores-title");
-      if (title) title.textContent = `${league} Standings`;
-      el.insertAdjacentHTML("afterbegin", header(dates.edition));
-    });
-    const leaders = Array.from(document.querySelectorAll(".col-leaders"));
-    leaders.forEach((el, i) => {
-      const league = i === 0 ? "American League" : "National League";
-      const title = el.querySelector(".boxscores-title");
-      if (title) title.textContent = `${league} Leaders`;
-      el.insertAdjacentHTML("afterbegin", header(dates.edition));
-    });
-    // Box scores describe one game played on a specific day, so they get
-    // stamped with the games date — not the day the digest happens to ship.
-    const games = Array.from(document.querySelectorAll(".game-container"));
-    games.forEach((el) => el.insertAdjacentHTML("afterbegin", header(dates.games)));
-  }, { edition: editionDateStr, games: gamesDateStr });
+  await page.evaluate(
+    (args: { edition: string; games: string; tagline: string }) => {
+      const header = (d: string) => `
+        <div class="share-header">
+          <div class="brand-cell">
+            <img src="/icon.png" alt="">
+            <span class="brand">boxscore</span>
+          </div>
+          <div class="share-date">${d}</div>
+        </div>`;
+      const footer = `
+        <div class="share-footer">
+          <div class="tagline">${args.tagline}</div>
+          <div class="url">boxscore.email/mlb</div>
+        </div>`;
+      // Standings + leaders are a snapshot of the morning the digest ships, so
+      // they get stamped with the edition date.
+      const standings = Array.from(document.querySelectorAll(".col-standings"));
+      standings.forEach((el, i) => {
+        const league = i === 0 ? "American League" : "National League";
+        const title = el.querySelector(".boxscores-title");
+        if (title) title.textContent = `${league} Standings`;
+        el.insertAdjacentHTML("afterbegin", header(args.edition));
+        el.insertAdjacentHTML("beforeend", footer);
+      });
+      const leaders = Array.from(document.querySelectorAll(".col-leaders"));
+      leaders.forEach((el, i) => {
+        const league = i === 0 ? "American League" : "National League";
+        const title = el.querySelector(".boxscores-title");
+        if (title) title.textContent = `${league} Leaders`;
+        el.insertAdjacentHTML("afterbegin", header(args.edition));
+        el.insertAdjacentHTML("beforeend", footer);
+      });
+      // Box scores describe one game played on a specific day, so they get
+      // stamped with the games date — not the day the digest happens to ship.
+      const games = Array.from(document.querySelectorAll(".game-container"));
+      games.forEach((el) => {
+        el.insertAdjacentHTML("afterbegin", header(args.games));
+        el.insertAdjacentHTML("beforeend", footer);
+      });
+    },
+    { edition: editionDateStr, games: gamesDateStr, tagline },
+  );
 }
 
 // Capture the scoreboard share-image using an already-launched browser.
@@ -311,7 +340,7 @@ export async function renderShareImages(args: {
     if (fullImage) results.push(fullImage);
 
     // Now flatten the page for per-section captures.
-    await injectShareChrome(page, editionDateStr, gamesDateStr);
+    await injectShareChrome(page, editionDateStr, gamesDateStr, BRAND.tagline);
     await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -416,6 +445,18 @@ async function captureFullDigest(
       .full-share-header .brand-cell img { width: 32px; height: 32px; border-radius: 5px; display: block; }
       .full-share-header .brand { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; color: #161410; }
       .full-share-header .share-date { font-size: 17px; font-style: italic; color: #6a6354; }
+      /* Mirror of .full-share-header — tagline + marketing URL at the bottom
+         of the digest, hairline rule above instead of below. Matches every
+         other share image's footer. */
+      .full-share-footer {
+        display: flex; align-items: baseline; justify-content: space-between;
+        padding: 16px 0 18px;
+        margin: 20px 0 0;
+        border-top: 2px solid #c4baa5;
+        font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
+      }
+      .full-share-footer .tagline { font-size: 17px; font-style: italic; color: #6a6354; }
+      .full-share-footer .url { font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; color: #161410; }
     `,
   });
   // Defensive: the rendered DOM has been observed to contain the digest
@@ -469,22 +510,32 @@ async function captureFullDigest(
   });
   console.log(`[captureFullDigest] dedup pre-injection: ${JSON.stringify(dedupReport)}`);
 
-  await page.evaluate((d: string) => {
-    const newspaper = document.querySelector(".newspaper");
-    if (!newspaper) return;
-    // Remove any pre-existing share-headers (in case this function ran twice
-    // somehow, or a prior injection wasn't cleaned up).
-    newspaper.querySelectorAll(".full-share-header").forEach((el) => el.remove());
-    const header = document.createElement("div");
-    header.className = "full-share-header";
-    header.innerHTML = `
-      <div class="brand-cell">
-        <img src="/icon.png" alt="">
-        <span class="brand">boxscore</span>
-      </div>
-      <div class="share-date">${d}</div>`;
-    newspaper.insertBefore(header, newspaper.firstChild);
-  }, dateStr);
+  await page.evaluate(
+    (args: { date: string; tagline: string }) => {
+      const newspaper = document.querySelector(".newspaper");
+      if (!newspaper) return;
+      // Remove any pre-existing share-chrome (in case this function ran twice
+      // somehow, or a prior injection wasn't cleaned up).
+      newspaper.querySelectorAll(".full-share-header").forEach((el) => el.remove());
+      newspaper.querySelectorAll(".full-share-footer").forEach((el) => el.remove());
+      const header = document.createElement("div");
+      header.className = "full-share-header";
+      header.innerHTML = `
+        <div class="brand-cell">
+          <img src="/icon.png" alt="">
+          <span class="brand">boxscore</span>
+        </div>
+        <div class="share-date">${args.date}</div>`;
+      newspaper.insertBefore(header, newspaper.firstChild);
+      const footer = document.createElement("div");
+      footer.className = "full-share-footer";
+      footer.innerHTML = `
+        <div class="tagline">${args.tagline}</div>
+        <div class="url">boxscore.email/mlb</div>`;
+      newspaper.appendChild(footer);
+    },
+    { date: dateStr, tagline: BRAND.tagline },
+  );
 
   await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
   await new Promise((r) => setTimeout(r, 300));
@@ -528,6 +579,7 @@ async function captureFullDigest(
       removedDuplicateNoNextDay: keepFirstWithinNewspaper(".no-next-day"),
       removedDuplicateBoxscoresContainer: keepFirstWithinNewspaper(".boxscores-container"),
       removedDuplicateShareHeader: keepFirstWithinNewspaper(".full-share-header"),
+      removedDuplicateShareFooter: keepFirstWithinNewspaper(".full-share-footer"),
       newspaperHeight: newspaper ? (newspaper as HTMLElement).getBoundingClientRect().height : 0,
     };
   });

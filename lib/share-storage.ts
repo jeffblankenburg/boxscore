@@ -111,6 +111,31 @@ export async function getStoredManifest(): Promise<StoredManifest | null> {
   }
 }
 
+// Page size for Supabase Storage list(). The endpoint silently caps each call
+// at ~1000 files regardless of `limit` — confirmed against a 1500-file bucket
+// where `limit: 10000` returned only 1500 entries with no error. We always
+// paginate by `offset` past a 999-row page to be safe.
+const STORAGE_PAGE = 1000;
+
+// Paginate Supabase Storage list past its silent per-call cap. The bucket grows
+// linearly with days of accumulated images (≈16 per day for MLB), so the
+// admin's "what dates have files" query and the default-latest-date lookup
+// both need every page.
+async function listAllFiles(): Promise<Array<{ name: string; updated_at?: string | null }>> {
+  const supa = supabaseAdmin();
+  const all: Array<{ name: string; updated_at?: string | null }> = [];
+  for (let offset = 0; ; offset += STORAGE_PAGE) {
+    const { data, error } = await supa.storage
+      .from(BUCKET)
+      .list("", { limit: STORAGE_PAGE, offset });
+    if (error) throw new Error(`storage list: ${error.message}`);
+    const page = data ?? [];
+    all.push(...page);
+    if (page.length < STORAGE_PAGE) break;
+  }
+  return all;
+}
+
 // List images for a single date. When `date` is omitted, the latest date
 // present in the bucket is used so the caller doesn't need to guess. Returns
 // the date that was actually used (null only when the bucket is empty), which
@@ -119,35 +144,44 @@ export async function listStoredImages(
   date?: string,
 ): Promise<{ date: string | null; images: StoredImage[] }> {
   const supa = supabaseAdmin();
-  // 10k cap — well above any per-date set size and roughly two seasons of
-  // accumulated daily images. Bump if we ever ship sports with much larger
-  // image sets per date.
-  const { data, error } = await supa.storage.from(BUCKET).list("", { limit: 10_000 });
-  if (error) throw new Error(`storage list: ${error.message}`);
 
+  // When the caller knows the date, hit the server-side `search:` prefix
+  // filter — that's a LIKE on the storage objects table and isn't subject
+  // to the per-call cap that bit the unfiltered list (see listAllFiles).
+  if (date) {
+    const { data, error } = await supa.storage
+      .from(BUCKET)
+      .list("", { search: `${date}_`, limit: STORAGE_PAGE });
+    if (error) throw new Error(`storage list: ${error.message}`);
+    const images: StoredImage[] = [];
+    for (const f of data ?? []) {
+      const m = f.name.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
+      if (!m || m[1] !== date) continue;
+      const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(f.name);
+      images.push({ file: m[2]!, url: urlData.publicUrl, updatedAt: f.updated_at ?? null });
+    }
+    images.sort((a, b) => imagePriority(a.file) - imagePriority(b.file));
+    return { date: images.length > 0 ? date : null, images };
+  }
+
+  // No date — find the latest one by scanning the full bucket (paginated).
+  const allFiles = await listAllFiles();
   type FileEntry = { date: string; file: string; updatedAt: string | null };
-  const allFiles: FileEntry[] = [];
-  for (const f of data ?? []) {
+  const parsed: FileEntry[] = [];
+  for (const f of allFiles) {
     if (f.name === ".emptyFolderPlaceholder") continue;
     const m = f.name.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
     if (!m) continue;
-    allFiles.push({ date: m[1]!, file: m[2]!, updatedAt: f.updated_at ?? null });
+    parsed.push({ date: m[1]!, file: m[2]!, updatedAt: f.updated_at ?? null });
   }
-
-  if (allFiles.length === 0) return { date: null, images: [] };
-
-  // Default to the most recent date present in storage (lexical sort works for
-  // ISO YYYY-MM-DD).
-  const targetDate =
-    date ?? allFiles.map((f) => f.date).sort().at(-1)!;
-
+  if (parsed.length === 0) return { date: null, images: [] };
+  const targetDate = parsed.map((f) => f.date).sort().at(-1)!;
   const images: StoredImage[] = [];
-  for (const f of allFiles) {
+  for (const f of parsed) {
     if (f.date !== targetDate) continue;
     const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(`${f.date}_${f.file}`);
     images.push({ file: f.file, url: urlData.publicUrl, updatedAt: f.updatedAt });
   }
-
   images.sort((a, b) => imagePriority(a.file) - imagePriority(b.file));
   return { date: targetDate, images };
 }
@@ -155,11 +189,9 @@ export async function listStoredImages(
 // All distinct dates present in the bucket, newest first. Used by the admin
 // images view to populate a date selector.
 export async function listStoredDates(): Promise<string[]> {
-  const supa = supabaseAdmin();
-  const { data, error } = await supa.storage.from(BUCKET).list("", { limit: 10_000 });
-  if (error) throw new Error(`storage list: ${error.message}`);
+  const all = await listAllFiles();
   const dates = new Set<string>();
-  for (const f of data ?? []) {
+  for (const f of all) {
     const m = f.name.match(/^(\d{4}-\d{2}-\d{2})_/);
     if (m) dates.add(m[1]!);
   }
