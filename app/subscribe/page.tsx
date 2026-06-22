@@ -1,4 +1,5 @@
 import { subscribe } from "./actions";
+import AttributionFields from "./AttributionFields";
 import { getVisibleSports } from "@/lib/sports";
 import { teamsBySport, type Sport } from "@/lib/teams";
 
@@ -51,6 +52,7 @@ export default async function SubscribePage({
       </p>
 
       <form action={subscribe} noValidate>
+        <AttributionFields />
         <input
           type="email"
           name="email"

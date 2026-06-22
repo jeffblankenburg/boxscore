@@ -27,27 +27,68 @@ export type Subscriber = {
 const COLS =
   "id, email, status, created_at, confirmed_at, unsubscribed_at, unsubscribe_reason, confirm_token, unsubscribe_token, is_admin, demographics_completed_at";
 
+// Acquisition attribution captured at /subscribe POST. All optional; null
+// fields are stored as null so they don't pollute the "subscribers by source"
+// aggregation. Schema added in migration 0057.
+export type SubscriberAttribution = {
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  referrer: string | null;
+  landing_path: string | null;
+};
+
 /**
  * Idempotent: starting a subscription for an email that already exists in any
  * state resets it to pending and rotates the tokens. The caller decides what to
  * tell the user (e.g., "if you were already subscribed, you'll get a fresh
  * confirmation email").
+ *
+ * Attribution (utm_*, referrer, landing_path) is only written when the row is
+ * brand-new — preserving first-touch source for returning unsubs/pendings. A
+ * Reddit signup who unsubs and later resubscribes via Twitter stays attributed
+ * to Reddit. Pre-decide here rather than in the action so every caller gets
+ * the same semantics.
  */
-export async function startSubscription(email: string): Promise<Subscriber> {
+export async function startSubscription(
+  email: string,
+  attribution?: SubscriberAttribution | null,
+): Promise<Subscriber> {
   const normalized = email.trim().toLowerCase();
-  const { data, error } = await supabaseAdmin()
+  const db = supabaseAdmin();
+
+  // Check whether the row already exists so we know whether to write
+  // attribution. Cheap — single PK-ish lookup by email.
+  const { data: existing, error: existingErr } = await db
     .from("subscribers")
-    .upsert(
-      {
-        email: normalized,
-        status: "pending" as const,
-        confirmed_at: null,
-        unsubscribed_at: null,
-        confirm_token: crypto.randomUUID(),
-        unsubscribe_token: crypto.randomUUID(),
-      },
-      { onConflict: "email" },
-    )
+    .select("id")
+    .eq("email", normalized)
+    .maybeSingle<{ id: string }>();
+  if (existingErr) throw new Error(`startSubscription lookup: ${existingErr.message}`);
+
+  const row: Record<string, unknown> = {
+    email: normalized,
+    status: "pending" as const,
+    confirmed_at: null,
+    unsubscribed_at: null,
+    confirm_token: crypto.randomUUID(),
+    unsubscribe_token: crypto.randomUUID(),
+  };
+  if (!existing && attribution) {
+    row.utm_source = attribution.utm_source;
+    row.utm_medium = attribution.utm_medium;
+    row.utm_campaign = attribution.utm_campaign;
+    row.utm_content = attribution.utm_content;
+    row.utm_term = attribution.utm_term;
+    row.referrer = attribution.referrer;
+    row.landing_path = attribution.landing_path;
+  }
+
+  const { data, error } = await db
+    .from("subscribers")
+    .upsert(row, { onConflict: "email" })
     .select(COLS)
     .single<Subscriber>();
   if (error) throw new Error(`startSubscription: ${error.message}`);

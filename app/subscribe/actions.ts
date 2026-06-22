@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { findByEmail, startSubscription } from "@/lib/subscribers";
+import { findByEmail, startSubscription, type SubscriberAttribution } from "@/lib/subscribers";
 import { applyInitialSubscriptions } from "@/lib/email-subscriptions";
 import { sendEmail } from "@/lib/email";
 import { confirmationEmail } from "@/lib/emails/templates";
@@ -12,6 +12,38 @@ import { isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Per-field caps for attribution. utm_* in the wild rarely exceed 64 chars;
+// referrer (full URL) and landing_path (pathname only) can be longer but we
+// truncate to keep a crafted POST from writing megabytes.
+const ATTR_LIMITS: Record<keyof SubscriberAttribution, number> = {
+  utm_source: 128,
+  utm_medium: 128,
+  utm_campaign: 256,
+  utm_content: 256,
+  utm_term: 256,
+  referrer: 512,
+  landing_path: 256,
+};
+
+function readAttribution(formData: FormData): SubscriberAttribution {
+  const read = (key: keyof SubscriberAttribution): string | null => {
+    const v = formData.get(key);
+    if (typeof v !== "string") return null;
+    const trimmed = v.trim();
+    if (trimmed === "") return null;
+    return trimmed.slice(0, ATTR_LIMITS[key]);
+  };
+  return {
+    utm_source: read("utm_source"),
+    utm_medium: read("utm_medium"),
+    utm_campaign: read("utm_campaign"),
+    utm_content: read("utm_content"),
+    utm_term: read("utm_term"),
+    referrer: read("referrer"),
+    landing_path: read("landing_path"),
+  };
+}
 
 // /subscribe POST. The page form carries:
 //   email         — the address to subscribe
@@ -85,11 +117,19 @@ export async function subscribe(formData: FormData): Promise<void> {
     redirect("/subscribe/sent?mode=signin");
   }
 
+  // Acquisition attribution. Populated by app/subscribe/AttributionFields.tsx
+  // from the sessionStorage write the root-layout script makes on first
+  // page-load of the session. Bounded length on each field guards against a
+  // crafted POST trying to bloat the row; UTMs in the wild are rarely above
+  // 64 chars and referrer/landing_path stay well under 512.
+  const attribution = readAttribution(formData);
+
   // New / pending / unsubscribed → confirmation flow. startSubscription
   // upserts the row to pending and rotates tokens. applyInitialSubscriptions
   // replaces any existing opt-in state with what they picked (per Jeff: a
   // returning unsub re-picking only MLB should have Guardians removed).
-  const subscriber = await startSubscription(email);
+  // Attribution is only written for genuinely-new rows (see startSubscription).
+  const subscriber = await startSubscription(email, attribution);
   await applyInitialSubscriptions(subscriber.id, { leagues, teams });
 
   const confirmUrl = `${EMAIL_LINK_BASE}/c/${subscriber.confirm_token}`;

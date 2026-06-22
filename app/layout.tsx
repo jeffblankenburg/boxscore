@@ -46,6 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <AttributionCapture />
         {bare ? (
           children
         ) : (
@@ -66,6 +67,17 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </body>
     </html>
   );
+}
+
+// Captures acquisition attribution into sessionStorage on first page-load of
+// the session. Read at /subscribe submit (see app/subscribe/AttributionFields.tsx)
+// so a subscriber who landed on /, /mlb/cle, etc. with UTMs and then navigated
+// internally to /subscribe doesn't lose the original source. Stored fields
+// match the migration 0057 column shape. Best-effort — silently no-ops if
+// sessionStorage is unavailable (private modes, some embedded webviews).
+function AttributionCapture() {
+  const script = `(function(){try{var K='boxscore_attr';if(sessionStorage.getItem(K))return;var p=new URLSearchParams(location.search);var a={utm_source:p.get('utm_source')||'',utm_medium:p.get('utm_medium')||'',utm_campaign:p.get('utm_campaign')||'',utm_content:p.get('utm_content')||'',utm_term:p.get('utm_term')||'',referrer:document.referrer||'',landing_path:location.pathname||''};sessionStorage.setItem(K,JSON.stringify(a));}catch(e){}})();`;
+  return <script dangerouslySetInnerHTML={{ __html: script }} />;
 }
 
 // JSON-LD on every public page. Two entities linked via @graph so Google
