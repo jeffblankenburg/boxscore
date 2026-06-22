@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "./supabase";
 import { yesterdayInET } from "./dates";
 import { getVisibleSports } from "./sports";
-import { featuresFor, type CronRoute as SportCronRoute } from "./sport-features";
+import { featuresFor, SPORTLESS_ROUTES, type CronRoute as SportCronRoute } from "./sport-features";
 import { getActiveSubscriberIdSet, getActiveSubscriberIdSetAt, getActiveSubscribersForSport } from "./subscribers";
 
 // Supabase's JS client caps un-paginated `select` at 1000 rows. The `sends`
@@ -718,28 +718,47 @@ export async function getDashboardWatchwall(): Promise<WatchwallRow[]> {
     .order("started_at", { ascending: true });
   if (error) throw new Error(`getDashboardWatchwall: ${error.message}`);
 
+  // Group by sport. Sport-less rows (e.g. `supervise`) get bucketed under
+  // the sentinel "__platform" key so the synthetic Platform row below can
+  // find them via the same map lookup as a real sport.
+  const PLATFORM_KEY = "__platform";
   const latest: Record<string, Record<string, Row>> = {};
-  for (const r of (data ?? []) as Row[]) {
-    (latest[r.sport] ??= {})[r.route] = r;
+  for (const r of (data ?? []) as Array<Row & { sport: string | null }>) {
+    const key = r.sport ?? PLATFORM_KEY;
+    (latest[key] ??= {})[r.route] = r as Row;
   }
 
-  return sports.map((sport) => {
+  const toCell = (route: SportCronRoute, r: Row | undefined): WatchwallCell => ({
+    route,
+    status: !r ? "missing"
+      : r.status === "ok" ? "pass"
+      : r.status === "failed" ? "fail"
+      : "running",
+    startedAt: r?.started_at ?? null,
+    error: r?.error ?? null,
+    runId: r?.id ?? null,
+  });
+
+  const sportRows: WatchwallRow[] = sports.map((sport) => {
     const features = featuresFor(sport.id);
-    const cells: WatchwallCell[] = features.expectedRoutes.map((route) => {
-      const r = latest[sport.id]?.[route];
-      return {
-        route,
-        status: !r ? "missing"
-          : r.status === "ok" ? "pass"
-          : r.status === "failed" ? "fail"
-          : "running",
-        startedAt: r?.started_at ?? null,
-        error: r?.error ?? null,
-        runId: r?.id ?? null,
-      };
-    });
+    const cells = features.expectedRoutes.map((route) =>
+      toCell(route, latest[sport.id]?.[route]),
+    );
     return { sport: sport.id, sportName: sport.name, date, cells };
   });
+
+  // Platform row — surfaces sport-less crons (currently just `supervise`).
+  // Without this they'd run daily and never appear on the wall.
+  const platformRow: WatchwallRow = {
+    sport: PLATFORM_KEY,
+    sportName: "Platform",
+    date,
+    cells: SPORTLESS_ROUTES.map((route) =>
+      toCell(route, latest[PLATFORM_KEY]?.[route]),
+    ),
+  };
+
+  return [...sportRows, platformRow];
 }
 
 // GitHub-style contribution grid — one row per visible sport, columns are
@@ -1525,66 +1544,46 @@ export async function getPublicAdStatsSnapshot(
   };
 }
 
-// Dedup-by-resend_id engagement rates, scoped to one sport's league digest.
-// Same algorithm as getRollingAdStats (count of distinct sends that received
-// each event type) so the public page's open/click rates match what
-// /admin/ads reports — within their shared time window. Materializes the
-// engagement-window events AND the in-window league sends so we can
-// intersect resend_ids and exclude team/cross-sport activity.
+// Dedup-by-resend_id engagement totals for the league digest of one sport,
+// summed over the engagement window. Reads the precomputed daily_metrics
+// rows instead of scanning every send + email_event in the window — the
+// raw-event scan was breaching Postgres's statement_timeout as the window
+// grew and broke the daily ad-stats-snapshot cron.
+//
+// Each row in daily_metrics already holds distinct-resend_id counts (the
+// computeDailyMetric scan handles the intersection). One row per edition
+// date; sum across rows for the window total. Cost is O(days), capped at
+// the engagement window length — fast for years to come.
+//
+// Small accuracy caveat: the old code did `opened AND delivered`, which
+// excluded the ~0% case where an open event lacks a corresponding delivered
+// event (a missed webhook). The new path just sums opened-per-day. In
+// practice the divergence is invisible; Resend's webhook order is
+// delivered → opened → clicked and missed deliveries on otherwise-opened
+// messages are vanishingly rare at our volume.
 async function getEngagementRates(
   sinceIso: string,
   sport: string,
 ): Promise<{ delivered: number; opened: number; clicked: number }> {
-  const db = supabaseAdmin();
+  const sinceDate = sinceIso.slice(0, 10); // ISO timestamp → YYYY-MM-DD
+  const { data, error } = await supabaseAdmin()
+    .from("daily_metrics")
+    .select("delivered, opened, clicked")
+    .eq("sport", sport)
+    .gte("date", sinceDate);
+  if (error) throw new Error(`getEngagementRates daily_metrics: ${error.message}`);
 
-  // Pull the set of resend_ids representing in-window league sends for this
-  // sport. The engagement window is short (since OPEN_TRACKING_START_ISO),
-  // so this is bounded — a few thousand rows.
-  type SendRow = { resend_id: string | null };
-  const sendRows = await fetchAll<SendRow>(
-    () => db.from("sends")
-      .select("resend_id")
-      .gte("sent_at", sinceIso)
-      .eq("digest_sport", sport)
-      .is("team_id", null)
-      .is("error", null) as unknown as QueryBuilder<SendRow>,
-    "getEngagementRates sends",
-  );
-  const inScope = new Set<string>();
-  for (const r of sendRows) if (r.resend_id) inScope.add(r.resend_id);
-  if (inScope.size === 0) return { delivered: 0, opened: 0, clicked: 0 };
-
-  type Ev = { resend_id: string | null; event_type: string };
-  const events = await fetchAll<Ev>(
-    () => db.from("email_events")
-      .select("resend_id, event_type")
-      .gte("event_at", sinceIso)
-      .in("event_type", ["email.delivered", "email.opened", "email.clicked"]) as unknown as QueryBuilder<Ev>,
-    "getEngagementRates events",
-  );
-
-  const delivered = new Set<string>();
-  const opened = new Set<string>();
-  const clicked = new Set<string>();
-  for (const e of events) {
-    if (!e.resend_id || !inScope.has(e.resend_id)) continue;
-    if (e.event_type === "email.delivered") delivered.add(e.resend_id);
-    else if (e.event_type === "email.opened") opened.add(e.resend_id);
-    else if (e.event_type === "email.clicked") clicked.add(e.resend_id);
+  let delivered = 0, opened = 0, clicked = 0;
+  for (const r of (data ?? []) as Array<{
+    delivered: number | null;
+    opened: number | null;
+    clicked: number | null;
+  }>) {
+    delivered += r.delivered ?? 0;
+    opened    += r.opened    ?? 0;
+    clicked   += r.clicked   ?? 0;
   }
-
-  let openedAndDelivered = 0;
-  let clickedAndDelivered = 0;
-  for (const id of delivered) {
-    if (opened.has(id)) openedAndDelivered++;
-    if (clicked.has(id)) clickedAndDelivered++;
-  }
-
-  return {
-    delivered: delivered.size,
-    opened: openedAndDelivered,
-    clicked: clickedAndDelivered,
-  };
+  return { delivered, opened, clicked };
 }
 
 // Daily cron writes this; /advertise reads it instead of recomputing the slow

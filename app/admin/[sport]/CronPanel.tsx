@@ -22,22 +22,30 @@ function prevDayIso(iso: string): string {
 
 type Route =
   | "generate"
+  | "generate-sdio"
   | "send-email"
   | "send-team-email"
   | "post-bluesky"
   | "post-twitter"
-  | "post-facebook";
+  | "post-discord"
+  | "post-facebook"
+  | "ad-stats-snapshot"
+  | "supervise";
 
 const GUARDED: ReadonlySet<Route> = new Set(["send-email", "send-team-email"]);
-const RESETTABLE: ReadonlySet<Route> = new Set(["post-bluesky", "post-twitter", "post-facebook"]);
+const RESETTABLE: ReadonlySet<Route> = new Set(["post-bluesky", "post-twitter", "post-discord", "post-facebook"]);
 
 const ROUTE_LABELS: Record<Route, string> = {
-  "generate": "Generate digest",
-  "send-email": "Send email to subscribers",
-  "send-team-email": "Send team digests to subscribers",
-  "post-bluesky": "Post to BlueSky",
-  "post-twitter": "Post to Twitter",
-  "post-facebook": "Post to Facebook",
+  "generate":          "Generate digest",
+  "generate-sdio":     "Generate SDIO snapshot",
+  "send-email":        "Send email to subscribers",
+  "send-team-email":   "Send team digests to subscribers",
+  "post-bluesky":      "Post to BlueSky",
+  "post-twitter":      "Post to Twitter",
+  "post-discord":      "Post to Discord",
+  "post-facebook":     "Post to Facebook",
+  "ad-stats-snapshot": "Snapshot ad stats",
+  "supervise":         "Run supervisor",
 };
 
 export function CronPanel({

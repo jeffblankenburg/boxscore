@@ -143,18 +143,30 @@ export async function triggerCron(formData: FormData): Promise<void> {
   const returnTo =
     typeof returnToRaw === "string" && returnToRaw.startsWith("/") ? returnToRaw : "/admin";
 
+  const KNOWN_ROUTES = new Set([
+    "generate", "generate-sdio",
+    "send-email", "send-team-email",
+    "post-bluesky", "post-twitter", "post-discord", "post-facebook",
+    "ad-stats-snapshot", "supervise",
+  ]);
+  // `supervise` doesn't take a sport — it inspects every league's morning
+  // runs and heals stuck ones. Other routes are sport-scoped.
+  const SPORTLESS_ROUTES = new Set(["supervise"]);
+
   let target: string;
   try {
-    if (!["generate", "send-email", "send-team-email", "post-bluesky", "post-twitter", "post-facebook"].includes(route)) {
+    if (!KNOWN_ROUTES.has(route)) {
       throw new Error(`Unknown cron route: ${route}`);
     }
-    if (!["mlb", "nba", "wnba"].includes(sport)) {
+    const isSportless = SPORTLESS_ROUTES.has(route);
+    if (!isSportless && !["mlb", "nba", "wnba"].includes(sport)) {
       throw new Error(`Unknown sport: ${sport}`);
     }
     if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
 
     const origin = await siteOrigin();
-    const params = new URLSearchParams({ trigger: "manual", date, sport });
+    const params = new URLSearchParams({ trigger: "manual", date });
+    if (!isSportless) params.set("sport", sport);
     if (reset) params.set("reset", "1");
     // Manual Regen should always hit MLB/ESPN fresh. Without refetch=true,
     // the generator reuses whatever's in daily_raw — which is exactly the

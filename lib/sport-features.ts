@@ -4,15 +4,29 @@
 // it through phases (e.g. NBA gaining send-email when its renderer ships)
 // happens in one place.
 
+// Ordered roughly chronologically by daily fire time so the watchwall reads
+// left-to-right as the morning unfolds (9:00 generate → 10:00 supervise).
+// post-facebook stays at the end as an unscheduled placeholder slot — when
+// Facebook posting goes live it gets added to the daily schedule and starts
+// passing on the wall without further wiring.
 export const ALL_CRON_ROUTES = [
   "generate",
+  "generate-sdio",
   "send-email",
-  "send-team-email",
   "post-twitter",
   "post-bluesky",
+  "post-discord",
+  "send-team-email",
+  "ad-stats-snapshot",
+  "supervise",
   "post-facebook",
 ] as const;
 export type CronRoute = (typeof ALL_CRON_ROUTES)[number];
+
+// Routes that don't belong to a single sport — the watchwall renders them
+// in a synthetic "Platform" row because their cron_runs rows have sport=null
+// and don't fit the per-sport groupings.
+export const SPORTLESS_ROUTES: readonly CronRoute[] = ["supervise"];
 
 export type SportFeatures = {
   hasPreview: boolean;
@@ -25,8 +39,14 @@ export type SportFeatures = {
   expectedRoutes: readonly CronRoute[];
 };
 
+// MLB expects every per-sport route. supervise is excluded because it has no
+// sport at insert time; it's shown on the synthetic Platform row instead.
+const MLB_EXPECTED = ALL_CRON_ROUTES.filter(
+  (r): r is CronRoute => !SPORTLESS_ROUTES.includes(r),
+);
+
 export const SPORT_FEATURES: Record<string, SportFeatures> = {
-  mlb:  { hasPreview: true,  hasShareImages: true,  hasTeamDigests: true,  hasRegenAll: true,  expectedRoutes: ALL_CRON_ROUTES },
+  mlb:  { hasPreview: true,  hasShareImages: true,  hasTeamDigests: true,  hasRegenAll: true,  expectedRoutes: MLB_EXPECTED },
   // NBA/WNBA: league send wired but no team digests or social posts yet.
   // The watchwall will flag generate/send-email as missing if they don't
   // run; the team/post routes stay intentionally absent so they don't

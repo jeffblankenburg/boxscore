@@ -12,6 +12,10 @@ import {
   getPublicAdStatsSnapshot,
   writeAdStatsSnapshot,
 } from "@/lib/dashboard";
+import {
+  computeDailyMetric,
+  writeDailyMetric,
+} from "@/lib/daily-metrics";
 
 export const runtime = "nodejs";
 // Steady state ~14s; budget headroom for natural growth without paying for
@@ -41,6 +45,16 @@ export async function GET(req: Request) {
   try {
     runId = await startCronRun({ route: "ad-stats-snapshot", sport, date, trigger });
 
+    // Write yesterday's daily_metrics row FIRST. The public snapshot below
+    // sums from daily_metrics for its open/click rates, so writing this row
+    // ahead of the snapshot ensures yesterday's send is included in today's
+    // rolling number. Edition date = yesterdayInET — the digest delivered
+    // yesterday morning has had ~24h to accumulate opens by 5:50 AM ET.
+    const dailyT0 = Date.now();
+    const daily = await computeDailyMetric(sport, date, { includeActiveSubscribers: true });
+    await writeDailyMetric(sport, date, daily);
+    const dailyMs = Date.now() - dailyT0;
+
     const t0 = Date.now();
     const stats = await getPublicAdStatsSnapshot(sport, 30);
     const computeMs = Date.now() - t0;
@@ -50,6 +64,7 @@ export async function GET(req: Request) {
     const result = {
       sport,
       compute_ms: computeMs,
+      daily_compute_ms: dailyMs,
       active_subscribers: stats.activeSubscribers,
       sends: stats.sends,
       delivered: stats.delivered,
@@ -57,6 +72,7 @@ export async function GET(req: Request) {
       click_rate: stats.clickRate,
       delivery_rate: stats.deliveryRate,
       tracked: stats.tracked,
+      daily: { date, ...daily },
     };
     await finishCronRun(runId, { status: "ok", result });
     return NextResponse.json({ ok: true, ...result });

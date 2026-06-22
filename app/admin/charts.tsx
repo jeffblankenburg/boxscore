@@ -12,7 +12,8 @@ import {
   type WatchwallRow,
   type CronGridBySport,
 } from "@/lib/dashboard";
-import { ALL_CRON_ROUTES } from "@/lib/sport-features";
+import { ALL_CRON_ROUTES, SPORTLESS_ROUTES } from "@/lib/sport-features";
+import { triggerCron } from "./actions";
 
 // ---- Subscriber growth: line + green/red bars overlay -----------------
 
@@ -389,6 +390,9 @@ export function Watchwall({ rows }: { rows: WatchwallRow[] }) {
                 const tooltipStatus = cell.status === "missing"
                   ? "missed (scheduled, never ran)" : cell.status;
                 const title = cell.error ?? `${tooltipStatus} · ${time}`;
+                const canRetry = cell.status === "fail" || cell.status === "missing";
+                // Platform row has no sport — supervise doesn't take one.
+                const sportParam = SPORTLESS_ROUTES.includes(route) ? "" : row.sport;
                 return (
                   <td
                     key={route}
@@ -397,6 +401,22 @@ export function Watchwall({ rows }: { rows: WatchwallRow[] }) {
                   >
                     <span className="watchwall-mark">{WALL_STATUS_LABEL[cell.status]}</span>
                     <span className="watchwall-time">{time}</span>
+                    {canRetry && (
+                      <form action={triggerCron} className="watchwall-retry-form">
+                        <input type="hidden" name="route" value={route} />
+                        <input type="hidden" name="sport" value={sportParam} />
+                        <input type="hidden" name="date" value={row.date} />
+                        <input type="hidden" name="returnTo" value="/admin" />
+                        <button
+                          type="submit"
+                          className="watchwall-retry"
+                          aria-label={`Re-run ${route}`}
+                          title="Re-run this cron"
+                        >
+                          ↻
+                        </button>
+                      </form>
+                    )}
                   </td>
                 );
               })}

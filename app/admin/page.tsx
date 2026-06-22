@@ -6,6 +6,8 @@ import {
   PulseSkeleton,
   QueueBlock,
   QueueSkeleton,
+  TickerBlock,
+  TickerSkeleton,
   TodaysSendBlock,
   TodaysSendSkeleton,
   WatchwallBlock,
@@ -38,6 +40,10 @@ export default async function AdminDashboard() {
         title="Dashboard"
         subtitle="Did everything run last night, and what did it produce?"
       />
+
+      <Suspense fallback={<TickerSkeleton />}>
+        <TickerBlock />
+      </Suspense>
 
       <Suspense fallback={<TodaysSendSkeleton />}>
         <TodaysSendBlock />
