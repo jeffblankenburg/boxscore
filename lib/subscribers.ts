@@ -331,15 +331,25 @@ export async function getActiveSubscribersForSport(sport: string): Promise<Subsc
 export async function unsubscribeSubscriber(
   id: string,
   reason: UnsubscribeReason = "user",
+  survey?: { userReason?: string | null; feedback?: string | null },
 ): Promise<Subscriber> {
   const db = supabaseAdmin();
+  // Build the update so we only set survey columns when provided; never wipe
+  // a previously-collected survey by passing nulls on an unrelated call.
+  const update: Record<string, unknown> = {
+    status: "unsubscribed" as const,
+    unsubscribed_at: new Date().toISOString(),
+    unsubscribe_reason: reason,
+  };
+  if (survey && survey.userReason !== undefined) {
+    update.unsubscribe_user_reason = survey.userReason || null;
+  }
+  if (survey && survey.feedback !== undefined) {
+    update.unsubscribe_feedback = survey.feedback || null;
+  }
   const { data, error } = await db
     .from("subscribers")
-    .update({
-      status: "unsubscribed" as const,
-      unsubscribed_at: new Date().toISOString(),
-      unsubscribe_reason: reason,
-    })
+    .update(update)
     .eq("id", id)
     .select(COLS)
     .single<Subscriber>();

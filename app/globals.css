@@ -597,6 +597,30 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 }
 .subscribe-error { color: #a40000; font-size: 13px; margin: 4px 0 0; }
 .subscribe-fine { font-size: 13px; color: var(--text-muted); margin: 18px 0 0; }
+
+/* Unsubscribe survey — dropdown + free-text on the /u/[token] page. Sits
+   above the unsubscribe button. Inputs are full-width so the page reads
+   as a single column. Inputs are deliberately quiet visually so the survey
+   doesn't feel like a guilt trip. */
+.unsub-survey { margin: 14px 0 18px; }
+.unsub-survey-label {
+  display: block; font-size: 13px; color: var(--text-primary);
+  margin: 12px 0 4px; font-weight: 500;
+}
+.unsub-survey-label:first-of-type { margin-top: 0; }
+.unsub-survey-optional { color: var(--text-muted); font-weight: 400; }
+.unsub-survey-select,
+.unsub-survey-textarea {
+  width: 100%; box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  background: #fff; color: var(--text-primary);
+  font-family: inherit; font-size: 14px; line-height: 1.4;
+  border-radius: 4px;
+}
+.unsub-survey-textarea { resize: vertical; min-height: 64px; }
+.unsub-survey-select:focus,
+.unsub-survey-textarea:focus { outline: 2px solid var(--text-primary); outline-offset: -1px; }
 .subscribe-card a { color: var(--text-secondary); }
 .subscribe-subhead {
   font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em;
