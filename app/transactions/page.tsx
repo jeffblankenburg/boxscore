@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { parseTransactions, type Transaction } from "@/lib/mlb";
 import { teamsBySport, findTeam } from "@/lib/teams";
 import { todayInET } from "@/lib/dates";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { TransactionChart, type ChartPoint } from "./transaction-chart";
 import "./transactions.css";
 
@@ -140,9 +141,30 @@ async function loadSeason(
   return { chart, rows };
 }
 
+const META_TITLE = "MLB Transactions | boxscore";
+const META_DESC =
+  "Daily MLB roster moves for the season — IL placements and activations, DFAs, options, recalls, 40-man selections, and signings. Filter by team.";
+const META_URL = `${EMAIL_LINK_BASE}/transactions`;
+const META_IMG = `${EMAIL_LINK_BASE}/icon.png`;
+
 export const metadata = {
-  title: "Transactions | boxscore",
-  description: "MLB roster moves — IL, DFA, options, recalls, signings.",
+  title: META_TITLE,
+  description: META_DESC,
+  alternates: { canonical: "/transactions" },
+  openGraph: {
+    title: META_TITLE,
+    description: META_DESC,
+    url: META_URL,
+    siteName: "boxscore",
+    type: "website",
+    images: [{ url: META_IMG, alt: "boxscore" }],
+  },
+  twitter: {
+    card: "summary",
+    title: META_TITLE,
+    description: META_DESC,
+    images: [META_IMG],
+  },
 };
 
 export default async function TransactionPage({
