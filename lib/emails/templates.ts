@@ -9,6 +9,24 @@
 
 import { EMAIL_STYLES } from "../render-email";
 import { nextDay, prettyDate, shortPrettyDate } from "../dates";
+import { EMAIL_LINK_BASE } from "../site";
+
+// Self-hosted open-tracking pixel. The Resend pixel sits at end-of-body
+// and is clipped by Gmail on the MLB league digest (~300 KB; clip at
+// ~102 KB). This sits at the very top of <body>, well above the clip
+// line, so opens fire for Gmail recipients too.
+//
+// Token is sends.open_token (UUID generated per send by the cron). The
+// pixel endpoint resolves token → resend_id and writes a boxscore.opened
+// event into email_events. See app/api/o/[token]/route.ts.
+function openPixelTag(openToken: string | null | undefined): string {
+  if (!openToken) return "";
+  const url = `${EMAIL_LINK_BASE}/api/o/${openToken}`;
+  // display:block is important — some clients skip display:none images.
+  // border:0 and the inline dimensions cover clients that ignore the
+  // <img>-attribute width/height in favor of style.
+  return `<img src="${url}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;outline:none;text-decoration:none;" />`;
+}
 
 const PAPER = "#f9f7f1";
 const INK = "#161410";
@@ -135,6 +153,7 @@ export function welcomeEmail(opts: {
   gamesUrl: string;
   tipJarUrl: string;
   digestEmailHtml: string;
+  openToken?: string | null;
 }): { subject: string; html: string; text: string } {
   const subject = `Welcome — boxscore · ${opts.digestPrettyDate}`;
   const html = wrapWithDigest({
@@ -147,6 +166,7 @@ export function welcomeEmail(opts: {
     manageUrl: opts.manageUrl,
     gamesUrl: opts.gamesUrl,
     tipJarUrl: opts.tipJarUrl,
+    openToken: opts.openToken,
     previewText: `Welcome — your boxscore digest for ${opts.digestPrettyDate} is below.`,
   });
   const text = `Welcome to boxscore!\n\nThe full digest for ${opts.digestPrettyDate} is in this email. You'll get one every morning at 5am ET.\n\nRead online: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
@@ -172,6 +192,7 @@ export function dailyEmail(opts: {
   digestEmailHtml: string;
   announcementBanner?: string; // optional product/feature note prepended
                                 // above the digest body
+  openToken?: string | null;   // injected as a 1x1 pixel at the top of <body>
 }): { subject: string; html: string; text: string } {
   const sportTag = opts.sport.toUpperCase();
   // Subject + preview text use the EDITION date (the day the email arrives)
@@ -187,6 +208,7 @@ export function dailyEmail(opts: {
     gamesUrl: opts.gamesUrl,
     tipJarUrl: opts.tipJarUrl,
     announcementBanner: opts.announcementBanner,
+    openToken: opts.openToken,
     previewText: `${prettyDate(editionDateIso)} · ${sportTag} digest from boxscore.`,
   });
   const text = `${subject}\n\nRead online: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
@@ -209,6 +231,7 @@ export function teamDailyEmail(opts: {
   tipJarUrl: string;
   digestEmailHtml: string;
   announcementBanner?: string;
+  openToken?: string | null;
 }): { subject: string; html: string; text: string } {
   // Sender name already shows "boxscore", so the subject leads with the
   // distinguishing label ({team name} or {sport}) — keeps the inbox preview
@@ -224,6 +247,7 @@ export function teamDailyEmail(opts: {
     gamesUrl: opts.gamesUrl,
     tipJarUrl: opts.tipJarUrl,
     announcementBanner: opts.announcementBanner,
+    openToken: opts.openToken,
     previewText: `${prettyDate(editionDateIso)} · ${opts.teamName} digest from boxscore.`,
   });
   const text = `${subject}\n\nRead online: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
@@ -249,10 +273,15 @@ function wrapWithDigest(opts: {
   gamesUrl: string;
   tipJarUrl: string;
   previewText?: string;
+  // UUID written to sends.open_token at send time. When present, a 1x1
+  // tracking pixel pointing at /api/o/<openToken> is injected at the
+  // very top of <body> — above the Gmail clip line.
+  openToken?: string | null;
 }): string {
   const preview = opts.previewText
     ? `<div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">${opts.previewText}</div>`
     : "";
+  const pixel = openPixelTag(opts.openToken);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -264,7 +293,7 @@ function wrapWithDigest(opts: {
 <style>${EMAIL_STYLES}</style>
 </head>
 <body style="margin:0; padding:0; background:${PAPER}; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; color:${INK}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; text-size-adjust:100%;">
-${preview}
+${pixel}${preview}
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fff;">
   <tr><td style="padding:8px 8px 24px;">
 

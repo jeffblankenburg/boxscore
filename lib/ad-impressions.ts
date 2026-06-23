@@ -102,7 +102,7 @@ export async function loadImpressionsByPair(
     const { data, error } = await db
       .from("email_events")
       .select("resend_id, event_at")
-      .eq("event_type", "email.opened")
+      .in("event_type", ["email.opened", "boxscore.opened"])
       .gte("event_at", sinceIso)
       .order("event_at", { ascending: true })
       .range(from, from + 999);

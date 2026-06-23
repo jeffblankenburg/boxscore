@@ -191,7 +191,11 @@ export async function GET(req: Request) {
         ]);
 
         for (const group of chunk(toSend, BATCH_SIZE)) {
-          const payload = group.map((sub) => {
+          // Pre-generate per-send open tokens so the URL in each email
+          // matches the sends row written via recordSend. Same approach as
+          // send-email/route.ts — see comment there.
+          const openTokens = group.map(() => crypto.randomUUID());
+          const payload = group.map((sub, i) => {
             const unsubscribeUrl = `${EMAIL_LINK_BASE}/u/${sub.unsubscribe_token}`;
             // Mail-client native one-click unsubscribe (RFC 8058). Separate
             // POST endpoint so a forwarded email / link scanner can't auto-
@@ -208,6 +212,7 @@ export async function GET(req: Request) {
               tipJarUrl:  tipJarTrackedUrl,
               announcementBanner,
               digestEmailHtml: body,
+              openToken: openTokens[i]!,
             });
             return {
               to: sub.email,
@@ -229,10 +234,12 @@ export async function GET(req: Request) {
             // batch failed so we can retry from /admin/mlb — hasAlreadySent
             // will skip the ones that did go through.
             const msg = (err as Error).message;
-            for (const sub of group) {
+            for (let i = 0; i < group.length; i++) {
+              const sub = group[i]!;
               await recordSend({
                 subscriberId: sub.id, sport, date,
                 resendId: null, error: msg, teamId,
+                openToken: openTokens[i]!,
               });
               failed++;
             }
@@ -245,6 +252,7 @@ export async function GET(req: Request) {
             await recordSend({
               subscriberId: sub.id, sport, date,
               resendId: r.id, error: r.error, teamId,
+              openToken: openTokens[i]!,
             });
             if (r.error) {
               failed++;

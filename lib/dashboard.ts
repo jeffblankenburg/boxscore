@@ -211,7 +211,7 @@ export async function getKpis(w: Window): Promise<DashboardKpis> {
     const opens = await fetchAll<{ resend_id: string }>(
       () => db.from("email_events")
         .select("resend_id")
-        .eq("event_type", "email.opened")
+        .in("event_type", ["email.opened", "boxscore.opened"])
         .gte("event_at", windowStartIso) as unknown as QueryBuilder<{ resend_id: string }>,
       "getKpis email_events",
     );
@@ -225,7 +225,7 @@ export async function getKpis(w: Window): Promise<DashboardKpis> {
     const { count } = await db
       .from("email_events")
       .select("id", { count: "exact", head: true })
-      .eq("event_type", "email.opened")
+      .in("event_type", ["email.opened", "boxscore.opened"])
       .limit(1);
     openTracked = (count ?? 0) > 0;
   }
@@ -448,7 +448,7 @@ export async function getOpenStickiness(
     let opens = 0;
     for (const date of dates) {
       const rid = ridByPair.get(`${sub}|${date}`);
-      if (rid && byId[rid]?.has("email.opened")) opens++;
+      if (rid && (byId[rid]?.has("email.opened") || byId[rid]?.has("boxscore.opened"))) opens++;
     }
     histogram[opens]!++;
   }
@@ -1273,7 +1273,7 @@ async function eventsByResendId(
     () => db.from("email_events")
       .select("resend_id, event_type")
       .gte("event_at", sinceIso)
-      .in("event_type", ["email.delivered", "email.opened", "email.clicked"]) as unknown as QueryBuilder<Ev>,
+      .in("event_type", ["email.delivered", "email.opened", "email.clicked", "boxscore.opened"]) as unknown as QueryBuilder<Ev>,
     "eventsByResendId",
   );
   const idSet = new Set(resendIds);
@@ -1320,7 +1320,7 @@ export async function getYesterdayAdStats(): Promise<YesterdayAdStats> {
     b.sends++;
     const evts = s.resend_id ? byId[s.resend_id] : undefined;
     if (evts?.has("email.delivered")) { b.delivered++; totalDelivered++; }
-    if (evts?.has("email.opened")) { b.opened++; totalOpened++; }
+    if (evts?.has("email.opened") || evts?.has("boxscore.opened")) { b.opened++; totalOpened++; }
     if (evts?.has("email.clicked")) { b.clicked++; totalClicked++; }
     buckets.set(key, b);
   }
@@ -1330,7 +1330,7 @@ export async function getYesterdayAdStats(): Promise<YesterdayAdStats> {
   const { count: openEverCount } = await db
     .from("email_events")
     .select("id", { count: "exact", head: true })
-    .eq("event_type", "email.opened");
+    .in("event_type", ["email.opened", "boxscore.opened"]);
 
   const breakdown = [...buckets.values()].sort((a, b) => {
     if (a.sport !== b.sport) return a.sport.localeCompare(b.sport);
@@ -1404,7 +1404,7 @@ export async function getRollingAdStats(days: number): Promise<RollingAdStats> {
       if (point) point.delivered++;
     }
     if (!point) continue; // event outside the axis window
-    if (evts.has("email.opened")) { point.opened++; totalOpened++; }
+    if (evts.has("email.opened") || evts.has("boxscore.opened")) { point.opened++; totalOpened++; }
     if (evts.has("email.clicked")) { point.clicked++; totalClicked++; }
   }
 
@@ -1416,7 +1416,7 @@ export async function getRollingAdStats(days: number): Promise<RollingAdStats> {
   const { count: openEverCount } = await db
     .from("email_events")
     .select("id", { count: "exact", head: true })
-    .eq("event_type", "email.opened");
+    .in("event_type", ["email.opened", "boxscore.opened"]);
 
   return {
     days,
@@ -1511,7 +1511,7 @@ export async function getPublicAdStatsSnapshot(
     db.from("email_events").select("id", { count: "exact", head: true })
       .gte("event_at", sinceIso).eq("event_type", "email.bounced"),
     getEngagementRates(engagementSinceIso, sport),
-    db.from("email_events").select("id", { count: "exact", head: true }).eq("event_type", "email.opened"),
+    db.from("email_events").select("id", { count: "exact", head: true }).in("event_type", ["email.opened", "boxscore.opened"]),
     // Web pageviews are not sport-scoped — the production site renders
     // multiple sports' pages from one Vercel project. Counting all
     // production pageviews is the correct "site-wide reach" number for
@@ -1765,11 +1765,11 @@ export async function getLast24hPulse(): Promise<Last24hPulse> {
       .lt("unsubscribed_at", last24hIso),
     db.from("email_events")
       .select("id", { count: "exact", head: true })
-      .eq("event_type", "email.opened")
+      .in("event_type", ["email.opened", "boxscore.opened"])
       .gte("event_at", last24hIso),
     db.from("email_events")
       .select("id", { count: "exact", head: true })
-      .eq("event_type", "email.opened")
+      .in("event_type", ["email.opened", "boxscore.opened"])
       .gte("event_at", prior24hIso)
       .lt("event_at", last24hIso),
     db.from("email_events")
@@ -1864,4 +1864,238 @@ export function formatBytes(n: number): string {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+// ---- Subscriber acquisition sources -------------------------------------
+//
+// Backed by the migration-0057 columns on subscribers: utm_source/medium/
+// campaign/content/term + referrer + landing_path. Captured at /subscribe
+// POST via the root-layout sessionStorage script (see app/layout.tsx) and
+// only written for genuinely-new rows so first-touch attribution sticks
+// across resubscribes.
+//
+// Windowing is on `created_at` — we want acquisition signal (who showed up)
+// not activation signal (who confirmed). A subscriber who signed up via
+// Reddit but never clicked the confirm link is still useful attribution
+// data; the diligence question is "where are signups coming from?", not
+// "where are activations coming from?"
+//
+// Pre-migration rows have nulls for all attribution columns and `created_at`
+// before 2026-06-22. We bucket those into a separate "pre-migration" count
+// so they don't pollute the "direct/unknown" bucket of the post-migration
+// window.
+
+export type SourceCount = { key: string; count: number };
+
+export type SubscriberSources = {
+  windowStartIso: string;
+  // Acquisition attempts (subscribers.created_at) in the window. Includes
+  // active, pending, and unsubscribed — every signup attempt is acquisition
+  // signal, even if it never confirmed.
+  total: number;
+  // Of `total`, how many had any utm_* field or a referrer recorded.
+  withAttribution: number;
+  // Of `total`, how many had no utm AND no referrer. Post-migration this
+  // means direct traffic; pre-migration it means the capture didn't exist.
+  unknownOrDirect: number;
+  // Top groupings, sorted desc by count, capped at MAX_KEYS_PER_FACET.
+  bySource: SourceCount[];
+  byMedium: SourceCount[];
+  byCampaign: SourceCount[];
+  byReferrerHost: SourceCount[];
+  // Full referrer URL — for "go visit the page that linked us." Search
+  // engines (Google/Bing) ship only the origin so those rows aren't
+  // useful to click, but blog posts / news articles / Reddit threads /
+  // HN comments preserve the full URL.
+  byReferrerUrl: SourceCount[];
+  byLandingPath: SourceCount[];
+};
+
+const MAX_KEYS_PER_FACET = 20;
+// URL-level facets get more headroom — same hostname can appear under
+// many distinct URLs (each Reddit thread, each blog post, etc.), and the
+// whole point of the URL table is "give me a list of pages to visit."
+const MAX_URLS_PER_FACET = 50;
+
+// Best-effort URL → hostname. Returns the raw string if it doesn't parse
+// (we can't trust client-supplied referrer strings to be valid URLs).
+function referrerHost(raw: string): string {
+  try {
+    const u = new URL(raw);
+    return u.hostname || raw;
+  } catch {
+    return raw;
+  }
+}
+
+function topN(counts: Map<string, number>, n: number): SourceCount[] {
+  return Array.from(counts.entries())
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .slice(0, n);
+}
+
+// ---- Site traffic sources (all visitors, not just signups) -------------
+//
+// Backed by page_views.raw — Vercel Web Analytics Drain ships `referrer` on
+// session-entry pageviews only (verified 2026-06-22 via probe-page-view-fields.ts:
+// ~1 in 20 production pageviews had a referrer field set, matching Vercel's
+// privacy-first "entry referrer per session" model).
+//
+// Counting model: we count entry events with a referrer as one "referred
+// session." Mid-session pageviews don't double-count. Sessions with no
+// referrer (typed URL, bookmark, app-link, referrer-policy: no-referrer
+// from the source page) are bucketed as direct/unknown.
+//
+// Note on session_id: Vercel sometimes ships sessionId=0 as a sentinel for
+// missing — we treat each (session_id, device_id) pair as unique. Two
+// sentinel rows on the same device collapse to one session count.
+
+export type TrafficSources = {
+  windowStartIso: string;
+  pageviews: number;           // total production pageviews in window
+  sessions: number;            // distinct (session_id, device_id) pairs
+  referredSessions: number;    // sessions whose entry event had a referrer
+  directOrUnknown: number;     // sessions − referredSessions
+  byReferrerHost: SourceCount[];
+  // Full URL of the referring page — clickable in the admin so we can
+  // actually go read what people are saying about us. Search-engine
+  // referrers degenerate to origin only (see top-of-file comment).
+  byReferrerUrl: SourceCount[];
+  byLandingPath: SourceCount[];
+};
+
+export async function getTrafficSources(w: Window): Promise<TrafficSources> {
+  const windowStartMs = Date.now() - windowHours(w) * 3600 * 1000;
+  const windowStartIso = new Date(windowStartMs).toISOString();
+
+  type Row = {
+    path: string | null;
+    session_id: number | null;
+    device_id: number | null;
+    raw: { referrer?: string } | null;
+  };
+  const rows = await fetchAll<Row>(
+    () => supabaseAdmin()
+      .from("page_views")
+      .select("path, session_id, device_id, raw")
+      .eq("event_type", "pageview")
+      .eq("vercel_environment", "production")
+      .gte("occurred_at", windowStartIso) as unknown as QueryBuilder<Row>,
+    "getTrafficSources",
+  );
+
+  // De-dupe to sessions. Vercel sends ~1 referrer per session on the entry
+  // event, so we group all rows by (session_id, device_id) and pick the
+  // first referrer we see for that session. Sessions with no referrer on
+  // any of their pageviews count as direct/unknown.
+  const sessionRef = new Map<string, string | null>();
+  const sessionLanding = new Map<string, string | null>();
+  for (const r of rows) {
+    const key = `${r.session_id ?? 0}:${r.device_id ?? 0}`;
+    const ref = r.raw?.referrer ?? null;
+    // First non-null referrer wins; once set, don't overwrite with a later
+    // mid-session pageview that lacks one.
+    if (ref && !sessionRef.get(key)) {
+      sessionRef.set(key, ref);
+    } else if (!sessionRef.has(key)) {
+      sessionRef.set(key, null);
+    }
+    if (!sessionLanding.has(key) && r.path) {
+      sessionLanding.set(key, r.path);
+    }
+  }
+
+  const refHostCounts = new Map<string, number>();
+  const refUrlCounts = new Map<string, number>();
+  const landingCounts = new Map<string, number>();
+  let referredSessions = 0;
+  for (const [key, ref] of sessionRef) {
+    if (ref) {
+      referredSessions++;
+      refHostCounts.set(referrerHost(ref), (refHostCounts.get(referrerHost(ref)) ?? 0) + 1);
+      refUrlCounts.set(ref, (refUrlCounts.get(ref) ?? 0) + 1);
+    }
+    const landing = sessionLanding.get(key);
+    if (landing) {
+      landingCounts.set(landing, (landingCounts.get(landing) ?? 0) + 1);
+    }
+  }
+
+  const sessions = sessionRef.size;
+  return {
+    windowStartIso,
+    pageviews: rows.length,
+    sessions,
+    referredSessions,
+    directOrUnknown: sessions - referredSessions,
+    byReferrerHost: topN(refHostCounts, MAX_KEYS_PER_FACET),
+    byReferrerUrl:  topN(refUrlCounts,  MAX_URLS_PER_FACET),
+    byLandingPath:  topN(landingCounts, MAX_KEYS_PER_FACET),
+  };
+}
+
+export async function getSubscriberSources(w: Window): Promise<SubscriberSources> {
+  const windowStartMs = Date.now() - windowHours(w) * 3600 * 1000;
+  const windowStartIso = new Date(windowStartMs).toISOString();
+
+  type Row = {
+    created_at: string | null;
+    utm_source: string | null;
+    utm_medium: string | null;
+    utm_campaign: string | null;
+    utm_content: string | null;
+    utm_term: string | null;
+    referrer: string | null;
+    landing_path: string | null;
+  };
+  const rows = await fetchAll<Row>(
+    () => supabaseAdmin()
+      .from("subscribers")
+      .select("created_at, utm_source, utm_medium, utm_campaign, utm_content, utm_term, referrer, landing_path")
+      .gte("created_at", windowStartIso) as unknown as QueryBuilder<Row>,
+    "getSubscriberSources",
+  );
+
+  let total = 0;
+  let withAttribution = 0;
+  const sourceCounts = new Map<string, number>();
+  const mediumCounts = new Map<string, number>();
+  const campaignCounts = new Map<string, number>();
+  const refHostCounts = new Map<string, number>();
+  const refUrlCounts = new Map<string, number>();
+  const landingCounts = new Map<string, number>();
+
+  const bump = (m: Map<string, number>, k: string) => {
+    m.set(k, (m.get(k) ?? 0) + 1);
+  };
+
+  for (const r of rows) {
+    total++;
+    const hasUtm = !!(r.utm_source || r.utm_medium || r.utm_campaign || r.utm_content || r.utm_term);
+    const hasRef = !!r.referrer;
+    if (hasUtm || hasRef) withAttribution++;
+
+    if (r.utm_source) bump(sourceCounts, r.utm_source);
+    if (r.utm_medium) bump(mediumCounts, r.utm_medium);
+    if (r.utm_campaign) bump(campaignCounts, r.utm_campaign);
+    if (r.referrer) {
+      bump(refHostCounts, referrerHost(r.referrer));
+      bump(refUrlCounts, r.referrer);
+    }
+    if (r.landing_path) bump(landingCounts, r.landing_path);
+  }
+
+  return {
+    windowStartIso,
+    total,
+    withAttribution,
+    unknownOrDirect: total - withAttribution,
+    bySource:        topN(sourceCounts,   MAX_KEYS_PER_FACET),
+    byMedium:        topN(mediumCounts,   MAX_KEYS_PER_FACET),
+    byCampaign:      topN(campaignCounts, MAX_KEYS_PER_FACET),
+    byReferrerHost:  topN(refHostCounts,  MAX_KEYS_PER_FACET),
+    byReferrerUrl:   topN(refUrlCounts,   MAX_URLS_PER_FACET),
+    byLandingPath:   topN(landingCounts,  MAX_KEYS_PER_FACET),
+  };
 }

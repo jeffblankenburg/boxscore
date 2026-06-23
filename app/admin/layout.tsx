@@ -1,34 +1,22 @@
-"use client";
-
-// Top-level admin layout. Renders the persistent sidebar + top bar shell
-// for every /admin/* route EXCEPT the unauthenticated /admin/login and
-// /admin/verify pages, which need to render bare. usePathname() is the
-// reason this is a client component; server children below still render
-// server-side and stream through.
+// Top-level admin layout. Reads the current admin's session email and
+// renders the shell via AdminLayoutShell (which owns the bare-path check
+// since usePathname is client-only).
 //
-// See issue #50 for the design decisions driving this rebuild.
+// The session lookup duplicates the work requireAdmin() does on each page,
+// but keeping the layout as the source of truth for the topbar avoids
+// threading the email through every page component. validateSession is a
+// single token-keyed select with an unused-row check — cheap.
+//
+// See issue #50 for the design decisions driving the rebuild.
 
-import { usePathname } from "next/navigation";
-import { Sidebar } from "./_components/Sidebar";
+import { cookies } from "next/headers";
+import { ADMIN_SESSION_COOKIE, validateSession } from "@/lib/admin-auth";
+import { AdminLayoutShell } from "./_components/AdminLayoutShell";
 import "./admin.css";
 
-const BARE_PATHS = new Set(["/admin/login", "/admin/verify"]);
-
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  if (BARE_PATHS.has(pathname)) {
-    return <>{children}</>;
-  }
-  return (
-    <div className="a-shell">
-      <Sidebar />
-      <div className="a-topbar">
-        <div /> {/* breadcrumbs slot — rendered per-page inside content */}
-        <div className="a-topbar-right">
-          <a href="/admin/login" className="a-muted">Sign out</a>
-        </div>
-      </div>
-      <main className="a-content">{children}</main>
-    </div>
-  );
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const jar = await cookies();
+  const sessionToken = jar.get(ADMIN_SESSION_COOKIE)?.value;
+  const email = sessionToken ? await validateSession(sessionToken) : null;
+  return <AdminLayoutShell email={email}>{children}</AdminLayoutShell>;
 }

@@ -85,12 +85,16 @@ async function aggregateEventsForResendIds(ids: string[]): Promise<EventTotals> 
       .from("email_events")
       .select("resend_id, event_type")
       .in("resend_id", chunk)
-      .in("event_type", ["email.delivered", "email.opened", "email.clicked"]);
+      .in("event_type", ["email.delivered", "email.opened", "email.clicked", "boxscore.opened"]);
     if (error) throw new Error(`aggregateEventsForResendIds: ${error.message}`);
     for (const e of (data ?? []) as Array<{ resend_id: string | null; event_type: string }>) {
       if (!e.resend_id) continue;
       if (e.event_type === "email.delivered") deliveredSet.add(e.resend_id);
-      else if (e.event_type === "email.opened")  openedSet.add(e.resend_id);
+      // Either pixel firing counts as one open — set dedupes by resend_id
+      // so we never double-count even if Resend's pixel and ours both fire.
+      else if (e.event_type === "email.opened" || e.event_type === "boxscore.opened") {
+        openedSet.add(e.resend_id);
+      }
       else if (e.event_type === "email.clicked") clickedSet.add(e.resend_id);
     }
   }

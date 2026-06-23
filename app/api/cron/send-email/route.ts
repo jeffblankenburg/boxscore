@@ -122,7 +122,12 @@ export async function GET(req: Request) {
     const groups = chunk(toSend, BATCH_SIZE);
     for (const [batchIndex, group] of groups.entries()) {
       const batchStart = performance.now();
-      const payload = group.map((sub) => {
+      // openTokens[i] aligns with group[i]. Pre-generated so the same UUID
+      // ends up in the email's pixel URL and the recordSend upsert. Without
+      // pre-generation, the token would have to round-trip through the DB
+      // before render — adding a write per subscriber on the hot path.
+      const openTokens = group.map(() => crypto.randomUUID());
+      const payload = group.map((sub, i) => {
         const unsubscribeUrl = `${EMAIL_LINK_BASE}/u/${sub.unsubscribe_token}`;
         // Mail-client native "Unsubscribe" buttons POST to this URL (RFC 8058).
         // It's a separate endpoint from the human-facing /u/[token] page so
@@ -139,6 +144,7 @@ export async function GET(req: Request) {
           tipJarUrl:  tipJarTrackedUrl,
           announcementBanner,
           digestEmailHtml: digest.email_html!,
+          openToken: openTokens[i]!,
         });
         return {
           to: sub.email,
@@ -166,8 +172,11 @@ export async function GET(req: Request) {
         // through. Parallelized to match the success path — sequential
         // awaits here re-introduce the 100× latency multiplier.
         const msg = (err as Error).message;
-        await Promise.all(group.map(async (sub) => {
-          await recordSend({ subscriberId: sub.id, sport, date, resendId: null, error: msg });
+        await Promise.all(group.map(async (sub, i) => {
+          await recordSend({
+            subscriberId: sub.id, sport, date, resendId: null, error: msg,
+            openToken: openTokens[i]!,
+          });
           failed++;
         }));
         console.log(
@@ -193,6 +202,7 @@ export async function GET(req: Request) {
         await recordSend({
           subscriberId: sub.id, sport, date,
           resendId: r.id, error: r.error,
+          openToken: openTokens[i]!,
         });
         if (r.error) {
           failed++;
