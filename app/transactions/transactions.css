@@ -1,0 +1,163 @@
+.tx-page { padding: 0 0 32px; }
+
+.tx-title {
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-weight: 900;
+  font-size: 32px;
+  margin: 8px 0 4px;
+  letter-spacing: -0.01em;
+}
+.tx-subtitle {
+  color: var(--text-muted);
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+
+/* ─── Chart ─────────────────────────────────────────────────────── */
+
+.tx-chart-wrap {
+  position: relative;
+  margin: 0 0 14px;
+  border: 1px solid var(--border-light);
+  background: #fff;
+  padding: 4px 6px 0;
+}
+.tx-chart {
+  display: block;
+  width: 100%;
+  height: 180px;
+  cursor: crosshair;
+}
+.tx-chart-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 32px;
+  text-align: center;
+  border: 1px solid var(--border-light);
+  background: #fff;
+  margin: 0 0 14px;
+}
+.tx-chart-tooltip {
+  position: absolute;
+  top: 6px;
+  transform: translateX(-50%);
+  background: #000;
+  color: #fff;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  display: inline-flex;
+  gap: 8px;
+}
+.tx-chart-tooltip-date { font-weight: 700; }
+.tx-chart-tooltip-total { opacity: 0.85; }
+
+/* ─── Team tabs (admin-style: small, mono, team-color tinted) ──── */
+
+.tx-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0 0 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+}
+.tx-tab {
+  display: inline-block;
+  width: 36px;
+  padding: 3px 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  text-decoration: none;
+  text-align: center;
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  background: #fff;
+  white-space: nowrap;
+}
+.tx-tab:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+.tx-tab-active,
+.tx-tab-active:hover {
+  background: #000;
+  color: #fff;
+  border-color: #000;
+}
+
+/* ─── Matrix table ─────────────────────────────────────────────── */
+
+.tx-scroll { overflow-x: auto; }
+
+.tx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 1100px;
+}
+.tx-table th,
+.tx-table td {
+  border: 1px solid var(--border-light);
+  padding: 4px 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+.tx-table th {
+  background: #f0ebde;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+  white-space: normal;
+  vertical-align: bottom;
+}
+.tx-table td.tx-col-date,
+.tx-table th.tx-col-date {
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  width: 110px;
+  min-width: 110px;
+}
+.tx-date-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-muted);
+}
+.tx-date-link:hover {
+  border-bottom-color: var(--border-strong);
+  border-bottom-style: solid;
+}
+.tx-table td.tx-col-total,
+.tx-table th.tx-col-total {
+  font-weight: 700;
+}
+.tx-table tbody tr:nth-child(even) { background: #fafafa; }
+.tx-table tfoot td {
+  background: #f0ebde;
+  font-weight: 700;
+  border-top: 2px solid var(--border-strong);
+}
+.tx-table-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px;
+}
+
+/* Chart-click highlight: brief yellow wash on the targeted row. */
+@keyframes tx-row-flash {
+  0%   { background: #fff4a3; }
+  100% { background: transparent; }
+}
+.tx-table tbody tr.tx-row-flash,
+.tx-table tbody tr.tx-row-flash:nth-child(even) {
+  animation: tx-row-flash 1.6s ease-out;
+}
