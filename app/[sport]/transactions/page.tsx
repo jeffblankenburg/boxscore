@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { parseTransactions, type Transaction } from "@/lib/mlb";
 import { teamsBySport, findTeam } from "@/lib/teams";
-import { todayInET } from "@/lib/dates";
+import { todayInET, nextDay } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { TransactionChart, type ChartPoint } from "./transaction-chart";
 import "./transactions.css";
@@ -147,13 +147,13 @@ async function loadSeason(
 const META_TITLE = "MLB Transactions | boxscore";
 const META_DESC =
   "Daily MLB roster moves for the season — IL placements and activations, DFAs, options, recalls, 40-man selections, and signings. Filter by team.";
-const META_URL = `${EMAIL_LINK_BASE}/transactions`;
+const META_URL = `${EMAIL_LINK_BASE}/mlb/transactions`;
 const META_IMG = `${EMAIL_LINK_BASE}/icon.png`;
 
 export const metadata = {
   title: META_TITLE,
   description: META_DESC,
-  alternates: { canonical: "/transactions" },
+  alternates: { canonical: "/mlb/transactions" },
   openGraph: {
     title: META_TITLE,
     description: META_DESC,
@@ -171,10 +171,14 @@ export const metadata = {
 };
 
 export default async function TransactionPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ sport: string }>;
   searchParams: Promise<{ team?: string }>;
 }) {
+  const { sport } = await params;
+  if (sport !== "mlb") notFound();
   const sp = await searchParams;
   const teamParam = (sp.team ?? "mlb").toLowerCase();
   const isAll = teamParam === "mlb";
@@ -210,7 +214,7 @@ export default async function TransactionPage({
       <nav className="tx-tabs" aria-label="Team filter">
         <a
           className={`tx-tab ${isAll ? "tx-tab-active" : ""}`}
-          href="/transactions"
+          href="/mlb/transactions"
         >
           MLB
         </a>
@@ -228,7 +232,7 @@ export default async function TransactionPage({
             <a
               key={t.slug}
               className={`tx-tab ${isActive ? "tx-tab-active" : ""}`}
-              href={`/transactions?team=${t.slug}`}
+              href={`/mlb/transactions?team=${t.slug}`}
               style={style}
               title={t.name}
             >
@@ -254,7 +258,7 @@ export default async function TransactionPage({
               <tr key={r.date} id={`d-${r.date}`}>
                 <td className="tx-col-date">
                   <a
-                    href={team ? `/mlb/${team.slug}/${r.date}` : `/mlb/${r.date}`}
+                    href={team ? `/mlb/${team.slug}/${nextDay(r.date)}` : `/mlb/${nextDay(r.date)}`}
                     className="tx-date-link"
                   >
                     {prettyShortDate(r.date)}

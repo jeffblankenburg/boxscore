@@ -1,4 +1,4 @@
-// Screenshot the /transactions page from the running dev server.
+// Screenshot the /mlb/transactions page from the running dev server.
 // Captures the MLB-default view and (optionally) one team view.
 //
 // Usage:
@@ -33,8 +33,8 @@ async function main() {
   const outArg = process.argv[2] ?? "/tmp/transactions-mlb.png";
   const out = resolve(outArg);
   await mkdir(resolve(out, ".."), { recursive: true });
-  await shot("/transactions", out);
-  await shot("/transactions?team=lad", resolve("/tmp/transactions-lad.png"));
+  await shot("/mlb/transactions", out);
+  await shot("/mlb/transactions?team=lad", resolve("/tmp/transactions-lad.png"));
 }
 
 main().catch((e) => {
