@@ -1,17 +1,12 @@
 import { notFound } from "next/navigation";
-import { supabaseAdmin } from "@/lib/supabase";
-import { getSlate, type SlateGame } from "@/lib/mlb";
-import { todayInET, timeInET, prevDay } from "@/lib/dates";
+import { getSlate } from "@/lib/mlb";
+import { todayInET, timeInET } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
-import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
+import { loadFantasyForDate } from "@/lib/sports/mlb/fantasy-data";
 import {
-  projectFantasySlate,
   HITTER_CATEGORIES,
   type FantasyHitterRow,
   type FantasySpRow,
-  type HitterSeasonInput,
-  type PitcherSeasonInput,
-  type PlayerProfileInput,
   type HitterCategory,
 } from "@/lib/sports/mlb/fantasy";
 import "./fantasy.css";
@@ -45,146 +40,22 @@ type FantasyData = {
   startingPitchers: FantasySpRow[];
 };
 
-// Type narrowings for the bits of yesterday's daily_raw boxscore we read.
-type YesterdayBoxTeam = {
-  team?: { id?: number; abbreviation?: string };
-  battingOrder?: number[];
-  pitchers?: number[];
-};
-type YesterdayBoxscore = {
-  teams?: { away?: YesterdayBoxTeam; home?: YesterdayBoxTeam };
-};
-type YesterdayGames = Record<string, { boxscore?: YesterdayBoxscore }>;
-
 async function loadFantasy(date: string): Promise<FantasyData> {
-  const season = Number(date.slice(0, 4));
-  const sb = supabaseAdmin();
-
-  // 1. Slate from statsapi.
-  let slate: SlateGame[] = [];
+  // Slate fetched once more here to derive firstPitchEt for the subtitle.
+  // The data-loader fetches its own copy; Next/fetch dedup makes this
+  // effectively one network call per request.
+  let firstPitch: string | null = null;
   try {
-    slate = await getSlate(date);
+    const slate = await getSlate(date);
+    firstPitch = slate
+      .filter((g) => g.status === "scheduled")
+      .map((g) => g.gameDate)
+      .sort()[0] ?? null;
   } catch {
-    slate = [];
-  }
-  const spMlbIds = new Set<number>();
-  for (const g of slate) {
-    if (g.away.probablePitcher) spMlbIds.add(g.away.probablePitcher.id);
-    if (g.home.probablePitcher) spMlbIds.add(g.home.probablePitcher.id);
-  }
-  const firstPitch = slate
-    .filter((g) => g.status === "scheduled")
-    .map((g) => g.gameDate)
-    .sort()[0] ?? null;
-
-  // 2. Yesterday's daily_raw — gives us per-team starting nine + SP as the
-  //    "probable lineup" fallback when today's lineup isn't posted yet.
-  //    Keyed by team abbreviation so we can match the slate.
-  const yesterdayDate = prevDay(date);
-  const { data: yRows } = await sb
-    .from("daily_raw")
-    .select("payload")
-    .eq("sport", "mlb")
-    .eq("date", yesterdayDate)
-    .limit(1);
-  const probableHittersByTeamAbbr = new Map<string, number[]>();  // mlb_ids
-  const yRow = yRows?.[0];
-  if (yRow) {
-    const games = ((yRow.payload as { games?: YesterdayGames })?.games) ?? {};
-    for (const g of Object.values(games)) {
-      const teams = g.boxscore?.teams;
-      for (const side of [teams?.away, teams?.home] as Array<YesterdayBoxTeam | undefined>) {
-        if (!side) continue;
-        const abbr = side.team?.abbreviation?.toUpperCase();
-        const ids = (side.battingOrder ?? []).filter((n) => typeof n === "number");
-        if (abbr && ids.length > 0) probableHittersByTeamAbbr.set(abbr, ids);
-      }
-    }
+    firstPitch = null;
   }
 
-  // 3. Pull in confirmed lineup mlb_ids from today's slate.
-  const confirmedHittersByTeamAbbr = new Map<string, number[]>();
-  for (const g of slate) {
-    if (g.away.lineupConfirmed) confirmedHittersByTeamAbbr.set(g.away.abbr.toUpperCase(), g.away.lineup.map((l) => l.playerId));
-    if (g.home.lineupConfirmed) confirmedHittersByTeamAbbr.set(g.home.abbr.toUpperCase(), g.home.lineup.map((l) => l.playerId));
-  }
-
-  // 4. Build the set of mlb_ids we need stats and profiles for. Confirmed
-  //    lineups take precedence over yesterday's fallback (so a player who
-  //    started yesterday but isn't in today's lineup drops out).
-  const hitterMlbIds = new Set<number>();
-  const rosterMlbByAbbr = new Map<string, number[]>();
-  for (const abbr of new Set([
-    ...probableHittersByTeamAbbr.keys(),
-    ...confirmedHittersByTeamAbbr.keys(),
-  ])) {
-    const ids = confirmedHittersByTeamAbbr.get(abbr) ?? probableHittersByTeamAbbr.get(abbr) ?? [];
-    rosterMlbByAbbr.set(abbr, ids);
-    for (const id of ids) hitterMlbIds.add(id);
-  }
-  const allMlbIds = new Set<number>([...hitterMlbIds, ...spMlbIds]);
-
-  // 5. Translate mlb_ids → internal player_seasons.player_id via the
-  //    canonical-players lookup (already-cached in-memory after first call).
-  const lookup = await getCanonicalPlayerLookup();
-  const internalToMlb = new Map<number, number>();
-  const mlbToInternal = new Map<number, number>();
-  for (const mlbId of allMlbIds) {
-    const rec = lookup.byMlbId.get(mlbId);
-    if (!rec) continue;
-    mlbToInternal.set(mlbId, rec.internalId);
-    internalToMlb.set(rec.internalId, mlbId);
-  }
-  const allInternalIds = [...internalToMlb.keys()];
-
-  // 6. Batch-query player_seasons (by internal id) and players (by internal
-  //    id) for this season.
-  const seasonRowCols =
-    "player_id, primary_position, team_abbr, pa, ab, h, doubles, triples, hr, rbi, r, sb, bb_bat, avg, obp, slg, ops, games_played, ip, k, w, era, whip, bb_pitch, hr_allowed";
-  const { data: seasonRows } = allInternalIds.length === 0
-    ? { data: [] }
-    : await sb
-        .from("player_seasons")
-        .select(seasonRowCols)
-        .eq("season", season)
-        .in("player_id", allInternalIds);
-  const { data: profileRows } = allInternalIds.length === 0
-    ? { data: [] }
-    : await sb
-        .from("players")
-        .select("id, full_name, boxscore_name, primary_position, bats, throws, name_slug")
-        .in("id", allInternalIds);
-
-  // 7. Build the maps the projection module expects — keyed by mlb_id (the
-  //    slate uses mlb_ids; keeping the same key avoids a second translation
-  //    in the projection module).
-  const hittersById = new Map<number, HitterSeasonInput>();
-  const pitchersById = new Map<number, PitcherSeasonInput>();
-  for (const row of (seasonRows ?? []) as Array<{ player_id: number } & Record<string, unknown>>) {
-    const mlbId = internalToMlb.get(row.player_id);
-    if (!mlbId) continue;
-    // The row carries both batting and pitching columns; the projection
-    // module only reads the ones relevant per category.
-    const remapped = { ...row, player_id: mlbId };
-    hittersById.set(mlbId, remapped as unknown as HitterSeasonInput);
-    pitchersById.set(mlbId, remapped as unknown as PitcherSeasonInput);
-  }
-  const profilesById = new Map<number, PlayerProfileInput>();
-  for (const row of (profileRows ?? []) as Array<{ id: number } & Record<string, unknown>>) {
-    const mlbId = internalToMlb.get(row.id);
-    if (!mlbId) continue;
-    profilesById.set(mlbId, { ...row, player_id: mlbId } as unknown as PlayerProfileInput);
-  }
-
-  // 8. Project. rosterByTeamAbbr already keyed by mlb_id.
-  const projections = projectFantasySlate({
-    date,
-    slate,
-    hittersById,
-    pitchersById,
-    profilesById,
-    rosterByTeamAbbr: rosterMlbByAbbr,
-  });
+  const { projections } = await loadFantasyForDate(date);
 
   return {
     date,

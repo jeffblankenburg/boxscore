@@ -55,6 +55,14 @@
     {
       "path": "/api/cron/predictions-snapshot?sport=mlb",
       "schedule": "30 14 * * *"
+    },
+    {
+      "path": "/api/cron/fantasy-snapshot?sport=mlb",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/predictions-comparator?sport=mlb",
+      "schedule": "30 9 * * *"
     }
   ],
   "functions": {
