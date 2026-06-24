@@ -35,46 +35,53 @@ export type ClickSummary = {
 };
 
 const MS_DAY = 24 * 60 * 60 * 1000;
+const PAGE_SIZE = 1000;
 
-// Per-table summary. While volumes are low (likely months) this fetches every
-// row to compute lifetime totals. If a table ever exceeds PostgREST's 1000-row
-// default cap, promote to a DB view or RPC aggregation.
+// Per-table summary. Totals + 7d + 24h come from cheap server-side count()
+// queries (no row pull); per-src aggregation paginates the full table
+// (PostgREST has no GROUP BY). If src cardinality stays in the dozens this
+// will be fine for years; if it ever feels slow, promote to a SQL view.
 export async function getEmailLinkClicksSummary(): Promise<ClickSummary> {
   const supa = supabaseAdmin();
   const now = Date.now();
   const d1 = new Date(now - MS_DAY).toISOString();
   const d7 = new Date(now - 7 * MS_DAY).toISOString();
 
-  const { data: allRows, error: e1 } = await supa
-    .from("email_link_clicks")
-    .select("src");
-  if (e1) throw new Error(`email_link_clicks total: ${e1.message}`);
+  // Cheap counts: server returns the count header without shipping rows.
+  // Caps at PostgREST's 1000-row default do not apply to count-only queries.
+  const [totalQ, last7dQ, last24hQ, recentQ] = await Promise.all([
+    supa.from("email_link_clicks").select("id", { count: "exact", head: true }),
+    supa.from("email_link_clicks").select("id", { count: "exact", head: true }).gte("clicked_at", d7),
+    supa.from("email_link_clicks").select("id", { count: "exact", head: true }).gte("clicked_at", d1),
+    supa.from("email_link_clicks")
+      .select("id, src, link_target, clicked_at, referer")
+      .order("clicked_at", { ascending: false })
+      .limit(50),
+  ]);
+  if (totalQ.error)   throw new Error(`email_link_clicks total: ${totalQ.error.message}`);
+  if (last7dQ.error)  throw new Error(`email_link_clicks 7d: ${last7dQ.error.message}`);
+  if (last24hQ.error) throw new Error(`email_link_clicks 24h: ${last24hQ.error.message}`);
+  if (recentQ.error)  throw new Error(`email_link_clicks recent: ${recentQ.error.message}`);
 
-  const { data: recent7Rows, error: e2 } = await supa
-    .from("email_link_clicks")
-    .select("id, src, link_target, clicked_at, referer")
-    .gte("clicked_at", d7)
-    .order("clicked_at", { ascending: false });
-  if (e2) throw new Error(`email_link_clicks 7d: ${e2.message}`);
-
-  const total = allRows?.length ?? 0;
-  const totalBySrc = new Map<string, number>();
-  for (const r of allRows ?? []) {
-    const s = r.src as string;
-    totalBySrc.set(s, (totalBySrc.get(s) ?? 0) + 1);
-  }
-
-  const rows7d = (recent7Rows ?? []) as ClickRow[];
-  const last7d = rows7d.length;
-  const last24h = rows7d.filter((r) => r.clicked_at >= d1).length;
-
-  const recent24hBySrc = new Map<string, number>();
-  const recent7dBySrc = new Map<string, number>();
-  for (const r of rows7d) {
-    recent7dBySrc.set(r.src, (recent7dBySrc.get(r.src) ?? 0) + 1);
-    if (r.clicked_at >= d1) {
-      recent24hBySrc.set(r.src, (recent24hBySrc.get(r.src) ?? 0) + 1);
+  // Per-src totals: paginate the whole table. Each row is just (src,
+  // clicked_at) — small payload. Aggregation runs in JS.
+  const totalBySrc   = new Map<string, number>();
+  const last7dBySrc  = new Map<string, number>();
+  const last24hBySrc = new Map<string, number>();
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supa
+      .from("email_link_clicks")
+      .select("src, clicked_at")
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`email_link_clicks paginated scan: ${error.message}`);
+    const page = (data ?? []) as Array<{ src: string; clicked_at: string }>;
+    for (const r of page) {
+      totalBySrc.set(r.src, (totalBySrc.get(r.src) ?? 0) + 1);
+      if (r.clicked_at >= d7) last7dBySrc.set(r.src, (last7dBySrc.get(r.src) ?? 0) + 1);
+      if (r.clicked_at >= d1) last24hBySrc.set(r.src, (last24hBySrc.get(r.src) ?? 0) + 1);
     }
+    if (page.length < PAGE_SIZE) break;
   }
 
   // Sort by 7-day count descending so busy sources are on top; fall back to
@@ -82,17 +89,17 @@ export async function getEmailLinkClicksSummary(): Promise<ClickSummary> {
   const bySrc: ClickSourceSummary[] = Array.from(totalBySrc.keys())
     .map((src) => ({
       src,
-      total: totalBySrc.get(src) ?? 0,
-      last7d: recent7dBySrc.get(src) ?? 0,
-      last24h: recent24hBySrc.get(src) ?? 0,
+      total:   totalBySrc.get(src)   ?? 0,
+      last7d:  last7dBySrc.get(src)  ?? 0,
+      last24h: last24hBySrc.get(src) ?? 0,
     }))
     .sort((a, b) => b.last7d - a.last7d || a.src.localeCompare(b.src));
 
   return {
-    total,
-    last7d,
-    last24h,
+    total:   totalQ.count   ?? 0,
+    last7d:  last7dQ.count  ?? 0,
+    last24h: last24hQ.count ?? 0,
     bySrc,
-    recent: rows7d.slice(0, 50),
+    recent: (recentQ.data ?? []) as ClickRow[],
   };
 }
