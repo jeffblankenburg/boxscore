@@ -128,13 +128,18 @@ export default async function AdminDemographicsView() {
   await requireAdmin();
   const rows = await loadRows();
   const total = rows.length;
-  const completed = rows.filter((r) => r.demographics_completed_at !== null).length;
+  // Breakdowns are scoped to subscribers who finished the welcome form, so
+  // percentages describe "of those who answered, what did they pick?" The
+  // response-rate panel at the top is the only place the full active-list
+  // denominator still appears — that's where it's actually the right number.
+  const completedRows = rows.filter((r) => r.demographics_completed_at !== null);
+  const completed = completedRows.length;
   const responseRate = total ? (completed / total) * 100 : 0;
 
-  // State breakdown — only meaningful within the US subset. Anyone who
-  // saved a region for a non-US country would have had it cleared by
-  // sanitizeDemographics, but we double-check by filtering here.
-  const usRows = rows.filter((r) => r.country === "US");
+  // State breakdown — only meaningful within the US subset of completions.
+  // Anyone who saved a region for a non-US country would have had it cleared
+  // by sanitizeDemographics, but we double-check by filtering here.
+  const usRows = completedRows.filter((r) => r.country === "US");
 
   return (
     <main className="admin">
@@ -145,18 +150,19 @@ export default async function AdminDemographicsView() {
         <p className="admin-meta" style={{ margin: "0 0 8px" }}>
           <b>{completed.toLocaleString()}</b> of <b>{total.toLocaleString()}</b> active subscribers
           have completed the welcome form — <b>{responseRate.toFixed(1)}%</b>.
-          Active = subscribers.status = &lsquo;active&rsquo;.
+          Active = subscribers.status = &lsquo;active&rsquo;. Percentages below
+          are out of the {completed.toLocaleString()} completed responses.
         </p>
         <div style={{ display: "flex", height: 14, background: "#eee", borderRadius: 2, overflow: "hidden" }}>
           <div style={{ width: `${responseRate}%`, background: "#1f7a3a" }} title={`${completed} completed`} />
         </div>
       </section>
 
-      <BreakdownTable title="Country"            rows={breakdown(rows,   "country",     COUNTRIES)} />
-      <BreakdownTable title={`State (US only — ${usRows.length.toLocaleString()} subscribers)`} rows={breakdown(usRows, "region", US_STATES)} />
-      <BreakdownTable title="Age range"          rows={breakdown(rows,   "age_band",    AGE_BANDS)} />
-      <BreakdownTable title="Household income"   rows={breakdown(rows,   "income_band", INCOME_BANDS)} />
-      <BreakdownTable title="Gender / identity"  rows={breakdown(rows,   "gender",      GENDERS)} />
+      <BreakdownTable title="Country"            rows={breakdown(completedRows, "country",     COUNTRIES)} />
+      <BreakdownTable title={`State (US only — ${usRows.length.toLocaleString()} completions)`} rows={breakdown(usRows, "region", US_STATES)} />
+      <BreakdownTable title="Age range"          rows={breakdown(completedRows, "age_band",    AGE_BANDS)} />
+      <BreakdownTable title="Household income"   rows={breakdown(completedRows, "income_band", INCOME_BANDS)} />
+      <BreakdownTable title="Gender / identity"  rows={breakdown(completedRows, "gender",      GENDERS)} />
     </main>
   );
 }

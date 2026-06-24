@@ -1538,14 +1538,43 @@ export type TodaysSendSummary = {
   lastSentAt: string | null; // most recent sent_at across this sport's rows
   hasSendRoute: boolean;     // does this sport have send-email at all?
   hasTeamSendRoute: boolean; // and team-email?
+  // Live "how is today's email doing?" — unique opens out of non-errored
+  // sends with a resend_id assigned. Split by scope so the dashboard can
+  // mirror the leagueSent/teamSent layout. Reflects the partial day so
+  // far; opens trickle for ~3 days but most arrive within hours.
+  leagueOpens: number;
+  leagueOpenDenominator: number;
+  teamOpens: number;
+  teamOpenDenominator: number;
 };
 
 // Per-sport summary of yesterday's-edition sends. The hero "did it work?" line.
 // Fast: a handful of count queries per sport, all parallel.
+//
+// Opens are live (no aggregate involved) so the dashboard answers "how is
+// today's email doing right now?" The one-time scan pulls every open event
+// with event_at >= start-of-today-UTC; per-sport open count is the
+// intersection of that set with the sport's resend_ids. Bounded payload
+// (one day of opens, paginated).
 export async function getTodaysSendSummaries(): Promise<TodaysSendSummary[]> {
   const date = yesterdayInET();
   const sports = await getVisibleSports({ includeAdminOnly: true });
   const db = supabaseAdmin();
+
+  // One scan of today's opens — every event_at >= UTC midnight with an
+  // opened event_type. Late opens from yesterday's send may also land
+  // today; the per-sport intersection below ignores them (their resend_ids
+  // aren't in today's send set).
+  const todayUtcMidnight = new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString();
+  const openedRows = await fetchAll<{ resend_id: string | null }>(
+    () => db.from("email_events")
+      .select("resend_id")
+      .in("event_type", ["email.opened", "boxscore.opened"])
+      .gte("event_at", todayUtcMidnight) as unknown as QueryBuilder<{ resend_id: string | null }>,
+    "getTodaysSendSummaries opens",
+  );
+  const openedIds = new Set<string>();
+  for (const r of openedRows) if (r.resend_id) openedIds.add(r.resend_id);
 
   const summaries = await Promise.all(
     sports.map(async (sport): Promise<TodaysSendSummary> => {
@@ -1553,8 +1582,10 @@ export async function getTodaysSendSummaries(): Promise<TodaysSendSummary[]> {
       const hasSendRoute = features.expectedRoutes.includes("send-email");
       const hasTeamSendRoute = features.expectedRoutes.includes("send-team-email");
 
-      // Four parallel count queries + one last-sent timestamp probe.
-      const [leagueSentRes, teamSentRes, failedRes, lastSentRes] = await Promise.all([
+      // Four parallel count queries, one last-sent timestamp, plus a
+      // paginated pull of this sport's resend_ids today to compute live
+      // open counts against the shared openedIds set.
+      const [leagueSentRes, teamSentRes, failedRes, lastSentRes, sportSends] = await Promise.all([
         hasSendRoute
           ? db.from("sends")
               .select("id", { count: "exact", head: true })
@@ -1583,7 +1614,29 @@ export async function getTodaysSendSummaries(): Promise<TodaysSendSummary[]> {
           .order("sent_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
+        fetchAll<{ resend_id: string | null; team_id: string | null }>(
+          () => db.from("sends")
+            .select("resend_id, team_id")
+            .eq("digest_sport", sport.id)
+            .eq("digest_date", date)
+            .is("error", null) as unknown as QueryBuilder<{ resend_id: string | null; team_id: string | null }>,
+          `getTodaysSendSummaries(${sport.id}) sends`,
+        ),
       ]);
+
+      let leagueOpens = 0, leagueOpenDenominator = 0;
+      let teamOpens = 0,   teamOpenDenominator   = 0;
+      for (const s of sportSends) {
+        if (!s.resend_id) continue;
+        const opened = openedIds.has(s.resend_id);
+        if (s.team_id == null) {
+          leagueOpenDenominator++;
+          if (opened) leagueOpens++;
+        } else {
+          teamOpenDenominator++;
+          if (opened) teamOpens++;
+        }
+      }
 
       return {
         sport: sport.id,
@@ -1595,6 +1648,8 @@ export async function getTodaysSendSummaries(): Promise<TodaysSendSummary[]> {
         lastSentAt: (lastSentRes.data as { sent_at: string | null } | null)?.sent_at ?? null,
         hasSendRoute,
         hasTeamSendRoute,
+        leagueOpens, leagueOpenDenominator,
+        teamOpens,   teamOpenDenominator,
       };
     }),
   );

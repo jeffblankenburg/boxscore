@@ -23,8 +23,24 @@ export async function TodaysSendBlock() {
   const summaries = await getTodaysSendSummaries();
   const date = yesterdayInET();
 
+  // Build a "How is today's email doing?" caption from the aggregate
+  // open rate across all sports + scopes. Opens are live (no aggregate)
+  // so this refreshes every page load.
+  let totalOpens = 0;
+  let totalDenominator = 0;
+  for (const s of summaries) {
+    totalOpens += s.leagueOpens + s.teamOpens;
+    totalDenominator += s.leagueOpenDenominator + s.teamOpenDenominator;
+  }
+  const overallPct = totalDenominator > 0
+    ? ((totalOpens / totalDenominator) * 100).toFixed(1)
+    : null;
+  const headline = overallPct
+    ? `This morning's send · ${prettyDate(date)} · ${overallPct}% opened so far`
+    : `This morning's send · ${prettyDate(date)}`;
+
   return (
-    <Section title={`This morning's send · ${prettyDate(date)}`}>
+    <Section title={headline}>
       {summaries.length === 0 ? (
         <p className="a-muted">No send-capable sports configured.</p>
       ) : (
@@ -44,6 +60,12 @@ export async function TodaysSendBlock() {
                 : totalSent > 0
                   ? "shipped"
                   : "no sends yet";
+            const leaguePct = s.leagueOpenDenominator > 0
+              ? (s.leagueOpens / s.leagueOpenDenominator) * 100
+              : null;
+            const teamPct = s.teamOpenDenominator > 0
+              ? (s.teamOpens / s.teamOpenDenominator) * 100
+              : null;
             return (
               <div
                 key={s.sport}
@@ -64,11 +86,33 @@ export async function TodaysSendBlock() {
                   <StatusBadge variant={variant}>{label}</StatusBadge>
                   <span className="a-muted">
                     {s.hasSendRoute && (
-                      <>{s.leagueSent.toLocaleString()} league</>
+                      <>
+                        {s.leagueSent.toLocaleString()} league
+                        {leaguePct !== null && (
+                          <>
+                            {" "}
+                            (<strong style={{ color: "var(--a-fg)" }}>
+                              {s.leagueOpens.toLocaleString()}
+                            </strong>
+                            {" "}opens, {leaguePct.toFixed(1)}%)
+                          </>
+                        )}
+                      </>
                     )}
                     {s.hasSendRoute && s.hasTeamSendRoute && " · "}
                     {s.hasTeamSendRoute && (
-                      <>{s.teamSent.toLocaleString()} team</>
+                      <>
+                        {s.teamSent.toLocaleString()} team
+                        {teamPct !== null && (
+                          <>
+                            {" "}
+                            (<strong style={{ color: "var(--a-fg)" }}>
+                              {s.teamOpens.toLocaleString()}
+                            </strong>
+                            {" "}opens, {teamPct.toFixed(1)}%)
+                          </>
+                        )}
+                      </>
                     )}
                     {failed > 0 && (
                       <span style={{ color: "var(--a-danger-fg)", marginLeft: 8 }}>
