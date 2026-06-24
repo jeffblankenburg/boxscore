@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getSlate, type SlateGame } from "@/lib/mlb";
 import { todayInET, timeInET, prevDay } from "@/lib/dates";
@@ -225,13 +226,13 @@ function playerHref(row: { nameSlug: string | null; playerId: number }): string 
 const META_TITLE = "Daily Fantasy Projections | boxscore";
 const META_DESC =
   "Daily MLB fantasy projections — top hitters by position and starting pitchers for tonight's slate. Updates as lineups post.";
-const META_URL = `${EMAIL_LINK_BASE}/fantasy`;
+const META_URL = `${EMAIL_LINK_BASE}/mlb/fantasy`;
 const META_IMG = `${EMAIL_LINK_BASE}/icon.png`;
 
 export const metadata = {
   title: META_TITLE,
   description: META_DESC,
-  alternates: { canonical: "/fantasy" },
+  alternates: { canonical: "/mlb/fantasy" },
   openGraph: {
     title: META_TITLE,
     description: META_DESC,
@@ -250,7 +251,13 @@ export const metadata = {
 
 // ─── Page ────────────────────────────────────────────────────────────────
 
-export default async function FantasyPage() {
+export default async function FantasyPage({
+  params,
+}: {
+  params: Promise<{ sport: string }>;
+}) {
+  const { sport } = await params;
+  if (sport !== "mlb") notFound();
   const today = todayInET();
   const data = await loadFantasy(today);
 

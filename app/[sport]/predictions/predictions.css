@@ -1,0 +1,103 @@
+.pr-page { padding: 0 0 32px; }
+
+.pr-title {
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-weight: 900;
+  font-size: 32px;
+  margin: 8px 0 4px;
+  letter-spacing: -0.01em;
+}
+.pr-subtitle {
+  color: var(--text-muted);
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+.pr-note {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 18px;
+  padding: 8px 12px;
+  background: #fafafa;
+  border-left: 3px solid var(--border-light);
+}
+.pr-empty {
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 32px 0;
+  text-align: center;
+}
+
+.pr-scroll { overflow-x: auto; }
+
+.pr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 760px;
+}
+.pr-table th,
+.pr-table td {
+  border: 1px solid var(--border-light);
+  padding: 6px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+.pr-table th {
+  background: #f0ebde;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.pr-table tbody tr:nth-child(even) { background: #fafafa; }
+
+.pr-col-time {
+  width: 88px;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  text-align: right !important;
+}
+.pr-col-side {
+  text-align: left !important;
+  min-width: 180px;
+  line-height: 1.3;
+}
+.pr-col-conf {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: -0.5px;
+}
+.pr-conf-bar {
+  color: var(--text-secondary);
+}
+
+.pr-team-link {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+}
+.pr-team-link:hover { text-decoration: underline; }
+.pr-record {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.pr-sp {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pr-sp-era { color: var(--text-muted); }
+
+.pr-fav {
+  background: #fffbea;
+  font-weight: 800;
+}
+.pr-pick { font-weight: 700; }
+.pr-pick-even { color: var(--text-muted); font-style: italic; font-weight: 500; }
