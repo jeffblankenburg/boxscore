@@ -20,6 +20,7 @@ type Category =
   | "outrighted"
   | "selected"
   | "recalled"
+  | "claimed"
   | "off_bereavement"
   | "on_bereavement"
   | "on_restricted";
@@ -35,6 +36,7 @@ const COLUMNS: { key: Category; label: string }[] = [
   { key: "outrighted", label: "Outrighted" },
   { key: "selected", label: "Selected to 40-man" },
   { key: "recalled", label: "Recalled" },
+  { key: "claimed", label: "Claimed off waivers" },
   { key: "off_bereavement", label: "Off bereavement" },
   { key: "on_bereavement", label: "On bereavement" },
   { key: "on_restricted", label: "On restricted list" },
@@ -51,6 +53,7 @@ function categorize(t: Transaction): Category | null {
     case "OUT": return "outrighted";
     case "SE":  return "selected";
     case "CU":  return "recalled";
+    case "CLW": return "claimed";
     case "ASG":
       return desc.includes("rehab assignment") ? "rehab" : null;
     case "SFA":
