@@ -339,6 +339,156 @@ export function parseTransactions(raw: unknown): Transaction[] {
     }));
 }
 
+// ─── Slate with lineups ──────────────────────────────────────────────────
+// Fantasy page needs same-day lineup state. statsapi hydrates batting
+// lineups onto the schedule envelope under hydrate=lineups; each team
+// gets `homePlayers`/`awayPlayers` arrays once a lineup is posted (~1-2
+// hours before first pitch). Empty until then. Probable starters come
+// from the existing probablePitcher hydrate.
+//
+// Distinct from getSchedule above so the daily generate cron (which
+// doesn't need lineups, but runs at 9am UTC before any lineups exist)
+// stays unchanged. /fantasy hits this on its own revalidate cycle.
+export async function fetchSlateRaw(date: string): Promise<unknown> {
+  return getRaw(
+    `/v1/schedule?sportId=1&date=${date}&hydrate=lineups,probablePitcher,team`,
+  );
+}
+
+export type SlateLineupEntry = {
+  /** statsapi person id. */
+  playerId: number;
+  fullName: string;
+  /** Position in this game's lineup ("CF", "1B", "DH", "SS"). */
+  position: string;
+  /** Batting order 1–9. */
+  battingOrder: number;
+};
+
+export type SlateTeam = {
+  teamId: number;
+  teamName: string;
+  abbr: string;
+  /** Empty array when lineup hasn't posted yet. */
+  lineup: SlateLineupEntry[];
+  /** True once statsapi populates the lineup array — vendor doesn't expose
+   *  an explicit confirmed boolean, so presence is the signal. */
+  lineupConfirmed: boolean;
+  probablePitcher: { id: number; fullName: string } | null;
+};
+
+export type SlateGame = {
+  gamePk: number;
+  gameDate: string;
+  status: "scheduled" | "live" | "final" | "postponed" | "suspended" | "cancelled" | "unknown";
+  statusDetail: string;
+  away: SlateTeam;
+  home: SlateTeam;
+};
+
+type RawLineupPlayer = {
+  id?: number;
+  fullName?: string;
+  primaryPosition?: { abbreviation?: string };
+  battingOrder?: number | string;
+};
+
+type RawSlateGame = StatsapiScheduleEnvelope_dates_games & {
+  lineups?: {
+    homePlayers?: RawLineupPlayer[];
+    awayPlayers?: RawLineupPlayer[];
+  };
+};
+
+// Loose typing to avoid pulling the full envelope shape from the canonical
+// adapter — this module owns its own narrow shape for /fantasy.
+type StatsapiScheduleEnvelope_dates_games = {
+  gamePk: number;
+  gameDate: string;
+  status: { abstractGameState?: string; detailedState?: string };
+  teams: {
+    away: {
+      team: { id: number; name: string; abbreviation?: string };
+      probablePitcher?: { id: number; fullName: string };
+    };
+    home: {
+      team: { id: number; name: string; abbreviation?: string };
+      probablePitcher?: { id: number; fullName: string };
+    };
+  };
+};
+
+function mapSlateStatus(s: { abstractGameState?: string; detailedState?: string }): SlateGame["status"] {
+  const abs = s.abstractGameState ?? "";
+  const det = (s.detailedState ?? "").toLowerCase();
+  if (det.includes("postpon")) return "postponed";
+  if (det.includes("suspend")) return "suspended";
+  if (det.includes("cancel")) return "cancelled";
+  if (abs === "Final") return "final";
+  if (abs === "Live") return "live";
+  if (abs === "Preview") return "scheduled";
+  return "unknown";
+}
+
+function lineupFromRaw(players: RawLineupPlayer[] | undefined): SlateLineupEntry[] {
+  if (!Array.isArray(players)) return [];
+  return players
+    .map((p): SlateLineupEntry | null => {
+      const id = typeof p.id === "number" ? p.id : null;
+      if (id == null) return null;
+      // statsapi encodes batting order as 100/200/.../900 (lineup slot * 100).
+      const raw = typeof p.battingOrder === "number"
+        ? p.battingOrder
+        : typeof p.battingOrder === "string" ? Number(p.battingOrder) : NaN;
+      if (!Number.isFinite(raw)) return null;
+      const slot = raw >= 100 ? Math.floor(raw / 100) : raw;
+      if (slot < 1 || slot > 9) return null;
+      return {
+        playerId: id,
+        fullName: p.fullName ?? `Player ${id}`,
+        position: p.primaryPosition?.abbreviation ?? "",
+        battingOrder: slot,
+      };
+    })
+    .filter((e): e is SlateLineupEntry => e !== null)
+    .sort((a, b) => a.battingOrder - b.battingOrder);
+}
+
+export function parseSlate(raw: unknown): SlateGame[] {
+  const data = raw as { dates?: Array<{ games?: RawSlateGame[] }> };
+  const games = (data.dates ?? []).flatMap((d) => d.games ?? []);
+  return games.map((g): SlateGame => {
+    const awayLineup = lineupFromRaw(g.lineups?.awayPlayers);
+    const homeLineup = lineupFromRaw(g.lineups?.homePlayers);
+    return {
+      gamePk: g.gamePk,
+      gameDate: g.gameDate,
+      status: mapSlateStatus(g.status),
+      statusDetail: g.status.detailedState ?? "",
+      away: {
+        teamId: g.teams.away.team.id,
+        teamName: g.teams.away.team.name,
+        abbr: g.teams.away.team.abbreviation ?? g.teams.away.team.name.slice(0, 3).toUpperCase(),
+        lineup: awayLineup,
+        lineupConfirmed: awayLineup.length === 9,
+        probablePitcher: g.teams.away.probablePitcher ?? null,
+      },
+      home: {
+        teamId: g.teams.home.team.id,
+        teamName: g.teams.home.team.name,
+        abbr: g.teams.home.team.abbreviation ?? g.teams.home.team.name.slice(0, 3).toUpperCase(),
+        lineup: homeLineup,
+        lineupConfirmed: homeLineup.length === 9,
+        probablePitcher: g.teams.home.probablePitcher ?? null,
+      },
+    };
+  });
+}
+
+export async function getSlate(date: string): Promise<SlateGame[]> {
+  return parseSlate(await fetchSlateRaw(date));
+}
+
 // ─── Person season stats ──────────────────────────────────────────────────
 // Used for probable-pitcher W-L on Today's Games. Single-person call returns
 // season pitching stats including wins and losses.
