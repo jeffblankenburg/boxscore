@@ -851,6 +851,9 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 
 .followers-actions { margin: 0 0 14px; }
 
+.followers-search { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; }
+.followers-search .admin-input { flex: 1; max-width: 360px; }
+
 @media (max-width: 720px) {
   .followers-table { font-size: 12px; }
   .followers-table .fl-platform { display: none; }

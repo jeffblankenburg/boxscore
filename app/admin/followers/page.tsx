@@ -9,6 +9,7 @@ import {
 } from "@/lib/social-followers";
 import { toggleStar, saveNotes, forceSync } from "./actions";
 import { NotesField } from "./NotesField";
+import { FollowerSearch } from "./FollowerSearch";
 
 // Followers dashboard, now backed by social_followers (migration 0028).
 // Renders the union of stored rows from both platforms with star + notes
@@ -176,6 +177,8 @@ export default async function AdminFollowersPage({
         </p>
       ))}
 
+      <FollowerSearch total={visible.length} />
+
       <div className="followers-filter">
         {VIEWS.map((v) => (
           <a
@@ -294,8 +297,12 @@ function SyncStatus({
 
 function FollowerRow({ f }: { f: Follower }) {
   const removed = f.removedAt != null;
+  // Lowercased haystack consumed by FollowerSearch's debounced client-side
+  // filter. Includes every field the search input scans (handle, display
+  // name, bio, notes) so DOM matches don't require re-reading React state.
+  const haystack = `${f.handle} ${f.displayName} ${f.bio ?? ""} ${f.notes ?? ""}`.toLowerCase();
   return (
-    <tr className={removed ? "fl-row-removed" : undefined}>
+    <tr className={removed ? "fl-row-removed" : undefined} data-search={haystack}>
       <td className="fl-star">
         <form action={toggleStar}>
           <input type="hidden" name="platform" value={f.platform} />
