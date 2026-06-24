@@ -119,129 +119,85 @@ export type DashboardKpis = {
 };
 
 export async function getKpis(w: Window): Promise<DashboardKpis> {
+  // Aggregate-backed. Two cheap live queries (active_now, pending_now,
+  // all-time digest count) + indexed reads of daily_send_stats and
+  // daily_subscriber_events for the window. See migration 0062 +
+  // /api/cron/aggregate-stats.
+  //
+  // Window granularity is one day. "24h" reads one row; longer windows
+  // sum N rows ending yesterday. Today's partial day is excluded since
+  // it isn't aggregated yet.
   const db = supabaseAdmin();
-  const now = new Date();
-  const windowStartMs = now.getTime() - windowHours(w) * 3600 * 1000;
-  const windowStartIso = new Date(windowStartMs).toISOString();
-  const windowStartDate = windowStartIso.slice(0, 10); // for digest_date comparisons (date column)
+  const days = Math.max(1, Math.ceil(windowHours(w) / 24));
+  const startDate = aggregateDateNDaysAgo(days);
+  const endDate   = aggregateDateNDaysAgo(1);
+  // Snapshot date for "active/pending at start of window" — end-of-day
+  // immediately before the window starts. days+1 ago.
+  const snapshotDate = aggregateDateNDaysAgo(days + 1);
 
-  // Active subscribers (current)
-  const { count: activeNow } = await db
-    .from("subscribers")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active");
+  const [
+    activeNowQ,
+    pendingNowQ,
+    totalDigestsQ,
+    sendRowsQ,
+    snapshotQ,
+    eventRowsQ,
+  ] = await Promise.all([
+    db.from("subscribers").select("id", { count: "exact", head: true }).eq("status", "active"),
+    db.from("subscribers").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    db.from("sends").select("id", { count: "exact", head: true }).is("error", null),
+    db.from("daily_send_stats")
+      .select("sends, failed_send, delivered, bounced, delayed, pending, opens_unique")
+      .gte("date", startDate).lte("date", endDate),
+    db.from("daily_subscriber_events")
+      .select("active_at_end, pending_at_end")
+      .eq("date", snapshotDate)
+      .maybeSingle<{ active_at_end: number; pending_at_end: number }>(),
+    db.from("daily_subscriber_events")
+      .select("new_subs, unsubs")
+      .gte("date", startDate).lte("date", endDate),
+  ]);
 
-  // Active at window start: confirmed before then AND (not unsubscribed yet, or unsubscribed after).
-  // Computed in JS from confirmed_at/unsubscribed_at to avoid Postgres OR-with-null gymnastics.
-  type SubRow = {
-    status: string;
-    created_at: string | null;
-    confirmed_at: string | null;
-    unsubscribed_at: string | null;
-  };
-  const subRows = await fetchAll<SubRow>(
-    () => db.from("subscribers").select("status, created_at, confirmed_at, unsubscribed_at") as unknown as QueryBuilder<SubRow>,
-    "getKpis subscribers",
-  );
-  let activeAtStart = 0;
-  let newSubs = 0;
-  let unsubs = 0;
-  let pendingNow = 0;
-  let pendingAtStart = 0;
-  for (const r of subRows) {
-    const cMs = r.confirmed_at ? new Date(r.confirmed_at).getTime() : null;
-    const uMs = r.unsubscribed_at ? new Date(r.unsubscribed_at).getTime() : null;
-    const createdMs = r.created_at ? new Date(r.created_at).getTime() : null;
+  const activeNow      = activeNowQ.count ?? 0;
+  const pendingNow     = pendingNowQ.count ?? 0;
+  const totalDigests   = totalDigestsQ.count ?? 0;
+  const activeAtStart  = snapshotQ.data?.active_at_end ?? 0;
+  const pendingAtStart = snapshotQ.data?.pending_at_end ?? 0;
 
-    // Active at window start: confirmed before windowStart and not yet unsubscribed at windowStart.
-    if (cMs !== null && cMs <= windowStartMs && (uMs === null || uMs > windowStartMs)) {
-      activeAtStart++;
-    }
-    // Net-growth counters: confirmations / unsubscribes that landed inside the window.
-    if (cMs !== null && cMs > windowStartMs) newSubs++;
-    if (uMs !== null && uMs > windowStartMs) unsubs++;
-
-    // Pending now: current status is pending.
-    if (r.status === "pending") pendingNow++;
-    // Pending at window start: created before windowStart, not yet confirmed and not unsubscribed by then.
-    if (
-      createdMs !== null && createdMs <= windowStartMs
-      && (cMs === null || cMs > windowStartMs)
-      && (uMs === null || uMs > windowStartMs)
-    ) {
-      pendingAtStart++;
-    }
+  let totalSends = 0, failedSends = 0, openDenominator = 0, openedInWindow = 0;
+  for (const r of (sendRowsQ.data ?? []) as Array<{
+    sends: number; failed_send: number; delivered: number;
+    bounced: number; delayed: number; pending: number; opens_unique: number;
+  }>) {
+    totalSends      += r.sends;
+    failedSends     += r.failed_send;
+    // "ok sends with a resend id" matches the old getKpis open-rate denominator.
+    openDenominator += r.sends - r.failed_send;
+    openedInWindow  += r.opens_unique;
   }
-
-  // Sends within window: count-only queries so we don't hit the 1000-row cap.
-  // Filter on sent_at (timestamptz) so sub-day windows work.
-  const { count: totalSendsCount } = await db
-    .from("sends")
-    .select("id", { count: "exact", head: true })
-    .gte("sent_at", windowStartIso);
-  const { count: failedSendsCount } = await db
-    .from("sends")
-    .select("id", { count: "exact", head: true })
-    .gte("sent_at", windowStartIso)
-    .not("error", "is", null);
-  const totalSends = totalSendsCount ?? 0;
-  const failedSends = failedSendsCount ?? 0;
   const okSends = totalSends - failedSends;
 
-  // Open rate: intersect successful sends in window with opens that arrived
-  // for those sends. Opens can land days after a send, so we intentionally
-  // don't filter the opens by window — we filter by the send window and
-  // accept any open of those sends.
-  const sendsWithIds = await fetchAll<{ resend_id: string | null }>(
-    () => db.from("sends")
-      .select("resend_id")
-      .gte("sent_at", windowStartIso)
-      .is("error", null) as unknown as QueryBuilder<{ resend_id: string | null }>,
-    "getKpis sends-with-ids",
-  );
-  const sendIds = new Set<string>();
-  for (const r of sendsWithIds) if (r.resend_id) sendIds.add(r.resend_id);
+  let newSubs = 0, unsubs = 0;
+  for (const r of (eventRowsQ.data ?? []) as Array<{ new_subs: number; unsubs: number }>) {
+    newSubs += r.new_subs;
+    unsubs  += r.unsubs;
+  }
 
-  let openedInWindow = 0;
-  let openTracked = false;
-  if (sendIds.size > 0) {
-    // Pull opens for any of the in-window resend_ids. We bound by event_at
-    // back to windowStart for performance — opens of in-window sends can't
-    // physically precede the send itself.
-    const opens = await fetchAll<{ resend_id: string }>(
-      () => db.from("email_events")
-        .select("resend_id")
-        .in("event_type", ["email.opened", "boxscore.opened"])
-        .gte("event_at", windowStartIso) as unknown as QueryBuilder<{ resend_id: string }>,
-      "getKpis email_events",
-    );
-    const openedIds = new Set<string>();
-    for (const r of opens) if (r.resend_id) openedIds.add(r.resend_id);
-    openTracked = openedIds.size > 0;
-    for (const id of sendIds) if (openedIds.has(id)) openedInWindow++;
-  } else {
-    // No sends in window. Check once whether opens have *ever* been recorded
-    // so we can distinguish "not tracked yet" from "tracked but no sends".
-    const { count } = await db
-      .from("email_events")
+  // "Tracked" = at least one open event in the window OR at least one
+  // open event ever (preserves the old "tracked but no sends" check).
+  let openTracked = openedInWindow > 0;
+  if (!openTracked) {
+    const { count } = await db.from("email_events")
       .select("id", { count: "exact", head: true })
       .in("event_type", ["email.opened", "boxscore.opened"])
       .limit(1);
     openTracked = (count ?? 0) > 0;
   }
-  const openRate = sendIds.size === 0 ? 0 : openedInWindow / sendIds.size;
-
-  // All-time successful digest sends. Count-only to dodge the 1000-row cap.
-  const { count: totalDigestsCount } = await db
-    .from("sends")
-    .select("id", { count: "exact", head: true })
-    .is("error", null);
-
-  void windowStartDate;
+  const openRate = openDenominator === 0 ? 0 : openedInWindow / openDenominator;
 
   return {
-    activeSubscribers: activeNow ?? 0,
-    activeSubscribersDelta: (activeNow ?? 0) - activeAtStart,
+    activeSubscribers: activeNow,
+    activeSubscribersDelta: activeNow - activeAtStart,
     sendSuccess: {
       ok: okSends,
       failed: failedSends,
@@ -260,10 +216,10 @@ export async function getKpis(w: Window): Promise<DashboardKpis> {
     openRate: {
       rate: openRate,
       opened: openedInWindow,
-      sends: sendIds.size,
+      sends: openDenominator,
       tracked: openTracked,
     },
-    totalDigestsShipped: totalDigestsCount ?? 0,
+    totalDigestsShipped: totalDigests,
   };
 }
 
@@ -481,6 +437,27 @@ export async function getSendSeries(w: Window): Promise<SendSeries> {
   const sinceIso = buckets[0]?.toISOString();
   if (!sinceIso) return { buckets, ok, failed };
 
+  // For day-bucket windows (3d+) the chart lines up with daily_send_stats
+  // rows one-to-one. Sub-day buckets (24h → 1h) aren't aggregated; fall
+  // back to a live sends scan, which is bounded to 24h and fast.
+  if (bucketHours(w) >= 24) {
+    const startDate = sinceIso.slice(0, 10);
+    const { data, error } = await supabaseAdmin()
+      .from("daily_send_stats")
+      .select("date, sends, failed_send")
+      .gte("date", startDate);
+    if (error) throw new Error(`getSendSeries: ${error.message}`);
+    for (const r of (data ?? []) as Array<{ date: string; sends: number; failed_send: number }>) {
+      // Bucket boundaries align to UTC day starts; map date → bucket index.
+      const idx = bucketIndex(buckets, sizeMs, new Date(`${r.date}T00:00:00.000Z`));
+      if (idx < 0) continue;
+      ok[idx]!     += r.sends - r.failed_send;
+      failed[idx]! += r.failed_send;
+    }
+    return { buckets, ok, failed };
+  }
+
+  // 24h window: live scan (small, fast).
   const rows = await fetchAll<{ sent_at: string; error: string | null }>(
     () => supabaseAdmin()
       .from("sends")
@@ -488,7 +465,6 @@ export async function getSendSeries(w: Window): Promise<SendSeries> {
       .gte("sent_at", sinceIso) as unknown as QueryBuilder<{ sent_at: string; error: string | null }>,
     "getSendSeries",
   );
-
   for (const r of rows) {
     const idx = bucketIndex(buckets, sizeMs, new Date(r.sent_at));
     if (idx < 0) continue;
@@ -595,83 +571,58 @@ export type DeliverabilityStats = {
 };
 
 export async function getDeliverabilityStats(w: Window): Promise<DeliverabilityStats> {
-  const db = supabaseAdmin();
-  const windowStartIso = new Date(Date.now() - windowHours(w) * 3600 * 1000).toISOString();
-
-  // Every send in the window, including failed ones. resend_id is null when
-  // Resend rejected before assigning an id; we count those as "failed" via
-  // the error column.
-  type SendRow = { resend_id: string | null; error: string | null };
-  const sends = await fetchAll<SendRow>(
-    () => db.from("sends")
-      .select("resend_id, error")
-      .gte("sent_at", windowStartIso) as unknown as QueryBuilder<SendRow>,
-    "getDeliverabilityStats sends",
-  );
-
-  const totalSent = sends.length;
-  if (totalSent === 0) {
+  // Reads precomputed daily_send_stats rows for the window and sums. The
+  // 60s+ per-request sends + email_events scan moved to the
+  // /api/cron/aggregate-stats nightly job; this function is now a small
+  // indexed lookup. See migration 0062 + lib/admin-aggregates.ts.
+  //
+  // Window granularity is one day (the smallest aggregate). "24h" maps to
+  // yesterday's row; longer windows sum N rows. Today's partial day isn't
+  // aggregated yet and is intentionally excluded — the live counts would
+  // distort hourly rates anyway.
+  const days = Math.max(1, Math.ceil(windowHours(w) / 24));
+  const start = aggregateDateNDaysAgo(days);
+  const end   = aggregateDateNDaysAgo(1);
+  const { data, error } = await supabaseAdmin()
+    .from("daily_send_stats")
+    .select("sends, failed_send, delivered, bounced, delayed, pending, complained")
+    .gte("date", start)
+    .lte("date", end);
+  if (error) throw new Error(`getDeliverabilityStats: ${error.message}`);
+  let sent = 0, delivered = 0, bounced = 0, delayed = 0, pending = 0, complained = 0, failed = 0;
+  for (const r of (data ?? []) as Array<{
+    sends: number; failed_send: number; delivered: number;
+    bounced: number; delayed: number; pending: number; complained: number;
+  }>) {
+    sent       += r.sends;
+    failed     += r.failed_send;
+    delivered  += r.delivered;
+    bounced    += r.bounced;
+    delayed    += r.delayed;
+    pending    += r.pending;
+    complained += r.complained;
+  }
+  if (sent === 0) {
     return {
       sent: 0, delivered: 0, bounced: 0, delayed: 0, complained: 0, pending: 0, failed: 0,
       deliveredRate: 0, bouncedRate: 0, delayedRate: 0, complainedRate: 0, failedRate: 0,
     };
   }
-
-  let failed = 0;
-  const liveResendIds = new Set<string>();
-  for (const s of sends) {
-    if (s.error) {
-      failed++;
-      continue;
-    }
-    if (s.resend_id) liveResendIds.add(s.resend_id);
-  }
-
-  // Pull terminal events for live ids. Bound by window so we don't drag in
-  // years of history; opens-only events aren't part of this classification.
-  type Event = { resend_id: string; event_type: string };
-  const RELEVANT_TYPES = [
-    "email.delivered",
-    "email.bounced",
-    "email.delivery_delayed",
-    "email.complained",
-  ];
-  let events: Event[] = [];
-  if (liveResendIds.size > 0) {
-    events = await fetchAll<Event>(
-      () => db.from("email_events")
-        .select("resend_id, event_type")
-        .gte("event_at", windowStartIso)
-        .in("event_type", RELEVANT_TYPES) as unknown as QueryBuilder<Event>,
-      "getDeliverabilityStats events",
-    );
-  }
-
-  const byId: Record<string, Set<string>> = {};
-  for (const ev of events) {
-    if (!liveResendIds.has(ev.resend_id)) continue;
-    (byId[ev.resend_id] ??= new Set()).add(ev.event_type);
-  }
-
-  let delivered = 0, bounced = 0, delayed = 0, pending = 0, complained = 0;
-  for (const id of liveResendIds) {
-    const evts = byId[id] ?? new Set<string>();
-    if (evts.has("email.delivered")) delivered++;
-    else if (evts.has("email.bounced")) bounced++;
-    else if (evts.has("email.delivery_delayed")) delayed++;
-    else pending++;
-    if (evts.has("email.complained")) complained++;
-  }
-
   return {
-    sent: totalSent,
-    delivered, bounced, delayed, pending, complained, failed,
-    deliveredRate: delivered / totalSent,
-    bouncedRate: bounced / totalSent,
-    delayedRate: delayed / totalSent,
-    complainedRate: complained / totalSent,
-    failedRate: failed / totalSent,
+    sent, delivered, bounced, delayed, pending, complained, failed,
+    deliveredRate: delivered / sent,
+    bouncedRate:   bounced   / sent,
+    delayedRate:   delayed   / sent,
+    complainedRate: complained / sent,
+    failedRate:    failed    / sent,
   };
+}
+
+// Helper: UTC date N days ago in YYYY-MM-DD. Matches daily_send_stats.date
+// (which stores sends.sent_at::date in UTC).
+function aggregateDateNDaysAgo(n: number): string {
+  const d = new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
 }
 
 // ---- Universal-dashboard watchwall + sport-day grid --------------------
@@ -1286,141 +1237,101 @@ async function eventsByResendId(
 }
 
 export async function getYesterdayAdStats(): Promise<YesterdayAdStats> {
+  // Aggregate-backed via daily_send_stats. The "date" label is preserved
+  // in ET semantics (matches the digest_date the email shipped under) but
+  // the aggregate row is keyed by UTC sent_at::date. For the steady-state
+  // 9am ET send the two align; in the rare edge case of a late-evening
+  // ET send pushed past midnight UTC the count may straddle.
   const db = supabaseAdmin();
   const date = yesterdayInET();
+  const utcDate = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
 
-  type SendRow = {
-    resend_id: string | null;
-    error: string | null;
-    digest_sport: string;
-    team_id: string | null;
-  };
-  const sends = await fetchAll<SendRow>(
-    () => db.from("sends")
-      .select("resend_id, error, digest_sport, team_id")
-      .eq("digest_date", date) as unknown as QueryBuilder<SendRow>,
-    "getYesterdayAdStats sends",
-  );
+  const [statsQ, openEverQ] = await Promise.all([
+    db.from("daily_send_stats")
+      .select("sport, scope, sends, delivered, opens_unique, clicks_unique")
+      .eq("date", utcDate),
+    db.from("email_events").select("id", { count: "exact", head: true })
+      .in("event_type", ["email.opened", "boxscore.opened"]),
+  ]);
 
-  const liveIds = sends.filter((s) => !s.error && s.resend_id).map((s) => s.resend_id!);
-  // Window the events query to the last 7 days — late opens (MPP prefetch
-  // staggered, recipients who let mail sit) land well within that.
-  const sinceIso = new Date(Date.now() - 7 * 86400_000).toISOString();
-  const byId = await eventsByResendId(liveIds, sinceIso);
-
-  // Aggregate per (sport, scope). Map key is `${sport}::${scope}`.
-  const buckets = new Map<string, AdStatsBucket>();
-  let totalDelivered = 0, totalOpened = 0, totalClicked = 0;
-  for (const s of sends) {
-    const scope: "league" | "team" = s.team_id ? "team" : "league";
-    const key = `${s.digest_sport}::${scope}`;
-    const b = buckets.get(key) ?? {
-      sport: s.digest_sport, scope, sends: 0, delivered: 0, opened: 0, clicked: 0,
-    };
-    b.sends++;
-    const evts = s.resend_id ? byId[s.resend_id] : undefined;
-    if (evts?.has("email.delivered")) { b.delivered++; totalDelivered++; }
-    if (evts?.has("email.opened") || evts?.has("boxscore.opened")) { b.opened++; totalOpened++; }
-    if (evts?.has("email.clicked")) { b.clicked++; totalClicked++; }
-    buckets.set(key, b);
+  let totalSends = 0, totalDelivered = 0, totalOpened = 0, totalClicked = 0;
+  const breakdown: AdStatsBucket[] = [];
+  for (const r of (statsQ.data ?? []) as Array<{
+    sport: string; scope: "league" | "team";
+    sends: number; delivered: number; opens_unique: number; clicks_unique: number;
+  }>) {
+    totalSends     += r.sends;
+    totalDelivered += r.delivered;
+    totalOpened    += r.opens_unique;
+    totalClicked   += r.clicks_unique;
+    breakdown.push({
+      sport: r.sport, scope: r.scope,
+      sends: r.sends, delivered: r.delivered,
+      opened: r.opens_unique, clicked: r.clicks_unique,
+    });
   }
-
-  // Has open tracking ever fired at all? One global probe — if zero, we
-  // render "—" instead of "0%".
-  const { count: openEverCount } = await db
-    .from("email_events")
-    .select("id", { count: "exact", head: true })
-    .in("event_type", ["email.opened", "boxscore.opened"]);
-
-  const breakdown = [...buckets.values()].sort((a, b) => {
-    if (a.sport !== b.sport) return a.sport.localeCompare(b.sport);
-    return a.scope.localeCompare(b.scope);
-  });
+  breakdown.sort((a, b) => a.sport.localeCompare(b.sport) || a.scope.localeCompare(b.scope));
 
   return {
     date,
-    sends: sends.length,
+    sends: totalSends,
     delivered: totalDelivered,
     opened: totalOpened,
     clicked: totalClicked,
     openRate: totalDelivered === 0 ? 0 : totalOpened / totalDelivered,
     clickRate: totalDelivered === 0 ? 0 : totalClicked / totalDelivered,
     breakdown,
-    tracked: (openEverCount ?? 0) > 0,
+    tracked: (openEverQ.count ?? 0) > 0,
   };
 }
 
 export async function getRollingAdStats(days: number): Promise<RollingAdStats> {
+  // Aggregate-backed via daily_send_stats (migration 0062). Was 95s in
+  // benchmark (per-request 30-day sends + email_events scan); now indexed.
+  // Axis is built in UTC (matching daily_send_stats.date); the chart's
+  // x-axis dates may shift by up to one row vs. the old ET-based labels
+  // on the calendar boundary — acceptable for an admin-only dashboard.
   const db = supabaseAdmin();
-  const now = new Date();
-  const windowStartMs = now.getTime() - days * 86400_000;
-  const sinceIso = new Date(windowStartMs).toISOString();
-
-  // Build the chronological date axis up front so days with zero activity
-  // still appear in the chart (visible gaps matter).
+  const now = Date.now();
   const axis: string[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 86400_000);
-    // ET-based date label to match digest_date semantics elsewhere.
-    axis.push(new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(d));
+    axis.push(new Date(now - i * 86400_000).toISOString().slice(0, 10));
   }
   const dailyMap = new Map<string, AdStatsDailyPoint>(
     axis.map((date) => [date, { date, delivered: 0, opened: 0, clicked: 0 }]),
   );
 
-  type SendRow = {
-    resend_id: string | null;
-    error: string | null;
-    digest_date: string;
-  };
-  const sends = await fetchAll<SendRow>(
-    () => db.from("sends")
-      .select("resend_id, error, digest_date")
-      .gte("sent_at", sinceIso) as unknown as QueryBuilder<SendRow>,
-    "getRollingAdStats sends",
-  );
+  const startDate = axis[0]!;
+  const endDate   = axis[axis.length - 1]!;
+  const [statsQ, activeQ, openEverQ] = await Promise.all([
+    db.from("daily_send_stats")
+      .select("date, sends, failed_send, delivered, opens_unique, clicks_unique")
+      .gte("date", startDate).lte("date", endDate),
+    db.from("subscribers").select("id", { count: "exact", head: true }).eq("status", "active"),
+    db.from("email_events").select("id", { count: "exact", head: true })
+      .in("event_type", ["email.opened", "boxscore.opened"]),
+  ]);
 
-  const dateByResendId = new Map<string, string>();
-  const liveIds: string[] = [];
-  let totalSends = 0;
-  for (const s of sends) {
-    totalSends++;
-    if (s.error || !s.resend_id) continue;
-    liveIds.push(s.resend_id);
-    dateByResendId.set(s.resend_id, s.digest_date);
-  }
-
-  const byId = await eventsByResendId(liveIds, sinceIso);
-  let totalDelivered = 0, totalOpened = 0, totalClicked = 0;
-  for (const id of liveIds) {
-    const evts = byId[id];
-    if (!evts) continue;
-    const day = dateByResendId.get(id);
-    const point = day ? dailyMap.get(day) : undefined;
-    if (evts.has("email.delivered")) {
-      totalDelivered++;
-      if (point) point.delivered++;
+  let totalSends = 0, totalDelivered = 0, totalOpened = 0, totalClicked = 0;
+  for (const r of (statsQ.data ?? []) as Array<{
+    date: string; sends: number; failed_send: number;
+    delivered: number; opens_unique: number; clicks_unique: number;
+  }>) {
+    totalSends     += r.sends;
+    totalDelivered += r.delivered;
+    totalOpened    += r.opens_unique;
+    totalClicked   += r.clicks_unique;
+    const point = dailyMap.get(r.date);
+    if (point) {
+      point.delivered += r.delivered;
+      point.opened    += r.opens_unique;
+      point.clicked   += r.clicks_unique;
     }
-    if (!point) continue; // event outside the axis window
-    if (evts.has("email.opened") || evts.has("boxscore.opened")) { point.opened++; totalOpened++; }
-    if (evts.has("email.clicked")) { point.clicked++; totalClicked++; }
   }
-
-  const { count: activeSubscribers } = await db
-    .from("subscribers")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active");
-
-  const { count: openEverCount } = await db
-    .from("email_events")
-    .select("id", { count: "exact", head: true })
-    .in("event_type", ["email.opened", "boxscore.opened"]);
 
   return {
     days,
-    activeSubscribers: activeSubscribers ?? 0,
+    activeSubscribers: activeQ.count ?? 0,
     sends: totalSends,
     delivered: totalDelivered,
     opened: totalOpened,
@@ -1429,7 +1340,7 @@ export async function getRollingAdStats(days: number): Promise<RollingAdStats> {
     clickRate: totalDelivered === 0 ? 0 : totalClicked / totalDelivered,
     deliveryRate: totalSends === 0 ? 0 : totalDelivered / totalSends,
     daily: axis.map((d) => dailyMap.get(d)!),
-    tracked: (openEverCount ?? 0) > 0,
+    tracked: (openEverQ.count ?? 0) > 0,
   };
 }
 

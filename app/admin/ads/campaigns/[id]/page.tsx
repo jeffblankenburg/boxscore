@@ -15,7 +15,7 @@ import {
 import { FormButton } from "../../../_components/FormButton";
 import { nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { SLOTS, type AdFormat } from "@/lib/ads-render";
-import { loadImpressionsByPair } from "@/lib/ad-impressions";
+import { loadPlacementImpressionsByIds } from "@/lib/admin-aggregates";
 import { CreativeForm } from "../../_components/CreativeForm";
 import { NewCreativeButton } from "../../_components/NewCreativeButton";
 import {
@@ -121,33 +121,6 @@ async function loadPlacements(creativeIds: string[]): Promise<Placement[]> {
 
 type ClickCount = { humans: number; bots: number };
 
-// Fetch every link_clicks row for these placements (label='ad' implicit
-// via FK; we only need is_bot to split humans from prefetchers). Tiny
-// row count expected in v1 — group in JS rather than build an RPC.
-async function loadClickCounts(
-  placementIds: string[],
-): Promise<Map<string, ClickCount>> {
-  const counts = new Map<string, ClickCount>();
-  if (placementIds.length === 0) return counts;
-  const { data, error } = await supabaseAdmin()
-    .from("link_clicks")
-    .select("placement_id, is_bot")
-    .in("placement_id", placementIds);
-  if (error) {
-    // Don't fail the page on a click-count read error — placement rows
-    // just show 0 and the admin can refresh later.
-    console.error(`load click counts: ${error.message}`);
-    return counts;
-  }
-  for (const r of (data ?? []) as Array<{ placement_id: string; is_bot: boolean }>) {
-    const cur = counts.get(r.placement_id) ?? { humans: 0, bots: 0 };
-    if (r.is_bot) cur.bots++;
-    else cur.humans++;
-    counts.set(r.placement_id, cur);
-  }
-  return counts;
-}
-
 function isLive(c: Campaign): boolean {
   return c.status === "approved" && c.paid_at !== null;
 }
@@ -199,10 +172,20 @@ export default async function CampaignDetailPage({
 
   const creatives = await loadCreatives(campaign.id);
   const placements = await loadPlacements(creatives.map((c) => c.id));
-  const clicksByPlacement = await loadClickCounts(placements.map((p) => p.id));
-  const impressionsByPair = await loadImpressionsByPair(
-    placements.map((p) => ({ sport: p.sport, date: p.date })),
-  );
+  // Per-placement impressions + clicks served from daily_placement_imps
+  // (migration 0062, refreshed nightly by /api/cron/aggregate-stats).
+  // Drops the per-request sends + email_events + page_views + link_clicks
+  // scan to a single indexed lookup. Shape the rows into the existing
+  // clicksByPlacement + impressionsByPair maps so downstream rendering
+  // doesn't change.
+  const impRows = await loadPlacementImpressionsByIds(placements.map((p) => p.id));
+  const clicksByPlacement = new Map<string, ClickCount>();
+  const impressionsByPair = new Map<string, { email: number; web: number }>();
+  for (const p of placements) {
+    const r = impRows.get(p.id);
+    clicksByPlacement.set(p.id, { humans: r?.human_clicks ?? 0, bots: r?.bot_clicks ?? 0 });
+    impressionsByPair.set(`${p.sport}|${p.date}`, { email: r?.email_unique_opens ?? 0, web: r?.web_pageviews ?? 0 });
+  }
   const placementsByCreative = new Map<string, Placement[]>();
   for (const p of placements) {
     const list = placementsByCreative.get(p.creative_id) ?? [];

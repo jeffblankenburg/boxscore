@@ -49,6 +49,10 @@
       "schedule": "50 9 * * *"
     },
     {
+      "path": "/api/cron/aggregate-stats",
+      "schedule": "55 9 * * *"
+    },
+    {
       "path": "/api/cron/supervise",
       "schedule": "0 10 * * *"
     },

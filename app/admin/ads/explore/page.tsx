@@ -1,5 +1,6 @@
 import { requireAdmin } from "../../require-admin";
 import { PageHeader } from "../../_components/primitives";
+import { unstable_cache } from "next/cache";
 import { loadDailyData } from "@/lib/daily";
 import { renderContent } from "@/lib/render";
 import { MLB_PREVIEW_FIXTURES } from "@/lib/mlb-preview-fixtures";
@@ -35,6 +36,16 @@ export const metadata = { title: "Ads · admin · boxscore", robots: { index: fa
 
 void ALL_AD_SAMPLES; // keep the aggregate export tree-shake-stable
 
+// The fixture preview is keyed on a fixed games_date (defined in
+// MLB_PREVIEW_FIXTURES) — by construction the underlying daily_raw row
+// doesn't change. Caching the full loadDailyData chain saves the ~1s
+// boxscore JSON pull and the parse work on every admin visit.
+const loadFixtureDigestCached = unstable_cache(
+  async (date: string) => loadDailyData(date),
+  ["admin-ads-explore-fixture-digest"],
+  { tags: ["admin-ads-explore-fixture"] },
+);
+
 export default async function AdsPage() {
   await requireAdmin();
 
@@ -43,7 +54,7 @@ export default async function AdsPage() {
   // hit at /mlb/[date].
   const gamesDate = MLB_PREVIEW_FIXTURES.regular;
   const [data, yesterday, rolling] = await Promise.all([
-    loadDailyData(gamesDate),
+    loadFixtureDigestCached(gamesDate),
     getYesterdayAdStats(),
     getRollingAdStats(30),
   ]);

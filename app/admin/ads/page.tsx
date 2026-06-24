@@ -2,7 +2,7 @@ import { requireAdmin } from "../require-admin";
 import { supabaseAdmin } from "@/lib/supabase";
 import { ADS_ENABLED_FLAG } from "@/lib/ad-placements";
 import { isFlagEnabled } from "@/lib/admin-settings";
-import { loadImpressionsByPair } from "@/lib/ad-impressions";
+import { loadPlacementImpressionsByIds } from "@/lib/admin-aggregates";
 import {
   Alert,
   Card,
@@ -82,49 +82,22 @@ async function loadCampaignRows(): Promise<CampaignRow[]> {
     placements.push({ id: p.id, sport: p.sport, date: p.date, campaign_id: c.campaign_id });
   }
 
-  // Impressions (email + web) for every (sport, date) the list touches —
-  // batched once so the page makes a single sends-scan + opens-scan +
-  // pageviews-scan instead of per-campaign round trips.
-  const impressions = await loadImpressionsByPair(
-    placements.map((p) => ({ sport: p.sport, date: p.date })),
-  );
-
-  // Click counts per placement_id. Humans only — bots are tracked on the
-  // detail page but don't belong on a row-level CTR-adjacent metric here.
-  const clicksByPlacement = new Map<string, number>();
-  if (placements.length > 0) {
-    const placementIds = placements.map((p) => p.id);
-    // Chunk IN to stay under PostgREST URL cap — UUIDs are 36 chars so
-    // 200 per chunk keeps us comfortably under 8 KB.
-    for (let i = 0; i < placementIds.length; i += 200) {
-      const chunk = placementIds.slice(i, i + 200);
-      const { data, error } = await db
-        .from("link_clicks")
-        .select("placement_id")
-        .in("placement_id", chunk)
-        .eq("is_bot", false);
-      if (error) {
-        console.error(`load clicks: ${error.message}`);
-        continue;
-      }
-      for (const c of (data ?? []) as Array<{ placement_id: string }>) {
-        clicksByPlacement.set(
-          c.placement_id,
-          (clicksByPlacement.get(c.placement_id) ?? 0) + 1,
-        );
-      }
-    }
-  }
+  // Per-placement impressions + clicks served from the precomputed
+  // daily_placement_imps table (migration 0062). The nightly cron at
+  // /api/cron/aggregate-stats refreshes the trailing 14 days each run;
+  // older placements are stable. Drops this loop from ~28s to a single
+  // indexed lookup.
+  const impressions = await loadPlacementImpressionsByIds(placements.map((p) => p.id));
 
   // Aggregate per campaign.
   type Agg = { email: number; web: number; clicks: number; placements: number };
   const aggByCampaign = new Map<string, Agg>();
   for (const p of placements) {
     const cur = aggByCampaign.get(p.campaign_id) ?? { email: 0, web: 0, clicks: 0, placements: 0 };
-    const imp = impressions.get(`${p.sport}|${p.date}`);
-    cur.email     += imp?.email ?? 0;
-    cur.web       += imp?.web   ?? 0;
-    cur.clicks    += clicksByPlacement.get(p.id) ?? 0;
+    const imp = impressions.get(p.id);
+    cur.email     += imp?.email_unique_opens ?? 0;
+    cur.web       += imp?.web_pageviews      ?? 0;
+    cur.clicks    += imp?.human_clicks       ?? 0;  // humans only on the list row
     cur.placements += 1;
     aggByCampaign.set(p.campaign_id, cur);
   }
