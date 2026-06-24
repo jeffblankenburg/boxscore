@@ -345,77 +345,49 @@ export async function getOpenStickiness(
 ): Promise<OpenStickiness> {
   if (windowDays < 1) throw new Error(`windowDays must be ≥1, got ${windowDays}`);
 
-  // Last N ET dates ending yesterday. Today is excluded — its open window
-  // is still partial and would understate stickiness.
-  const dates: string[] = [];
-  for (let i = 1; i <= windowDays; i++) {
-    dates.push(ymdInET(new Date(Date.now() - i * 86_400_000)));
-  }
-  dates.reverse();
-  const windowStart = dates[0]!;
-  const windowEnd   = dates[dates.length - 1]!;
+  // Reads the most recent snapshot from daily_open_stickiness (migration
+  // 0063, written nightly by /api/cron/aggregate-stats). The histogram
+  // pivot is per-subscriber-per-day, which can't be served from the
+  // per-(sport,scope,date) totals in daily_send_stats — but precomputing
+  // it once in the cron lets the page render in one indexed read.
+  //
+  // Scope is "league" (matches the original team_id IS NULL filter).
+  // If no snapshot exists yet (fresh deploy, never-run cron, or sport
+  // with no recent league sends), return a zeroed histogram so the
+  // panel renders an empty state instead of erroring.
+  const { data, error } = await supabaseAdmin()
+    .from("daily_open_stickiness")
+    .select("date, eligible, histogram")
+    .eq("sport", sport)
+    .eq("scope", "league")
+    .eq("window_days", windowDays)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ date: string; eligible: number; histogram: number[] }>();
+  if (error) throw new Error(`getOpenStickiness: ${error.message}`);
 
-  // Successful league sends in the window (no team_id, no error).
-  type SendRow = { subscriber_id: string; digest_date: string; resend_id: string | null };
-  const sends = await fetchAll<SendRow>(
-    () => supabaseAdmin().from("sends")
-      .select("subscriber_id, digest_date, resend_id")
-      .eq("digest_sport", sport)
-      .is("team_id", null)
-      .is("error", null)
-      .gte("digest_date", windowStart)
-      .lte("digest_date", windowEnd) as unknown as QueryBuilder<SendRow>,
-    "getOpenStickiness sends",
-  );
-
-  // Per-subscriber set of distinct dates received + sub|date → resend_id.
-  const subDates = new Map<string, Set<string>>();
-  const ridByPair = new Map<string, string>();
-  for (const s of sends) {
-    (subDates.get(s.subscriber_id) ?? subDates.set(s.subscriber_id, new Set()).get(s.subscriber_id)!)
-      .add(s.digest_date);
-    if (s.resend_id) ridByPair.set(`${s.subscriber_id}|${s.digest_date}`, s.resend_id);
-  }
-
-  const eligibleSubs: string[] = [];
-  for (const [sub, ds] of subDates) {
-    if (ds.size === windowDays) eligibleSubs.push(sub);
-  }
-  const histogram = new Array<number>(windowDays + 1).fill(0);
-  if (eligibleSubs.length === 0) {
-    return { sport, windowDays, windowStart, windowEnd, eligible: 0, histogram };
+  if (!data) {
+    return {
+      sport, windowDays,
+      windowStart: ymdInET(new Date(Date.now() - windowDays * 86_400_000)),
+      windowEnd:   ymdInET(new Date(Date.now() - 86_400_000)),
+      eligible: 0,
+      histogram: new Array<number>(windowDays + 1).fill(0),
+    };
   }
 
-  // Resend ids that belong to eligible subscribers. Reusing the same
-  // date-bounded events query the rolling stats uses — see eventsByResendId
-  // for why we don't pass ids through `.in()` at this scale.
-  const eligibleSet = new Set(eligibleSubs);
-  const candidateIds: string[] = [];
-  for (const s of sends) {
-    if (s.resend_id && eligibleSet.has(s.subscriber_id)) candidateIds.push(s.resend_id);
-  }
-  // Late opens can land a few days after the send (MPP staggers them).
-  // Window the events query to start of stickiness window and pad a
-  // little to catch trailing fires.
-  const sinceIso = new Date(new Date(windowStart + "T00:00:00Z").getTime() - 2 * 86_400_000).toISOString();
-  const byId = await eventsByResendId(candidateIds, sinceIso);
-
-  for (const sub of eligibleSubs) {
-    let opens = 0;
-    for (const date of dates) {
-      const rid = ridByPair.get(`${sub}|${date}`);
-      if (rid && (byId[rid]?.has("email.opened") || byId[rid]?.has("boxscore.opened"))) opens++;
-    }
-    histogram[opens]!++;
-  }
+  // Reconstruct the window labels from the snapshot's end date. The cron
+  // writes end = "yesterday in ET"; the page's "windowStart" label is N-1
+  // days before that.
+  const endMs = new Date(`${data.date}T12:00:00Z`).getTime();
+  const windowStart = ymdInET(new Date(endMs - (windowDays - 1) * 86_400_000));
+  const windowEnd   = data.date;
 
   return {
-    sport,
-    windowDays,
-    windowStart,
-    windowEnd,
-    eligible: eligibleSubs.length,
-    histogram,
+    sport, windowDays,
+    windowStart, windowEnd,
+    eligible: data.eligible,
+    histogram: data.histogram,
   };
 }
 

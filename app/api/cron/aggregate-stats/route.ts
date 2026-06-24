@@ -22,7 +22,10 @@ import {
   writeDailySubscriberEvents,
   computePlacementImpressions,
   writePlacementImpressions,
+  computeOpenStickiness,
+  writeOpenStickiness,
 } from "@/lib/admin-aggregates";
+import { yesterdayInET } from "@/lib/dates";
 
 export const runtime = "nodejs";
 // Yesterday-only sends compute is ~5s; placement recompute is the long pole
@@ -83,6 +86,18 @@ export async function GET(req: Request) {
     await writePlacementImpressions(placementRows);
     const placementsMs = Date.now() - placementsT0;
 
+    // 4. Open stickiness — rolling 7-day histogram, per (sport, scope).
+    //    Inclusive end date is yesterday in ET (matches the existing
+    //    getOpenStickiness semantics; today's window would be partial).
+    const stickyT0 = Date.now();
+    const stickyEnd = yesterdayInET();
+    const stickyRows = await Promise.all([
+      computeOpenStickiness("mlb", "league", stickyEnd, 7),
+      computeOpenStickiness("mlb", "team",   stickyEnd, 7),
+    ]);
+    await writeOpenStickiness(stickyRows);
+    const stickyMs = Date.now() - stickyT0;
+
     const totalMs = Date.now() - t0;
     const result = {
       date,
@@ -90,6 +105,7 @@ export async function GET(req: Request) {
       send_stats: { rows: sendRows.length, ms: sendStatsMs },
       subscribers: { row: subRow, ms: subsMs },
       placements: { rows: placementRows.length, since: sinceDate, ms: placementsMs },
+      stickiness: { rows: stickyRows.length, end: stickyEnd, ms: stickyMs },
     };
     await finishCronRun(runId, { status: "ok", result });
     return NextResponse.json({ ok: true, ...result });

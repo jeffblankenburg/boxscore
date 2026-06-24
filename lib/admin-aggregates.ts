@@ -368,3 +368,139 @@ export async function writePlacementImpressions(rows: PlacementImpressionsRow[])
     );
   if (error) throw new Error(`writePlacementImpressions: ${error.message}`);
 }
+
+// ─── daily_open_stickiness ────────────────────────────────────────────────
+// Per-subscriber open distribution over a rolling window. Backs the
+// stickiness panel on /admin/metrics/sends, which can't be served from
+// the per-day totals in daily_send_stats (it needs per-subscriber-per-day
+// to ask "of subs who got all N sends, how many days did each open?").
+
+export type OpenStickinessRow = {
+  date: string;          // inclusive end of the window (ET)
+  sport: string;
+  scope: "league" | "team";
+  window_days: number;
+  eligible: number;
+  histogram: number[];   // length = window_days + 1
+};
+
+function ymdET(d: Date): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+// Live compute the histogram for one (sport, scope, endDate, windowDays).
+// endDate is the inclusive ET end of the window — the cron calls with
+// "yesterday in ET". The pivot is per-subscriber-per-day, so we still
+// have to walk `sends` for the window and `email_events` for the matching
+// resend_ids — but it's run ONCE in the cron and stored.
+export async function computeOpenStickiness(
+  sport: string,
+  scope: "league" | "team",
+  endDate: string,
+  windowDays: number,
+): Promise<OpenStickinessRow> {
+  if (windowDays < 1) throw new Error(`windowDays must be ≥1, got ${windowDays}`);
+  const db = supabaseAdmin();
+
+  // Build N ET dates ending at endDate (inclusive).
+  const endMs = new Date(`${endDate}T12:00:00Z`).getTime(); // noon-UTC = same ET date
+  const dates: string[] = [];
+  for (let i = windowDays - 1; i >= 0; i--) {
+    dates.push(ymdET(new Date(endMs - i * 24 * 60 * 60 * 1000)));
+  }
+  const windowStart = dates[0]!;
+  const windowEnd   = dates[dates.length - 1]!;
+
+  type SendRow = { subscriber_id: string; digest_date: string; resend_id: string | null };
+  let q = db.from("sends")
+    .select("subscriber_id, digest_date, resend_id")
+    .eq("digest_sport", sport)
+    .is("error", null)
+    .gte("digest_date", windowStart)
+    .lte("digest_date", windowEnd);
+  q = scope === "league" ? q.is("team_id", null) : q.not("team_id", "is", null);
+  const sends = await fetchAll<SendRow>(
+    () => q as unknown as QueryBuilder<SendRow>,
+    `computeOpenStickiness(${sport},${scope},${endDate},${windowDays}) sends`,
+  );
+
+  // Per-subscriber set of received-dates + (sub,date) → resend_id map.
+  const subDates  = new Map<string, Set<string>>();
+  const ridByPair = new Map<string, string>();
+  for (const s of sends) {
+    (subDates.get(s.subscriber_id) ?? subDates.set(s.subscriber_id, new Set()).get(s.subscriber_id)!)
+      .add(s.digest_date);
+    if (s.resend_id) ridByPair.set(`${s.subscriber_id}|${s.digest_date}`, s.resend_id);
+  }
+
+  const eligibleSubs: string[] = [];
+  for (const [sub, ds] of subDates) {
+    if (ds.size === windowDays) eligibleSubs.push(sub);
+  }
+  const histogram = new Array<number>(windowDays + 1).fill(0);
+  if (eligibleSubs.length === 0) {
+    return { date: endDate, sport, scope, window_days: windowDays, eligible: 0, histogram };
+  }
+
+  // Resend ids belonging to eligible subs only — keeps the open-events
+  // lookup focused.
+  const eligibleSet = new Set(eligibleSubs);
+  const candidateIds: string[] = [];
+  for (const s of sends) {
+    if (s.resend_id && eligibleSet.has(s.subscriber_id)) candidateIds.push(s.resend_id);
+  }
+  const eventMap = await eventsByResendIds(candidateIds);
+
+  for (const sub of eligibleSubs) {
+    let opens = 0;
+    for (const date of dates) {
+      const rid = ridByPair.get(`${sub}|${date}`);
+      const evts = rid ? eventMap.get(rid) : undefined;
+      if (evts?.has("email.opened") || evts?.has("boxscore.opened")) opens++;
+    }
+    histogram[opens]!++;
+  }
+
+  return {
+    date: endDate, sport, scope, window_days: windowDays,
+    eligible: eligibleSubs.length, histogram,
+  };
+}
+
+export async function writeOpenStickiness(rows: OpenStickinessRow[]): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await supabaseAdmin()
+    .from("daily_open_stickiness")
+    .upsert(
+      rows.map((r) => ({ ...r, computed_at: new Date().toISOString() })),
+      { onConflict: "date,sport,scope,window_days" },
+    );
+  if (error) throw new Error(`writeOpenStickiness: ${error.message}`);
+}
+
+// Read-side: fetch the most recent row matching (sport, scope, windowDays).
+// Returns null if no snapshot has been written yet (caller should fall
+// back to live compute or render an empty state).
+export async function loadLatestOpenStickiness(
+  sport: string,
+  scope: "league" | "team",
+  windowDays: number,
+): Promise<OpenStickinessRow | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("daily_open_stickiness")
+    .select("date, sport, scope, window_days, eligible, histogram")
+    .eq("sport", sport)
+    .eq("scope", scope)
+    .eq("window_days", windowDays)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`loadLatestOpenStickiness: ${error.message}`);
+  return (data ?? null) as OpenStickinessRow | null;
+}
