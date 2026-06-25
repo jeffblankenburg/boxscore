@@ -97,6 +97,84 @@ const BASELINE_NRFI = 0.57;             // league NRFI rate, season-aggregate
 const NRFI_MIN = 0.30;
 const NRFI_MAX = 0.80;
 
+// ─── Play thresholds ─────────────────────────────────────────────────────
+// Below which the model's signal isn't strong enough to justify a wager
+// against typical sportsbook prices (see /mlb/predictions methodology
+// note for the breakeven math).
+//
+//   ML at -150 needs ~60% win prob to break even. Confidence 0.20 = 60%
+//     win prob for the favored side.
+//   NRFI at -135 needs ~57% to break even; 60% gives ~3pp of edge that
+//     survives variance once you correct for our model's optimism.
+//
+// Strong thresholds are the second tier — flagged with the same badge,
+// styled with extra weight. Not used for filtering yet, just for the UI.
+
+export const ML_PLAY_THRESHOLD = 0.60;        // favorite's win probability
+export const ML_STRONG_THRESHOLD = 0.65;
+export const NRFI_PLAY_THRESHOLD = 0.60;      // NRFI side; YRFI side is 1 - this
+export const NRFI_STRONG_THRESHOLD = 0.65;
+
+// ─── Play helpers ────────────────────────────────────────────────────────
+
+export type WinPlay = {
+  side: "away" | "home";
+  abbr: string;
+  winPct: number;
+  strong: boolean;
+};
+export type NrfiPlay = {
+  side: "NRFI" | "YRFI";
+  probability: number;            // probability of the side we're betting (>= 0.60)
+  strong: boolean;
+};
+
+/** Returns the moneyline play for this game, or null if no side clears
+ *  the threshold. The play side is the favored team only when its win
+ *  probability >= ML_PLAY_THRESHOLD. */
+export function winPlayFor(game: GamePrediction): WinPlay | null {
+  if (game.away.winProbability >= ML_PLAY_THRESHOLD) {
+    return {
+      side: "away",
+      abbr: game.away.abbr,
+      winPct: game.away.winProbability,
+      strong: game.away.winProbability >= ML_STRONG_THRESHOLD,
+    };
+  }
+  if (game.home.winProbability >= ML_PLAY_THRESHOLD) {
+    return {
+      side: "home",
+      abbr: game.home.abbr,
+      winPct: game.home.winProbability,
+      strong: game.home.winProbability >= ML_STRONG_THRESHOLD,
+    };
+  }
+  return null;
+}
+
+/** Returns the first-inning play for this game, or null if NRFI sits in
+ *  the 40–60% no-play zone. NRFI side fires when nrfi >= threshold;
+ *  YRFI side fires symmetrically when nrfi <= 1 - threshold. */
+export function nrfiPlayFor(game: GamePrediction): NrfiPlay | null {
+  const nrfi = game.nrfiProbability;
+  if (nrfi >= NRFI_PLAY_THRESHOLD) {
+    return {
+      side: "NRFI",
+      probability: nrfi,
+      strong: nrfi >= NRFI_STRONG_THRESHOLD,
+    };
+  }
+  if (nrfi <= 1 - NRFI_PLAY_THRESHOLD) {
+    const yrfi = 1 - nrfi;
+    return {
+      side: "YRFI",
+      probability: yrfi,
+      strong: yrfi >= NRFI_STRONG_THRESHOLD,
+    };
+  }
+  return null;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
 function clamp(v: number, lo: number, hi: number): number {

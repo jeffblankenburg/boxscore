@@ -67,6 +67,10 @@
     {
       "path": "/api/cron/predictions-comparator?sport=mlb",
       "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/fantasy-comparator?sport=mlb",
+      "schedule": "45 9 * * *"
     }
   ],
   "functions": {

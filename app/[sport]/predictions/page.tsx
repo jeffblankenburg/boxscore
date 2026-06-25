@@ -1,8 +1,25 @@
 import { notFound } from "next/navigation";
-import { todayInET, timeInET } from "@/lib/dates";
+import { todayInET, timeInET, prevDay } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { loadPredictionsForDate } from "@/lib/sports/mlb/predictions-data";
-import type { GamePrediction, PredictionSide } from "@/lib/sports/mlb/predictions";
+import {
+  winPlayFor,
+  nrfiPlayFor,
+  ML_PLAY_THRESHOLD,
+  NRFI_PLAY_THRESHOLD,
+  type GamePrediction,
+  type PredictionSide,
+  type WinPlay,
+  type NrfiPlay,
+} from "@/lib/sports/mlb/predictions";
+import {
+  loadPredictionOutcomesForDate,
+  loadPredictionAccuracy,
+  outcomeWinPlay,
+  outcomeNrfiPlay,
+  type PlayAccuracySummary,
+  type GamePredictionOutcome,
+} from "@/lib/sports/mlb/predictions-history";
 import "./predictions.css";
 
 export const revalidate = 300;
@@ -53,23 +70,51 @@ export default async function PredictionsPage({
   if (sport !== "mlb") notFound();
 
   const today = todayInET();
-  const result = await loadPredictionsForDate(today);
+  const yesterday = prevDay(today);
+  const [result, yesterdayOutcomes, rolling7, rolling30] = await Promise.all([
+    loadPredictionsForDate(today),
+    loadPredictionOutcomesForDate(yesterday),
+    loadPredictionAccuracy(7, yesterday),
+    loadPredictionAccuracy(30, yesterday),
+  ]);
+
+  const plays = result.games
+    .map((g) => ({ game: g, win: winPlayFor(g), nrfi: nrfiPlayFor(g) }))
+    .filter((p) => p.win !== null || p.nrfi !== null);
 
   return (
     <div className="pr-page">
       <h1 className="pr-title">Daily Predictions</h1>
       <p className="pr-subtitle">
         {prettyDate(today)} &middot; {result.gameCount} game{result.gameCount === 1 ? "" : "s"}
+        {plays.length > 0 && <> &middot; <strong>{plays.length} play{plays.length === 1 ? "" : "s"}</strong></>}
       </p>
 
       <p className="pr-note">
-        WIN combines Bill James pythagorean expectation (runs scored / runs allowed) with log5 matchup, a +.040
-        home-field bump, and each starter&apos;s ERA delta from league average (4.20).
-        NRFI starts from the .57 league baseline and is modulated by both lineups&apos; runs-per-game and both
-        starters&apos; ERA. v1 does not use first-inning-specific splits, bullpen quality, or park factors.
-        Commonly used equations &mdash; we will not beat sharps with this. The point is a transparent baseline.
+        WIN combines Bill James pythagorean expectation (runs scored / runs allowed) with log5 matchup,
+        a +.040 home-field bump, and each starter&apos;s ERA delta from league average (4.20).
+        NRFI starts from the .57 league baseline and is modulated by both lineups&apos; runs-per-game
+        and both starters&apos; ERA. v1 does not use first-inning-specific splits, bullpen quality, or
+        park factors.{" "}
+        <strong>
+          We flag a moneyline play at {Math.round(ML_PLAY_THRESHOLD * 100)}%+ win probability
+          (clears a -150 line at breakeven) and a NRFI/YRFI play at {Math.round(NRFI_PLAY_THRESHOLD * 100)}%+
+          (clears -135 with ~3pp of edge).
+        </strong>{" "}
+        Anything between {Math.round((1 - NRFI_PLAY_THRESHOLD) * 100)}% and {Math.round(NRFI_PLAY_THRESHOLD * 100)}%
+        NRFI sits in the no-play zone.
       </p>
 
+      <PlaysSection plays={plays} date={today} />
+
+      <Recap
+        yesterday={yesterday}
+        outcomes={yesterdayOutcomes}
+        rolling7={rolling7}
+        rolling30={rolling30}
+      />
+
+      <h2 className="pr-section-h">All games</h2>
       {result.games.length === 0 ? (
         <p className="pr-empty">No games on the slate today.</p>
       ) : (
@@ -85,6 +130,7 @@ export default async function PredictionsPage({
                 <th>NRFI</th>
                 <th>Pick</th>
                 <th className="pr-col-conf">Conf</th>
+                <th className="pr-col-play">Play</th>
               </tr>
             </thead>
             <tbody>
@@ -100,6 +146,8 @@ export default async function PredictionsPage({
 }
 
 function PredictionRow({ game }: { game: GamePrediction }) {
+  const winPlay = winPlayFor(game);
+  const nrfiPlay = nrfiPlayFor(game);
   return (
     <tr>
       <td className="pr-col-time">{timeInET(game.startTime)}</td>
@@ -122,7 +170,90 @@ function PredictionRow({ game }: { game: GamePrediction }) {
       <td className="pr-col-conf">
         <ConfidenceBar value={game.winConfidence} />
       </td>
+      <td className="pr-col-play">
+        <PlayBadges winPlay={winPlay} nrfiPlay={nrfiPlay} />
+      </td>
     </tr>
+  );
+}
+
+function PlayBadges({ winPlay, nrfiPlay }: { winPlay: WinPlay | null; nrfiPlay: NrfiPlay | null }) {
+  if (!winPlay && !nrfiPlay) {
+    return <span className="pr-na">—</span>;
+  }
+  return (
+    <span className="pr-play-stack">
+      {winPlay && (
+        <span className={`pr-play-badge pr-play-ml${winPlay.strong ? " pr-play-strong" : ""}`}>
+          ML {winPlay.abbr} {pct(winPlay.winPct)}
+        </span>
+      )}
+      {nrfiPlay && (
+        <span className={`pr-play-badge pr-play-nrfi${nrfiPlay.strong ? " pr-play-strong" : ""}`}>
+          {nrfiPlay.side} {pct(nrfiPlay.probability)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function PlaysSection({
+  plays,
+  date,
+}: {
+  plays: Array<{ game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }>;
+  date: string;
+}) {
+  void date;
+  return (
+    <section className="pr-plays">
+      <h2 className="pr-plays-head">Today&apos;s Plays</h2>
+      {plays.length === 0 ? (
+        <p className="pr-plays-empty">
+          No games clear the {Math.round(ML_PLAY_THRESHOLD * 100)}% ML or
+          {" "}{Math.round(NRFI_PLAY_THRESHOLD * 100)}% NRFI thresholds tonight. Pass.
+        </p>
+      ) : (
+        <div className="pr-scroll">
+          <table className="pr-plays-table">
+            <thead>
+              <tr>
+                <th className="pr-col-time">Time</th>
+                <th>Matchup</th>
+                <th>ML play</th>
+                <th>NRFI play</th>
+              </tr>
+            </thead>
+            <tbody>
+              {plays.map(({ game, win, nrfi }) => (
+                <tr key={game.gamePk}>
+                  <td className="pr-col-time">{timeInET(game.startTime)}</td>
+                  <td className="pr-pick-cell">
+                    <a className="pr-team-link" href={teamHref(game.away.abbr)}>{game.away.abbr}</a>
+                    {" @ "}
+                    <a className="pr-team-link" href={teamHref(game.home.abbr)}>{game.home.abbr}</a>
+                  </td>
+                  <td>
+                    {win
+                      ? <span className={`pr-play-badge pr-play-ml${win.strong ? " pr-play-strong" : ""}`}>
+                          ML {win.abbr} {pct(win.winPct)}
+                        </span>
+                      : <span className="pr-na">—</span>}
+                  </td>
+                  <td>
+                    {nrfi
+                      ? <span className={`pr-play-badge pr-play-nrfi${nrfi.strong ? " pr-play-strong" : ""}`}>
+                          {nrfi.side} {pct(nrfi.probability)}
+                        </span>
+                      : <span className="pr-na">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -146,4 +277,141 @@ function ConfidenceBar({ value }: { value: number }) {
   const filled = Math.min(10, Math.max(0, Math.round(pctNum / 10)));
   const blocks = "█".repeat(filled) + "░".repeat(10 - filled);
   return <span className="pr-conf-bar" title={`${pctNum}% confidence`}>{blocks}</span>;
+}
+
+// ─── How we did ─────────────────────────────────────────────────────────
+
+function pctOrDash(v: number | null): string {
+  if (v == null) return "—";
+  return `${(v * 100).toFixed(1)}%`;
+}
+
+function Recap({
+  yesterday,
+  outcomes,
+  rolling7,
+  rolling30,
+}: {
+  yesterday: string;
+  outcomes: GamePredictionOutcome[];
+  rolling7: PlayAccuracySummary;
+  rolling30: PlayAccuracySummary;
+}) {
+  // Filter yesterday's grades to plays only — games we didn't bet
+  // shouldn't show up in the success ledger.
+  const playedRows = outcomes
+    .map((o) => ({ o, win: outcomeWinPlay(o), nrfi: outcomeNrfiPlay(o) }))
+    .filter((p) => p.win !== null || p.nrfi !== null);
+
+  const hasHistory = rolling30.mlPlays > 0 || rolling30.nrfiPlays > 0 || playedRows.length > 0;
+  if (!hasHistory) return null;
+
+  return (
+    <section className="pr-recap">
+      <h2 className="pr-recap-head">How our plays did</h2>
+      <div className="pr-recap-stats">
+        <PlayStat label="7d ML plays" plays={rolling7.mlPlays} hits={rolling7.mlPlayHits} rate={rolling7.mlHitRate} />
+        <PlayStat label="7d NRFI plays" plays={rolling7.nrfiPlays} hits={rolling7.nrfiPlayHits} rate={rolling7.nrfiHitRate} />
+        <PlayStat label="30d ML plays" plays={rolling30.mlPlays} hits={rolling30.mlPlayHits} rate={rolling30.mlHitRate} />
+        <PlayStat label="30d NRFI plays" plays={rolling30.nrfiPlays} hits={rolling30.nrfiPlayHits} rate={rolling30.nrfiHitRate} />
+      </div>
+      {playedRows.length > 0 && (
+        <>
+          <div className="pr-recap-subhead">Yesterday ({prettyDate(yesterday)})</div>
+          <div className="pr-scroll">
+            <table className="pr-recap-table">
+              <thead>
+                <tr>
+                  <th>Game</th>
+                  <th>Final</th>
+                  <th>ML play</th>
+                  <th>NRFI play</th>
+                </tr>
+              </thead>
+              <tbody>
+                {playedRows.map(({ o, win, nrfi }) => (
+                  <YesterdayRow key={o.gamePk} o={o} win={win} nrfi={nrfi} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function PlayStat({
+  label,
+  plays,
+  hits,
+  rate,
+}: {
+  label: string;
+  plays: number;
+  hits: number;
+  rate: number | null;
+}) {
+  return (
+    <div className="pr-stat-block">
+      <div className="pr-stat-label">{label}</div>
+      <div className="pr-stat-value">{pctOrDash(rate)}</div>
+      <div className="pr-stat-sub">{plays > 0 ? `${hits} of ${plays}` : "no plays in window"}</div>
+    </div>
+  );
+}
+
+function YesterdayRow({
+  o,
+  win,
+  nrfi,
+}: {
+  o: GamePredictionOutcome;
+  win: WinPlay | null;
+  nrfi: NrfiPlay | null;
+}) {
+  const finalScore =
+    o.awayScore !== null && o.homeScore !== null
+      ? `${o.awayAbbr} ${o.awayScore} · ${o.homeAbbr} ${o.homeScore}`
+      : <span className="pr-na">{o.status}</span>;
+
+  return (
+    <tr>
+      <td className="pr-pick-cell">{o.awayAbbr} @ {o.homeAbbr}</td>
+      <td>{finalScore}</td>
+      <td>
+        {win
+          ? <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`ML ${win.abbr} ${pct(win.winPct)}`} hit={o.winCorrect} />
+          : <span className="pr-na">—</span>}
+      </td>
+      <td>
+        {nrfi
+          ? <PlayCell badgeClass="pr-play-nrfi" strong={nrfi.strong} label={`${nrfi.side} ${pct(nrfi.probability)}`} hit={o.nrfiCorrect} />
+          : <span className="pr-na">—</span>}
+      </td>
+    </tr>
+  );
+}
+
+function PlayCell({
+  badgeClass,
+  strong,
+  label,
+  hit,
+}: {
+  badgeClass: string;
+  strong: boolean;
+  label: string;
+  hit: boolean | null;
+}) {
+  return (
+    <span className="pr-play-cell">
+      <span className={`pr-play-badge ${badgeClass}${strong ? " pr-play-strong" : ""}`}>{label}</span>
+      {hit === null
+        ? <span className="pr-na"> —</span>
+        : hit
+          ? <span className="pr-hit"> ✓</span>
+          : <span className="pr-miss"> ✗</span>}
+    </span>
+  );
 }

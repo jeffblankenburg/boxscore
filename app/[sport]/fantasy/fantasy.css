@@ -147,3 +147,85 @@
   border-radius: 2px;
   letter-spacing: 0.05em;
 }
+
+/* "How we did" — projection vs actual recap. */
+.fa-recap {
+  padding: 14px 16px;
+  border: 1px solid var(--border-light);
+  background: #fdfcf7;
+  margin-bottom: 24px;
+}
+.fa-recap-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  margin: 0 0 16px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.fa-stat-block {
+  min-width: 120px;
+}
+.fa-stat-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 2px;
+}
+.fa-stat-value {
+  font-weight: 800;
+  font-size: 18px;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.fa-stat-sub {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.fa-recap-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 720px) {
+  .fa-recap-grid { grid-template-columns: 1fr; }
+}
+.fa-recap-table-wrap { min-width: 0; }
+.fa-recap-subhead {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin: 0 0 6px;
+}
+.fa-recap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.fa-recap-table th,
+.fa-recap-table td {
+  border: 1px solid var(--border-light);
+  padding: 4px 6px;
+  text-align: center;
+}
+.fa-recap-table th {
+  background: #f0ebde;
+  font-weight: 700;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.fa-recap-table tbody tr:nth-child(even) { background: #fafafa; }
+.fa-recap-name {
+  text-align: left !important;
+  font-weight: 700;
+}
+.fa-recap-vs {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.fa-recap-pos { color: #1f5a1f; font-weight: 800; }
+.fa-recap-neg { color: #a83232; font-weight: 700; }

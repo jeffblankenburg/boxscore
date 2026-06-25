@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSlate } from "@/lib/mlb";
-import { todayInET, timeInET } from "@/lib/dates";
+import { todayInET, timeInET, prevDay } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { loadFantasyForDate } from "@/lib/sports/mlb/fantasy-data";
 import {
@@ -9,6 +9,12 @@ import {
   type FantasySpRow,
   type HitterCategory,
 } from "@/lib/sports/mlb/fantasy";
+import {
+  loadFantasyResultsForDate,
+  loadFantasyAccuracy,
+  type FantasyAccuracySummary,
+  type FantasyResultRow,
+} from "@/lib/sports/mlb/fantasy-history";
 import "./fantasy.css";
 
 // Refresh every 5 minutes so lineups posted between cron polls show up
@@ -130,7 +136,12 @@ export default async function FantasyPage({
   const { sport } = await params;
   if (sport !== "mlb") notFound();
   const today = todayInET();
-  const data = await loadFantasy(today);
+  const yesterday = prevDay(today);
+  const [data, yesterdayResults, rolling7] = await Promise.all([
+    loadFantasy(today),
+    loadFantasyResultsForDate(yesterday),
+    loadFantasyAccuracy(7, yesterday),
+  ]);
 
   return (
     <div className="fa-page">
@@ -146,6 +157,8 @@ export default async function FantasyPage({
         Projected rows use the team's most-active hitters until lineups post; confirmed rows lock in once MLB releases the lineup.
         v1 does not include rolling form, park factors, or platoon splits.
       </p>
+
+      <Recap yesterday={yesterday} results={yesterdayResults} rolling7={rolling7} />
 
       {data.gameCount === 0 ? (
         <p className="fa-empty">No games on the slate today.</p>
@@ -309,4 +322,97 @@ function HitterSection({ category, rows }: { category: HitterCategory; rows: Fan
       </div>
     </section>
   );
+}
+
+// ─── How we did ─────────────────────────────────────────────────────────
+
+function Recap({
+  yesterday,
+  results,
+  rolling7,
+}: {
+  yesterday: string;
+  results: FantasyResultRow[];
+  rolling7: FantasyAccuracySummary;
+}) {
+  // No history yet (first day after deploy, or comparator hasn't run).
+  if (results.length === 0 && rolling7.played === 0) return null;
+
+  const played = results.filter((r) => r.played && r.actualScore !== null);
+  const beats  = [...played].sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0)).slice(0, 5);
+  const misses = [...played].sort((a, b) => (a.delta ?? 0) - (b.delta ?? 0)).slice(0, 5);
+
+  return (
+    <section className="fa-section fa-recap">
+      <h2 className="fa-section-title">How we did</h2>
+      <div className="fa-recap-stats">
+        <RecapStat label="MAE (7d)" value={rolling7.mae == null ? "—" : rolling7.mae.toFixed(2)}
+          sub={rolling7.played === 0 ? "no graded players" : `${rolling7.played.toLocaleString()} played`} />
+        <RecapStat label="Bias (7d)" value={rolling7.bias == null ? "—" : signedFixed(rolling7.bias, 2)}
+          sub={rolling7.bias == null ? "" : rolling7.bias > 0 ? "actual > projection" : "actual < projection"} />
+        <RecapStat label="Correlation (7d)" value={rolling7.correlation == null ? "—" : rolling7.correlation.toFixed(2)}
+          sub="proj vs actual" />
+        <RecapStat label="Yesterday" value={played.length === 0 ? "—" : `${played.length}`}
+          sub={played.length === 0 ? "no graded players" : "players graded"} />
+      </div>
+      {beats.length > 0 && (
+        <div className="fa-recap-grid">
+          <RecapTable title={`Biggest beats — ${prettyDate(yesterday)}`} rows={beats} />
+          <RecapTable title={`Biggest misses — ${prettyDate(yesterday)}`} rows={misses} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RecapStat({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="fa-stat-block">
+      <div className="fa-stat-label">{label}</div>
+      <div className="fa-stat-value">{value}</div>
+      {sub && <div className="fa-stat-sub">{sub}</div>}
+    </div>
+  );
+}
+
+function RecapTable({ title, rows }: { title: string; rows: FantasyResultRow[] }) {
+  return (
+    <div className="fa-recap-table-wrap">
+      <div className="fa-recap-subhead">{title}</div>
+      <table className="fa-recap-table">
+        <thead>
+          <tr>
+            <th className="fa-recap-name">Player</th>
+            <th>Cat</th>
+            <th>Proj</th>
+            <th>Actual</th>
+            <th>Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.playerId}>
+              <td className="fa-recap-name">
+                {r.fullName}{" "}
+                <span className="fa-recap-vs">
+                  {r.teamAbbr}{r.isHome ? " vs " : " @ "}{r.oppAbbr}
+                </span>
+              </td>
+              <td>{r.category}</td>
+              <td>{r.projScore.toFixed(1)}</td>
+              <td>{r.actualScore == null ? "—" : r.actualScore.toFixed(1)}</td>
+              <td className={r.delta != null && r.delta >= 0 ? "fa-recap-pos" : "fa-recap-neg"}>
+                {r.delta == null ? "—" : signedFixed(r.delta, 1)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function signedFixed(n: number, digits: number): string {
+  const s = n.toFixed(digits);
+  return n >= 0 ? `+${s}` : s;
 }

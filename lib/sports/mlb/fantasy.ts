@@ -200,21 +200,63 @@ const EXPECTED_SP_IP = 5.5;
 // Fallback OPS for hitters whose season stats are missing (callups, etc.).
 const FALLBACK_OPS = 0.700;
 
-// DraftKings classic scoring (hitters)
-const SCORE_1B = 3;
-const SCORE_2B = 5;
-const SCORE_3B = 8;
-const SCORE_HR = 10;
-const SCORE_R  = 2;
-const SCORE_RBI = 2;
-const SCORE_BB = 2;
-const SCORE_SB = 5;
+// DraftKings classic scoring (hitters). Exported so the fantasy
+// comparator uses the same constants when computing actuals — keeps
+// the projection and the outcome on the same scale.
+export const SCORE_1B = 3;
+export const SCORE_2B = 5;
+export const SCORE_3B = 8;
+export const SCORE_HR = 10;
+export const SCORE_R  = 2;
+export const SCORE_RBI = 2;
+export const SCORE_BB = 2;
+export const SCORE_SB = 5;
 
 // DraftKings classic scoring (pitchers, simplified — no W/QS/CG bonus
 // because we can't reliably project decisions yet).
-const SCORE_IP = 2.25;
-const SCORE_K  = 2;
-const SCORE_ER = -2;
+export const SCORE_IP = 2.25;
+export const SCORE_K  = 2;
+export const SCORE_ER = -2;
+
+// Score a player's actual game line. Hitters use single/double/triple/HR/
+// runs/RBI/walks/stolen-bases counts; pitchers use innings (decimal),
+// strikeouts, earned runs. Same formula as the projector applies to
+// expected values.
+export function scoreHittingLine(line: {
+  hits: number; doubles: number; triples: number; homeRuns: number;
+  runs: number; rbi: number; baseOnBalls: number; stolenBases: number;
+}): number {
+  const singles = Math.max(0, line.hits - line.doubles - line.triples - line.homeRuns);
+  return (
+    SCORE_1B * singles +
+    SCORE_2B * line.doubles +
+    SCORE_3B * line.triples +
+    SCORE_HR * line.homeRuns +
+    SCORE_R  * line.runs +
+    SCORE_RBI * line.rbi +
+    SCORE_BB * line.baseOnBalls +
+    SCORE_SB * line.stolenBases
+  );
+}
+
+// IP comes from statsapi as "5.2" meaning 5⅔ innings — convert to
+// proper decimal so the IP multiplier doesn't undercount fractional
+// outs.
+export function ipStringToDecimal(s: string | null | undefined): number {
+  if (!s) return 0;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return 0;
+  const whole = Math.trunc(n);
+  const tenths = Math.round((n - whole) * 10);
+  return whole + (tenths === 1 ? 1 / 3 : tenths === 2 ? 2 / 3 : 0);
+}
+
+export function scorePitchingLine(line: {
+  inningsPitched: string | null; strikeOuts: number; earnedRuns: number;
+}): number {
+  const ip = ipStringToDecimal(line.inningsPitched);
+  return SCORE_IP * ip + SCORE_K * line.strikeOuts + SCORE_ER * line.earnedRuns;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 

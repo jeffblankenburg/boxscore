@@ -101,3 +101,180 @@
 }
 .pr-pick { font-weight: 700; }
 .pr-pick-even { color: var(--text-muted); font-style: italic; font-weight: 500; }
+
+/* "How we did" — yesterday's graded picks + rolling accuracy. */
+.pr-recap {
+  margin: 0 0 28px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-light);
+  background: #fdfcf7;
+}
+.pr-recap-head {
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  margin: 0 0 10px;
+  letter-spacing: -0.005em;
+}
+.pr-recap-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.pr-stat-block {
+  min-width: 120px;
+}
+.pr-stat-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 2px;
+}
+.pr-stat-value {
+  font-weight: 800;
+  font-size: 18px;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.pr-stat-sub {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.pr-recap-subhead {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin: 14px 0 6px;
+}
+.pr-recap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 560px;
+}
+.pr-recap-table th,
+.pr-recap-table td {
+  border: 1px solid var(--border-light);
+  padding: 5px 8px;
+  text-align: center;
+}
+.pr-recap-table th {
+  background: #f0ebde;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pr-recap-table tbody tr:nth-child(even) { background: #fafafa; }
+.pr-pick-cell { font-weight: 700; }
+.pr-hit  { color: #1f5a1f; font-weight: 800; }
+.pr-miss { color: #a83232; font-weight: 600; }
+.pr-na   { color: var(--text-muted); font-style: italic; }
+.pr-recap-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 12px 0;
+  text-align: center;
+}
+
+/* Section header above the "All games" table. */
+.pr-section-h {
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  margin: 24px 0 10px;
+  letter-spacing: -0.005em;
+}
+
+/* Today's Plays — featured at top */
+.pr-plays {
+  margin: 0 0 28px;
+  padding: 14px 16px;
+  border: 2px solid #1f5a1f;
+  background: #f7fbf3;
+}
+.pr-plays-head {
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  margin: 0 0 10px;
+  letter-spacing: -0.005em;
+  color: #1f5a1f;
+}
+.pr-plays-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+.pr-plays-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 560px;
+}
+.pr-plays-table th,
+.pr-plays-table td {
+  border: 1px solid var(--border-light);
+  padding: 6px 8px;
+  text-align: center;
+}
+.pr-plays-table th {
+  background: #e4ecda;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pr-plays-table tbody tr:nth-child(even) { background: #fafafa; }
+
+/* Play badges (used in both Plays section and main table) */
+.pr-col-play {
+  width: 160px;
+  white-space: nowrap;
+}
+.pr-play-stack {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+}
+.pr-play-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.pr-play-ml {
+  background: #d8e5c5;
+  color: #1f5a1f;
+  border: 1px solid #1f5a1f;
+}
+.pr-play-nrfi {
+  background: #f6e2c5;
+  color: #7a4e10;
+  border: 1px solid #7a4e10;
+}
+.pr-play-strong {
+  background: #1f5a1f;
+  color: #fff;
+}
+.pr-play-nrfi.pr-play-strong {
+  background: #7a4e10;
+  color: #fff;
+  border-color: #7a4e10;
+}
+.pr-play-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
