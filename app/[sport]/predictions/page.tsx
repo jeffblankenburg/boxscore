@@ -91,18 +91,20 @@ export default async function PredictionsPage({
       </p>
 
       <p className="pr-note">
-        WIN combines Bill James pythagorean expectation (runs scored / runs allowed) with log5 matchup,
-        a +.040 home-field bump, and each starter&apos;s ERA delta from league average (4.20).
-        NRFI starts from the .57 league baseline and is modulated by both lineups&apos; runs-per-game
-        and both starters&apos; ERA. v1 does not use first-inning-specific splits, bullpen quality, or
-        park factors.{" "}
+        WIN combines pythagorean expectation (blended 60% recent / 40% season RS/RA),
+        log5 matchup, a +.040 home-field bump, each starter&apos;s ERA delta (also recent-blended),
+        and each team&apos;s bullpen ERA scaled to ~3.5 IP/game.
+        NRFI starts from the .57 league baseline and is modulated by both lineups&apos;
+        actual 1st-inning runs-per-game, each starter&apos;s actual 1st-inning ERA,
+        and a static 3-year park-factor index for the home venue — all from cached box scores.
+        The raw model output is then shrunk toward 50% by an empirical calibration factor
+        (fit on graded games) so the displayed probability matches observed frequency.{" "}
         <strong>
-          We flag a moneyline play at {Math.round(ML_PLAY_THRESHOLD * 100)}%+ win probability
-          (clears a -150 line at breakeven) and a NRFI/YRFI play at {Math.round(NRFI_PLAY_THRESHOLD * 100)}%+
-          (clears -135 with ~3pp of edge).
+          We flag a play at {(ML_PLAY_THRESHOLD * 100).toFixed(1)}%+ calibrated probability.
         </strong>{" "}
-        Anything between {Math.round((1 - NRFI_PLAY_THRESHOLD) * 100)}% and {Math.round(NRFI_PLAY_THRESHOLD * 100)}%
-        NRFI sits in the no-play zone.
+        Below that, the model&apos;s signal isn&apos;t strong enough to clear typical book prices.
+        Doesn&apos;t use: batter-vs-pitcher handedness splits, bullpen fatigue,
+        umpire tendencies, or weather.
       </p>
 
       <PlaysSection plays={plays} date={today} />

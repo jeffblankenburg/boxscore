@@ -2,13 +2,18 @@
 // /mlb/predictions page (live render) and the snapshot cron call this —
 // keeping the data plumbing in one place so they can never drift.
 //
-// Inputs come from:
-//   - statsapi (today's slate, fresh per request)
-//   - yesterday's daily_raw payload (standings + probablePitcherStats,
-//     cached so we don't hammer statsapi on every page view)
+// Inputs ALL come from yesterday's daily_raw payload:
+//   - standings (as of last night, post-yesterday's games)
+//   - probablePitcherStats for tonight's slate
+//   - nextDaySchedule = tonight's slate as known when the cron wrote
+//     the row, parsed into SlateGame shape with the same parser the
+//     live getSlate path uses.
+//
+// No statsapi calls — keeps the model fully reproducible from cached
+// state, which makes historical backfills leak-free.
 
 import { supabaseAdmin } from "@/lib/supabase";
-import { getSlate, type SlateGame } from "@/lib/mlb";
+import { parseSlate, type SlateGame } from "@/lib/mlb";
 import { prevDay } from "@/lib/dates";
 import {
   predictGames,
@@ -16,6 +21,7 @@ import {
   type TeamSeasonRecord,
   type ProbableSpStats,
 } from "./predictions";
+import { loadSeasonAggregates } from "./season-aggregates";
 
 const PYTHAG_FALLBACK_SP_ERA = 4.20;
 
@@ -43,16 +49,11 @@ function parseFiniteNumber(v: unknown): number | null {
 export async function loadPredictionsForDate(date: string): Promise<PredictionsResult> {
   const sb = supabaseAdmin();
 
-  // 1. Today's slate (live).
-  let slate: SlateGame[];
-  try {
-    slate = await getSlate(date);
-  } catch {
-    slate = [];
-  }
-
-  // 2. Yesterday's daily_raw → standings + probablePitcherStats. Cached
-  //    in our DB by the daily generate cron, no live statsapi call needed.
+  // Yesterday's daily_raw → everything. The generate cron writes this
+  // row at 5 AM ET each morning; it contains the standings as of that
+  // moment (post yesterday's games), probable-pitcher season stats for
+  // tonight's slate, AND the nextDaySchedule blob which IS tonight's
+  // slate. No live statsapi call required.
   const { data } = await sb
     .from("daily_raw")
     .select("payload")
@@ -60,6 +61,16 @@ export async function loadPredictionsForDate(date: string): Promise<PredictionsR
     .eq("date", prevDay(date))
     .limit(1);
   const payload = (data?.[0]?.payload as Record<string, unknown>) ?? {};
+
+  // Parse nextDaySchedule into SlateGame shape with the same parser
+  // the live getSlate() path uses — so the model sees identical input
+  // structure whether the data came from statsapi live or cache.
+  let slate: SlateGame[] = [];
+  try {
+    slate = parseSlate(payload.nextDaySchedule);
+  } catch {
+    slate = [];
+  }
 
   // 3. Build team-records lookup keyed by statsapi team id.
   const recordsByTeamId = new Map<number, TeamSeasonRecord>();
@@ -106,9 +117,26 @@ export async function loadPredictionsForDate(date: string): Promise<PredictionsR
     }
   }
 
-  return predictGames({ date, slate, recordsByTeamId, spStatsById });
+  // Season aggregates — team 1st-inning RPG, team bullpen ERA, and
+  // per-SP 1st-inning ERA. Computed from `daily_raw` payloads we
+  // already cache; falls back to league averages where a team or
+  // pitcher hasn't accumulated enough sample yet (see
+  // sp1stInningEra / team1stInningRpg / bullpenDelta min thresholds).
+  // Loader is memoized per process for 6h, so the cold-start hit
+  // only happens once per warm serverless instance.
+  const season = Number(date.slice(0, 4));
+  const aggregates = await loadSeasonAggregates(season, prevDay(date));
+
+  return predictGames({ date, slate, recordsByTeamId, spStatsById, aggregates });
 }
 
 /** Stable version string for predictions snapshots. Bump when the model
- *  formula changes so historical calibration stays attributable. */
-export const PREDICTIONS_MODEL_VERSION = "v1-pythag-log5-home";
+ *  formula changes (or calibration is refit) so historical attribution
+ *  stays clean.
+ *
+ *  v4 layers empirical linear shrinkage onto v3: WIN_SHRINKAGE=0.20,
+ *  NRFI_SHRINKAGE=0.15 fit by Brier-minimizing least squares on 313
+ *  graded June games. Threshold bands re-anchored to the calibrated
+ *  scale (0.53 play / 0.55 strong) so the displayed probability and
+ *  the play logic agree. */
+export const PREDICTIONS_MODEL_VERSION = "v4-calibrated";

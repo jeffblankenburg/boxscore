@@ -20,6 +20,7 @@ import {
   type WinPlay,
   type NrfiPlay,
 } from "./predictions";
+import { PREDICTIONS_MODEL_VERSION } from "./predictions-data";
 
 type RawResultRow = {
   date:              string;
@@ -118,11 +119,13 @@ export async function loadPredictionOutcomesForDate(date: string): Promise<GameP
       )
       .eq("sport", "mlb")
       .eq("date", date)
+      .eq("model_version", PREDICTIONS_MODEL_VERSION)
       .order("game_pk", { ascending: true }),
     sb.from("daily_predictions")
       .select("game_pk, away_team_id, home_team_id")
       .eq("sport", "mlb")
-      .eq("date", date),
+      .eq("date", date)
+      .eq("model_version", PREDICTIONS_MODEL_VERSION),
   ]);
 
   if (resultsQ.error || predsQ.error) return [];
@@ -172,6 +175,7 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
     .from("prediction_results")
     .select("away_win_pct, home_win_pct, nrfi_pct, win_correct, nrfi_correct, win_brier, nrfi_brier, actual_winner, actual_nrfi")
     .eq("sport", "mlb")
+    .eq("model_version", PREDICTIONS_MODEL_VERSION)
     .gte("date", startIso)
     .lte("date", endIso);
   if (error) {
