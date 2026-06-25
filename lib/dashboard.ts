@@ -3,6 +3,7 @@ import { yesterdayInET } from "./dates";
 import { getVisibleSports } from "./sports";
 import { featuresFor, SPORTLESS_ROUTES, type CronRoute as SportCronRoute } from "./sport-features";
 import { getActiveSubscriberIdSet, getActiveSubscriberIdSetAt, getActiveSubscribersForSport } from "./subscribers";
+import { findTeam, type Sport } from "./teams";
 
 // Supabase's JS client caps un-paginated `select` at 1000 rows. The `sends`
 // and `subscribers` tables both grow past that, so any aggregation that needs
@@ -2036,4 +2037,71 @@ export async function getSubscriberSources(w: Window): Promise<SubscriberSources
     byReferrerUrl:   topN(refUrlCounts,   MAX_URLS_PER_FACET),
     byLandingPath:   topN(landingCounts,  MAX_KEYS_PER_FACET),
   };
+}
+
+// ---- Recent subscribers ------------------------------------------------
+
+export type RecentSubscriberRow = {
+  id: string;
+  email: string;
+  status: "pending" | "active" | "unsubscribed";
+  createdAt: string;       // ISO
+  confirmedAt: string | null;
+  /** Display strings for each active newsletter the subscriber is on —
+   *  "MLB" for league opt-ins, "MLB Guardians" for team opt-ins. */
+  selections: string[];
+};
+
+// Most recent N subscribers (by created_at desc) with their currently-
+// active newsletter opt-ins. Powers the audit list at the bottom of
+// /admin/metrics/subscribers — useful for spot-checking signups and
+// seeing which newsletters new arrivals are picking.
+export async function getRecentSubscribers(limit: number = 50): Promise<RecentSubscriberRow[]> {
+  const db = supabaseAdmin();
+  const { data: subs, error: subErr } = await db
+    .from("subscribers")
+    .select("id, email, status, created_at, confirmed_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (subErr) throw new Error(`getRecentSubscribers subs: ${subErr.message}`);
+  const subRows = (subs ?? []) as Array<{
+    id: string;
+    email: string;
+    status: "pending" | "active" | "unsubscribed";
+    created_at: string;
+    confirmed_at: string | null;
+  }>;
+  if (subRows.length === 0) return [];
+
+  const ids = subRows.map((r) => r.id);
+  const { data: optins, error: optErr } = await db
+    .from("email_subscriptions")
+    .select("subscriber_id, sport, scope, team_id")
+    .in("subscriber_id", ids)
+    .eq("active", true);
+  if (optErr) throw new Error(`getRecentSubscribers optins: ${optErr.message}`);
+
+  const bySubscriber = new Map<string, string[]>();
+  for (const row of (optins ?? []) as Array<{
+    subscriber_id: string;
+    sport: string;
+    scope: "league" | "team";
+    team_id: string | null;
+  }>) {
+    const label = row.scope === "team" && row.team_id
+      ? `${row.sport.toUpperCase()} ${findTeam(row.sport as Sport, row.team_id)?.nickname ?? row.team_id}`
+      : row.sport.toUpperCase();
+    const list = bySubscriber.get(row.subscriber_id) ?? [];
+    list.push(label);
+    bySubscriber.set(row.subscriber_id, list);
+  }
+
+  return subRows.map((r) => ({
+    id:          r.id,
+    email:       r.email,
+    status:      r.status,
+    createdAt:   r.created_at,
+    confirmedAt: r.confirmed_at,
+    selections:  (bySubscriber.get(r.id) ?? []).sort(),
+  }));
 }

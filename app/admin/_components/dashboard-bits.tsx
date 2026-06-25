@@ -11,6 +11,7 @@
 import type { CronRun } from "@/lib/cron-runs";
 import {
   WINDOW_OPTIONS,
+  type RecentSubscriberRow,
   type RssReadershipDay,
   type SendCoverageRow,
   type SubscriberSeries,
@@ -286,6 +287,48 @@ export function SendCoverageTable({ rows }: { rows: SendCoverageRow[] }) {
       </tbody>
     </table>
   );
+}
+
+export function RecentSubscribersTable({ rows }: { rows: RecentSubscriberRow[] }) {
+  if (rows.length === 0) {
+    return <p className="admin-meta">No subscribers yet.</p>;
+  }
+  return (
+    <table className="admin-cron-runs">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Joined (ET)</th>
+          <th>Newsletters</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.id}>
+            <td>{r.email}</td>
+            <td>
+              <span className={
+                r.status === "active" ? "admin-kpi-delta-good" :
+                r.status === "unsubscribed" ? "admin-kpi-delta-bad" :
+                "admin-meta"
+              }>{r.status}</span>
+            </td>
+            <td><code>{formatJoinedEt(r.createdAt)}</code></td>
+            <td>{r.selections.length === 0 ? <span className="admin-meta">none</span> : r.selections.join(", ")}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function formatJoinedEt(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date(iso)).replace(",", "");
 }
 
 function CoverageCell({ bucket }: { bucket: SendCoverageRow["league"] }) {

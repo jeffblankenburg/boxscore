@@ -1,12 +1,14 @@
 import { requireAdmin } from "../../require-admin";
 import {
   getKpis,
+  getRecentSubscribers,
   getSubscriberSeries,
   parseWindow,
 } from "@/lib/dashboard";
 import { SubscriberGrowthChart } from "../../charts";
 import {
   KpiCard,
+  RecentSubscribersTable,
   SubscriberDailyTable,
   WindowSelector,
   formatDelta,
@@ -30,9 +32,10 @@ export default async function SubscribersMetricsPage({
   await requireAdmin();
   const { window: windowParam } = await searchParams;
   const w = parseWindow(windowParam);
-  const [kpis, subSeries] = await Promise.all([
+  const [kpis, subSeries, recent] = await Promise.all([
     getKpis(w),
     getSubscriberSeries(w),
+    getRecentSubscribers(50),
   ]);
 
   return (
@@ -88,6 +91,10 @@ export default async function SubscribersMetricsPage({
 
       <Section title="Daily add / remove">
         <SubscriberDailyTable series={subSeries} />
+      </Section>
+
+      <Section title="Recent subscribers (last 50)">
+        <RecentSubscribersTable rows={recent} />
       </Section>
     </>
   );
