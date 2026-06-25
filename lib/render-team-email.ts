@@ -182,6 +182,13 @@ function isHitter(p: RosterPlayer): boolean {
   return !isPitcher(p);
 }
 
+// IL marker — statsapi roster status codes "D7"/"D10"/"D15"/"D60" all
+// denote injured list. Empty string when the player is active (or status
+// is missing, which we treat as active to fail-open).
+function ilTag(p: RosterPlayer): string {
+  return p.statusCode?.startsWith("D") ? ` <span class="es-mut">(IL)</span>` : "";
+}
+
 function renderHitters(players: RosterPlayer[]): string {
   if (players.length === 0) return "";
   const rows = players.map((p) => {
@@ -191,7 +198,7 @@ function renderHitters(players: RosterPlayer[]): string {
       : "";
     const pos = p.position ? ` <span class="es-mut">${esc(p.position.toLowerCase())}</span>` : "";
     return `<tr>
-      <td align="left">${jersey}${lastNameLinkEmail(p)}${pos}</td>
+      <td align="left">${jersey}${lastNameLinkEmail(p)}${pos}${ilTag(p)}</td>
       <td align="right">${pad(h.gamesPlayed)}</td>
       <td align="right">${pad(h.atBats)}</td>
       <td align="right">${pad(h.runs)}</td>
@@ -238,7 +245,7 @@ function renderPitchers(players: RosterPlayer[]): string {
       ? `<span class="es-mut">#${esc(p.jerseyNumber)}</span> `
       : "";
     return `<tr>
-      <td align="left">${jersey}${lastNameLinkEmail(p)}</td>
+      <td align="left">${jersey}${lastNameLinkEmail(p)}${ilTag(p)}</td>
       <td align="right">${pad(pi.gamesPlayed)}</td>
       <td align="right">${pad(pi.wins)}</td>
       <td align="right">${pad(pi.losses)}</td>
@@ -325,7 +332,7 @@ function renderAdvancedHitters(players: RosterPlayer[]): string {
       ? `<span class="es-mut">#${esc(p.jerseyNumber)}</span> `
       : "";
     return `<tr>
-      <td align="left">${jersey}${lastNameLinkEmail(p)}</td>
+      <td align="left">${jersey}${lastNameLinkEmail(p)}${ilTag(p)}</td>
       <td align="right">${pad(h.plateAppearances)}</td>
       <td align="right">${fmtAvg(h.avg)}</td>
       <td align="right">${fmtAvg(h.obp)}</td>
@@ -365,7 +372,7 @@ function renderAdvancedPitchers(players: RosterPlayer[]): string {
       ? `<span class="es-mut">#${esc(p.jerseyNumber)}</span> `
       : "";
     return `<tr>
-      <td align="left">${jersey}${lastNameLinkEmail(p)}</td>
+      <td align="left">${jersey}${lastNameLinkEmail(p)}${ilTag(p)}</td>
       <td align="right">${esc(pi.inningsPitched ?? "—")}</td>
       <td align="right">${esc(pi.strikeoutsPer9Inn ?? "—")}</td>
       <td align="right">${esc(pi.walksPer9Inn ?? "—")}</td>

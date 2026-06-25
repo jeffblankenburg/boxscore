@@ -535,6 +535,11 @@ export type RosterPlayer = {
   fullName: string;
   jerseyNumber?: string;
   position: string;
+  /** Roster status code from statsapi. "A" = active 26-man; "D7"/"D10"/
+   *  "D15"/"D60" = injured list (the renderer flags these with "(IL)").
+   *  Optioned-to-minors players are filtered out at parse, so we don't
+   *  expect "RM" or other minors codes to surface here. */
+  statusCode?: string;
   hitting?: PersonHittingStats;
   pitching?: PersonPitchingStats;
 };
@@ -551,8 +556,12 @@ export async function fetchTeamRosterWithStatsRaw(
   // Hydrate both `season` (standard counting stats) and `seasonAdvanced`
   // (sabermetric splits). MLB returns BABIP for pitchers only in advanced.
   const hydrate = `person(stats(group=[hitting,pitching],type=[season,seasonAdvanced],season=${season}))`;
+  // 40Man (not "active") so IL'd players still surface — fans expect to
+  // see Jose Ramirez in the Guardians digest even when he's on the 10-day.
+  // Optioned-to-minors players (status code "RM") are filtered out at
+  // parse so we don't surface AAA prospects who aren't with the club.
   return getRaw(
-    `/v1/teams/${teamId}/roster?rosterType=active&hydrate=${encodeURIComponent(hydrate)}`,
+    `/v1/teams/${teamId}/roster?rosterType=40Man&hydrate=${encodeURIComponent(hydrate)}`,
   );
 }
 
@@ -570,6 +579,7 @@ type RawRosterEntry = {
   };
   jerseyNumber?: string;
   position?: { abbreviation?: string };
+  status?: { code?: string; description?: string };
 };
 
 function extractStatGroup(
@@ -631,7 +641,14 @@ function pickPitching(stat: Record<string, unknown> | undefined): PersonPitching
 
 export function parseTeamRoster(raw: unknown, teamId: number): TeamRoster {
   const data = raw as { roster?: RawRosterEntry[] };
-  const players = (data.roster ?? []).map((entry): RosterPlayer => {
+  const players = (data.roster ?? []).flatMap((entry): RosterPlayer[] => {
+    // Optioned-to-minors players (RM) live on the 40-man but aren't with
+    // the major-league club, so drop them. Keep active + IL + any other
+    // unusual statuses (suspended, restricted, etc.) so we don't quietly
+    // disappear edge cases.
+    const statusCode = entry.status?.code;
+    if (statusCode === "RM") return [];
+
     const stats = entry.person?.stats;
     const hitting = pickHitting(extractStatGroup(stats, "hitting", "season"));
     const pitching = pickPitching(extractStatGroup(stats, "pitching", "season"));
@@ -645,14 +662,15 @@ export function parseTeamRoster(raw: unknown, teamId: number): TeamRoster {
       }
     }
 
-    return {
+    return [{
       personId: entry.person?.id ?? 0,
       fullName: entry.person?.fullName ?? "",
       jerseyNumber: entry.jerseyNumber,
       position: entry.position?.abbreviation ?? "",
+      statusCode,
       hitting,
       pitching,
-    };
+    }];
   });
   return { teamId, players };
 }

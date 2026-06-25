@@ -64,6 +64,10 @@ function isHitter(p: RosterPlayer): boolean {
   return !isPitcher(p);
 }
 
+function ilTag(p: RosterPlayer): string {
+  return p.statusCode?.startsWith("D") ? ` <span class="pos">(IL)</span>` : "";
+}
+
 function sortedRosters(data: TeamEmailData): { hitters: RosterPlayer[]; pitchers: RosterPlayer[] } {
   const players = data.roster.players;
   const hitters = players
@@ -87,7 +91,7 @@ function renderSeasonHitters(players: RosterPlayer[]): string {
     const jersey = p.jerseyNumber ? `<span class="jersey">#${esc(p.jerseyNumber)}</span> ` : "";
     const pos = p.position ? ` <span class="pos">${esc(p.position.toLowerCase())}</span>` : "";
     return `<tr>
-      <td class="player-col">${jersey}${lastNameLinkWeb(p)}${pos}</td>
+      <td class="player-col">${jersey}${lastNameLinkWeb(p)}${pos}${ilTag(p)}</td>
       <td>${pad(h.gamesPlayed)}</td>
       <td>${pad(h.atBats)}</td>
       <td>${pad(h.runs)}</td>
@@ -119,7 +123,7 @@ function renderSeasonPitchers(players: RosterPlayer[]): string {
     const pi = p.pitching ?? {};
     const jersey = p.jerseyNumber ? `<span class="jersey">#${esc(p.jerseyNumber)}</span> ` : "";
     return `<tr>
-      <td class="player-col">${jersey}${lastNameLinkWeb(p)}</td>
+      <td class="player-col">${jersey}${lastNameLinkWeb(p)}${ilTag(p)}</td>
       <td>${pad(pi.gamesPlayed)}</td>
       <td>${pad(pi.wins)}</td>
       <td>${pad(pi.losses)}</td>
@@ -175,7 +179,7 @@ function renderAdvancedHitters(players: RosterPlayer[]): string {
   const rows = players.map((p) => {
     const h = p.hitting ?? {};
     return `<tr>
-      <td class="player-col">${lastNameLinkWeb(p)}</td>
+      <td class="player-col">${lastNameLinkWeb(p)}${ilTag(p)}</td>
       <td>${pad(h.plateAppearances)}</td>
       <td>${fmtAvg(h.avg)}</td>
       <td>${fmtAvg(h.obp)}</td>
@@ -202,7 +206,7 @@ function renderAdvancedPitchers(players: RosterPlayer[]): string {
   const rows = players.map((p) => {
     const pi = p.pitching ?? {};
     return `<tr>
-      <td class="player-col">${lastNameLinkWeb(p)}</td>
+      <td class="player-col">${lastNameLinkWeb(p)}${ilTag(p)}</td>
       <td>${esc(pi.inningsPitched ?? "—")}</td>
       <td>${esc(pi.strikeoutsPer9Inn ?? "—")}</td>
       <td>${esc(pi.walksPer9Inn ?? "—")}</td>
