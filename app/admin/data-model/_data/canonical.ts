@@ -193,6 +193,8 @@ export const CANONICAL_SECTIONS: CanonicalSection[] = [
           { name: "isStarter", type: "boolean" },
           { name: "batting", type: "MlbBoxBatting | null", notes: "null for pitchers who didn't bat (AL DH games)" },
           { name: "pitching", type: "MlbBoxPitching | null", notes: "null for non-pitchers" },
+          { name: "errors", type: "number", notes: "per-game fielding errors" },
+          { name: "seasonErrors", type: "number", notes: "season-to-date fielding errors through this game" },
           { name: "seasonBatting", type: "MlbSeasonBattingSummary | null", notes: "null when source can't hydrate" },
           { name: "seasonPitching", type: "MlbSeasonPitchingSummary | null" },
         ],

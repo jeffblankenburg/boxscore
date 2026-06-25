@@ -242,7 +242,7 @@ function boxPlayer(p: MlbBoxPlayer): BoxPlayer {
             battersFaced:   pi.battersFaced,
           }
         : {},
-      fielding: {},
+      fielding: { errors: p.errors },
     },
     seasonStats: {
       batting: {
@@ -252,7 +252,7 @@ function boxPlayer(p: MlbBoxPlayer): BoxPlayer {
       pitching: {
         era: pi ? fmtRate2(p.seasonPitching?.era) : undefined,
       },
-      fielding: {},
+      fielding: { errors: p.seasonErrors },
     },
   };
 }

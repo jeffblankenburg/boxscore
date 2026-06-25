@@ -159,6 +159,8 @@ export const STATSAPI_MAPPING: MlbSourceMapping = {
         { canonical: "isStarter", vendor: "battingOrder", status: "derived", notes: 'true when battingOrder ends with "00"' },
         { canonical: "batting", vendor: "stats.batting", status: "transformed", notes: "null when empty object" },
         { canonical: "pitching", vendor: "stats.pitching", status: "transformed" },
+        { canonical: "errors", vendor: "stats.fielding.errors", status: "direct" },
+        { canonical: "seasonErrors", vendor: "seasonStats.fielding.errors", status: "direct" },
         { canonical: "seasonBatting.battingAverage", vendor: "seasonStats.batting.avg", status: "transformed" },
         { canonical: "seasonBatting.ops", vendor: "seasonStats.batting.ops", status: "transformed" },
         { canonical: "seasonPitching.era", vendor: "seasonStats.pitching.era", status: "transformed" },

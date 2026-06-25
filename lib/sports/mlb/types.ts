@@ -217,6 +217,14 @@ export type MlbBoxPlayer = {
   batting: MlbBoxBatting | null;    // null for pitchers who didn't bat (AL DH games)
   pitching: MlbBoxPitching | null;  // null for non-pitchers
 
+  /** Per-game fielding errors. Lives on the player (not batting) so AL
+   *  pitchers who didn't bat but committed an error still surface in the
+   *  box-score "E:" extras line. */
+  errors: number;
+  /** Season-to-date fielding errors through this game. Drives the
+   *  "Lindor (3)" running-total annotation alongside the per-game count. */
+  seasonErrors: number;
+
   /** Season-to-date averages shown beside the game line. Null when source can't hydrate. */
   seasonBatting: MlbSeasonBattingSummary | null;
   seasonPitching: MlbSeasonPitchingSummary | null;

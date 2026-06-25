@@ -474,6 +474,8 @@ const PLAYER_BATTING_FIELDS: Record<string, (p: MlbBoxPlayer) => unknown> = {
   "batting.doubles":     (p) => p.batting?.doubles ?? null,
   "batting.triples":     (p) => p.batting?.triples ?? null,
   "batting.stolenBases": (p) => p.batting?.stolenBases ?? null,
+  errors:                (p) => p.errors,
+  seasonErrors:          (p) => p.seasonErrors,
   "seasonBatting.battingAverage": (p) => round3(p.seasonBatting?.battingAverage ?? null),
   "seasonBatting.ops":            (p) => round3(p.seasonBatting?.ops ?? null),
 };

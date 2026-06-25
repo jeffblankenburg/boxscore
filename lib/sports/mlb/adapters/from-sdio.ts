@@ -152,6 +152,9 @@ type SdioPlayerGame = {
   // the pitcher-row sort so the canonical box matches statsapi's order
   // (starter, then relievers in chronological entry order).
   PitchingInningStarted: number | null;
+  // Per-game fielding errors. SDIO PlayerGame.Errors (decimal in the
+  // dictionary but always integer in practice).
+  Errors: number | null;
 };
 type SdioTeamGame = {
   TeamID:      number;
@@ -230,6 +233,7 @@ type SdioPlayerSeason = {
   InningsPitchedDecimal: number;
   PitchingStrikeouts: number;
   WalksHitsPerInningsPitched: number | null;
+  Errors: number | null;
 };
 
 // One row out of the StartingLineups feed's HomeBattingLineup /
@@ -640,6 +644,8 @@ function adaptPlayer(
     allPositionsAbbr,
     batting:       bat,
     pitching:      pit,
+    errors:        pg.Errors ?? 0,
+    seasonErrors:  s?.Errors ?? 0,
     // Season batting from PlayerSeasonStats (not PlayerGame). Counting
     // stats hydrated from the same row so hittingExtras' running-total
     // "(N)" annotation in the box-score notes shows real numbers.

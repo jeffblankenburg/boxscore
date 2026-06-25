@@ -149,6 +149,7 @@ type StatsapiBoxPlayer = {
       era?: string | number;
       note?: string;
     }>;
+    fielding?: { errors?: number };
   };
   seasonStats: {
     batting?: {
@@ -166,6 +167,7 @@ type StatsapiBoxPlayer = {
       losses?: number;
       saves?:  number;
     };
+    fielding?: { errors?: number };
   };
   gameStatus?: unknown;
 };
@@ -444,6 +446,8 @@ function adaptBoxPlayer(player: StatsapiBoxPlayer, isPitcher: boolean): MlbBoxPl
     allPositionsAbbr,
     batting,
     pitching,
+    errors:        player.stats.fielding?.errors ?? 0,
+    seasonErrors:  player.seasonStats.fielding?.errors ?? 0,
     seasonBatting: batting ? {
       battingAverage: seasonAvg,
       ops:            seasonOps,

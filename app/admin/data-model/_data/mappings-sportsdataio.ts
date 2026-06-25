@@ -155,6 +155,8 @@ export const SPORTSDATAIO_MAPPING: MlbSourceMapping = {
         { canonical: "isStarter", vendor: "Started", status: "transformed", notes: "1 → true" },
         { canonical: "batting", vendor: "batting fields when PA or AB > 0", status: "derived" },
         { canonical: "pitching", vendor: "pitching fields when PitchesThrown or InningsPitchedOuts > 0", status: "derived" },
+        { canonical: "errors", vendor: "PlayerGames[].Errors", status: "direct" },
+        { canonical: "seasonErrors", vendor: "Join PlayerID → PlayerSeasonStatsByTeam.Errors", status: "transformed" },
         { canonical: "seasonBatting", vendor: "Join PlayerID → PlayerSeasonStatsByTeam.{BattingAverage, OnBasePlusSlugging}", status: "unwired", notes: "Season stats already cached per season; join inline when building MlbBoxPlayer." },
         { canonical: "seasonPitching", vendor: "Join PlayerID → PlayerSeasonStatsByTeam.EarnedRunAverage", status: "unwired" },
       ],

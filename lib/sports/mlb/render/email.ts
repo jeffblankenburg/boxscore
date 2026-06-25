@@ -441,7 +441,7 @@ function renderBatting(team: MlbBoxTeam, cityName: string): string {
     <td></td>
     <td></td>
   </tr>`;
-  const extras = hittingExtras(ordered);
+  const extras = hittingExtras(ordered, team.pitchers);
   return `<div class="es-team-label">${esc(cityName)} Batting</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
@@ -469,15 +469,15 @@ function formatRate3(v: number | null): string | undefined {
   return v.toFixed(3);
 }
 
-function hittingExtras(players: MlbBoxPlayer[]): string {
+function hittingExtras(batters: MlbBoxPlayer[], pitchers: MlbBoxPlayer[]): string {
   type Bucket = { last: string; season: number };
-  const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[], RBI: [] as Bucket[] };
+  const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[], RBI: [] as Bucket[], E: [] as Bucket[] };
   const push = (bucket: Bucket[], name: string, gameCount: number, seasonTotal: number) => {
     for (let k = 0; k < gameCount; k++) {
       bucket.push({ last: name, season: seasonTotal - gameCount + k + 1 });
     }
   };
-  for (const p of players) {
+  for (const p of batters) {
     const b = p.batting;
     if (!b) continue;
     const s = p.seasonBatting;
@@ -487,6 +487,17 @@ function hittingExtras(players: MlbBoxPlayer[]): string {
     push(cat.HR,   name, b.homeRuns,     s?.homeRuns    ?? 0);
     push(cat.SB,   name, b.stolenBases,  s?.stolenBases ?? 0);
     push(cat.RBI,  name, b.rbi,          s?.rbi         ?? 0);
+  }
+  // Errors come from anyone who took the field. Union batters + pitchers
+  // and dedupe by player id so two-way players (Ohtani) aren't counted
+  // twice, but AL pitchers who didn't bat still surface here.
+  const seen = new Set<string>();
+  for (const p of [...batters, ...pitchers]) {
+    if (p.errors === 0) continue;
+    const key = p.player.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    push(cat.E, lastName(p.player.fullName), p.errors, p.seasonErrors);
   }
   const parts: string[] = [];
   for (const [label, list] of Object.entries(cat)) {
