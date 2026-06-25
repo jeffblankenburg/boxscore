@@ -160,7 +160,7 @@ function buildTeamAbbrevMap(teamsRaw: unknown): Record<string, string> {
 }
 
 // Pure transform: raw payloads → DailyData. No network.
-function rawToDailyData(raw: DailyRaw, date: string): DailyData {
+export function rawToDailyData(raw: DailyRaw, date: string): DailyData {
   const schedule = parseSchedule(raw.schedule);
   const games: GameDetail[] = schedule.map((game): GameDetail => {
     if (game.status.codedGameState !== "F") return { game };
@@ -247,7 +247,10 @@ async function refetchProbablePitcherStats(scheduleRaw: unknown, season: number)
 // stomping it with today's leader board. Historical accuracy beats freshness
 // here; the leaders shown on a 2026-03-25 page should be from late March
 // 2026, not whatever's current today.
-export async function loadDailyData(date: string, opts?: { refetch?: boolean }): Promise<DailyData> {
+// Pulls the maintained DailyRaw — same refetch/lazy-patch behavior that
+// loadDailyData has always had, just factored out so the canonical path
+// can adapt the same raw payload without duplicating the maintenance.
+export async function loadDailyRaw(date: string, opts?: { refetch?: boolean }): Promise<DailyRaw> {
   const existing = await getDailyRaw("mlb", date);
   const stale = !existing || isOldShape(existing) || opts?.refetch === true;
 
@@ -272,5 +275,10 @@ export async function loadDailyData(date: string, opts?: { refetch?: boolean }):
     }
     if (dirty) await upsertDailyRaw("mlb", date, raw);
   }
+  return raw;
+}
+
+export async function loadDailyData(date: string, opts?: { refetch?: boolean }): Promise<DailyData> {
+  const raw = await loadDailyRaw(date, opts);
   return rawToDailyData(raw, date);
 }

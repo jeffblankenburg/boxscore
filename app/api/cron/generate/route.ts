@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { loadDailyData } from "@/lib/daily";
+import { loadDailyRaw, rawToDailyData } from "@/lib/daily";
 import {
-  renderContentWithAds,
-  renderEmailContentWithAds,
+  renderCanonicalContentWithAds,
+  renderCanonicalEmailContentWithAds,
 } from "@/lib/ad-placements";
 import { upsertDigest } from "@/lib/digests";
 import { upsertTeamDigest } from "@/lib/team-digests";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
 import { renderTeamWebContent } from "@/lib/render-team-web";
 import { teamsBySport } from "@/lib/teams";
+import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
+import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
 import { loadNbaData } from "@/lib/nba";
 import { loadWnbaData } from "@/lib/wnba";
 import {
@@ -66,18 +68,26 @@ export async function GET(req: Request) {
     runId = await startCronRun({ route: "generate", sport, date, trigger });
 
     if (sport === "mlb") {
-      const data = await loadDailyData(date, { refetch });
-      // renderContentWithAds / renderEmailContentWithAds call the same
-      // underlying renderers and then splice in any live placements for
-      // (sport, edition_date). If the ads_enabled flag is OFF, or the
-      // sport scope check fails, or any layer throws, they return the
-      // base HTML unchanged — so the digest still ships. See the safety
-      // comments in lib/ad-placements.ts.
-      const html = await renderContentWithAds(data, sport);
-      const email_html = await renderEmailContentWithAds(data, sport);
+      // League digest renders from the canonical model (lib/sports/mlb).
+      // Same DailyRaw underneath; we just adapt it twice — once into the
+      // canonical bundle for the renderers, and once into the legacy
+      // DailyData for the team-digest loop below (still on the legacy
+      // path) and for the `mode` field passed to upsertDigest.
+      const raw = await loadDailyRaw(date, { refetch });
+      await getCanonicalPlayerLookup();
+      const canonical = adaptStatsapiDailyRaw(date, raw);
+      const data = rawToDailyData(raw, date);
+
+      // renderCanonical*ContentWithAds renders the canonical HTML and
+      // splices in any live placements for (sport, edition_date). If
+      // ads_enabled is OFF, scope check fails, or any layer throws, they
+      // return the base HTML unchanged — the digest still ships. See
+      // safety comments in lib/ad-placements.ts.
+      const html = await renderCanonicalContentWithAds(canonical, sport);
+      const email_html = await renderCanonicalEmailContentWithAds(canonical, sport);
       await upsertDigest({
         sport, date, html, email_html,
-        game_count: data.games.length,
+        game_count: canonical.games.length,
         mode: data.mode,
       });
 

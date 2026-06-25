@@ -3,11 +3,13 @@ import { join } from "node:path";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, validateSession } from "@/lib/admin-auth";
-import { loadDailyData } from "@/lib/daily";
+import { loadDailyRaw, rawToDailyData } from "@/lib/daily";
 import { loadNbaData } from "@/lib/nba";
 import { loadWnbaData } from "@/lib/wnba";
-import { renderContent } from "@/lib/render";
-import { renderEmailContent } from "@/lib/render-email";
+import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
+import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
+import { renderCanonicalWeb } from "@/lib/sports/mlb/render/web";
+import { renderCanonicalEmail } from "@/lib/sports/mlb/render/email";
 import {
   renderBasketballContent,
   renderBasketballEmailContent,
@@ -103,11 +105,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
   let webBody: string;
   let emailBody: string;
   if (sport === "mlb") {
-    const data = await loadDailyData(targetDate);
+    const raw = await loadDailyRaw(targetDate);
+    await getCanonicalPlayerLookup();
+    const canonical = adaptStatsapiDailyRaw(targetDate, raw);
+    const data = rawToDailyData(raw, targetDate);
     digestDate = data.date;
     digestPrettyDate = data.prettyDate;
-    webBody = renderContent(data);
-    emailBody = renderEmailContent(data);
+    webBody = renderCanonicalWeb(canonical);
+    emailBody = renderCanonicalEmail(canonical);
   } else {
     const data = sport === "nba"
       ? await loadNbaData(targetDate)

@@ -25,6 +25,9 @@ import {
 } from "./ads-render";
 import { renderContent, type DailyData } from "./render";
 import { renderEmailContent } from "./render-email";
+import { renderCanonicalWeb } from "./sports/mlb/render/web";
+import { renderCanonicalEmail } from "./sports/mlb/render/email";
+import type { CanonicalDailyData } from "./sports/mlb/canonical";
 
 // Setting key the admin toggle on /admin/ads writes/reads.
 export const ADS_ENABLED_FLAG = "ads_enabled";
@@ -244,6 +247,47 @@ export async function renderEmailContentWithAds(
   sport: string,
 ): Promise<string> {
   const baseHtml = renderEmailContent(data);
+  const editionDate = nextDay(data.date);
+  const result = await spliceLiveAds({
+    digestHtml: baseHtml,
+    sport,
+    editionDate,
+    target: "email",
+  });
+  console.log(
+    `[ads] ${sport} ${editionDate} email: ${result.rendered} rendered, ${result.skipped} skipped` +
+      (result.errors.length > 0 ? ` · errors: ${result.errors.join("; ")}` : ""),
+  );
+  return result.html;
+}
+
+// Canonical variants — same ad-splicing pipeline, but the base HTML comes
+// from the canonical renderers (lib/sports/mlb/render/{web,email}). Used
+// by the MLB league-digest cron now that it's on the canonical path.
+export async function renderCanonicalContentWithAds(
+  data: CanonicalDailyData,
+  sport: string,
+): Promise<string> {
+  const baseHtml = renderCanonicalWeb(data);
+  const editionDate = nextDay(data.date);
+  const result = await spliceLiveAds({
+    digestHtml: baseHtml,
+    sport,
+    editionDate,
+    target: "web",
+  });
+  console.log(
+    `[ads] ${sport} ${editionDate} web: ${result.rendered} rendered, ${result.skipped} skipped` +
+      (result.errors.length > 0 ? ` · errors: ${result.errors.join("; ")}` : ""),
+  );
+  return result.html;
+}
+
+export async function renderCanonicalEmailContentWithAds(
+  data: CanonicalDailyData,
+  sport: string,
+): Promise<string> {
+  const baseHtml = renderCanonicalEmail(data);
   const editionDate = nextDay(data.date);
   const result = await spliceLiveAds({
     digestHtml: baseHtml,
