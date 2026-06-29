@@ -360,21 +360,47 @@ export async function deleteCreative(formData: FormData): Promise<void> {
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_SPORTS = new Set(["mlb"]); // v1 — see ticket #44
+// Sanity cap on the placement range — protects against a fat-fingered
+// year-long range. 92 days covers any single quarter; a longer
+// campaign should be split intentionally.
+const MAX_RANGE_DAYS = 92;
+
+function expandDateRange(startIso: string, endIso: string): string[] {
+  // Anchor at UTC midnight to avoid DST drift; we only care about
+  // calendar dates here, not times.
+  const start = new Date(`${startIso}T00:00:00Z`);
+  const end   = new Date(`${endIso}T00:00:00Z`);
+  const out: string[] = [];
+  for (let t = start.getTime(); t <= end.getTime(); t += 86_400_000) {
+    out.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return out;
+}
 
 export async function createPlacement(formData: FormData): Promise<void> {
   await requireAdmin();
   const returnPath = readReturn(formData);
   const creativeId = readString(formData, "creative_id");
   const sport = readString(formData, "sport");
-  const date = readString(formData, "date");
+  // Accept either (start_date, end_date) for the multi-day form OR a
+  // single `date` for legacy callers / the per-row "+ next day" button.
+  const startInput = readString(formData, "start_date") || readString(formData, "date");
+  const endInput   = readString(formData, "end_date")   || startInput;
   const slotIndexStr = readString(formData, "slot_index");
 
   if (!creativeId) err(returnPath, "creative_id is required.");
   if (!VALID_SPORTS.has(sport)) err(returnPath, `Invalid sport: ${sport}`);
-  if (!ISO_DATE_RE.test(date)) err(returnPath, `Invalid date: ${date} (expected YYYY-MM-DD)`);
+  if (!ISO_DATE_RE.test(startInput)) err(returnPath, `Invalid start date: ${startInput} (expected YYYY-MM-DD)`);
+  if (!ISO_DATE_RE.test(endInput)) err(returnPath, `Invalid end date: ${endInput} (expected YYYY-MM-DD)`);
+  if (endInput < startInput) err(returnPath, `End date ${endInput} is before start ${startInput}.`);
   const slotIndex = Number(slotIndexStr);
   if (!Number.isInteger(slotIndex) || slotIndex < 1) {
     err(returnPath, `Invalid slot_index: ${slotIndexStr}`);
+  }
+
+  const dates = expandDateRange(startInput, endInput);
+  if (dates.length > MAX_RANGE_DAYS) {
+    err(returnPath, `Range ${startInput} → ${endInput} is ${dates.length} days; max is ${MAX_RANGE_DAYS}. Split into smaller campaigns.`);
   }
 
   // Denormalize creative.format onto the placement row so the unique
@@ -395,23 +421,54 @@ export async function createPlacement(formData: FormData): Promise<void> {
     err(returnPath, `Slot ${slotIndex} is out of range for ${creative.format} (max ${maxSlot}).`);
   }
 
-  const { error } = await db.from("ad_placements").insert({
+  // Try inserting all rows in one shot. On any unique-constraint hit
+  // we don't know which date conflicted, so retry per-row to give the
+  // operator a precise list — the common case (no conflicts) still
+  // costs only one round trip.
+  const rows = dates.map((date) => ({
     creative_id: creativeId,
-    format: creative.format,
+    format:      creative.format,
     sport,
     date,
-    slot_index: slotIndex,
-  });
-
-  if (error) {
-    if (error.code === "23505") {
-      err(returnPath, `Slot already taken: ${sport} ${date} ${creative.format} #${slotIndex}.`);
-    }
-    err(returnPath, `Create placement failed: ${error.message}`);
+    slot_index:  slotIndex,
+  }));
+  const bulk = await db.from("ad_placements").insert(rows);
+  if (!bulk.error) {
+    revalidatePath(returnPath);
+    const summary = dates.length === 1
+      ? `Placed ${creative.format} on ${sport} ${dates[0]} slot ${slotIndex}.`
+      : `Placed ${creative.format} on ${sport} slot ${slotIndex} across ${dates.length} days (${dates[0]} → ${dates[dates.length - 1]}).`;
+    ok(returnPath, summary);
   }
 
+  // Fall through: bulk failed. Retry one date at a time to separate
+  // "already taken" from real errors.
+  const placed: string[] = [];
+  const conflicts: string[] = [];
+  for (const date of dates) {
+    const one = await db.from("ad_placements").insert({
+      creative_id: creativeId,
+      format:      creative.format,
+      sport,
+      date,
+      slot_index:  slotIndex,
+    });
+    if (!one.error) { placed.push(date); continue; }
+    if (one.error.code === "23505") { conflicts.push(date); continue; }
+    // Hard error — bail out and report what we managed before it.
+    revalidatePath(returnPath);
+    err(returnPath, `Create placement failed at ${date}: ${one.error.message}` +
+        (placed.length > 0 ? ` (${placed.length} earlier date(s) succeeded)` : ""));
+  }
   revalidatePath(returnPath);
-  ok(returnPath, `Placed ${creative.format} on ${sport} ${date} slot ${slotIndex}.`);
+  if (placed.length === 0) {
+    err(returnPath, `All ${dates.length} date(s) already taken: ${conflicts.join(", ")}.`);
+  }
+  if (conflicts.length > 0) {
+    ok(returnPath, `Placed ${placed.length}/${dates.length}. Skipped (already taken): ${conflicts.join(", ")}.`);
+  } else {
+    ok(returnPath, `Placed ${placed.length} date(s).`);
+  }
 }
 
 export async function deletePlacement(formData: FormData): Promise<void> {

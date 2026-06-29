@@ -519,6 +519,13 @@ function CreativeBlock({
             {placements.map((p) => {
               const slot = SLOTS[p.format]?.[p.slot_index - 1];
               const clicks = clicksByPlacement.get(p.id);
+              // Compute the calendar day immediately after this placement
+              // so the "+ next day" button posts a single-date placement
+              // anchored at the day-after. Date math via UTC midnight to
+              // dodge DST drift.
+              const next = new Date(`${p.date}T00:00:00Z`);
+              next.setUTCDate(next.getUTCDate() + 1);
+              const nextDay = next.toISOString().slice(0, 10);
               return (
                 <div
                   key={p.id}
@@ -545,11 +552,26 @@ function CreativeBlock({
                       )}
                     </span>
                   </span>
-                  <form action={deletePlacement}>
-                    <input type="hidden" name="_return" value={returnPath} />
-                    <input type="hidden" name="placement_id" value={p.id} />
-                    <button type="submit" className="a-btn a-btn-sm">remove</button>
-                  </form>
+                  <div className="a-row" style={{ gap: 6 }}>
+                    <form action={createPlacement}>
+                      <input type="hidden" name="_return" value={returnPath} />
+                      <input type="hidden" name="creative_id" value={p.creative_id} />
+                      <input type="hidden" name="sport" value={p.sport} />
+                      <input type="hidden" name="start_date" value={nextDay} />
+                      <input type="hidden" name="end_date" value={nextDay} />
+                      <input type="hidden" name="slot_index" value={p.slot_index} />
+                      <button
+                        type="submit"
+                        className="a-btn a-btn-sm"
+                        title={`Add the same placement for ${nextDay}`}
+                      >+ next day</button>
+                    </form>
+                    <form action={deletePlacement}>
+                      <input type="hidden" name="_return" value={returnPath} />
+                      <input type="hidden" name="placement_id" value={p.id} />
+                      <button type="submit" className="a-btn a-btn-sm">remove</button>
+                    </form>
+                  </div>
                 </div>
               );
             })}
@@ -565,17 +587,27 @@ function CreativeBlock({
               <option value="mlb">mlb</option>
             </select>
           </div>
-          <div className="a-field" style={{ marginBottom: 0, width: 160 }}>
-            <label className="a-label">Date</label>
+          <div className="a-field" style={{ marginBottom: 0, width: 150 }}>
+            <label className="a-label">Start date</label>
             <input
-              name="date"
+              name="start_date"
               type="date"
               required
               defaultValue={defaultDate}
               className="a-input"
             />
           </div>
-          <div className="a-field" style={{ marginBottom: 0, minWidth: 280, flex: 1 }}>
+          <div className="a-field" style={{ marginBottom: 0, width: 150 }}>
+            <label className="a-label">End date</label>
+            <input
+              name="end_date"
+              type="date"
+              defaultValue={defaultDate}
+              className="a-input"
+              title="Defaults to the start date for a single-day placement. Set a later date to create one placement per day in the range."
+            />
+          </div>
+          <div className="a-field" style={{ marginBottom: 0, minWidth: 220, flex: 1 }}>
             <label className="a-label">Slot</label>
             <select name="slot_index" className="a-select" defaultValue={1}>
               {SLOTS[creative.format].map((slot, i) => (
@@ -583,7 +615,7 @@ function CreativeBlock({
               ))}
             </select>
           </div>
-          <FormButton idleLabel="Add placement" pendingLabel="Saving…" />
+          <FormButton idleLabel="Add placement(s)" pendingLabel="Saving…" />
         </form>
       </div>
     </Card>
