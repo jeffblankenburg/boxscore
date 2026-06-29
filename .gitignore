@@ -7,3 +7,4 @@ out
 *.log
 *.tsbuildinfo
 .vercel
+docs/boxscore-ad-onepager.pdf

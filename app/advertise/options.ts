@@ -4,10 +4,10 @@
 // function, so constants have to live elsewhere.
 
 export const BUDGETS = [
-  "Under $500 / send",
-  "$500–$1,000 / send",
-  "$1,000–$2,500 / send",
-  "$2,500+ / send",
+  "Under $500 / week",
+  "$500–$1,000 / week",
+  "$1,000–$2,500 / week",
+  "$2,500+ / week",
   "Long-term (3+ months)",
   "Not sure yet",
 ] as const;

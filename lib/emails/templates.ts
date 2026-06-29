@@ -330,6 +330,10 @@ ${pixel}${preview}
       <tr><td style="padding-top:8px; text-align:center; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; color:${MUTED}; font-style:italic;">
         Like boxscore? <a href="https://boxscore.email/r/support?src=email-footer" style="color:${MUTED};">Leave a tip →</a>
       </td></tr>
+
+      <tr><td style="padding-top:4px; text-align:center; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; color:${MUTED}; font-style:italic;">
+        Want to reach this audience? <a href="https://boxscore.email/advertise" style="color:${MUTED};">Advertise with us →</a>
+      </td></tr>
     </table>
 
   </td></tr>

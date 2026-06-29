@@ -1,9 +1,5 @@
 import { prettyDate, yesterdayInET } from "@/lib/dates";
-import {
-  getPublicAdStatsSnapshot,
-  readAdStatsSnapshot,
-  type PublicAdStats,
-} from "@/lib/dashboard";
+import { QUARTERLY_STATS } from "@/lib/quarterly-stats";
 import {
   CLASSIFIEDS,
   DISPLAY_BOXES,
@@ -23,34 +19,14 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { InquiryForm } from "./InquiryForm";
 import { CountUp, DemographicBars, Reveal } from "./Animations";
 
-// Public advertiser-facing page. Stats normally come from the daily
-// ad_stats_snapshot table (written by /api/cron/ad-stats-snapshot) — reading
-// one row keeps the first render fast as the engagement window grows. If the
-// snapshot is missing or older than SNAPSHOT_STALE_AFTER_MS, the page falls
-// back to live compute via getPublicAdStatsSnapshot so a broken cron doesn't
-// silently show week-old numbers to advertisers. Page revalidates every hour
-// on top of that. The page deliberately reads like a section of the newspaper:
-// bold sectional masthead, italic lede, stat slab below the fold,
-// classified-style rate card, "letters to the editor" inquiry coupon.
-// Tone is stats-forward, no marketing voice.
+// Public advertiser-facing page. Headline stats come from the shared
+// QUARTERLY_STATS module so the PDF one-pager and this page always
+// agree — a prospect who reads both sees identical numbers. Stats
+// refresh once per quarter (see lib/quarterly-stats.ts for the
+// procedure); demographics are still pulled live so the bar chart
+// reflects new survey responses as they come in.
 
 export const revalidate = 3600;
-
-// 48h covers a single missed daily cron plus the next supervisor pass without
-// triggering fallback. If the snapshot is older than this, recompute live.
-const SNAPSHOT_STALE_AFTER_MS = 48 * 60 * 60 * 1000;
-
-async function loadAdStats(): Promise<PublicAdStats> {
-  const snapshot = await readAdStatsSnapshot();
-  if (snapshot) {
-    const ageMs = Date.now() - new Date(snapshot.generatedAt).getTime();
-    if (ageMs < SNAPSHOT_STALE_AFTER_MS) return snapshot;
-    console.warn(
-      `[advertise] snapshot stale (${Math.round(ageMs / 3_600_000)}h old), recomputing live`,
-    );
-  }
-  return getPublicAdStatsSnapshot("mlb", 30);
-}
 
 // Subscribers who finished the welcome demographics form. Form fields
 // are optional, so per-field counts gate on field != null separately.
@@ -113,65 +89,31 @@ function bucketPct(
     }));
 }
 
-// 2026 industry benchmarks we compare against in the stats slab. Sources:
-// Letterhead, Brevo, beehiiv (open + click); Validity, Cleanlist (delivery).
-// When boxscore's number is above the threshold, the stat's note shows
-// "industry avg X%" so the comparison sells itself; if we ever slip below,
-// the note falls back to the original descriptor.
-const INDUSTRY = {
-  openRateThreshold: 0.43,
-  openRateLabel: "43%",
-  clickRateThreshold: 0.023,
-  clickRateLabel: "2.3%",
-  deliveryRateThreshold: 0.89,
-  deliveryRateLabel: "89%",
-};
+// Industry benchmarks shown alongside our numbers so the comparison
+// sells itself. Open: Letterhead/Brevo/beehiiv 2026 reports.
+const INDUSTRY_OPEN_RATE_LABEL = "43%";
 
 export const metadata = {
   title: "Advertise — boxscore",
   description:
     "Sponsorship inventory for boxscore — a daily sports digest delivered every morning. Four ad formats, real engagement numbers, direct booking.",
   alternates: { canonical: "/advertise" },
-  // Page is being shared privately with a broker; keep it out of search
-  // results until we're ready to publish it. Remove this line to publish.
-  robots: { index: false, follow: false },
 };
 
 export default async function AdvertisePage() {
   const today = yesterdayInET();
-  // Stats are scoped to the MLB LEAGUE digest specifically (the product an
-  // advertiser would be sponsoring placements in via this page). Team
-  // digests are a separate inventory called out further down. Snapshot read
-  // with live-compute fallback — see loadAdStats above.
-  const [rolling, demoRows] = await Promise.all([loadAdStats(), loadDemographics()]);
+  const Q = QUARTERLY_STATS;
 
-  // Demographic breakdowns. Per-field denominator is rows that answered
-  // (non-null + non opt-out), so they're truly "share of respondents".
-  // Country shows only options that have at least one respondent so the
-  // panel doesn't list zeros for every country we don't reach.
+  // Demographics still pulled live — the survey grows continuously and
+  // the bar chart wants the most-recent split. Headline stats stay
+  // frozen per quarter via QUARTERLY_STATS so the PDF and page match.
+  const demoRows = await loadDemographics();
   const ageDist     = bucketPct(demoRows, "age_band",    AGE_BANDS);
   const incomeDist  = bucketPct(demoRows, "income_band", INCOME_BANDS);
   const genderDist  = bucketPct(demoRows, "gender",      GENDERS);
   const countryDist = bucketPct(demoRows, "country",     COUNTRIES).filter((c) => c.pct > 0);
   const hasDemographics =
     ageDist.length > 0 || incomeDist.length > 0 || genderDist.length > 0 || countryDist.length > 0;
-
-  // Forward-looking "what an advertiser actually sees per day" — the sum of
-  // (1) email opens on the daily league send: subscribers × delivery rate
-  //     × open rate. Email convention (FOS, Morning Brew) treats opens as
-  //     impressions, not deliveries — reach is bigger, impressions earn CPM.
-  // (2) web pageviews per day: total production pageviews over the rolling
-  //     window divided by the window length. Sourced from the page_views
-  //     table populated by the Vercel Web Analytics Drain.
-  // Pageviews are zero until the Drain is configured; the email component
-  // works independently.
-  const dailyEmailImpressions = rolling.activeSubscribers
-    * (rolling.deliveryRate || 1)
-    * (rolling.tracked ? rolling.openRate : 1);
-  const dailyWebPageviews = rolling.windowDays > 0
-    ? rolling.webPageviews / rolling.windowDays
-    : 0;
-  const avgDailyImpressions = Math.round(dailyEmailImpressions + dailyWebPageviews);
 
   return (
     <article className="advertise-page">
@@ -189,48 +131,32 @@ export default async function AdvertisePage() {
 
       <Section eyebrow="By the numbers" title="An engaged, daily-read audience">
         <p className="advertise-meta">
-          MLB league digest, pulled live from the production database. No
-          panel data, no estimates. Team digests are a separate inventory
-          — see below.
+          {Q.reportTitle}. MLB league + team digests, current as of the
+          quarter print. Team digests are a separate inventory — see below.
         </p>
         <dl className="advertise-stats">
           <Stat
-            value={<CountUp to={rolling.activeSubscribers} />}
-            label="MLB Subscribers"
+            value={<CountUp to={Q.totalSubscribers} />}
+            label="Subscribers"
           />
           <Stat
-            value={<CountUp to={avgDailyImpressions} />}
+            value={<CountUp to={Q.trialDailyImpressions} />}
             label="Avg daily impressions"
+            note="from a recent 5-day sponsor-line trial"
           />
           <Stat
-            value={rolling.tracked
-              ? <CountUp to={rolling.openRate * 100} format="percent" />
-              : "—"}
+            value={<CountUp to={Q.openRate} format="percent" />}
             label="Open rate"
-            note={
-              !rolling.tracked
-                ? "tracking pending"
-                : rolling.openRate > INDUSTRY.openRateThreshold
-                ? `industry avg ${INDUSTRY.openRateLabel}`
-                : `since ${prettyDate(rolling.engagementSince)}`
-            }
-          />
-          {/* Click rate hidden until the in-house link tracker ships
-              (issue TBD). Resend click tracking has been disabled to fix
-              activation-link breakage, so the prior click rate signal is
-              gone and would read "—" until we wire the new tracker. */}
-          <Stat
-            value={<CountUp to={rolling.deliveryRate * 100} format="percent" />}
-            label="Delivery rate"
-            note={
-              rolling.deliveryRate > INDUSTRY.deliveryRateThreshold
-                ? `industry avg ${INDUSTRY.deliveryRateLabel}`
-                : "successfully reached inbox"
-            }
+            note={`industry avg ${INDUSTRY_OPEN_RATE_LABEL}`}
           />
           <Stat
-            value={<CountUp to={rolling.sends} />}
-            label={`Sends in last ${rolling.windowDays} days`}
+            value={<CountUp to={Q.trialDailyClicks} />}
+            label="Avg daily clicks"
+            note="from the same trial"
+          />
+          <Stat
+            value={<CountUp to={Q.sendsLast30d} />}
+            label="Sends · last 30 days"
           />
         </dl>
       </Section>
@@ -343,7 +269,6 @@ export default async function AdvertisePage() {
           <thead>
             <tr>
               <th>Format</th>
-              <th>Single send</th>
               <th>Weekly (7 sends)</th>
               <th>Monthly (28+ sends)</th>
             </tr>
@@ -351,33 +276,28 @@ export default async function AdvertisePage() {
           <tbody>
             <tr>
               <td>Sponsor line <span className="advertise-rate-note">(top of paper, exclusive)</span></td>
-              <td data-label="Single send">$250</td>
-              <td data-label="Weekly (7 sends)">$225 each</td>
-              <td data-label="Monthly (28+ sends)">$200 each</td>
-            </tr>
-            <tr>
-              <td>Standings strip</td>
-              <td data-label="Single send">$175</td>
-              <td data-label="Weekly (7 sends)">$155 each</td>
-              <td data-label="Monthly (28+ sends)">$135 each</td>
+              <td data-label="Weekly (7 sends)">$650</td>
+              <td data-label="Monthly (28+ sends)">$2,200</td>
             </tr>
             <tr>
               <td>Display box</td>
-              <td data-label="Single send">$200</td>
-              <td data-label="Weekly (7 sends)">$180 each</td>
-              <td data-label="Monthly (28+ sends)">$160 each</td>
+              <td data-label="Weekly (7 sends)">$500</td>
+              <td data-label="Monthly (28+ sends)">$1,750</td>
+            </tr>
+            <tr>
+              <td>Standings strip</td>
+              <td data-label="Weekly (7 sends)">$400</td>
+              <td data-label="Monthly (28+ sends)">$1,400</td>
             </tr>
             <tr>
               <td>Classified bundle <span className="advertise-rate-note">(6 lines)</span></td>
-              <td data-label="Single send">$100</td>
-              <td data-label="Weekly (7 sends)">$85 each</td>
-              <td data-label="Monthly (28+ sends)">$70 each</td>
+              <td data-label="Weekly (7 sends)">$250</td>
+              <td data-label="Monthly (28+ sends)">$850</td>
             </tr>
             <tr>
               <td>Dedicated send <span className="advertise-rate-note">(full edition, one sponsor)</span></td>
-              <td data-label="Single send">$750</td>
-              <td data-label="Weekly (7 sends)">$675 each</td>
-              <td data-label="Monthly (28+ sends)">$600 each</td>
+              <td data-label="Weekly (7 sends)">$1,950</td>
+              <td data-label="Monthly (28+ sends)">$6,900</td>
             </tr>
           </tbody>
         </table>
@@ -388,32 +308,32 @@ export default async function AdvertisePage() {
         </p>
       </Section>
 
-      <Section eyebrow="Local? Targeted?" title="Sponsor a team digest">
+      <Section eyebrow="Fanbase-specific" title="Sponsor a team digest">
         <p className="advertise-meta">
           Every MLB club has its own daily digest — the Guardians paper,
           the Yankees paper, the Padres paper — sent only to subscribers
-          who opted in for that team. If your business is local (a
-          Cleveland restaurant, a Bronx ticket broker, a San Diego brewery),
-          team digests target the audience that actually walks past your
-          door.
+          who opted in for that team. These lists reach that team's fans
+          nationwide, not the city. Right fit for advertisers selling to
+          a specific fanbase (a team-merch shop that ships everywhere, a
+          brand that wants to align with one franchise).
         </p>
         <div className="advertise-team-cards">
           <div className="advertise-team-card">
-            <h3>Hyper-local reach</h3>
+            <h3>Fanbase-focused reach</h3>
             <p>
               A sponsor line in the Guardians digest reaches Guardians
-              fans, not the entire MLB list. Better fit for local businesses,
-              better creative latitude (team-specific tie-ins land harder),
-              and a lower price point.
+              fans wherever they live, not the entire MLB list. Better fit
+              for fan-affinity brands and team-specific creative, with a
+              lower price point.
             </p>
           </div>
           <div className="advertise-team-card">
             <h3>Per-team pricing</h3>
             <p>
-              Subscriber counts vary by 10× between large and small markets,
-              so team-digest rates are quoted individually rather than
-              listed. Tell us which team(s) you want and we'll come back
-              with a number based on that team's actual audience.
+              Subscriber counts vary by 10× between large and small
+              fanbases, so team-digest rates are quoted individually
+              rather than listed. Tell us which team(s) you want and we'll
+              come back with a number based on that team's actual audience.
             </p>
           </div>
           <div className="advertise-team-card">
@@ -437,11 +357,11 @@ export default async function AdvertisePage() {
           <div>
             <h3>We're glad to run</h3>
             <ul>
-              <li>Sporting goods, apparel, memorabilia, books</li>
-              <li>Local businesses (restaurants, bars, services)</li>
-              <li>Ticket marketplaces, MLB-affiliated brands</li>
-              <li>Consumer apps, fintech, subscription services</li>
-              <li>Sports media (podcasts, newsletters, shows)</li>
+              <li>National DTC brands — apparel, gear, memorabilia, books</li>
+              <li>Online sports-card and collectibles marketplaces</li>
+              <li>Ticket marketplaces and travel packages that ship nationwide</li>
+              <li>Consumer apps, fintech, subscription services with a U.S. footprint</li>
+              <li>Sports media (podcasts, newsletters, shows) looking for crossover audiences</li>
             </ul>
           </div>
           <div>
