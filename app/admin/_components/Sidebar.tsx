@@ -59,6 +59,7 @@ const SECTIONS: NavSection[] = [
     links: [
       { href: "/admin/ads", label: "Campaigns" },
       { href: "/admin/ads/advertisers", label: "Advertisers" },
+      { href: "/admin/ads/leads", label: "Leads" },
       { href: "/admin/ads/explore", label: "Explore" },
     ],
   },

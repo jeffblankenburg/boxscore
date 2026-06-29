@@ -44,6 +44,14 @@ export function PostHogPageview() {
     if (pathname?.startsWith("/admin")) return;
     const qs = searchParams?.toString();
     const url = qs ? `${pathname}?${qs}` : pathname;
+    // Remember the first pathname of the session — the InquiryForm reads
+    // this so /admin/leads can show "they landed on /mlb/cle before
+    // finding /advertise" instead of just "/advertise."
+    try {
+      if (pathname && !sessionStorage.getItem("boxscore_landing_path")) {
+        sessionStorage.setItem("boxscore_landing_path", pathname);
+      }
+    } catch { /* sessionStorage unavailable — Safari private mode etc. */ }
     posthog.capture("$pageview", { $current_url: url });
   }, [pathname, searchParams]);
 

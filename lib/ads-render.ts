@@ -181,6 +181,12 @@ function renderWebDisplayBox(
   imageUrl?: string | null,
   altText?: string | null,
 ): string {
+  // Markup matches the hand-written samples in lib/ads-samples.ts so the
+  // /admin live preview, /advertise sample tiles, and real digest
+  // placements all render identically. Children are <div>s (block) with
+  // an explicit .ad-display-rule between headline and body; the footer
+  // class is .ad-display-foot so .ad-display-foot CSS (border-top, small
+  // uppercase) actually attaches.
   const headline = sanitizeInlineHtml(payload.headline);
   const body = sanitizeInlineHtml(payload.body);
   const ctaText = sanitizeInlineHtml(payload.cta_text);
@@ -190,10 +196,11 @@ function renderWebDisplayBox(
       : "";
   return `<a class="ad ad-display-box" href="${cta}" target="_blank" rel="noopener noreferrer">
     ${imageHtml}
-    <span class="ad-display-eyebrow">Advertisement</span>
-    <span class="ad-display-headline">${headline}</span>
-    <span class="ad-display-body">${body}</span>
-    ${ctaText ? `<span class="ad-display-cta">${ctaText}</span>` : ""}
+    <div class="ad-display-eyebrow">— Advertisement —</div>
+    <div class="ad-display-headline">${headline}</div>
+    <div class="ad-display-rule"></div>
+    <div class="ad-display-body">${body}</div>
+    ${ctaText ? `<div class="ad-display-foot">${ctaText}</div>` : ""}
   </a>`;
 }
 

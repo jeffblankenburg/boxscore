@@ -2219,7 +2219,8 @@ body:has(.paper-mode) .paper-toggle {
    eyebrow + bold headline, hairline rule, left-aligned body, small uppercase
    foot. Lives centered in-flow. */
 .ad-display-box {
-  display: block;
+  display: flex;
+  flex-direction: column;
   max-width: 340px;
   margin: 24px auto;
   padding: 16px 22px 14px;
@@ -2674,10 +2675,6 @@ body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !impo
   margin: 0;
   width: 280px;
   max-width: 100%;
-  aspect-ratio: 1 / 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
 }
 .advertise-format-sample figcaption {
   font-size: 11px;
