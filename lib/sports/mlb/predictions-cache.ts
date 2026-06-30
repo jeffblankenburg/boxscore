@@ -114,3 +114,34 @@ export async function readPredictionsRenderBlob(date: string): Promise<Predictio
   if (row.model_version !== PREDICTIONS_MODEL_VERSION) return null;
   return row.payload;
 }
+
+/** Pre-renders /mlb/predictions on the server by issuing a real GET
+ *  against the live URL. revalidatePath only INVALIDATES the route
+ *  cache — the next inbound request triggers the regeneration. By
+ *  fetching the page here, the cron itself becomes that request,
+ *  populating Next.js's ISR cache so the first real visitor lands on
+ *  fully cached HTML.
+ *
+ *  Both crons call this AFTER revalidatePath + the blob rebuild, so
+ *  the rendered HTML reflects the freshest data. A non-2xx response
+ *  or a network failure is logged but never throws — the page can
+ *  still recover via ISR on the next visitor.
+ */
+export async function warmPredictionsPage(origin: string): Promise<{ ok: boolean; status?: number; durationMs: number; error?: string }> {
+  const url = `${origin}/mlb/predictions`;
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url, {
+      // Bust any Next data-cache layer in front of the route handler.
+      cache: "no-store",
+      headers: { "x-predictions-warmer": "1" },
+    });
+    // Drain the body so the server-side render fully completes before
+    // we return — fetch resolves on headers, but the ISR cache is only
+    // populated after the response stream finishes.
+    await res.arrayBuffer();
+    return { ok: res.ok, status: res.status, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { ok: false, durationMs: Date.now() - t0, error: (e as Error).message };
+  }
+}

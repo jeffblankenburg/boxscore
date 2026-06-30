@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { todayInET, isValidIsoDate } from "@/lib/dates";
-import { rebuildPredictionsRenderCache } from "@/lib/sports/mlb/predictions-cache";
+import {
+  rebuildPredictionsRenderCache,
+  warmPredictionsPage,
+} from "@/lib/sports/mlb/predictions-cache";
+import { siteOrigin } from "@/lib/site";
 import {
   loadPredictionsForDate,
   PREDICTIONS_MODEL_VERSION,
@@ -80,15 +84,20 @@ export async function GET(req: Request) {
   }
 
   // Rebuild the /mlb/predictions render cache so the page picks up
-  // today's just-written predictions on its next render, then bust
-  // the route cache so existing ISR-cached HTML gets regenerated
-  // immediately instead of waiting for the revalidate window. A
-  // failure here doesn't roll back the snapshot — the page can still
-  // recompute live; just slower.
+  // today's just-written predictions, bust the route cache, and then
+  // warm it by issuing a real request against the page so the cron
+  // itself is the first-hit render. Result: real visitors only ever
+  // see fully cached HTML.
   let cacheError: string | null = null;
+  let warm: Awaited<ReturnType<typeof warmPredictionsPage>> | null = null;
   try {
     await rebuildPredictionsRenderCache(date);
     revalidatePath("/mlb/predictions");
+    const origin = await siteOrigin();
+    warm = await warmPredictionsPage(origin);
+    if (!warm.ok) {
+      console.error(`[predictions-snapshot] warm-fetch ${warm.status ?? "—"} after ${warm.durationMs}ms: ${warm.error ?? "non-2xx"}`);
+    }
   } catch (e) {
     cacheError = (e as Error).message;
     console.error(`[predictions-snapshot] cache rebuild failed: ${cacheError}`);
@@ -100,5 +109,6 @@ export async function GET(req: Request) {
     written: rows.length,
     model: PREDICTIONS_MODEL_VERSION,
     ...(cacheError ? { cache_error: cacheError } : {}),
+    ...(warm ? { warm_status: warm.status, warm_ms: warm.durationMs } : {}),
   });
 }

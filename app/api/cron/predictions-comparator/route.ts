@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { yesterdayInET, todayInET, isValidIsoDate } from "@/lib/dates";
-import { rebuildPredictionsRenderCache } from "@/lib/sports/mlb/predictions-cache";
+import {
+  rebuildPredictionsRenderCache,
+  warmPredictionsPage,
+} from "@/lib/sports/mlb/predictions-cache";
+import { siteOrigin } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -212,16 +216,20 @@ export async function GET(req: Request) {
   const nrfiFinal = rows.filter((r) => r.nrfi_correct !== null);
   const nrfiHits = nrfiFinal.filter((r) => r.nrfi_correct).length;
 
-  // Refresh the /mlb/predictions render cache for TODAY (the cron's
-  // `date` param graded yesterday). The page renders today's slate
-  // with yesterday's rolling-7d/30d/season stats, and those stats
-  // just changed because the comparator added new graded rows. Then
-  // bust the route cache so the rendered HTML regenerates instead of
-  // waiting for the revalidate window.
+  // Refresh the /mlb/predictions render cache for TODAY, bust the
+  // route cache, and warm it with a real request so the cron itself
+  // performs the first-hit render. Real visitors only see fully
+  // cached HTML.
   let cacheError: string | null = null;
+  let warm: Awaited<ReturnType<typeof warmPredictionsPage>> | null = null;
   try {
     await rebuildPredictionsRenderCache(todayInET());
     revalidatePath("/mlb/predictions");
+    const origin = await siteOrigin();
+    warm = await warmPredictionsPage(origin);
+    if (!warm.ok) {
+      console.error(`[predictions-comparator] warm-fetch ${warm.status ?? "—"} after ${warm.durationMs}ms: ${warm.error ?? "non-2xx"}`);
+    }
   } catch (e) {
     cacheError = (e as Error).message;
     console.error(`[predictions-comparator] cache rebuild failed: ${cacheError}`);
@@ -235,5 +243,6 @@ export async function GET(req: Request) {
     win_accuracy: final.length > 0 ? winHits / final.length : null,
     nrfi_accuracy: nrfiFinal.length > 0 ? nrfiHits / nrfiFinal.length : null,
     ...(cacheError ? { cache_error: cacheError } : {}),
+    ...(warm ? { warm_status: warm.status, warm_ms: warm.durationMs } : {}),
   });
 }
