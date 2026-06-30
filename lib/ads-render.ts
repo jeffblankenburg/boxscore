@@ -134,11 +134,7 @@ export function renderCreative(args: RenderCreativeArgs): string {
       case "classified":
         return renderEmailClassified(args.payload, cta);
       case "display_box":
-        // Web-grid format — doesn't translate to email's single-column flow.
-        // Splice for display_box on email is also a no-op, so this is just
-        // defensive. Returning empty string means even if it were spliced,
-        // nothing visible would appear.
-        return "";
+        return renderEmailDisplayBox(args.payload, cta, args.imageUrl, args.altText);
     }
   }
   switch (args.format) {
@@ -242,6 +238,37 @@ function renderEmailStandingsStrip(payload: Payload, cta: string): string {
   </a>`;
 }
 
+function renderEmailDisplayBox(
+  payload: Payload,
+  cta: string,
+  imageUrl?: string | null,
+  altText?: string | null,
+): string {
+  // Email twin of renderWebDisplayBox. Same content order, same hairline-
+  // rule between headline and body, same border. Fully inline styles so
+  // Outlook/Gmail/etc. render it identically — no class hooks survive the
+  // mail client's CSS stripping. Width is fixed at 300px so the card
+  // doesn't blow out narrow mobile widths; centered in-flow via auto
+  // margins. Optional image sits on top.
+  const headline = sanitizeInlineHtml(payload.headline);
+  const body = sanitizeInlineHtml(payload.body);
+  const ctaText = sanitizeInlineHtml(payload.cta_text);
+  const imageHtml = imageUrl && altText
+    ? `<img src="${safeHref(imageUrl)}" alt="${String(altText).replace(/"/g, "&quot;")}" style="display:block;max-width:100%;height:auto;margin:0 auto 10px;">`
+    : "";
+  const ctaHtml = ctaText
+    ? `<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:${EMAIL_MUT};border-top:1px solid ${EMAIL_BORDER};padding-top:7px;margin-top:4px;">${ctaText}</div>`
+    : "";
+  return `<a href="${cta}" target="_blank" rel="noopener noreferrer" style="display:block;${EMAIL_AD_LINK_RESET}box-sizing:border-box;width:100%;margin:18px 0;padding:18px 22px 14px;border:1px solid ${EMAIL_BORDER};background:#ffffff;text-align:center;">
+    ${imageHtml}
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.16em;font-style:italic;color:${EMAIL_MUT};margin-bottom:8px;">— Advertisement —</div>
+    <div style="font-weight:700;font-size:22px;line-height:1.15;letter-spacing:-0.005em;margin:0 0 8px;">${headline}</div>
+    <div style="width:56px;height:0;border-top:1px solid ${EMAIL_BORDER};margin:6px auto 12px;"></div>
+    <div style="font-size:13.5px;line-height:1.5;text-align:center;margin-bottom:${ctaText ? "12" : "0"}px;">${body}</div>
+    ${ctaHtml}
+  </a>`;
+}
+
 function renderEmailClassified(payload: Payload, cta: string): string {
   const lead = sanitizeInlineHtml(payload.lead);
   const body = sanitizeInlineHtml(payload.body);
@@ -331,22 +358,38 @@ export function spliceIntoDigest(args: {
         : spliceBeforeFirst(html, /<div class="boxscores-title">Yesterday's Box Scores<\/div>/, c);
 
     // ─── display_box (after Nth box score) ───────────────────────────────
-    // Email box scores have a completely different visual format (full
-    // batting/pitching tables) that doesn't have a "between tiles" insertion
-    // point — display_box is intentionally a web-grid format. Email no-op.
+    // Email box scores are full batting/pitching tables — each game is
+    // wrapped in <div class="es-game">. We splice the display box right
+    // before the (N+1)th game wrapper so it lands between two complete
+    // box scores; on web, anchor stays <div class="game-container">.
     case "after_boxscore_1":
-      return isEmail ? html : spliceBeforeNth(html, /<div class="game-container">/g, 2, c);
+      return isEmail
+        ? spliceBeforeNth(html, /<div class="es-game">/g, 2, c)
+        : spliceBeforeNth(html, /<div class="game-container">/g, 2, c);
     case "after_boxscore_2":
-      return isEmail ? html : spliceBeforeNth(html, /<div class="game-container">/g, 3, c);
+      return isEmail
+        ? spliceBeforeNth(html, /<div class="es-game">/g, 3, c)
+        : spliceBeforeNth(html, /<div class="game-container">/g, 3, c);
     case "after_boxscore_3":
-      return isEmail ? html : spliceBeforeNth(html, /<div class="game-container">/g, 4, c);
+      return isEmail
+        ? spliceBeforeNth(html, /<div class="es-game">/g, 4, c)
+        : spliceBeforeNth(html, /<div class="game-container">/g, 4, c);
 
     // ─── classified ───────────────────────────────────────────────────────
     case "above_transactions": {
-      const wrapped = `<div class="ad-classifieds-block"><div class="ad-classifieds-header">Classifieds</div><div class="ad-classifieds-body">${c}</div></div>`;
+      // Web wrapper uses .ad-classifieds-* classes (column layout, eyebrow
+      // styling) defined in globals.css. Email clients don't see globals.css,
+      // so the email wrapper inlines the same visual: section-header
+      // matching .es-section-h, then the classified body stacked.
+      const webWrapped = `<div class="ad-classifieds-block"><div class="ad-classifieds-header">Classifieds</div><div class="ad-classifieds-body">${c}</div></div>`;
+      const emailWrapped =
+        `<div style="margin:22px 0 6px;">
+           <h2 style="font-size:20px;font-weight:800;letter-spacing:0.01em;margin:0 0 6px;padding-bottom:4px;border-bottom:2px solid #161410;">Classifieds</h2>
+           <div style="font-size:13px;line-height:1.45;">${c}</div>
+         </div>`;
       return isEmail
-        ? spliceBeforeFirst(html, /<h2 class="es-section-h">Transactions<\/h2>/, wrapped)
-        : spliceBeforeFirst(html, /<div class="transactions-section">/, wrapped);
+        ? spliceBeforeFirst(html, /<h2 class="es-section-h">Transactions<\/h2>/, emailWrapped)
+        : spliceBeforeFirst(html, /<div class="transactions-section">/, webWrapped);
     }
 
     default:

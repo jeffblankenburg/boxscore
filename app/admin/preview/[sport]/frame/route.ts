@@ -8,8 +8,10 @@ import { loadNbaData } from "@/lib/nba";
 import { loadWnbaData } from "@/lib/wnba";
 import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
 import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
-import { renderCanonicalWeb } from "@/lib/sports/mlb/render/web";
-import { renderCanonicalEmail } from "@/lib/sports/mlb/render/email";
+import {
+  renderCanonicalContentWithAds,
+  renderCanonicalEmailContentWithAds,
+} from "@/lib/ad-placements";
 import {
   renderBasketballContent,
   renderBasketballEmailContent,
@@ -111,8 +113,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
     const data = rawToDailyData(raw, targetDate);
     digestDate = data.date;
     digestPrettyDate = data.prettyDate;
-    webBody = renderCanonicalWeb(canonical);
-    emailBody = renderCanonicalEmail(canonical);
+    // Splice live ad placements just like /api/cron/generate does, so
+    // the admin preview shows the digest as recipients will actually
+    // see it (sponsor lines, display boxes, classifieds, etc.).
+    [webBody, emailBody] = await Promise.all([
+      renderCanonicalContentWithAds(canonical, sport),
+      renderCanonicalEmailContentWithAds(canonical, sport),
+    ]);
   } else {
     const data = sport === "nba"
       ? await loadNbaData(targetDate)
