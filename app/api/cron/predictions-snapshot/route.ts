@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { todayInET, isValidIsoDate } from "@/lib/dates";
+import { rebuildPredictionsRenderCache } from "@/lib/sports/mlb/predictions-cache";
 import {
   loadPredictionsForDate,
   PREDICTIONS_MODEL_VERSION,
@@ -76,10 +77,24 @@ export async function GET(req: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Rebuild the /mlb/predictions render cache so the page picks up
+  // today's just-written predictions on its next render. A failure
+  // here doesn't roll back the snapshot — the page can still
+  // recompute live; just slower.
+  let cacheError: string | null = null;
+  try {
+    await rebuildPredictionsRenderCache(date);
+  } catch (e) {
+    cacheError = (e as Error).message;
+    console.error(`[predictions-snapshot] cache rebuild failed: ${cacheError}`);
+  }
+
   return NextResponse.json({
     ok: true,
     date,
     written: rows.length,
     model: PREDICTIONS_MODEL_VERSION,
+    ...(cacheError ? { cache_error: cacheError } : {}),
   });
 }

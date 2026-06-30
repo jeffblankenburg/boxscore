@@ -20,6 +20,7 @@ import {
   type PlayAccuracySummary,
   type GamePredictionOutcome,
 } from "@/lib/sports/mlb/predictions-history";
+import { readPredictionsRenderBlob } from "@/lib/sports/mlb/predictions-cache";
 import "./predictions.css";
 
 export const revalidate = 300;
@@ -71,12 +72,39 @@ export default async function PredictionsPage({
 
   const today = todayInET();
   const yesterday = prevDay(today);
-  const [result, yesterdayOutcomes, rolling7, rolling30] = await Promise.all([
-    loadPredictionsForDate(today),
-    loadPredictionOutcomesForDate(yesterday),
-    loadPredictionAccuracy(7, yesterday),
-    loadPredictionAccuracy(30, yesterday),
-  ]);
+
+  // Read the pre-rendered blob first — both crons (predictions-snapshot
+  // and predictions-comparator) rebuild it after they write data, so
+  // this is current within hours. Live compute is the fallback for the
+  // first request after a model bump (model_version mismatch returns
+  // null) or before today's first cron has run.
+  let result: Awaited<ReturnType<typeof loadPredictionsForDate>>;
+  let yesterdayOutcomes: GamePredictionOutcome[];
+  let rolling7:      PlayAccuracySummary;
+  let rolling30:     PlayAccuracySummary;
+  let rollingSeason: PlayAccuracySummary | null;
+  let seasonDays = 0;
+
+  const cached = await readPredictionsRenderBlob(today);
+  if (cached) {
+    result            = cached.slate;
+    yesterdayOutcomes = cached.outcomes;
+    rolling7          = cached.rolling7;
+    rolling30         = cached.rolling30;
+    rollingSeason     = cached.rollingSeason;
+    seasonDays        = cached.seasonDays;
+  } else {
+    // Cold path — same loaders the cache would have called. Wait on
+    // all in parallel. Page is slow here (~20s on a fresh serverless
+    // instance) but functional; next cron run repairs the cache.
+    [result, yesterdayOutcomes, rolling7, rolling30] = await Promise.all([
+      loadPredictionsForDate(today),
+      loadPredictionOutcomesForDate(yesterday),
+      loadPredictionAccuracy(7,  yesterday),
+      loadPredictionAccuracy(30, yesterday),
+    ]);
+    rollingSeason = null;
+  }
 
   const plays = result.games
     .map((g) => ({ game: g, win: winPlayFor(g), nrfi: nrfiPlayFor(g) }))
@@ -114,6 +142,8 @@ export default async function PredictionsPage({
         outcomes={yesterdayOutcomes}
         rolling7={rolling7}
         rolling30={rolling30}
+        rollingSeason={rollingSeason}
+        seasonDays={seasonDays}
       />
 
       <h2 className="pr-section-h">All games</h2>
@@ -293,11 +323,15 @@ function Recap({
   outcomes,
   rolling7,
   rolling30,
+  rollingSeason,
+  seasonDays,
 }: {
   yesterday: string;
   outcomes: GamePredictionOutcome[];
   rolling7: PlayAccuracySummary;
   rolling30: PlayAccuracySummary;
+  rollingSeason: PlayAccuracySummary | null;
+  seasonDays: number;
 }) {
   // Filter yesterday's grades to plays only — games we didn't bet
   // shouldn't show up in the success ledger.
@@ -308,6 +342,8 @@ function Recap({
   const hasHistory = rolling30.mlPlays > 0 || rolling30.nrfiPlays > 0 || playedRows.length > 0;
   if (!hasHistory) return null;
 
+  const seasonLabel = seasonDays > 0 ? `Season (${seasonDays}d)` : "Season";
+
   return (
     <section className="pr-recap">
       <h2 className="pr-recap-head">How our plays did</h2>
@@ -316,6 +352,12 @@ function Recap({
         <PlayStat label="7d NRFI plays" plays={rolling7.nrfiPlays} hits={rolling7.nrfiPlayHits} rate={rolling7.nrfiHitRate} />
         <PlayStat label="30d ML plays" plays={rolling30.mlPlays} hits={rolling30.mlPlayHits} rate={rolling30.mlHitRate} />
         <PlayStat label="30d NRFI plays" plays={rolling30.nrfiPlays} hits={rolling30.nrfiPlayHits} rate={rolling30.nrfiHitRate} />
+        {rollingSeason && (
+          <>
+            <PlayStat label={`${seasonLabel} ML plays`} plays={rollingSeason.mlPlays} hits={rollingSeason.mlPlayHits} rate={rollingSeason.mlHitRate} />
+            <PlayStat label={`${seasonLabel} NRFI plays`} plays={rollingSeason.nrfiPlays} hits={rollingSeason.nrfiPlayHits} rate={rollingSeason.nrfiHitRate} />
+          </>
+        )}
       </div>
       {playedRows.length > 0 && (
         <>

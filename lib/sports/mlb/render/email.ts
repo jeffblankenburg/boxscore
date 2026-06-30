@@ -206,14 +206,16 @@ function standingsRowCells(
     gb: string; diff: string; home: string; away: string; l10: string; strk: string;
     teamHref?: string;
   },
-  rowClass = "",
+  // Raw attributes spliced onto the <tr> — pass `class="..."`,
+  // `style="..."`, or both. Empty by default.
+  rowAttrs = "",
 ): string {
-  const cls = rowClass ? ` class="${rowClass}"` : "";
+  const attrs = rowAttrs ? ` ${rowAttrs}` : "";
   const nameCell = r.teamHref
     ? `<a href="${r.teamHref}" class="es-team-link" style="color:inherit;text-decoration:none">${esc(r.nickname)}</a>`
     : esc(r.nickname);
   const nowrap = `style="white-space:nowrap"`;
-  return `<tr${cls}>
+  return `<tr${attrs}>
     <td align="left"  ${nowrap}>${nameCell}</td>
     <td align="right" ${nowrap}>${r.wins}</td>
     <td align="right" ${nowrap}>${r.losses}</td>
@@ -259,13 +261,55 @@ function renderDivisionTable(
     </table>`;
 }
 
-function renderWildCardTable(wc: MlbWildCardStandings): string {
-  // Wild card omitted from email body per the legacy renderer's choice —
-  // the email stays tighter without it; the full wild card race is on
-  // the web. Kept as a function for parity with the web renderer in
-  // case we revisit.
-  void wc;
-  return "";
+function renderWildCardTable(wc: MlbWildCardStandings, editionDate: string): string {
+  // Top 6 by wild-card rank, with the standard tiebreaker walk: if the
+  // 7th team is tied with the 6th on W-L, extend the cut. Matches the
+  // web renderer's logic in lib/sports/mlb/render/web.ts.
+  const sorted = [...wc.teams].sort(
+    (a, b) => (a.wildCardRank ?? 99) - (b.wildCardRank ?? 99),
+  );
+  const minTeams = 6;
+  let cutoff = Math.min(minTeams, sorted.length);
+  const lastIncluded = sorted[cutoff - 1];
+  while (cutoff < sorted.length) {
+    const next = sorted[cutoff];
+    if (next && lastIncluded
+        && next.wins === lastIncluded.wins
+        && next.losses === lastIncluded.losses) {
+      cutoff++;
+    } else {
+      break;
+    }
+  }
+  const top = sorted.slice(0, cutoff);
+  const rows = top.map((t, i) => {
+    // Position 4 (0-indexed = 3) is the first team OUTSIDE the wild
+    // card picture — draw a hairline top border to mark the cutoff so
+    // the email reader sees the "above this line = in" visual. Class
+    // wouldn't survive Gmail's <style> stripping in some clients;
+    // inline border keeps it reliable.
+    const rowClass = i === 3 ? `style="border-top:2px solid #161410"` : "";
+    const team = findTeam("mlb", t.team.id);
+    const teamHref = team ? `${EMAIL_LINK_BASE}/mlb/${team.slug}/${editionDate}` : undefined;
+    return standingsRowCells({
+      nickname: nickname(t.team.name),
+      wins: t.wins, losses: t.losses,
+      pct: fmtPct(t.leagueRecord.pct),
+      gb: fmtWcgb(t.wildCardGamesBehind),
+      diff: fmtDiff(t.runsScored, t.runsAllowed),
+      home: `${t.homeRecord.wins}-${t.homeRecord.losses}`,
+      away: `${t.awayRecord.wins}-${t.awayRecord.losses}`,
+      l10: `${t.lastTenRecord.wins}-${t.lastTenRecord.losses}`,
+      strk: t.streak ?? "—",
+      teamHref,
+    }, rowClass);
+  }).join("");
+  return `${subH("Wild Card")}
+    <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
+      ${standingsColgroup()}
+      ${standingsTableHead("WCGB")}
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function renderLeague(label: string, league: MlbLeague, data: CanonicalDailyData, editionDate: string): string {
@@ -274,7 +318,9 @@ function renderLeague(label: string, league: MlbLeague, data: CanonicalDailyData
     const div = data.standings.find((d) => d.league === league && d.division === divName);
     return div ? renderDivisionTable(divName, div, editionDate) : "";
   }).join("");
-  return `${sectionH(label + " Standings")}${standingsHtml}`;
+  const wcRecord = data.wildCard.find((r) => r.league === league);
+  const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord, editionDate) : "";
+  return `${sectionH(label + " Standings")}${standingsHtml}${wildCardHtml}`;
 }
 
 // ─── Leaders ────────────────────────────────────────────────────────────
