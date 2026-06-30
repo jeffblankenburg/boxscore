@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { yesterdayInET, todayInET, isValidIsoDate } from "@/lib/dates";
 import { rebuildPredictionsRenderCache } from "@/lib/sports/mlb/predictions-cache";
@@ -214,10 +215,13 @@ export async function GET(req: Request) {
   // Refresh the /mlb/predictions render cache for TODAY (the cron's
   // `date` param graded yesterday). The page renders today's slate
   // with yesterday's rolling-7d/30d/season stats, and those stats
-  // just changed because the comparator added new graded rows.
+  // just changed because the comparator added new graded rows. Then
+  // bust the route cache so the rendered HTML regenerates instead of
+  // waiting for the revalidate window.
   let cacheError: string | null = null;
   try {
     await rebuildPredictionsRenderCache(todayInET());
+    revalidatePath("/mlb/predictions");
   } catch (e) {
     cacheError = (e as Error).message;
     console.error(`[predictions-comparator] cache rebuild failed: ${cacheError}`);

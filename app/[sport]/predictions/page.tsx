@@ -23,8 +23,12 @@ import {
 import { readPredictionsRenderBlob } from "@/lib/sports/mlb/predictions-cache";
 import "./predictions.css";
 
-export const revalidate = 300;
-export const dynamic = "force-dynamic";
+// Data is once-a-day. Cache the rendered HTML aggressively — the two
+// crons that own this data (predictions-snapshot, predictions-comparator)
+// call revalidatePath("/mlb/predictions") after they rebuild the
+// blob, so the page invalidates the moment new data lands rather than
+// waiting for the timer. The 1-hour fallback covers anything missed.
+export const revalidate = 3600;
 
 const META_TITLE = "Daily Predictions | boxscore";
 const META_DESC =

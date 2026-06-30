@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { todayInET, isValidIsoDate } from "@/lib/dates";
 import { rebuildPredictionsRenderCache } from "@/lib/sports/mlb/predictions-cache";
@@ -79,12 +80,15 @@ export async function GET(req: Request) {
   }
 
   // Rebuild the /mlb/predictions render cache so the page picks up
-  // today's just-written predictions on its next render. A failure
-  // here doesn't roll back the snapshot — the page can still
+  // today's just-written predictions on its next render, then bust
+  // the route cache so existing ISR-cached HTML gets regenerated
+  // immediately instead of waiting for the revalidate window. A
+  // failure here doesn't roll back the snapshot — the page can still
   // recompute live; just slower.
   let cacheError: string | null = null;
   try {
     await rebuildPredictionsRenderCache(date);
+    revalidatePath("/mlb/predictions");
   } catch (e) {
     cacheError = (e as Error).message;
     console.error(`[predictions-snapshot] cache rebuild failed: ${cacheError}`);
