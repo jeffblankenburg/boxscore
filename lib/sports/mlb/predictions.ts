@@ -179,6 +179,42 @@ export function winPlayFor(game: GamePrediction): WinPlay | null {
   return null;
 }
 
+/** Always-pick rule: even when no game clears the threshold, return
+ *  the slate's strongest favorite so we never have a day without a
+ *  moneyline pick. Tested over June: forced picks hit 6/6 with no
+ *  drop in aggregate win rate, so we surface them by default. */
+export function bestOfSlateWinPlay(games: GamePrediction[]): { gamePk: number; play: WinPlay } | null {
+  let best: { gamePk: number; favPct: number; play: WinPlay } | null = null;
+  for (const g of games) {
+    const a = g.away.winProbability, h = g.home.winProbability;
+    const fav = a >= h ? a : h;
+    if (!best || fav > best.favPct) {
+      const play: WinPlay = a >= h
+        ? { side: "away", abbr: g.away.abbr, winPct: a, strong: a >= ML_STRONG_THRESHOLD }
+        : { side: "home", abbr: g.home.abbr, winPct: h, strong: h >= ML_STRONG_THRESHOLD };
+      best = { gamePk: g.gamePk, favPct: fav, play };
+    }
+  }
+  return best ? { gamePk: best.gamePk, play: best.play } : null;
+}
+
+/** NRFI analogue of bestOfSlateWinPlay: picks the slate's strongest
+ *  lean (max |p - 0.5|), going NRFI when p >= 0.5 and YRFI when below. */
+export function bestOfSlateNrfiPlay(games: GamePrediction[]): { gamePk: number; play: NrfiPlay } | null {
+  let best: { gamePk: number; dev: number; play: NrfiPlay } | null = null;
+  for (const g of games) {
+    const p = g.nrfiProbability;
+    const dev = Math.abs(p - 0.5);
+    if (!best || dev > best.dev) {
+      const play: NrfiPlay = p >= 0.5
+        ? { side: "NRFI", probability: p,     strong: p >= NRFI_STRONG_THRESHOLD }
+        : { side: "YRFI", probability: 1 - p, strong: (1 - p) >= NRFI_STRONG_THRESHOLD };
+      best = { gamePk: g.gamePk, dev, play };
+    }
+  }
+  return best ? { gamePk: best.gamePk, play: best.play } : null;
+}
+
 /** Returns the first-inning play for this game, or null if NRFI sits in
  *  the 40–60% no-play zone. NRFI side fires when nrfi >= threshold;
  *  YRFI side fires symmetrically when nrfi <= 1 - threshold. */
@@ -224,10 +260,12 @@ function log5(pA: number, pB: number): number {
   return num / den;
 }
 
-function spDelta(sp: ProbableSpStats | null): number {
+function spDelta(sp: ProbableSpStats | null, cfg?: PredictionConfig): number {
   if (!sp || sp.era === null) return 0;
-  const delta = (LG_AVG_ERA - sp.era) * SP_ERA_TO_WINPCT;
-  return clamp(delta, -SP_DELTA_CAP, SP_DELTA_CAP);
+  const eraScale = cfg?.spEraToWinPct ?? SP_ERA_TO_WINPCT;
+  const cap      = cfg?.spDeltaCap    ?? SP_DELTA_CAP;
+  const delta = (LG_AVG_ERA - sp.era) * eraScale;
+  return clamp(delta, -cap, cap);
 }
 
 // Bullpens cover roughly the last 3.5 innings of a 9-inning game. A
@@ -312,6 +350,19 @@ export type PredictionInputs = {
    *  callers (snapshot cron from the v0 era) still compile; when absent
    *  the model falls back to its pre-aggregate behavior. */
   aggregates?: SeasonAggregates;
+  /** Per-call overrides for tunable constants. Used by the backtest
+   *  harness to test variants; production callers omit this. */
+  config?: PredictionConfig;
+};
+
+/** Tunable model constants exposed to backtests. Any field omitted
+ *  falls back to the production module constant. */
+export type PredictionConfig = {
+  homeFieldBump?:   number;
+  spDeltaCap?:      number;
+  spEraToWinPct?:   number;
+  winShrinkage?:    number;
+  nrfiShrinkage?:   number;
 };
 
 export function predictGames(inputs: PredictionInputs): PredictionsResult {
@@ -365,10 +416,12 @@ export function predictGames(inputs: PredictionInputs): PredictionsResult {
     // quality relative to league."
     const awayBp = aggregates?.teamBullpen.get(g.away.teamId);
     const homeBp = aggregates?.teamBullpen.get(g.home.teamId);
-    const awayAdj = clamp(awayPythag + spDelta(awaySp) + bullpenDelta(awayBp, lgBullpenEra), 0.05, 0.95);
-    const homeAdj = clamp(homePythag + spDelta(homeSp) + bullpenDelta(homeBp, lgBullpenEra), 0.05, 0.95);
+    const cfg = inputs.config;
+    const awayAdj = clamp(awayPythag + spDelta(awaySp, cfg) + bullpenDelta(awayBp, lgBullpenEra), 0.05, 0.95);
+    const homeAdj = clamp(homePythag + spDelta(homeSp, cfg) + bullpenDelta(homeBp, lgBullpenEra), 0.05, 0.95);
     const awayWinNeutral = log5(awayAdj, homeAdj);
-    const homeWinProb = clamp((1 - awayWinNeutral) + HOME_FIELD_BUMP, 0.05, 0.95);
+    const hfa = cfg?.homeFieldBump ?? HOME_FIELD_BUMP;
+    const homeWinProb = clamp((1 - awayWinNeutral) + hfa, 0.05, 0.95);
     const awayWinProb = 1 - homeWinProb;
 
     // NRFI model — uses 1st-inning-specific rates when we have enough
@@ -415,9 +468,11 @@ export function predictGames(inputs: PredictionInputs): PredictionsResult {
     // fit. From here down, "homeWinProbCal" / "nrfiCal" are what the
     // model contracts for — both downstream play logic and the renderer
     // consume the calibrated values, not the raw ones.
-    const homeWinProbCal = clamp(0.5 + WIN_SHRINKAGE  * (homeWinProb - 0.5), 0.05, 0.95);
+    const winShrink  = cfg?.winShrinkage  ?? WIN_SHRINKAGE;
+    const nrfiShrink = cfg?.nrfiShrinkage ?? NRFI_SHRINKAGE;
+    const homeWinProbCal = clamp(0.5 + winShrink  * (homeWinProb - 0.5), 0.05, 0.95);
     const awayWinProbCal = 1 - homeWinProbCal;
-    const nrfiCal        = clamp(0.5 + NRFI_SHRINKAGE * (nrfi        - 0.5), NRFI_MIN, NRFI_MAX);
+    const nrfiCal        = clamp(0.5 + nrfiShrink * (nrfi        - 0.5), NRFI_MIN, NRFI_MAX);
 
     const favorite: "away" | "home" | "even" = awayWinProbCal > 0.52 ? "away" : homeWinProbCal > 0.52 ? "home" : "even";
 

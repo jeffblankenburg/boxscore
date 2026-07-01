@@ -298,6 +298,9 @@ ${pixel}${preview}
   <tr><td style="padding:8px 8px 24px;">
 
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr><td style="padding:0 0 6px; text-align:center; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:11px; color:${MUTED}; font-style:italic;">
+        <a href="${opts.digestUrl}" style="color:${MUTED};">View in browser</a> &nbsp;|&nbsp; <a href="${EMAIL_LINK_BASE}/subscribe" style="color:${MUTED};">Subscribe to boxscore</a>
+      </td></tr>
       <tr><td style="padding-bottom:4px; border-bottom:2px solid ${INK};">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
           <tr>

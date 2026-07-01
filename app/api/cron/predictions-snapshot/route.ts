@@ -11,6 +11,7 @@ import {
   loadPredictionsForDate,
   PREDICTIONS_MODEL_VERSION,
 } from "@/lib/sports/mlb/predictions-data";
+import { captureEspnOddsForDate } from "@/lib/sports/mlb/odds-cache";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -83,6 +84,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Capture today's DraftKings ML odds from ESPN alongside the
+  // predictions so the ROI table on /mlb/predictions can show $10/play
+  // P/L. Non-fatal — if ESPN is down or a game can't be matched, the
+  // daily_odds row just doesn't get written and the ROI math skips it.
+  let oddsReport: Awaited<ReturnType<typeof captureEspnOddsForDate>> | null = null;
+  let oddsError: string | null = null;
+  try {
+    oddsReport = await captureEspnOddsForDate(date);
+  } catch (e) {
+    oddsError = (e as Error).message;
+    console.error(`[predictions-snapshot] odds capture failed: ${oddsError}`);
+  }
+
   // Rebuild the /mlb/predictions render cache so the page picks up
   // today's just-written predictions, bust the route cache, and then
   // warm it by issuing a real request against the page so the cron
@@ -108,6 +122,12 @@ export async function GET(req: Request) {
     date,
     written: rows.length,
     model: PREDICTIONS_MODEL_VERSION,
+    ...(oddsReport ? {
+      odds_matched: oddsReport.matched,
+      odds_upserted: oddsReport.upserted,
+      odds_unmatched: oddsReport.unmatched.length,
+    } : {}),
+    ...(oddsError ? { odds_error: oddsError } : {}),
     ...(cacheError ? { cache_error: cacheError } : {}),
     ...(warm ? { warm_status: warm.status, warm_ms: warm.durationMs } : {}),
   });

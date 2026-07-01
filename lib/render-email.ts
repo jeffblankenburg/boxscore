@@ -578,16 +578,13 @@ function renderBatting(team: BoxTeam, cityName: string): string {
 // with each player's season total in parentheses. Returns "" if nothing to
 // show (e.g., bunt-only game).
 function hittingExtras(players: BoxPlayer[]): string {
-  type Bucket = { last: string; season: number };
+  type Bucket = { last: string; count: number; season: number };
   const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[] };
-  // When a player does N of a thing in a game, emit N entries with consecutive
-  // season counts ending at the current season total. e.g. Alvarez hits 2 HRs
-  // and ends the night with 20 → `Alvarez (19), Alvarez (20)`. Otherwise the
-  // line silently undercounts and a reader counts the home runs themselves.
+  // One entry per player-stat combo. Multi-count games render as
+  // "Alvarez 2 (20)"; singles as "Alvarez (20)" (newspaper convention).
   const push = (bucket: Bucket[], name: string, gameCount: number, seasonTotal: number) => {
-    for (let k = 0; k < gameCount; k++) {
-      bucket.push({ last: name, season: seasonTotal - gameCount + k + 1 });
-    }
+    if (gameCount <= 0) return;
+    bucket.push({ last: name, count: gameCount, season: seasonTotal });
   };
   for (const p of players) {
     const b = p.stats.batting;
@@ -601,7 +598,9 @@ function hittingExtras(players: BoxPlayer[]): string {
   const parts: string[] = [];
   for (const [label, list] of Object.entries(cat)) {
     if (list.length === 0) continue;
-    const names = list.map((p) => `${esc(p.last)} (${p.season})`).join(", ");
+    const names = list.map((p) =>
+      p.count > 1 ? `${esc(p.last)} ${p.count} (${p.season})` : `${esc(p.last)} (${p.season})`,
+    ).join(", ");
     parts.push(`<b>${label}:</b> ${names}.`);
   }
   return parts.join(" ");

@@ -182,6 +182,68 @@
   text-align: center;
 }
 
+/* Win-percentage stat boxes — three side-by-side panels (7d / 30d / season),
+ * each showing ML% and NRFI% as separate rows. */
+.pr-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.pr-window-box {
+  border: 1px solid var(--border-light);
+  background: #fff;
+  padding: 10px 12px;
+}
+.pr-window-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.pr-window-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+.pr-window-tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  min-width: 36px;
+}
+.pr-window-pct {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 800;
+  font-size: 16px;
+}
+.pr-window-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.pr-window-row-roi {
+  padding-left: 6px;
+}
+.pr-window-tag-sub {
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 10px;
+}
+.pr-window-pl {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-size: 13px;
+}
+.pr-window-pl-pos { color: #1f5a1f; }
+.pr-window-pl-neg { color: #a83232; }
+
 /* Section header above the "All games" table. */
 .pr-section-h {
   font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;

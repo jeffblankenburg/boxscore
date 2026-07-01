@@ -216,6 +216,35 @@ async function loadSeasonAggregatesUncached(
     .order("date", { ascending: true });
   if (datesErr) throw new Error(`loadSeasonAggregates dates: ${datesErr.message}`);
 
+  const rows: Array<{ date: string; payload: Payload }> = [];
+  for (const dRow of (dateRows ?? []) as Array<{ date: string }>) {
+    const { data: oneRow, error } = await sb
+      .from("daily_raw")
+      .select("date, payload")
+      .eq("sport", "mlb")
+      .eq("date", dRow.date)
+      .maybeSingle();
+    if (error) throw new Error(`loadSeasonAggregates row(${dRow.date}): ${error.message}`);
+    if (oneRow) rows.push(oneRow as unknown as { date: string; payload: Payload });
+  }
+
+  return computeSeasonAggregatesFromRows(rows, throughDate);
+}
+
+/** Pure aggregator — given pre-loaded daily_raw payloads, runs the
+ *  same accumulation as production but skips DB I/O. Used by the
+ *  backtest harness: load all season payloads ONCE, then compute
+ *  aggregates per throughDate in-memory. Production behavior is
+ *  identical because `loadSeasonAggregatesUncached` calls this after
+ *  the per-date fetch.
+ *
+ *  `rows` MUST be sorted by date ascending and MUST only include dates
+ *  ≤ throughDate (caller's responsibility — same contract production
+ *  enforces via the SQL filter). */
+export function computeSeasonAggregatesFromRows(
+  rows: Array<{ date: string; payload: Payload }>,
+  throughDate: string,
+): SeasonAggregates {
   const rawTeam1st = new Map<number, { games: number; runs: number }>();
   const rawBullpen = new Map<number, { innings: number; earnedRuns: number; walks: number; strikeouts: number }>();
   const rawSp1st   = new Map<number, { starts: number; runs: number }>();
@@ -228,18 +257,6 @@ async function loadSeasonAggregatesUncached(
   const rawTeamRecent = new Map<number, { games: number; rs: number; ra: number }>();
   const rawSpRecent = new Map<number, { starts: number; er: number; ip: number }>();
   let daysCovered = 0;
-
-  const rows: Array<{ date: string; payload: Payload }> = [];
-  for (const dRow of (dateRows ?? []) as Array<{ date: string }>) {
-    const { data: oneRow, error } = await sb
-      .from("daily_raw")
-      .select("date, payload")
-      .eq("sport", "mlb")
-      .eq("date", dRow.date)
-      .maybeSingle();
-    if (error) throw new Error(`loadSeasonAggregates row(${dRow.date}): ${error.message}`);
-    if (oneRow) rows.push(oneRow as unknown as { date: string; payload: Payload });
-  }
 
   for (const row of rows) {
     daysCovered++;

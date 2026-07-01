@@ -22,9 +22,13 @@ import {
 import {
   loadPredictionAccuracy,
   loadPredictionOutcomesForDate,
+  loadPlayRoi,
+  loadSeasonHistory,
   type AccuracySummary,
   type GamePredictionOutcome,
   type PlayAccuracySummary,
+  type PlayRoiSummary,
+  type SeasonHistoryDay,
 } from "./predictions-history";
 import type { PredictionsResult } from "./predictions";
 
@@ -38,7 +42,7 @@ function daysSinceSeasonStart(todayIso: string): number {
 }
 
 export type PredictionsRenderBlob = {
-  version: 1;
+  version: 3;
   date: string;               // ISO — the slate date (today, from the cron's perspective)
   yesterday: string;          // ISO — date we read outcomes/accuracy for
   generatedAt: string;        // ISO timestamp at build time
@@ -48,27 +52,37 @@ export type PredictionsRenderBlob = {
   rolling7:  AccuracySummary & PlayAccuracySummary;
   rolling30: AccuracySummary & PlayAccuracySummary;
   rollingSeason: AccuracySummary & PlayAccuracySummary;
+  roi7:      PlayRoiSummary;
+  roi30:     PlayRoiSummary;
+  roiSeason: PlayRoiSummary;
   seasonDays: number;         // how many days the season-rolling window covered
+  seasonHistory: SeasonHistoryDay[]; // newest-first, one row per graded day
 };
 
 export async function buildPredictionsRenderBlob(date: string): Promise<PredictionsRenderBlob> {
   const yesterday = prevDay(date);
   const seasonDays = daysSinceSeasonStart(date);
 
-  // Wait on all four loaders in parallel. The slate load is the
-  // expensive one — runs the model live, which is what this cache
-  // exists to skip on the page. The other three are cheap reads of
-  // prediction_results.
-  const [slate, outcomes, rolling7, rolling30, rollingSeason] = await Promise.all([
+  // Season window for the history table: from March 1 through yesterday.
+  const seasonStart = `${date.slice(0, 4)}-03-01`;
+
+  // Wait on all loaders in parallel. The slate load is the expensive
+  // one — runs the model live, which is what this cache exists to
+  // skip on the page. The other five are cheap reads.
+  const [slate, outcomes, rolling7, rolling30, rollingSeason, seasonHistory, roi7, roi30, roiSeason] = await Promise.all([
     loadPredictionsForDate(date),
     loadPredictionOutcomesForDate(yesterday),
     loadPredictionAccuracy(7,           yesterday),
     loadPredictionAccuracy(30,          yesterday),
     loadPredictionAccuracy(seasonDays,  yesterday),
+    loadSeasonHistory(seasonStart, yesterday),
+    loadPlayRoi(7,           yesterday),
+    loadPlayRoi(30,          yesterday),
+    loadPlayRoi(seasonDays,  yesterday),
   ]);
 
   return {
-    version: 1,
+    version: 3,
     date,
     yesterday,
     generatedAt:  new Date().toISOString(),
@@ -78,7 +92,11 @@ export async function buildPredictionsRenderBlob(date: string): Promise<Predicti
     rolling7,
     rolling30,
     rollingSeason,
+    roi7,
+    roi30,
+    roiSeason,
     seasonDays,
+    seasonHistory,
   };
 }
 
@@ -102,6 +120,8 @@ export async function rebuildPredictionsRenderCache(date: string): Promise<void>
  *  model version; otherwise null so the caller can fall back to live
  *  compute. Stale-model rows are treated as missing so a refit doesn't
  *  show old probabilities until the cron repopulates. */
+const CURRENT_BLOB_VERSION = 3;
+
 export async function readPredictionsRenderBlob(date: string): Promise<PredictionsRenderBlob | null> {
   const { data, error } = await supabaseAdmin()
     .from("predictions_render_cache")
@@ -112,6 +132,10 @@ export async function readPredictionsRenderBlob(date: string): Promise<Predictio
   if (error || !data) return null;
   const row = data as { payload: PredictionsRenderBlob; model_version: string };
   if (row.model_version !== PREDICTIONS_MODEL_VERSION) return null;
+  // Bump CURRENT_BLOB_VERSION above when adding fields so old rows
+  // get rebuilt by the next cron instead of crashing the page on
+  // missing data.
+  if ((row.payload as { version?: number }).version !== CURRENT_BLOB_VERSION) return null;
   return row.payload;
 }
 

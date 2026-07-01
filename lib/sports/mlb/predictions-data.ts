@@ -46,7 +46,18 @@ function parseFiniteNumber(v: unknown): number | null {
   return null;
 }
 
-export async function loadPredictionsForDate(date: string): Promise<PredictionsResult> {
+/** Loads the model inputs for `date` from cached daily_raw — does NOT
+ *  call the model. Split out so the backtest harness can substitute a
+ *  variant predictGames implementation without duplicating the
+ *  data-loading plumbing. Returns null if the upstream daily_raw row
+ *  for prevDay(date) is missing (no slate snapshot to build from). */
+export async function loadPredictionInputsForDate(date: string): Promise<{
+  date: string;
+  slate: SlateGame[];
+  recordsByTeamId: Map<number, TeamSeasonRecord>;
+  spStatsById: Map<number, ProbableSpStats>;
+  aggregates: Awaited<ReturnType<typeof loadSeasonAggregates>> | undefined;
+} | null> {
   const sb = supabaseAdmin();
 
   // Yesterday's daily_raw → everything. The generate cron writes this
@@ -127,7 +138,13 @@ export async function loadPredictionsForDate(date: string): Promise<PredictionsR
   const season = Number(date.slice(0, 4));
   const aggregates = await loadSeasonAggregates(season, prevDay(date));
 
-  return predictGames({ date, slate, recordsByTeamId, spStatsById, aggregates });
+  return { date, slate, recordsByTeamId, spStatsById, aggregates };
+}
+
+export async function loadPredictionsForDate(date: string): Promise<PredictionsResult> {
+  const inputs = await loadPredictionInputsForDate(date);
+  if (!inputs) return { date, gameCount: 0, games: [], generatedAt: new Date().toISOString() };
+  return predictGames(inputs);
 }
 
 /** Stable version string for predictions snapshots. Bump when the model

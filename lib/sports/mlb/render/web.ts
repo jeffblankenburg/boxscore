@@ -978,12 +978,13 @@ function renderBatting(team: MlbBoxTeam, cityName: string, bkey?: string, side?:
 }
 
 function hittingExtras(batters: MlbBoxPlayer[], pitchers: MlbBoxPlayer[]): string {
-  type Bucket = { last: string; season: number };
+  type Bucket = { last: string; count: number; season: number };
   const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[], RBI: [] as Bucket[], E: [] as Bucket[] };
+  // One entry per player-stat combo. Multi-count games render as
+  // "Perez 4 (26)"; singles as "Perez (26)" (newspaper convention).
   const push = (bucket: Bucket[], name: string, gameCount: number, seasonTotal: number) => {
-    for (let k = 0; k < gameCount; k++) {
-      bucket.push({ last: name, season: seasonTotal - gameCount + k + 1 });
-    }
+    if (gameCount <= 0) return;
+    bucket.push({ last: name, count: gameCount, season: seasonTotal });
   };
   for (const p of batters) {
     const b = p.batting;
@@ -1010,7 +1011,9 @@ function hittingExtras(batters: MlbBoxPlayer[], pitchers: MlbBoxPlayer[]): strin
   const parts: string[] = [];
   for (const [label, list] of Object.entries(cat)) {
     if (list.length === 0) continue;
-    const names = list.map((p) => `${esc(p.last)} (${p.season})`).join(", ");
+    const names = list.map((p) =>
+      p.count > 1 ? `${esc(p.last)} ${p.count} (${p.season})` : `${esc(p.last)} (${p.season})`,
+    ).join(", ");
     parts.push(`<b>${label}:</b> ${names}.`);
   }
   return parts.join(" ");
