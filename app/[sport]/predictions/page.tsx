@@ -7,6 +7,7 @@ import {
   nrfiPlayFor,
   bestOfSlateWinPlay,
   bestOfSlateNrfiPlay,
+  nrfiSideLabel,
   type GamePrediction,
   type WinPlay,
   type NrfiPlay,
@@ -93,9 +94,13 @@ export default async function PredictionsPage({
   let seasonHistory: SeasonHistoryDay[] = [];
   let seasonDays = 0;
 
-  // Yesterday's odds — small, dedicated fetch. Not part of the render
-  // blob today; if this becomes a hot spot, bake into the blob later.
-  const yesterdayOdds = await loadOddsForDate(yesterday);
+  // Yesterday's and today's odds — small, dedicated fetches. Today's
+  // odds gate the ML play selection (heavy chalk and underdogs are
+  // filtered), so this must run for the plays list to be honest.
+  const [yesterdayOdds, todayOdds] = await Promise.all([
+    loadOddsForDate(yesterday),
+    loadOddsForDate(today),
+  ]);
 
   const cached = await readPredictionsRenderBlob(today);
   if (cached) {
@@ -136,7 +141,7 @@ export default async function PredictionsPage({
     ]);
   }
 
-  const plays = buildTodaysPlays(result.games);
+  const plays = buildTodaysPlays(result.games, todayOdds);
 
   return (
     <div className="pr-page">
@@ -171,12 +176,14 @@ export default async function PredictionsPage({
  *  attach the slate's strongest favorite, and same for NRFI. */
 function buildTodaysPlays(
   games: GamePrediction[],
+  todayOdds: DayOdds,
 ): Array<{ game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }> {
   if (games.length === 0) return [];
 
   const byPk = new Map<number, { game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }>();
   for (const g of games) {
-    const win = winPlayFor(g);
+    const homeOdds = todayOdds.mlByGamePk.get(g.gamePk)?.home ?? null;
+    const win = winPlayFor(g, homeOdds);
     const nrfi = nrfiPlayFor(g);
     if (win || nrfi) byPk.set(g.gamePk, { game: g, win, nrfi });
   }
@@ -247,7 +254,7 @@ function PlaysSection({
                   <td className="pr-plays-play">
                     {!win && !nrfi && <span className="pr-na">—</span>}
                     {win && <span className="pr-play-plain">{win.abbr} ML</span>}
-                    {nrfi && <span className="pr-play-plain">{nrfi.side}</span>}
+                    {nrfi && <span className="pr-play-plain">{nrfiSideLabel(nrfi.side)}</span>}
                   </td>
                 </tr>
               ))}
@@ -274,7 +281,11 @@ function YesterdayResults({
   odds: DayOdds;
 }) {
   const playedRows = outcomes
-    .map((o) => ({ o, win: outcomeWinPlay(o), nrfi: outcomeNrfiPlay(o) }))
+    .map((o) => ({
+      o,
+      win: outcomeWinPlay(o, odds.mlByGamePk.get(o.gamePk)?.home ?? null),
+      nrfi: outcomeNrfiPlay(o),
+    }))
     .filter((p) => p.win !== null || p.nrfi !== null);
 
   if (playedRows.length === 0) return null;
@@ -548,7 +559,7 @@ function YesterdayRow({
       <td className="pr-yesterday-play">
         {!win && !nrfi && <span className="pr-na">—</span>}
         {win && <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML`} hit={o.winCorrect} />}
-        {nrfi && <PlayCell badgeClass="pr-play-nrfi" strong={nrfi.strong} label={nrfi.side} hit={o.nrfiCorrect} />}
+        {nrfi && <PlayCell badgeClass="pr-play-nrfi" strong={nrfi.strong} label={nrfiSideLabel(nrfi.side)} hit={o.nrfiCorrect} />}
       </td>
       <td className="pr-yesterday-odds">
         {oddsCells.length === 0

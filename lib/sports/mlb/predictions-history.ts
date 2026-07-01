@@ -17,6 +17,8 @@ import {
   ML_STRONG_THRESHOLD,
   NRFI_PLAY_THRESHOLD,
   NRFI_STRONG_THRESHOLD,
+  nrfiSideLabel,
+  mlOddsInPlayableRange,
   type WinPlay,
   type NrfiPlay,
 } from "./predictions";
@@ -222,21 +224,31 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
 
   const sb = supabaseAdmin();
   type Row = {
-    date: string;
+    date: string; game_pk: number;
     away_win_pct: number; home_win_pct: number; nrfi_pct: number;
     win_correct: boolean | null; nrfi_correct: boolean | null;
     win_brier: number | null; nrfi_brier: number | null;
     actual_winner: "away" | "home" | null;
     actual_nrfi: boolean | null;
   };
-  const data = await paginateSelect<Row>((from, to) => sb
-    .from("prediction_results")
-    .select("date, away_win_pct, home_win_pct, nrfi_pct, win_correct, nrfi_correct, win_brier, nrfi_brier, actual_winner, actual_nrfi")
-    .eq("sport", "mlb")
-    .eq("model_version", PREDICTIONS_MODEL_VERSION)
-    .gte("date", startIso)
-    .lte("date", endIso)
-    .range(from, to));
+  type DkOddsRow = { date: string; game_pk: number; home_ml_odds: number | null };
+  const [data, dkRows] = await Promise.all([
+    paginateSelect<Row>((from, to) => sb
+      .from("prediction_results")
+      .select("date, game_pk, away_win_pct, home_win_pct, nrfi_pct, win_correct, nrfi_correct, win_brier, nrfi_brier, actual_winner, actual_nrfi")
+      .eq("sport", "mlb")
+      .eq("model_version", PREDICTIONS_MODEL_VERSION)
+      .gte("date", startIso)
+      .lte("date", endIso)
+      .range(from, to)),
+    paginateSelect<DkOddsRow>((from, to) => sb.from("daily_odds")
+      .select("date, game_pk, home_ml_odds")
+      .eq("sport", "mlb").eq("book", "DraftKings")
+      .gte("date", startIso).lte("date", endIso)
+      .range(from, to)),
+  ]);
+  const dkHomeOdds = new Map<string, number | null>();
+  for (const r of dkRows) dkHomeOdds.set(`${r.date}|${r.game_pk}`, r.home_ml_odds);
 
   // Group by date so the always-pick rule (one ML + one NRFI per day,
   // even when nothing clears threshold) can be applied per slate.
@@ -276,10 +288,12 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
       }
 
       // Threshold-qualifying ML pick for this game. Home-only per
-      // winPlayFor's selection rule (see its docstring).
+      // winPlayFor's selection rule (see its docstring), and only when
+      // DK home odds are in the playable range.
       if (r.win_correct !== null && r.actual_winner !== null) {
         const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
-        if (h >= ML_PLAY_THRESHOLD) {
+        const homeOdds = dkHomeOdds.get(`${r.date}|${r.game_pk}`) ?? null;
+        if (h >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(homeOdds)) {
           mlPlays++;
           if (r.actual_winner === "home") mlPlayHits++;
           mlDayPicked = true;
@@ -310,16 +324,12 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
       }
     }
 
-    // Always-pick fallbacks: only fire when no threshold pick existed
-    // for the metric on this date AND a candidate game graded.
-    if (!mlDayPicked && bestMl) {
-      mlPlays++;
-      if (bestMl.side === bestMl.winner) mlPlayHits++;
-    }
-    if (!nrfiDayPicked && bestNrfi) {
-      nrfiPlays++;
-      if (bestNrfi.pickNrfi === bestNrfi.actual) nrfiPlayHits++;
-    }
+    // Fallback picks are excluded from the accuracy denominator — they're
+    // shown in the Season Picks table for continuity but they're NOT
+    // real bets (no threshold cleared, no odds check). Counting them
+    // dilutes the "here's what you'd actually play" hit rate that the
+    // Win Percentages box is trying to communicate.
+    void mlDayPicked; void nrfiDayPicked; void bestMl; void bestNrfi;
   }
 
   return {
@@ -343,12 +353,12 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
 // Mirror winPlayFor/nrfiPlayFor from predictions.ts, but against a
 // graded historical outcome row. Both return null when no side cleared
 // the threshold (no play would have been made).
-export function outcomeWinPlay(o: GamePredictionOutcome): WinPlay | null {
-  // Home only — mirrors winPlayFor. See its docstring for why.
-  if (o.homeWinPct >= ML_PLAY_THRESHOLD) {
-    return { side: "home", abbr: o.homeAbbr, winPct: o.homeWinPct, strong: o.homeWinPct >= ML_STRONG_THRESHOLD };
-  }
-  return null;
+export function outcomeWinPlay(o: GamePredictionOutcome, dkHomeOdds?: number | null): WinPlay | null {
+  // Home only, and only when DK odds are in the playable range —
+  // mirrors winPlayFor. See its docstring for why.
+  if (o.homeWinPct < ML_PLAY_THRESHOLD) return null;
+  if (!mlOddsInPlayableRange(dkHomeOdds)) return null;
+  return { side: "home", abbr: o.homeAbbr, winPct: o.homeWinPct, strong: o.homeWinPct >= ML_STRONG_THRESHOLD };
 }
 
 export function outcomeNrfiPlay(o: GamePredictionOutcome): NrfiPlay | null {
@@ -499,22 +509,16 @@ export async function loadPlayRoi(
     let bestMl: { gamePk: number; favPct: number; side: "away" | "home"; winner: "away" | "home" } | null = null;
     for (const r of dayRows) {
       if (r.win_correct === null || r.actual_winner === null) continue;
-      const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
-      // Home-only ML picks — see winPlayFor for rationale.
-      let picked: "away" | "home" | null = null;
-      if (h >= ML_PLAY_THRESHOLD) picked = "home";
-      if (picked !== null) {
-        mlPicks.push({ gamePk: r.game_pk, side: picked, winner: r.actual_winner });
-      }
-      const fav  = a >= h ? a : h;
-      const side: "away" | "home" = a >= h ? "away" : "home";
-      if (!bestMl || fav > bestMl.favPct) {
-        bestMl = { gamePk: r.game_pk, favPct: fav, side, winner: r.actual_winner };
+      const h = Number(r.home_win_pct);
+      // Home-only ML picks + DK odds range filter — matches
+      // outcomeWinPlay and the accuracy tally.
+      const homeOdds = mlOddsByKey.get(`${r.date}|${r.game_pk}`)?.home_ml_odds ?? null;
+      if (h >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(homeOdds)) {
+        mlPicks.push({ gamePk: r.game_pk, side: "home", winner: r.actual_winner });
       }
     }
-    if (mlPicks.length === 0 && bestMl) {
-      mlPicks.push({ gamePk: bestMl.gamePk, side: bestMl.side, winner: bestMl.winner });
-    }
+    // No fallback — ROI counts only threshold+odds-qualifying picks.
+    void bestMl;
     for (const p of mlPicks) {
       mlPlaysGraded++;
       const o = mlOddsByKey.get(`${dayRows[0]?.date}|${p.gamePk}`);
@@ -607,7 +611,7 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
   };
   type PredRowRaw = { date: string; game_pk: number; away_team_id: number; home_team_id: number };
 
-  const [resultsRows, predsRows] = await Promise.all([
+  const [resultsRows, predsRows, dkOddsRows] = await Promise.all([
     paginateSelect<ResRowRaw>((from, to) => sb.from("prediction_results")
       .select(
         "date, game_pk, away_win_pct, home_win_pct, nrfi_pct, status, " +
@@ -630,6 +634,12 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
       .gte("date", startIso)
       .lte("date", endIso)
       .range(from, to)),
+    paginateSelect<{ date: string; game_pk: number; home_ml_odds: number | null }>((from, to) =>
+      sb.from("daily_odds")
+        .select("date, game_pk, home_ml_odds")
+        .eq("sport", "mlb").eq("book", "DraftKings")
+        .gte("date", startIso).lte("date", endIso)
+        .range(from, to)),
   ]);
 
   // Reuse the date-by-date outcome assembly we already have so the
@@ -670,6 +680,9 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
     linescoreByKey.set(`${r.date}|${r.game_pk}`, r.linescore ?? null);
   }
 
+  const dkHomeOddsByKey = new Map<string, number | null>();
+  for (const r of dkOddsRows) dkHomeOddsByKey.set(`${r.date}|${r.game_pk}`, r.home_ml_odds);
+
   // One row per game (rowspanned per day in the renderer). Days with
   // no threshold qualifier still get exactly one best-of-day fallback
   // pick per market so the season history has no empty days.
@@ -682,7 +695,8 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
     const mlPlaysByPk = new Map<number, WinPlay>();
     const nrfiPlaysByPk = new Map<number, NrfiPlay>();
     for (const o of outcomes) {
-      const ml = outcomeWinPlay(o);
+      const homeOdds = dkHomeOddsByKey.get(`${date}|${o.gamePk}`) ?? null;
+      const ml = outcomeWinPlay(o, homeOdds);
       if (ml) mlPlaysByPk.set(o.gamePk, ml);
       const nrfi = outcomeNrfiPlay(o);
       if (nrfi) nrfiPlaysByPk.set(o.gamePk, nrfi);
@@ -714,7 +728,7 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
           ? { label: ml.side === "away" ? o.awayAbbr : o.homeAbbr, strong: ml.strong, hit: o.winCorrect }
           : null,
         nrfiPick: nrfi
-          ? { label: nrfi.side, strong: nrfi.strong, hit: o.nrfiCorrect }
+          ? { label: nrfiSideLabel(nrfi.side), strong: nrfi.strong, hit: o.nrfiCorrect }
           : null,
       });
     }

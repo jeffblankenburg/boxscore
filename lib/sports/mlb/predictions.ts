@@ -152,6 +152,20 @@ export const ML_STRONG_THRESHOLD = 0.555;
 export const NRFI_PLAY_THRESHOLD = 0.545;     // calibrated NRFI; YRFI side mirrors
 export const NRFI_STRONG_THRESHOLD = 0.55;
 
+/** Empirical price band for ML plays where our ROI is positive. Below
+ *  -200 the juice on heavy chalk eats us alive (68% hit but -5% ROI);
+ *  above -100 the model overestimates home teams the books don't favor
+ *  (33% hit, -30% ROI). Everything in between averages +5.8% ROI on
+ *  115 season plays. When DK odds aren't captured yet we DON'T filter
+ *  — a play stays a play; the odds check applies only when we have a
+ *  price to check against. */
+export const ML_ODDS_MIN = -200;
+export const ML_ODDS_MAX = -100;
+export function mlOddsInPlayableRange(odds: number | null | undefined): boolean {
+  if (odds == null) return true; // no odds captured yet — don't filter
+  return odds >= ML_ODDS_MIN && odds <= ML_ODDS_MAX;
+}
+
 // ─── Play helpers ────────────────────────────────────────────────────────
 
 export type WinPlay = {
@@ -166,6 +180,13 @@ export type NrfiPlay = {
   strong: boolean;
 };
 
+/** Display label for a NRFI/YRFI play — appends a directional arrow so
+ *  glancing at the badge tells you which way you're betting without
+ *  parsing the acronym. Down = "no runs" (NRFI), up = "runs" (YRFI). */
+export function nrfiSideLabel(side: "NRFI" | "YRFI"): string {
+  return side === "NRFI" ? "NRFI ↓" : "YRFI ↑";
+}
+
 /** Returns the moneyline play for this game, or null.
  *
  *  Home-team only. Empirical sweep across 262 v4 plays showed away
@@ -173,17 +194,20 @@ export type NrfiPlay = {
  *  Away picks are noise around break-even, so we filter them out
  *  rather than pretending a play exists. Fallback `bestOfSlateWinPlay`
  *  can still surface an away favorite when no home team clears — those
- *  are labeled as best-of-slate, not threshold-qualifying plays. */
-export function winPlayFor(game: GamePrediction): WinPlay | null {
-  if (game.home.winProbability >= ML_PLAY_THRESHOLD) {
-    return {
-      side: "home",
-      abbr: game.home.abbr,
-      winPct: game.home.winProbability,
-      strong: game.home.winProbability >= ML_STRONG_THRESHOLD,
-    };
-  }
-  return null;
+ *  are labeled as best-of-slate, not threshold-qualifying plays.
+ *
+ *  When DraftKings odds are provided, plays outside [ML_ODDS_MIN,
+ *  ML_ODDS_MAX] are filtered. Heavy chalk (< -200) and underdogs
+ *  (> -100) both lose money at this hit rate. */
+export function winPlayFor(game: GamePrediction, dkHomeOdds?: number | null): WinPlay | null {
+  if (game.home.winProbability < ML_PLAY_THRESHOLD) return null;
+  if (!mlOddsInPlayableRange(dkHomeOdds)) return null;
+  return {
+    side: "home",
+    abbr: game.home.abbr,
+    winPct: game.home.winProbability,
+    strong: game.home.winProbability >= ML_STRONG_THRESHOLD,
+  };
 }
 
 /** Always-pick rule: even when no game clears the threshold, return
