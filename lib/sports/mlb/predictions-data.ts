@@ -154,6 +154,13 @@ export async function loadPredictionsForDate(date: string): Promise<PredictionsR
  *  v4 layers empirical linear shrinkage onto v3: WIN_SHRINKAGE=0.20,
  *  NRFI_SHRINKAGE=0.15 fit by Brier-minimizing least squares on 313
  *  graded June games. Threshold bands re-anchored to the calibrated
- *  scale (0.53 play / 0.55 strong) so the displayed probability and
- *  the play logic agree. */
-export const PREDICTIONS_MODEL_VERSION = "v4-calibrated";
+ *  scale (0.545 play / 0.555 strong) so the displayed probability and
+ *  the play logic agree.
+ *
+ *  Note (2026-07-01): v5-empirical was tried and reverted — bumping
+ *  HOME_FIELD_BUMP to 0.060 diluted the ML pick pool (56% vs 61.6% on
+ *  home picks), and NRFI shrinkage of 0.05 killed all NRFI plays.
+ *  Instead of retuning calibration, the play-selection rule was
+ *  changed to home-only ML (winPlayFor). The stored calibrated
+ *  probabilities are unchanged. */
+export const PREDICTIONS_MODEL_VERSION = "v6-nrfi-rebased";

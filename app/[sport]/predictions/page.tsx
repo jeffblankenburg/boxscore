@@ -16,12 +16,16 @@ import {
   loadPredictionAccuracy,
   loadPlayRoi,
   loadSeasonHistory,
+  loadOddsForDate,
+  americanToProfitMultiplier,
   outcomeWinPlay,
   outcomeNrfiPlay,
   type PlayAccuracySummary,
   type PlayRoiSummary,
   type GamePredictionOutcome,
   type SeasonHistoryDay,
+  type SeasonHistoryGame,
+  type DayOdds,
 } from "@/lib/sports/mlb/predictions-history";
 import { readPredictionsRenderBlob } from "@/lib/sports/mlb/predictions-cache";
 import "./predictions.css";
@@ -51,9 +55,6 @@ export const metadata = {
   twitter: { card: "summary", title: META_TITLE, description: META_DESC, images: [META_IMG] },
 };
 
-function pct(v: number): string {
-  return `${(v * 100).toFixed(0)}%`;
-}
 function teamHref(abbr: string): string {
   return `/mlb/${abbr.toLowerCase()}`;
 }
@@ -92,6 +93,10 @@ export default async function PredictionsPage({
   let seasonHistory: SeasonHistoryDay[] = [];
   let seasonDays = 0;
 
+  // Yesterday's odds — small, dedicated fetch. Not part of the render
+  // blob today; if this becomes a hot spot, bake into the blob later.
+  const yesterdayOdds = await loadOddsForDate(yesterday);
+
   const cached = await readPredictionsRenderBlob(today);
   if (cached) {
     result            = cached.slate;
@@ -109,16 +114,26 @@ export default async function PredictionsPage({
     // all in parallel. Page is slow here (~20s on a fresh serverless
     // instance) but functional; next cron run repairs the cache.
     const seasonStart = `${today.slice(0, 4)}-03-01`;
-    [result, yesterdayOutcomes, rolling7, rolling30, seasonHistory, roi7, roi30] = await Promise.all([
+    // Mirror daysSinceSeasonStart from predictions-cache — used as the
+    // window for the season-to-date accuracy and ROI boxes.
+    seasonDays = Math.max(
+      1,
+      Math.round(
+        (new Date(`${today}T00:00:00Z`).getTime() -
+         new Date(`${seasonStart}T00:00:00Z`).getTime()) / 86_400_000,
+      ),
+    );
+    [result, yesterdayOutcomes, rolling7, rolling30, rollingSeason, seasonHistory, roi7, roi30, roiSeason] = await Promise.all([
       loadPredictionsForDate(today),
       loadPredictionOutcomesForDate(yesterday),
-      loadPredictionAccuracy(7,  yesterday),
-      loadPredictionAccuracy(30, yesterday),
+      loadPredictionAccuracy(7,          yesterday),
+      loadPredictionAccuracy(30,         yesterday),
+      loadPredictionAccuracy(seasonDays, yesterday),
       loadSeasonHistory(seasonStart, yesterday),
-      loadPlayRoi(7,  yesterday),
-      loadPlayRoi(30, yesterday),
+      loadPlayRoi(7,          yesterday),
+      loadPlayRoi(30,         yesterday),
+      loadPlayRoi(seasonDays, yesterday),
     ]);
-    rollingSeason = null;
   }
 
   const plays = buildTodaysPlays(result.games);
@@ -133,7 +148,7 @@ export default async function PredictionsPage({
 
       <PlaysSection plays={plays} date={today} />
 
-      <YesterdayResults yesterday={yesterday} outcomes={yesterdayOutcomes} />
+      <YesterdayResults yesterday={yesterday} outcomes={yesterdayOutcomes} odds={yesterdayOdds} />
 
       <StatBoxes
         rolling7={rolling7}
@@ -217,8 +232,7 @@ function PlaysSection({
               <tr>
                 <th className="pr-col-time">Time</th>
                 <th>Matchup</th>
-                <th>ML play</th>
-                <th>NRFI play</th>
+                <th>Play</th>
               </tr>
             </thead>
             <tbody>
@@ -230,19 +244,10 @@ function PlaysSection({
                     {" @ "}
                     <a className="pr-team-link" href={teamHref(game.home.abbr)}>{game.home.abbr}</a>
                   </td>
-                  <td>
-                    {win
-                      ? <span className={`pr-play-badge pr-play-ml${win.strong ? " pr-play-strong" : ""}`}>
-                          ML {win.abbr} {pct(win.winPct)}
-                        </span>
-                      : <span className="pr-na">—</span>}
-                  </td>
-                  <td>
-                    {nrfi
-                      ? <span className={`pr-play-badge pr-play-nrfi${nrfi.strong ? " pr-play-strong" : ""}`}>
-                          {nrfi.side} {pct(nrfi.probability)}
-                        </span>
-                      : <span className="pr-na">—</span>}
+                  <td className="pr-plays-play">
+                    {!win && !nrfi && <span className="pr-na">—</span>}
+                    {win && <span className="pr-play-plain">{win.abbr} ML</span>}
+                    {nrfi && <span className="pr-play-plain">{nrfi.side}</span>}
                   </td>
                 </tr>
               ))}
@@ -262,9 +267,11 @@ function pctOrDash(v: number | null): string {
 function YesterdayResults({
   yesterday,
   outcomes,
+  odds,
 }: {
   yesterday: string;
   outcomes: GamePredictionOutcome[];
+  odds: DayOdds;
 }) {
   const playedRows = outcomes
     .map((o) => ({ o, win: outcomeWinPlay(o), nrfi: outcomeNrfiPlay(o) }))
@@ -273,22 +280,22 @@ function YesterdayResults({
   if (playedRows.length === 0) return null;
 
   return (
-    <section className="pr-recap">
+    <section className="pr-recap pr-yesterday">
       <h2 className="pr-recap-head">Yesterday&apos;s Results</h2>
       <div className="pr-recap-subhead">{prettyDate(yesterday)}</div>
       <div className="pr-scroll">
-        <table className="pr-recap-table">
+        <table className="pr-recap-table pr-yesterday-table">
           <thead>
             <tr>
-              <th>Game</th>
               <th>Final</th>
-              <th>ML play</th>
-              <th>NRFI play</th>
+              <th>Play</th>
+              <th>Odds</th>
+              <th>Profit</th>
             </tr>
           </thead>
           <tbody>
             {playedRows.map(({ o, win, nrfi }) => (
-              <YesterdayRow key={o.gamePk} o={o} win={win} nrfi={nrfi} />
+              <YesterdayRow key={o.gamePk} o={o} win={win} nrfi={nrfi} odds={odds} />
             ))}
           </tbody>
         </table>
@@ -391,20 +398,28 @@ function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
     <section className="pr-recap">
       <h2 className="pr-recap-head">Season Picks</h2>
       <div className="pr-scroll">
-        <table className="pr-recap-table">
+        <table className="pr-recap-table pr-season-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Game</th>
-              <th>Final</th>
-              <th>ML play</th>
-              <th>NRFI play</th>
+              <th className="pr-season-date-head">Date</th>
+              <th className="pr-season-box-head">Box Score</th>
+              <th className="pr-season-result-head">Result</th>
             </tr>
           </thead>
           <tbody>
-            {days.map((d) => (
-              <SeasonHistoryRow key={d.date} day={d} />
-            ))}
+            {days.flatMap((d) =>
+              d.games.map((g, gi) => (
+                <tr key={`${d.date}|${g.gamePk}`}>
+                  {gi === 0 && (
+                    <td className="pr-season-date" rowSpan={d.games.length}>
+                      {shortDate(d.date)}
+                    </td>
+                  )}
+                  <td className="pr-season-box"><BoxScoreCell game={g} /></td>
+                  <td className="pr-season-result"><ResultCell game={g} /></td>
+                </tr>
+              )),
+            )}
           </tbody>
         </table>
       </div>
@@ -412,30 +427,71 @@ function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
   );
 }
 
-function SeasonHistoryRow({ day }: { day: SeasonHistoryDay }) {
-  const game = day.game;
-  const finalScore =
-    game && game.awayScore !== null && game.homeScore !== null
-      ? `${game.awayAbbr} ${game.awayScore} · ${game.homeAbbr} ${game.homeScore}`
-      : <span className="pr-na">{game?.status ?? "—"}</span>;
+function BoxScoreCell({ game }: { game: SeasonHistoryGame }) {
+  const ls = game.linescore;
+  if (!ls) {
+    return <span className="pr-na">{game.awayAbbr} @ {game.homeAbbr}</span>;
+  }
+  // Determine the widest single-inning cell width across both teams,
+  // then pad. Keeps columns aligned even when a 10+ inning happens.
+  const innings = ls.innings.slice(0, 9);
+  let width = 1;
+  for (const i of innings) {
+    if (i.a != null) width = Math.max(width, String(i.a).length);
+    if (i.h != null) width = Math.max(width, String(i.h).length);
+  }
+  const fmtCell = (v: number | null): string => (v == null ? "-".padStart(width) : String(v).padStart(width));
+  const fmtInns = (side: "a" | "h"): string => {
+    const cells: string[] = [];
+    for (let i = 0; i < 9; i++) {
+      const inn = innings[i];
+      cells.push(fmtCell(inn ? (side === "a" ? inn.a : inn.h) : null));
+    }
+    // Group by threes (1-3, 4-6, 7-9) with spaces between groups only
+    // when width > 1; otherwise a single space between the groups keeps
+    // the line tight.
+    const gap = width === 1 ? " " : "  ";
+    return `${cells.slice(0,3).join(width === 1 ? "" : " ")}${gap}${cells.slice(3,6).join(width === 1 ? "" : " ")}${gap}${cells.slice(6,9).join(width === 1 ? "" : " ")}`;
+  };
+  const fmtTot = (t: { r: number | null; h: number | null; e: number | null }): string =>
+    `${(t.r ?? 0).toString().padStart(2)} ${(t.h ?? 0).toString().padStart(2)} ${(t.e ?? 0).toString().padStart(1)}`;
   return (
-    <tr>
-      <td className="pr-col-time">{shortDate(day.date)}</td>
-      <td className="pr-pick-cell">
-        {game ? `${game.awayAbbr} @ ${game.homeAbbr}` : "—"}
-      </td>
-      <td>{finalScore}</td>
-      <td>
-        {day.mlPlay
-          ? <PlayCell badgeClass="pr-play-ml" strong={day.mlPlay.strong} label={day.mlPlay.label} hit={day.mlPlay.hit} />
-          : <span className="pr-na">—</span>}
-      </td>
-      <td>
-        {day.nrfiPlay
-          ? <PlayCell badgeClass="pr-play-nrfi" strong={day.nrfiPlay.strong} label={day.nrfiPlay.label} hit={day.nrfiPlay.hit} />
-          : <span className="pr-na">—</span>}
-      </td>
-    </tr>
+    <span className="pr-linescore">
+      <span className="pr-linescore-row">
+        <span className="pr-linescore-team">{game.awayAbbr}</span>
+        <span className="pr-linescore-inn">{fmtInns("a")}</span>
+        <span className="pr-linescore-tot">{fmtTot(ls.away)}</span>
+      </span>
+      <span className="pr-linescore-row">
+        <span className="pr-linescore-team">{game.homeAbbr}</span>
+        <span className="pr-linescore-inn">{fmtInns("h")}</span>
+        <span className="pr-linescore-tot">{fmtTot(ls.home)}</span>
+      </span>
+    </span>
+  );
+}
+
+function ResultCell({ game }: { game: SeasonHistoryGame }) {
+  if (!game.mlPick && !game.nrfiPick) return <span className="pr-na">—</span>;
+  return (
+    <span className="pr-result-stack">
+      {game.mlPick && (
+        <PlayCell
+          badgeClass="pr-play-ml"
+          strong={game.mlPick.strong}
+          label={`${game.mlPick.label} ML`}
+          hit={game.mlPick.hit}
+        />
+      )}
+      {game.nrfiPick && (
+        <PlayCell
+          badgeClass="pr-play-nrfi"
+          strong={game.nrfiPick.strong}
+          label={game.nrfiPick.label}
+          hit={game.nrfiPick.hit}
+        />
+      )}
+    </span>
   );
 }
 
@@ -450,32 +506,73 @@ function YesterdayRow({
   o,
   win,
   nrfi,
+  odds,
 }: {
   o: GamePredictionOutcome;
   win: WinPlay | null;
   nrfi: NrfiPlay | null;
+  odds: DayOdds;
 }) {
   const finalScore =
     o.awayScore !== null && o.homeScore !== null
       ? `${o.awayAbbr} ${o.awayScore} · ${o.homeAbbr} ${o.homeScore}`
       : <span className="pr-na">{o.status}</span>;
 
+  const STAKE = 10;
+  const oddsCells: string[] = [];
+  const profits: number[] = [];
+  let missingOdds = false;
+  if (win && o.winCorrect !== null) {
+    const mlOdds = odds.mlByGamePk.get(o.gamePk);
+    const price = win.side === "away" ? mlOdds?.away : mlOdds?.home;
+    if (price == null) { missingOdds = true; oddsCells.push("—"); }
+    else {
+      oddsCells.push(formatOdds(price));
+      profits.push(o.winCorrect ? STAKE * americanToProfitMultiplier(price) : -STAKE);
+    }
+  }
+  if (nrfi && o.nrfiCorrect !== null) {
+    const nrfiOdds = odds.nrfiByGamePk.get(o.gamePk);
+    const price = nrfi.side === "NRFI" ? nrfiOdds?.nrfi : nrfiOdds?.yrfi;
+    if (price == null) { missingOdds = true; oddsCells.push("—"); }
+    else {
+      oddsCells.push(formatOdds(price));
+      profits.push(o.nrfiCorrect ? STAKE * americanToProfitMultiplier(price) : -STAKE);
+    }
+  }
+  const totalProfit = profits.length > 0 ? profits.reduce((a, b) => a + b, 0) : null;
+
   return (
     <tr>
-      <td className="pr-pick-cell">{o.awayAbbr} @ {o.homeAbbr}</td>
       <td>{finalScore}</td>
-      <td>
-        {win
-          ? <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`ML ${win.abbr} ${pct(win.winPct)}`} hit={o.winCorrect} />
-          : <span className="pr-na">—</span>}
+      <td className="pr-yesterday-play">
+        {!win && !nrfi && <span className="pr-na">—</span>}
+        {win && <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML`} hit={o.winCorrect} />}
+        {nrfi && <PlayCell badgeClass="pr-play-nrfi" strong={nrfi.strong} label={nrfi.side} hit={o.nrfiCorrect} />}
       </td>
-      <td>
-        {nrfi
-          ? <PlayCell badgeClass="pr-play-nrfi" strong={nrfi.strong} label={`${nrfi.side} ${pct(nrfi.probability)}`} hit={o.nrfiCorrect} />
-          : <span className="pr-na">—</span>}
+      <td className="pr-yesterday-odds">
+        {oddsCells.length === 0
+          ? <span className="pr-na">—</span>
+          : oddsCells.join(" / ")}
+      </td>
+      <td className="pr-yesterday-profit">
+        {totalProfit === null
+          ? <span className="pr-na">—</span>
+          : <span className={totalProfit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>
+              {formatProfit(totalProfit)}
+            </span>}
+        {missingOdds && totalProfit !== null && <span className="pr-profit-partial" title="Some odds missing">*</span>}
       </td>
     </tr>
   );
+}
+
+function formatProfit(v: number): string {
+  const sign = v >= 0 ? "+" : "−";
+  return `${sign}$${Math.abs(v).toFixed(2)}`;
+}
+function formatOdds(v: number): string {
+  return v >= 0 ? `+${v}` : `${v}`;
 }
 
 function PlayCell({
@@ -489,9 +586,10 @@ function PlayCell({
   label: string;
   hit: boolean | null;
 }) {
+  const outcomeClass = hit === true ? " pr-play-hit" : hit === false ? " pr-play-miss" : "";
   return (
     <span className="pr-play-cell">
-      <span className={`pr-play-badge ${badgeClass}${strong ? " pr-play-strong" : ""}`}>{label}</span>
+      <span className={`pr-play-badge ${badgeClass}${strong ? " pr-play-strong" : ""}${outcomeClass}`}>{label}</span>
       {hit === null
         ? <span className="pr-na"> —</span>
         : hit

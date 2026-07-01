@@ -102,7 +102,11 @@ const HOME_FIELD_BUMP = LG_HOME_WIN_PCT - 0.500;  // +0.040
 const SP_ERA_TO_WINPCT = 0.020;         // 1 ERA point ≈ 2 win-pct points
 const SP_DELTA_CAP = 0.05;              // clamp SP adjustment to ±5 pct
 
-const BASELINE_NRFI = 0.57;             // league NRFI rate, season-aggregate
+// v6: rebased from 0.57 (pre-2023 rule-change baseline) to 0.49 (2026
+// empirical rate across 1279 graded games). The old baseline over-
+// predicted NRFI, which is why the v4 model never fired a YRFI play —
+// every prediction started 9pp too optimistic on scoreless-1st.
+const BASELINE_NRFI = 0.49;
 const NRFI_MIN = 0.30;
 const NRFI_MAX = 0.80;
 
@@ -120,7 +124,13 @@ const NRFI_MAX = 0.80;
 // fitting run (see PREDICTIONS_MODEL_VERSION for the contract).
 
 export const WIN_SHRINKAGE  = 0.20;
-export const NRFI_SHRINKAGE = 0.15;
+// v6: relaxed from 0.15 → 0.30. With rebased BASELINE_NRFI=0.49, the
+// tighter 0.15 shrinkage collapsed every NRFI pick back to ~0.50 and
+// zero plays cleared threshold. 0.30 lets both NRFI and YRFI plays
+// fire; empirically improves combined hit rate 52.8% → 54.0% while
+// doubling play volume (from 159 to ~226) — verified via
+// scripts/simulate-nrfi-rebase.ts.
+export const NRFI_SHRINKAGE = 0.30;
 
 // ─── Play thresholds ─────────────────────────────────────────────────────
 // Operate on the CALIBRATED probabilities (post-shrinkage). Empirical
@@ -156,18 +166,15 @@ export type NrfiPlay = {
   strong: boolean;
 };
 
-/** Returns the moneyline play for this game, or null if no side clears
- *  the threshold. The play side is the favored team only when its win
- *  probability >= ML_PLAY_THRESHOLD. */
+/** Returns the moneyline play for this game, or null.
+ *
+ *  Home-team only. Empirical sweep across 262 v4 plays showed away
+ *  picks hit 50-55% at every threshold band; home picks hit 61.6%.
+ *  Away picks are noise around break-even, so we filter them out
+ *  rather than pretending a play exists. Fallback `bestOfSlateWinPlay`
+ *  can still surface an away favorite when no home team clears — those
+ *  are labeled as best-of-slate, not threshold-qualifying plays. */
 export function winPlayFor(game: GamePrediction): WinPlay | null {
-  if (game.away.winProbability >= ML_PLAY_THRESHOLD) {
-    return {
-      side: "away",
-      abbr: game.away.abbr,
-      winPct: game.away.winProbability,
-      strong: game.away.winProbability >= ML_STRONG_THRESHOLD,
-    };
-  }
   if (game.home.winProbability >= ML_PLAY_THRESHOLD) {
     return {
       side: "home",

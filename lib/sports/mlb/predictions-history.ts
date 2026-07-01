@@ -22,6 +22,24 @@ import {
 } from "./predictions";
 import { PREDICTIONS_MODEL_VERSION } from "./predictions-data";
 
+// A full season of MLB games (~15/day × 180 days = ~2700 rows) blows
+// past Supabase's silent 1000-row default. Every query that ranges
+// over "many days" of prediction_results / daily_odds MUST use this
+// paginator. See feedback_supabase_1000_row_cap for the last incident.
+const SUPABASE_PAGE = 1000;
+async function paginateSelect<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += SUPABASE_PAGE) {
+    const { data, error } = await build(from, from + SUPABASE_PAGE - 1);
+    if (error || !Array.isArray(data)) return rows;
+    const chunk = data as T[];
+    rows.push(...chunk);
+    if (chunk.length < SUPABASE_PAGE) return rows;
+  }
+}
+
 type RawResultRow = {
   date:              string;
   game_pk:           number;
@@ -150,11 +168,14 @@ export async function loadPredictionOutcomesForDate(date: string): Promise<GameP
       .eq("date", date)
       .eq("model_version", PREDICTIONS_MODEL_VERSION)
       .order("game_pk", { ascending: true }),
+    // Team IDs are model-agnostic — a game's away/home teams don't
+    // change per model version. Skip the model_version filter so we
+    // still get team abbreviations even when the current model's
+    // daily_predictions rows have been overwritten by another version.
     sb.from("daily_predictions")
-      .select("game_pk, away_team_id, home_team_id")
+      .select("game_pk, away_team_id, home_team_id, model_version")
       .eq("sport", "mlb")
-      .eq("date", date)
-      .eq("model_version", PREDICTIONS_MODEL_VERSION),
+      .eq("date", date),
   ]);
 
   if (resultsQ.error || predsQ.error) return [];
@@ -200,20 +221,6 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
   const endIso = end.toISOString().slice(0, 10);
 
   const sb = supabaseAdmin();
-  const { data, error } = await sb
-    .from("prediction_results")
-    .select("date, away_win_pct, home_win_pct, nrfi_pct, win_correct, nrfi_correct, win_brier, nrfi_brier, actual_winner, actual_nrfi")
-    .eq("sport", "mlb")
-    .eq("model_version", PREDICTIONS_MODEL_VERSION)
-    .gte("date", startIso)
-    .lte("date", endIso);
-  if (error) {
-    return { finals: 0, winHits: 0, winAccuracy: null, winBrier: null,
-             nrfiFinals: 0, nrfiHits: 0, nrfiAccuracy: null, nrfiBrier: null,
-             mlPlays: 0, mlPlayHits: 0, mlHitRate: null,
-             nrfiPlays: 0, nrfiPlayHits: 0, nrfiHitRate: null };
-  }
-
   type Row = {
     date: string;
     away_win_pct: number; home_win_pct: number; nrfi_pct: number;
@@ -222,11 +229,19 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
     actual_winner: "away" | "home" | null;
     actual_nrfi: boolean | null;
   };
+  const data = await paginateSelect<Row>((from, to) => sb
+    .from("prediction_results")
+    .select("date, away_win_pct, home_win_pct, nrfi_pct, win_correct, nrfi_correct, win_brier, nrfi_brier, actual_winner, actual_nrfi")
+    .eq("sport", "mlb")
+    .eq("model_version", PREDICTIONS_MODEL_VERSION)
+    .gte("date", startIso)
+    .lte("date", endIso)
+    .range(from, to));
 
   // Group by date so the always-pick rule (one ML + one NRFI per day,
   // even when nothing clears threshold) can be applied per slate.
   const byDate = new Map<string, Row[]>();
-  for (const r of (data ?? []) as Row[]) {
+  for (const r of data) {
     const list = byDate.get(r.date) ?? [];
     list.push(r);
     byDate.set(r.date, list);
@@ -260,15 +275,13 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
         if (r.nrfi_brier !== null) nrfiBrierSum += Number(r.nrfi_brier);
       }
 
-      // Threshold-qualifying ML pick for this game.
+      // Threshold-qualifying ML pick for this game. Home-only per
+      // winPlayFor's selection rule (see its docstring).
       if (r.win_correct !== null && r.actual_winner !== null) {
         const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
-        let picked: "away" | "home" | null = null;
-        if (a >= ML_PLAY_THRESHOLD) picked = "away";
-        else if (h >= ML_PLAY_THRESHOLD) picked = "home";
-        if (picked !== null) {
+        if (h >= ML_PLAY_THRESHOLD) {
           mlPlays++;
-          if (picked === r.actual_winner) mlPlayHits++;
+          if (r.actual_winner === "home") mlPlayHits++;
           mlDayPicked = true;
         }
         // Track best-of-slate candidate for the fallback.
@@ -331,9 +344,7 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
 // graded historical outcome row. Both return null when no side cleared
 // the threshold (no play would have been made).
 export function outcomeWinPlay(o: GamePredictionOutcome): WinPlay | null {
-  if (o.awayWinPct >= ML_PLAY_THRESHOLD) {
-    return { side: "away", abbr: o.awayAbbr, winPct: o.awayWinPct, strong: o.awayWinPct >= ML_STRONG_THRESHOLD };
-  }
+  // Home only — mirrors winPlayFor. See its docstring for why.
   if (o.homeWinPct >= ML_PLAY_THRESHOLD) {
     return { side: "home", abbr: o.homeAbbr, winPct: o.homeWinPct, strong: o.homeWinPct >= ML_STRONG_THRESHOLD };
   }
@@ -394,6 +405,36 @@ type OddsLookupRow = {
   nrfi_odds:    number | null; yrfi_odds:    number | null;
 };
 
+export type DayOdds = {
+  mlByGamePk:   Map<number, { away: number | null; home: number | null }>;
+  nrfiByGamePk: Map<number, { nrfi: number | null; yrfi: number | null }>;
+};
+
+/** Odds captured for one date, keyed by game_pk. ML odds come from
+ *  DraftKings, NRFI odds from FanDuel — same book split loadPlayRoi
+ *  uses. Missing games/books return empty maps rather than throwing so
+ *  the caller can silently render "—" for a missing price. */
+export async function loadOddsForDate(date: string): Promise<DayOdds> {
+  const sb = supabaseAdmin();
+  const { data, error } = await sb.from("daily_odds")
+    .select("date, game_pk, book, away_ml_odds, home_ml_odds, nrfi_odds, yrfi_odds")
+    .eq("sport", "mlb")
+    .eq("date", date)
+    .in("book", ["DraftKings", "FanDuel"]);
+  const mlByGamePk = new Map<number, { away: number | null; home: number | null }>();
+  const nrfiByGamePk = new Map<number, { nrfi: number | null; yrfi: number | null }>();
+  if (error || !data) return { mlByGamePk, nrfiByGamePk };
+  type Row = OddsLookupRow & { book: string };
+  for (const r of data as Row[]) {
+    if (r.book === "DraftKings") {
+      mlByGamePk.set(r.game_pk, { away: r.away_ml_odds, home: r.home_ml_odds });
+    } else if (r.book === "FanDuel") {
+      nrfiByGamePk.set(r.game_pk, { nrfi: r.nrfi_odds, yrfi: r.yrfi_odds });
+    }
+  }
+  return { mlByGamePk, nrfiByGamePk };
+}
+
 /** Same day-grouping logic as loadPredictionAccuracy, but each picked
  *  game is joined to daily_odds (DraftKings book for now) and the
  *  outcome is converted to $stake P/L. Plays where odds weren't
@@ -413,38 +454,34 @@ export async function loadPlayRoi(
   // ML odds come from ESPN→DraftKings; NRFI odds come from FanDuel.
   // Pull both books in one query so the join is cheap, then split into
   // two lookups by book.
-  const [resQ, oddsQ] = await Promise.all([
-    sb.from("prediction_results")
+  type OddsRowWithBook = OddsLookupRow & { book: string };
+  const [resRows, oddsRows] = await Promise.all([
+    paginateSelect<RoiResultRow>((from, to) => sb.from("prediction_results")
       .select("date, game_pk, away_win_pct, home_win_pct, nrfi_pct, win_correct, nrfi_correct, actual_winner, actual_nrfi")
       .eq("sport", "mlb")
       .eq("model_version", PREDICTIONS_MODEL_VERSION)
       .gte("date", startIso)
-      .lte("date", endIso),
-    sb.from("daily_odds")
+      .lte("date", endIso)
+      .range(from, to)),
+    paginateSelect<OddsRowWithBook>((from, to) => sb.from("daily_odds")
       .select("date, game_pk, book, away_ml_odds, home_ml_odds, nrfi_odds, yrfi_odds")
       .eq("sport", "mlb")
       .in("book", ["DraftKings", "FanDuel"])
       .gte("date", startIso)
-      .lte("date", endIso),
+      .lte("date", endIso)
+      .range(from, to)),
   ]);
-  const empty: PlayRoiSummary = {
-    stake,
-    mlPlaysGraded: 0, mlPlaysWithOdds: 0, mlStaked: 0, mlProfit: 0, mlRoi: null,
-    nrfiPlaysGraded: 0, nrfiPlaysWithOdds: 0, nrfiStaked: 0, nrfiProfit: 0, nrfiRoi: null,
-  };
-  if (resQ.error || oddsQ.error) return empty;
 
-  type OddsRowWithBook = OddsLookupRow & { book: string };
   const mlOddsByKey = new Map<string, OddsLookupRow>();
   const nrfiOddsByKey = new Map<string, OddsLookupRow>();
-  for (const o of ((oddsQ.data ?? []) as unknown) as OddsRowWithBook[]) {
+  for (const o of oddsRows) {
     const k = `${o.date}|${o.game_pk}`;
     if (o.book === "DraftKings") mlOddsByKey.set(k, o);
     if (o.book === "FanDuel")    nrfiOddsByKey.set(k, o);
   }
 
   const byDate = new Map<string, RoiResultRow[]>();
-  for (const r of ((resQ.data ?? []) as unknown) as RoiResultRow[]) {
+  for (const r of resRows) {
     const list = byDate.get(r.date) ?? [];
     list.push(r);
     byDate.set(r.date, list);
@@ -463,9 +500,9 @@ export async function loadPlayRoi(
     for (const r of dayRows) {
       if (r.win_correct === null || r.actual_winner === null) continue;
       const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
+      // Home-only ML picks — see winPlayFor for rationale.
       let picked: "away" | "home" | null = null;
-      if (a >= ML_PLAY_THRESHOLD) picked = "away";
-      else if (h >= ML_PLAY_THRESHOLD) picked = "home";
+      if (h >= ML_PLAY_THRESHOLD) picked = "home";
       if (picked !== null) {
         mlPicks.push({ gamePk: r.game_pk, side: picked, winner: r.actual_winner });
       }
@@ -533,11 +570,23 @@ export async function loadPlayRoi(
 
 // ─── Season history (for the table on /mlb/predictions) ────────────────
 
+export type SeasonHistoryLinescore = {
+  innings: Array<{ a: number | null; h: number | null }>;
+  away: { r: number | null; h: number | null; e: number | null };
+  home: { r: number | null; h: number | null; e: number | null };
+};
+export type SeasonHistoryGame = {
+  gamePk:    number;
+  awayAbbr:  string;
+  homeAbbr:  string;
+  status:    string;
+  linescore: SeasonHistoryLinescore | null;
+  mlPick:    { label: string; strong: boolean; hit: boolean | null } | null;
+  nrfiPick:  { label: string; strong: boolean; hit: boolean | null } | null;
+};
 export type SeasonHistoryDay = {
-  date: string;
-  game: { gamePk: number; awayAbbr: string; homeAbbr: string; awayScore: number | null; homeScore: number | null; status: string } | null;
-  mlPlay:  { label: string; strong: boolean; hit: boolean | null } | null;
-  nrfiPlay: { label: string; strong: boolean; hit: boolean | null } | null;
+  date:  string;
+  games: SeasonHistoryGame[];
 };
 
 /** Returns one row per graded day in the window, each with the
@@ -545,31 +594,8 @@ export type SeasonHistoryDay = {
  *  Newest first. Used by the season history table on the page. */
 export async function loadSeasonHistory(startIso: string, endIso: string): Promise<SeasonHistoryDay[]> {
   const sb = supabaseAdmin();
-  const [resultsQ, predsQ] = await Promise.all([
-    sb.from("prediction_results")
-      .select(
-        "date, game_pk, away_win_pct, home_win_pct, nrfi_pct, status, " +
-        "away_score, home_score, away_first_inning, home_first_inning, " +
-        "actual_winner, actual_nrfi, win_correct, nrfi_correct, win_brier, nrfi_brier",
-      )
-      .eq("sport", "mlb")
-      .eq("model_version", PREDICTIONS_MODEL_VERSION)
-      .gte("date", startIso)
-      .lte("date", endIso)
-      .order("date", { ascending: false })
-      .order("game_pk", { ascending: true }),
-    sb.from("daily_predictions")
-      .select("date, game_pk, away_team_id, home_team_id")
-      .eq("sport", "mlb")
-      .eq("model_version", PREDICTIONS_MODEL_VERSION)
-      .gte("date", startIso)
-      .lte("date", endIso),
-  ]);
-  if (resultsQ.error || predsQ.error) return [];
 
-  // Reuse the date-by-date outcome assembly we already have so the
-  // same threshold + best-of-day logic applies.
-  type ResRow = {
+  type ResRowRaw = {
     date: string; game_pk: number;
     away_win_pct: number; home_win_pct: number; nrfi_pct: number;
     status: string; away_score: number | null; home_score: number | null;
@@ -577,16 +603,48 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
     actual_winner: "away" | "home" | null; actual_nrfi: boolean | null;
     win_correct: boolean | null; nrfi_correct: boolean | null;
     win_brier: number | null; nrfi_brier: number | null;
+    linescore: SeasonHistoryLinescore | null;
   };
+  type PredRowRaw = { date: string; game_pk: number; away_team_id: number; home_team_id: number };
+
+  const [resultsRows, predsRows] = await Promise.all([
+    paginateSelect<ResRowRaw>((from, to) => sb.from("prediction_results")
+      .select(
+        "date, game_pk, away_win_pct, home_win_pct, nrfi_pct, status, " +
+        "away_score, home_score, away_first_inning, home_first_inning, " +
+        "actual_winner, actual_nrfi, win_correct, nrfi_correct, win_brier, nrfi_brier, " +
+        "linescore",
+      )
+      .eq("sport", "mlb")
+      .eq("model_version", PREDICTIONS_MODEL_VERSION)
+      .gte("date", startIso)
+      .lte("date", endIso)
+      .order("date", { ascending: false })
+      .order("game_pk", { ascending: true })
+      .range(from, to)),
+    // Team IDs are model-agnostic — see the note in
+    // loadPredictionOutcomesForDate for why we skip the version filter.
+    paginateSelect<PredRowRaw>((from, to) => sb.from("daily_predictions")
+      .select("date, game_pk, away_team_id, home_team_id")
+      .eq("sport", "mlb")
+      .gte("date", startIso)
+      .lte("date", endIso)
+      .range(from, to)),
+  ]);
+
+  // Reuse the date-by-date outcome assembly we already have so the
+  // same threshold + best-of-day logic applies.
   const teamMap = new Map<string, { away_team_id: number; home_team_id: number }>();
-  for (const p of (predsQ.data ?? []) as Array<{ date: string; game_pk: number; away_team_id: number; home_team_id: number }>) {
+  for (const p of predsRows) {
     teamMap.set(`${p.date}|${p.game_pk}`, { away_team_id: p.away_team_id, home_team_id: p.home_team_id });
   }
 
   // Build the GamePredictionOutcome[] per date so we can reuse the
-  // outcomeWinPlay / outcomeNrfiPlay / best-of-day helpers above.
+  // outcomeWinPlay / outcomeNrfiPlay / best-of-day helpers above. Also
+  // stash the linescore beside each outcome row.
   const outcomesByDate = new Map<string, GamePredictionOutcome[]>();
-  for (const r of ((resultsQ.data ?? []) as unknown) as ResRow[]) {
+  const linescoreByKey = new Map<string, SeasonHistoryLinescore | null>();
+  for (const r of resultsRows) {
     const teams = teamMap.get(`${r.date}|${r.game_pk}`);
     const o: GamePredictionOutcome = {
       gamePk: r.game_pk,
@@ -609,68 +667,59 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
     const list = outcomesByDate.get(r.date) ?? [];
     list.push(o);
     outcomesByDate.set(r.date, list);
+    linescoreByKey.set(`${r.date}|${r.game_pk}`, r.linescore ?? null);
   }
 
-  // Sort the per-day outcomes by game_pk for deterministic ordering.
-  // Date order itself stays newest-first because of the SQL order by above.
+  // One row per game (rowspanned per day in the renderer). Days with
+  // no threshold qualifier still get exactly one best-of-day fallback
+  // pick per market so the season history has no empty days.
   const days: SeasonHistoryDay[] = [];
-  for (const [date, outcomes] of outcomesByDate) {
-    // Threshold qualifiers first.
-    const mlGames = outcomes.map((o) => ({ o, play: outcomeWinPlay(o) })).filter((x) => x.play !== null);
-    const nrfiGames = outcomes.map((o) => ({ o, play: outcomeNrfiPlay(o) })).filter((x) => x.play !== null);
+  const dateKeys = [...outcomesByDate.keys()].sort((a, b) => b.localeCompare(a));
+  for (const date of dateKeys) {
+    const outcomes = outcomesByDate.get(date) ?? [];
+    const outcomesByPk = new Map(outcomes.map((o) => [o.gamePk, o]));
 
-    // Pick a representative game for the row — the one that holds the
-    // primary ML play (if any), else the NRFI play, else the slate's
-    // strongest favorite. Table shows one row per day.
-    let chosen: { outcome: GamePredictionOutcome; mlPlay: { play: ReturnType<typeof outcomeWinPlay>; hit: boolean | null } | null; nrfiPlay: { play: ReturnType<typeof outcomeNrfiPlay>; hit: boolean | null } | null } | null = null;
-
-    // ML — first threshold play, or best-of-day fallback.
-    if (mlGames.length > 0 && mlGames[0]?.play) {
-      const x = mlGames[0];
-      chosen = { outcome: x.o, mlPlay: { play: x.play, hit: x.o.winCorrect }, nrfiPlay: null };
-    } else {
+    const mlPlaysByPk = new Map<number, WinPlay>();
+    const nrfiPlaysByPk = new Map<number, NrfiPlay>();
+    for (const o of outcomes) {
+      const ml = outcomeWinPlay(o);
+      if (ml) mlPlaysByPk.set(o.gamePk, ml);
+      const nrfi = outcomeNrfiPlay(o);
+      if (nrfi) nrfiPlaysByPk.set(o.gamePk, nrfi);
+    }
+    if (mlPlaysByPk.size === 0) {
       const fb = bestOfDayWinPlay(outcomes);
-      if (fb) {
-        const o = outcomes.find((x) => x.gamePk === fb.gamePk);
-        if (o) chosen = { outcome: o, mlPlay: { play: fb.play, hit: o.winCorrect }, nrfiPlay: null };
-      }
+      if (fb) mlPlaysByPk.set(fb.gamePk, fb.play);
     }
-
-    // NRFI — same. May land on a different game; row's "game" cell will
-    // reflect the ML pick's game since that's what shows the final
-    // score most naturally.
-    let nrfiPlayInfo: { play: NonNullable<ReturnType<typeof outcomeNrfiPlay>>; hit: boolean | null } | null = null;
-    const firstNrfi = nrfiGames[0];
-    if (firstNrfi && firstNrfi.play) {
-      nrfiPlayInfo = { play: firstNrfi.play, hit: firstNrfi.o.nrfiCorrect };
-    } else {
+    if (nrfiPlaysByPk.size === 0) {
       const fb = bestOfDayNrfiPlay(outcomes);
-      if (fb) {
-        const o = outcomes.find((x) => x.gamePk === fb.gamePk);
-        if (o) nrfiPlayInfo = { play: fb.play, hit: o.nrfiCorrect };
-      }
+      if (fb) nrfiPlaysByPk.set(fb.gamePk, fb.play);
     }
-    if (chosen) chosen.nrfiPlay = nrfiPlayInfo;
 
-    if (!chosen) continue;
-    const o = chosen.outcome;
-    days.push({
-      date,
-      game: {
-        gamePk: o.gamePk,
-        awayAbbr: o.awayAbbr, homeAbbr: o.homeAbbr,
-        awayScore: o.awayScore, homeScore: o.homeScore,
-        status: o.status,
-      },
-      mlPlay: chosen.mlPlay && chosen.mlPlay.play
-        ? { label: `${chosen.mlPlay.play.side === "away" ? o.awayAbbr : o.homeAbbr} ${(chosen.mlPlay.play.winPct * 100).toFixed(0)}%`,
-            strong: chosen.mlPlay.play.strong, hit: chosen.mlPlay.hit }
-        : null,
-      nrfiPlay: chosen.nrfiPlay && chosen.nrfiPlay.play
-        ? { label: `${chosen.nrfiPlay.play.side} ${(chosen.nrfiPlay.play.probability * 100).toFixed(0)}%`,
-            strong: chosen.nrfiPlay.play.strong, hit: chosen.nrfiPlay.hit }
-        : null,
-    });
+    // Any game touched by an ML or NRFI pick gets a row for the day.
+    const gamePks = new Set<number>([...mlPlaysByPk.keys(), ...nrfiPlaysByPk.keys()]);
+    const games: SeasonHistoryGame[] = [];
+    for (const pk of [...gamePks].sort((a, b) => a - b)) {
+      const o = outcomesByPk.get(pk);
+      if (!o) continue;
+      const ml   = mlPlaysByPk.get(pk);
+      const nrfi = nrfiPlaysByPk.get(pk);
+      games.push({
+        gamePk:   o.gamePk,
+        awayAbbr: o.awayAbbr,
+        homeAbbr: o.homeAbbr,
+        status:   o.status,
+        linescore: linescoreByKey.get(`${date}|${pk}`) ?? null,
+        mlPick: ml
+          ? { label: ml.side === "away" ? o.awayAbbr : o.homeAbbr, strong: ml.strong, hit: o.winCorrect }
+          : null,
+        nrfiPick: nrfi
+          ? { label: nrfi.side, strong: nrfi.strong, hit: o.nrfiCorrect }
+          : null,
+      });
+    }
+
+    if (games.length > 0) days.push({ date, games });
   }
   return days;
 }
