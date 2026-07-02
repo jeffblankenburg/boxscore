@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSportById } from "@/lib/sports";
+import { getSportRow } from "@/lib/sports";
 import { getActiveTeamIds } from "@/lib/email-subscriptions";
 import { getActiveSubscribers, getTeamOptInSubscriberIds, type Subscriber } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
 
     // Per-sport send kill switch — same gate as the league send. See
     // app/api/cron/send-email/route.ts for the operator-confidence framing.
-    const sportRow = await getSportById(sport);
+    const sportRow = await getSportRow(sport);
     if (sportRow && sportRow.sends_enabled === false) {
       const result = {
         sport, date,

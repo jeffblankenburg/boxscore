@@ -11,7 +11,7 @@ import {
   listAnnouncements,
   type AnnouncementListItem,
 } from "@/lib/announcements";
-import { getSportById, isSportVisible } from "@/lib/sports";
+import { getSportById, getSportRow, isSportVisible } from "@/lib/sports";
 import { getActiveSubscribersForSport } from "@/lib/subscribers";
 import { countActiveTeamSubscriptions } from "@/lib/email-subscriptions";
 import { recentCronRunsForSports, type CronRun } from "@/lib/cron-runs";
@@ -38,8 +38,8 @@ export default async function LeagueDashboard({
 }) {
   await requireAdmin();
   const { sport } = await params;
-  if (!(await isSportVisible(sport, { includeAdminOnly: true }))) notFound();
-  const sportRow = await getSportById(sport);
+  if (!isSportVisible(sport, { includeAdminOnly: true })) notFound();
+  const sportRow = await getSportRow(sport);
   if (!sportRow) notFound();
   const { ok, error } = await searchParams;
 

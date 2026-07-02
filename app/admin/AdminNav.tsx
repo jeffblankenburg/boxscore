@@ -70,7 +70,6 @@ export function AdminNav({
     { key: "games", href: "/admin/games", label: "Games" },
 
     // Configuration / external surfaces
-    { key: "sports", href: "/admin/sports", label: "Sports" },
     { key: "ads", href: "/admin/ads", label: "Ads" },
     { key: "discord", href: "/admin/discord", label: "Discord" },
   ];

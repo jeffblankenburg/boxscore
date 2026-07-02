@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDigest } from "@/lib/digests";
-import { getSportById } from "@/lib/sports";
+import { getSportRow } from "@/lib/sports";
 import { getActiveSubscribersForSport } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
@@ -60,7 +60,7 @@ export async function GET(req: Request) {
     // work, but the daily send pauses. Operator flips this on
     // /admin/[sport]. Record an ok run with skipped_reason so the dashboard
     // cron pulse stays green and the recent-runs table shows the intent.
-    const sportRow = await getSportById(sport);
+    const sportRow = await getSportRow(sport);
     if (sportRow && sportRow.sends_enabled === false) {
       const result = {
         sport, date,

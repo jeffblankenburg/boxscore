@@ -97,13 +97,6 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Admin",
-    links: [
-      // Chunk 2b: move /admin/sports → /admin/admin/sports
-      { href: "/admin/sports", label: "Sports config" },
-    ],
-  },
-  {
     label: "Data model",
     links: [
       { href: "/admin/data-model", label: "Canonical model" },

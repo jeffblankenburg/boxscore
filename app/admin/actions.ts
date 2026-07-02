@@ -260,7 +260,7 @@ export async function setSportSends(formData: FormData): Promise<void> {
     if (!sport) throw new Error("missing sport");
     if (!confirmed) throw new Error("not confirmed");
     const { getSportById, setSportSendsEnabled } = await import("@/lib/sports");
-    const row = await getSportById(sport);
+    const row = getSportById(sport);
     if (!row) throw new Error(`Unknown sport: ${sport}`);
     await setSportSendsEnabled(sport, enable);
     const verb = enable ? "resumed" : "paused";
