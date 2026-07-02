@@ -10,6 +10,7 @@ import { EMAIL_LINK_BASE } from "@/lib/site";
 import { requestMagicLink } from "@/lib/subscriber-auth";
 import { isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
+import { checkSubscribeRate, recordSubscribeAttempt } from "@/lib/subscribe-rate-limit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -98,6 +99,21 @@ export async function subscribe(formData: FormData): Promise<void> {
   if (leagues.length === 0 && teams.length === 0) {
     redirect("/subscribe?error=no_picks");
   }
+
+  // Rate limit before we touch subscribers / Resend. Blocks list-bombing
+  // (attacker fires arbitrary emails to burn our sender reputation) and
+  // enumeration probes. The check happens AFTER validation so a malformed
+  // POST doesn't inflate the counter.
+  const hSubs = await headers();
+  const fwdSubs = hSubs.get("x-forwarded-for");
+  const ipSubs = fwdSubs ? (fwdSubs.split(",")[0]?.trim() ?? null) : (hSubs.get("x-real-ip") ?? null);
+  const rate = await checkSubscribeRate({ ip: ipSubs, email });
+  if (!rate.ok) {
+    // Silent redirect to the "check your email" page. Don't leak whether
+    // it was IP or email that tripped — an attacker could probe either.
+    redirect("/subscribe/sent");
+  }
+  await recordSubscribeAttempt({ ip: ipSubs, email });
 
   const existing = await findByEmail(email);
 

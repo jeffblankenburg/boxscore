@@ -8,3 +8,12 @@ out
 *.tsbuildinfo
 .vercel
 docs/boxscore-ad-onepager.pdf
+
+# Never commit binary business/legal artifacts to a public repo — they
+# leak sensitive material (attorney-client memos, financial spreadsheets)
+# and bloat clones. Reference URLs from private storage instead.
+*.pdf
+*.xlsx
+*.xls
+*.doc
+*.docx

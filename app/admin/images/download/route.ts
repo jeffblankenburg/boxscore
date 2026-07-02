@@ -11,10 +11,7 @@ export const dynamic = "force-dynamic";
 async function isAdmin(): Promise<boolean> {
   const jar = await cookies();
   const sessionToken = jar.get(ADMIN_SESSION_COOKIE)?.value;
-  if (sessionToken && (await validateSession(sessionToken))) return true;
-  const legacy = jar.get("boxscore_admin")?.value;
-  const secret = process.env.ADMIN_SECRET;
-  return Boolean(secret && legacy === secret);
+  return sessionToken !== undefined && (await validateSession(sessionToken)) !== null;
 }
 
 export async function GET(req: NextRequest) {

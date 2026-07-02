@@ -49,6 +49,14 @@ export async function getAdminEmails(): Promise<string[]> {
 const CODE_TTL_MIN = 10;
 const SESSION_TTL_DAYS = 30;
 
+// Brute-force guard. A 6-digit code has a 1-in-1M chance per guess; at 5
+// failed attempts we lock the email for LOCKOUT_MIN and invalidate any
+// outstanding code. That caps the attacker's expected work per code well
+// past the 10-minute TTL, and if they were fast enough to burn 5 tries
+// the operator gets a clear signal (locked_until) from the DB.
+const MAX_CODE_ATTEMPTS = 5;
+const LOCKOUT_MIN = 15;
+
 const sha256 = (s: string): string =>
   createHash("sha256").update(s).digest("hex");
 
@@ -88,11 +96,35 @@ export async function issueCode(email: string): Promise<IssuedCode> {
   return { plaintext: code };
 }
 
-// Check the submitted code. On success, marks the row used and returns true.
-// Returns false for: no matching row, expired, already used, wrong code.
-export async function consumeCode(email: string, submitted: string): Promise<boolean> {
+/** Outcome of a code check. `locked` is caller-visible so the UI can say
+ *  "too many attempts — try again in N minutes" instead of the generic
+ *  "invalid code," which teaches the attacker nothing extra. */
+export type ConsumeResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid" | "locked"; lockedUntil?: Date };
+
+// Check the submitted code with brute-force protection. Failed attempts
+// are tallied per email; after MAX_CODE_ATTEMPTS the account locks for
+// LOCKOUT_MIN and any outstanding code is invalidated.
+export async function consumeCode(email: string, submitted: string): Promise<ConsumeResult> {
+  const sb = supabaseAdmin();
+
+  // Existing lockout check.
+  const { data: attempt } = await sb
+    .from("admin_code_attempts")
+    .select("failed_count, locked_until")
+    .eq("email", email)
+    .maybeSingle<{ failed_count: number; locked_until: string | null }>();
+  const now = Date.now();
+  if (attempt?.locked_until) {
+    const until = new Date(attempt.locked_until).getTime();
+    if (until > now) {
+      return { ok: false, reason: "locked", lockedUntil: new Date(until) };
+    }
+  }
+
   const codeHash = sha256(submitted);
-  const { data, error } = await supabaseAdmin()
+  const { data, error } = await sb
     .from("admin_codes")
     .select("id, code_hash, expires_at, used_at")
     .eq("email", email)
@@ -102,15 +134,38 @@ export async function consumeCode(email: string, submitted: string): Promise<boo
     .limit(1)
     .maybeSingle<{ id: string; code_hash: string; expires_at: string; used_at: string | null }>();
   if (error) throw new Error(`consumeCode lookup: ${error.message}`);
-  if (!data) return false;
-  if (!constantTimeEq(data.code_hash, codeHash)) return false;
 
-  const { error: updErr } = await supabaseAdmin()
+  const matched = !!data && constantTimeEq(data.code_hash, codeHash);
+  if (!matched) {
+    // Failed attempt — bump counter, lock if threshold hit, kill any
+    // outstanding codes on lockout so the attacker can't finish guessing.
+    const newCount = (attempt?.failed_count ?? 0) + 1;
+    const willLock = newCount >= MAX_CODE_ATTEMPTS;
+    const lockedUntil = willLock ? new Date(now + LOCKOUT_MIN * 60_000) : null;
+    await sb.from("admin_code_attempts").upsert({
+      email,
+      failed_count: newCount,
+      locked_until: lockedUntil ? lockedUntil.toISOString() : null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "email" });
+    if (willLock) {
+      await sb.from("admin_codes")
+        .update({ used_at: new Date().toISOString() })
+        .eq("email", email)
+        .is("used_at", null);
+      return { ok: false, reason: "locked", lockedUntil: lockedUntil! };
+    }
+    return { ok: false, reason: "invalid" };
+  }
+
+  const { error: updErr } = await sb
     .from("admin_codes")
     .update({ used_at: new Date().toISOString() })
-    .eq("id", data.id);
+    .eq("id", data!.id);
   if (updErr) throw new Error(`consumeCode mark-used: ${updErr.message}`);
-  return true;
+  // Successful login clears the failure counter.
+  await sb.from("admin_code_attempts").delete().eq("email", email);
+  return { ok: true };
 }
 
 // Create a new session and return the token. Caller stores it as a httpOnly
