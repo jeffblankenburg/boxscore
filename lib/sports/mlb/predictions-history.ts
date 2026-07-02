@@ -324,12 +324,20 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
       }
     }
 
-    // Fallback picks are excluded from the accuracy denominator — they're
-    // shown in the Season Picks table for continuity but they're NOT
-    // real bets (no threshold cleared, no odds check). Counting them
-    // dilutes the "here's what you'd actually play" hit rate that the
-    // Win Percentages box is trying to communicate.
-    void mlDayPicked; void nrfiDayPicked; void bestMl; void bestNrfi;
+    // Always-pick fallbacks: fire when no threshold pick existed for
+    // the metric on this date AND a candidate game graded. Keeping
+    // fallbacks IN the tally ensures every day surfaces at least one
+    // ML and one NRFI, matching what the display shows. The ROI
+    // number naturally reflects that fallbacks are lower-quality
+    // picks (they're rarely at good prices), which is honest.
+    if (!mlDayPicked && bestMl) {
+      mlPlays++;
+      if (bestMl.side === bestMl.winner) mlPlayHits++;
+    }
+    if (!nrfiDayPicked && bestNrfi) {
+      nrfiPlays++;
+      if (bestNrfi.pickNrfi === bestNrfi.actual) nrfiPlayHits++;
+    }
   }
 
   return {
@@ -509,16 +517,24 @@ export async function loadPlayRoi(
     let bestMl: { gamePk: number; favPct: number; side: "away" | "home"; winner: "away" | "home" } | null = null;
     for (const r of dayRows) {
       if (r.win_correct === null || r.actual_winner === null) continue;
-      const h = Number(r.home_win_pct);
+      const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
       // Home-only ML picks + DK odds range filter — matches
       // outcomeWinPlay and the accuracy tally.
       const homeOdds = mlOddsByKey.get(`${r.date}|${r.game_pk}`)?.home_ml_odds ?? null;
       if (h >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(homeOdds)) {
         mlPicks.push({ gamePk: r.game_pk, side: "home", winner: r.actual_winner });
       }
+      // Track best-of-day candidate for the fallback (unfiltered so
+      // we can always surface *something* on quiet slates).
+      const fav = a >= h ? a : h;
+      const side: "away" | "home" = a >= h ? "away" : "home";
+      if (!bestMl || fav > bestMl.favPct) {
+        bestMl = { gamePk: r.game_pk, favPct: fav, side, winner: r.actual_winner };
+      }
     }
-    // No fallback — ROI counts only threshold+odds-qualifying picks.
-    void bestMl;
+    if (mlPicks.length === 0 && bestMl) {
+      mlPicks.push({ gamePk: bestMl.gamePk, side: bestMl.side, winner: bestMl.winner });
+    }
     for (const p of mlPicks) {
       mlPlaysGraded++;
       const o = mlOddsByKey.get(`${dayRows[0]?.date}|${p.gamePk}`);

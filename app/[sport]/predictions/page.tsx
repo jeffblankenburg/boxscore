@@ -21,6 +21,8 @@ import {
   americanToProfitMultiplier,
   outcomeWinPlay,
   outcomeNrfiPlay,
+  bestOfDayWinPlay,
+  bestOfDayNrfiPlay,
   type PlayAccuracySummary,
   type PlayRoiSummary,
   type GamePredictionOutcome,
@@ -280,13 +282,43 @@ function YesterdayResults({
   outcomes: GamePredictionOutcome[];
   odds: DayOdds;
 }) {
-  const playedRows = outcomes
-    .map((o) => ({
-      o,
-      win: outcomeWinPlay(o, odds.mlByGamePk.get(o.gamePk)?.home ?? null),
-      nrfi: outcomeNrfiPlay(o),
-    }))
-    .filter((p) => p.win !== null || p.nrfi !== null);
+  // Threshold + odds-qualifying picks per game.
+  const rowsByPk = new Map<number, { o: GamePredictionOutcome; win: WinPlay | null; nrfi: NrfiPlay | null }>();
+  for (const o of outcomes) {
+    const win = outcomeWinPlay(o, odds.mlByGamePk.get(o.gamePk)?.home ?? null);
+    const nrfi = outcomeNrfiPlay(o);
+    if (win || nrfi) rowsByPk.set(o.gamePk, { o, win, nrfi });
+  }
+
+  // Always-pick fallbacks — same rule as buildTodaysPlays and
+  // loadSeasonHistory: if no ML/NRFI cleared threshold on the slate,
+  // surface the day's strongest lean so the table always shows at
+  // least one ML and one NRFI.
+  const hasMl   = Array.from(rowsByPk.values()).some((p) => p.win !== null);
+  const hasNrfi = Array.from(rowsByPk.values()).some((p) => p.nrfi !== null);
+  if (!hasMl) {
+    const fb = bestOfDayWinPlay(outcomes);
+    if (fb) {
+      const o = outcomes.find((x) => x.gamePk === fb.gamePk);
+      if (o) {
+        const existing = rowsByPk.get(fb.gamePk);
+        if (existing) existing.win = fb.play;
+        else rowsByPk.set(fb.gamePk, { o, win: fb.play, nrfi: null });
+      }
+    }
+  }
+  if (!hasNrfi) {
+    const fb = bestOfDayNrfiPlay(outcomes);
+    if (fb) {
+      const o = outcomes.find((x) => x.gamePk === fb.gamePk);
+      if (o) {
+        const existing = rowsByPk.get(fb.gamePk);
+        if (existing) existing.nrfi = fb.play;
+        else rowsByPk.set(fb.gamePk, { o, win: null, nrfi: fb.play });
+      }
+    }
+  }
+  const playedRows = Array.from(rowsByPk.values()).sort((a, b) => a.o.gamePk - b.o.gamePk);
 
   if (playedRows.length === 0) return null;
 
