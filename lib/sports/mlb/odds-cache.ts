@@ -1,16 +1,25 @@
-// Persists ESPN odds into daily_odds, joined to our predictions on
-// (date, awayAbbr, homeAbbr). Used by both the predictions-snapshot
-// cron (capture today's odds going forward) and the historical
-// backfill script.
+// Appends ESPN + FanDuel odds captures into daily_odds (append-only
+// since migration 0071). Used by:
+//   * predictions-snapshot cron — first capture of the day, ~10:30 ET
+//   * predictions-odds-poll cron — every 30 min through game hours
+//   * backfill scripts for historical dates
+//
+// daily_odds is append-only: PK is (sport, date, game_pk, book,
+// captured_at). Every call writes a NEW row rather than overwriting the
+// existing (sport, date, game_pk, book) row. Readers that used to see
+// one row per (game, book) go through the daily_odds_first view, which
+// returns the earliest capture ("opening price"). The predictions-
+// comparator scans the full history to find the "latest capture before
+// first pitch" per game for CLV closing prices.
 //
 // The join key is the (away abbr, home abbr) pair, normalized through
 // ESPN_TO_CANONICAL_ABBR in odds-espn.ts. That avoids depending on
 // ESPN event IDs matching MLB statsapi gamePks (they don't), but it
 // breaks down on doubleheaders — two games same day with the same
-// matchup will end up sharing one odds row. Doubleheaders are rare
-// enough that we'll accept the loss for v1; if the missed-game count
-// rises above noise we'll switch to a (date, abbr, abbr, startTime)
-// match instead.
+// matchup will end up sharing one odds row per capture. Doubleheaders
+// are rare enough that we'll accept the loss for v1; if the missed-
+// game count rises above noise we'll switch to a (date, abbr, abbr,
+// startTime) match instead.
 
 import { supabaseAdmin } from "@/lib/supabase";
 import { findTeamByMlbApiId, TEAMS } from "@/lib/teams";
@@ -29,14 +38,13 @@ export type OddsUpsertReport = {
   espnGames: number;     // games ESPN returned for this date
   matched: number;       // predictions joined to an ESPN row
   withMl: number;        // matched rows with both ML values present
-  upserted: number;      // rows actually written to daily_odds
+  upserted: number;      // rows appended to daily_odds
   unmatched: Array<{ awayAbbr: string; homeAbbr: string }>;
 };
 
-/** Fetches ESPN ML odds for a date and upserts one daily_odds row per
- *  matched daily_prediction. Silent skips on unmatched games (logged
- *  in the return value, never throws). Idempotent — same date can be
- *  rerun to refresh odds for late lines. */
+/** Fetches ESPN ML odds for a date and appends one row per matched
+ *  daily_prediction into daily_odds. Silent skips on unmatched games
+ *  (logged in the return value, never throws). */
 export async function captureEspnOddsForDate(
   date: string,
 ): Promise<OddsUpsertReport> {
@@ -59,7 +67,7 @@ export async function captureEspnOddsForDate(
   const espnRows = await fetchEspnOddsForDate(date);
   const byMatchup = indexOddsByMatchup(espnRows);
 
-  const upsertRows: Array<{
+  const insertRows: Array<{
     sport: string; date: string; game_pk: number;
     book: string; source: string;
     away_ml_odds: number | null; home_ml_odds: number | null;
@@ -82,7 +90,7 @@ export async function captureEspnOddsForDate(
     }
     matched++;
     if (typeof odds.awayMl === "number" && typeof odds.homeMl === "number") withMl++;
-    upsertRows.push({
+    insertRows.push({
       sport: "mlb",
       date,
       game_pk: p.game_pk,
@@ -96,12 +104,10 @@ export async function captureEspnOddsForDate(
     });
   }
 
-  if (upsertRows.length > 0) {
-    const { error } = await sb
-      .from("daily_odds")
-      .upsert(upsertRows, { onConflict: "sport,date,game_pk,book" });
+  if (insertRows.length > 0) {
+    const { error } = await sb.from("daily_odds").insert(insertRows);
     if (error) {
-      throw new Error(`captureEspnOddsForDate(${date}): upsert: ${error.message}`);
+      throw new Error(`captureEspnOddsForDate(${date}): insert: ${error.message}`);
     }
   }
 
@@ -111,7 +117,7 @@ export async function captureEspnOddsForDate(
     espnGames: espnRows.length,
     matched,
     withMl,
-    upserted: upsertRows.length,
+    upserted: insertRows.length,
     unmatched,
   };
 }
@@ -139,7 +145,7 @@ export type FanDuelNrfiReport = {
   fanDuelGames: number;    // games FanDuel returned for this date
   matched: number;         // matched to a prediction by team-name pair
   withNrfi: number;        // matched rows with non-null NRFI + YRFI odds
-  upserted: number;        // rows written
+  upserted: number;        // rows appended
   unmatched: Array<{ awayName: string; homeName: string }>;
 };
 
@@ -172,7 +178,7 @@ export async function captureFanDuelNrfiForDate(
     predByPair.set(`${p.away_team_id}|${p.home_team_id}`, p.game_pk);
   }
 
-  const upsertRows: Array<{
+  const insertRows: Array<{
     sport: string; date: string; game_pk: number;
     book: string; source: string;
     away_ml_odds: number | null; home_ml_odds: number | null;
@@ -197,7 +203,7 @@ export async function captureFanDuelNrfiForDate(
     }
     matched++;
     if (typeof fd.nrfiOdds === "number" && typeof fd.yrfiOdds === "number") withNrfi++;
-    upsertRows.push({
+    insertRows.push({
       sport: "mlb",
       date,
       game_pk: gamePk,
@@ -212,12 +218,10 @@ export async function captureFanDuelNrfiForDate(
     void byMatchup; // index built but iterating fdRows directly is fine here
   }
 
-  if (upsertRows.length > 0) {
-    const { error } = await sb
-      .from("daily_odds")
-      .upsert(upsertRows, { onConflict: "sport,date,game_pk,book" });
+  if (insertRows.length > 0) {
+    const { error } = await sb.from("daily_odds").insert(insertRows);
     if (error) {
-      throw new Error(`captureFanDuelNrfiForDate(${date}): upsert: ${error.message}`);
+      throw new Error(`captureFanDuelNrfiForDate(${date}): insert: ${error.message}`);
     }
   }
 
@@ -227,7 +231,7 @@ export async function captureFanDuelNrfiForDate(
     fanDuelGames: fdRows.length,
     matched,
     withNrfi,
-    upserted: upsertRows.length,
+    upserted: insertRows.length,
     unmatched,
   };
 }

@@ -357,7 +357,7 @@ async function main() {
   console.log("phase 2: load odds...");
   const sb = supabaseAdmin();
   const { data: oddsRows, error: oddsErr } = await sb
-    .from("daily_odds")
+    .from("daily_odds_first")
     .select("date, game_pk, book, away_ml_odds, home_ml_odds, nrfi_odds, yrfi_odds")
     .eq("sport", "mlb")
     .in("book", ["DraftKings", "FanDuel"])

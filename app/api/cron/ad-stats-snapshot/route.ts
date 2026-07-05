@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
-import { yesterdayInET } from "@/lib/dates";
+import { yesterdayInET, prevDay } from "@/lib/dates";
 import {
   getPublicAdStatsSnapshot,
   writeAdStatsSnapshot,
@@ -50,9 +50,32 @@ export async function GET(req: Request) {
     // ahead of the snapshot ensures yesterday's send is included in today's
     // rolling number. Edition date = yesterdayInET — the digest delivered
     // yesterday morning has had ~24h to accumulate opens by 5:50 AM ET.
+    //
+    // Also re-compute the two days PRIOR to yesterday. This is a bounded
+    // self-heal window: if an email.delivered webhook flurry lands late
+    // (Resend retries queued events for several days) or a prior day's
+    // aggregator ran with an incomplete event stream (webhook paused,
+    // Resend outage, whatever), the next morning's cron heals the row
+    // without any human intervention. 3-day window is a conservative
+    // trade — most webhook deliveries settle within 24h, but Resend's
+    // stated retry ceiling is ~72h. `includeActiveSubscribers` is only
+    // set for yesterday: sport-scoped active counts can't be
+    // reconstructed for historical days without a subscriber-history
+    // table, so the heal preserves whatever was written the first time.
     const dailyT0 = Date.now();
     const daily = await computeDailyMetric(sport, date, { includeActiveSubscribers: true });
     await writeDailyMetric(sport, date, daily);
+    const healDates = [prevDay(date), prevDay(prevDay(date))];
+    for (const healDate of healDates) {
+      try {
+        const healed = await computeDailyMetric(sport, healDate);
+        await writeDailyMetric(sport, healDate, healed);
+      } catch (e) {
+        // Heal is best-effort — a stale-date failure shouldn't take out
+        // yesterday's snapshot write above.
+        console.warn(`[ad-stats-snapshot] heal ${healDate} failed: ${(e as Error).message}`);
+      }
+    }
     const dailyMs = Date.now() - dailyT0;
 
     const t0 = Date.now();

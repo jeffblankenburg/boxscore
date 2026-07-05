@@ -106,10 +106,13 @@ async function backfillDate(date: string): Promise<{ matched: number; upserted: 
     });
   }
   if (rows.length > 0) {
-    const { error } = await sb
-      .from("daily_odds")
-      .upsert(rows, { onConflict: "sport,date,game_pk,book" });
-    if (error) throw new Error(`upsert(${date}): ${error.message}`);
+    // daily_odds is append-only (migration 0071). Backfill treats each
+    // run as a fresh capture; if you re-run the same date, you'll get
+    // duplicate rows at slightly different captured_at. That's fine
+    // because daily_odds_first surfaces the earliest row for legacy
+    // "opening price" reads.
+    const { error } = await sb.from("daily_odds").insert(rows);
+    if (error) throw new Error(`insert(${date}): ${error.message}`);
   }
   return {
     matched: rows.length,

@@ -7,6 +7,7 @@ import {
   warmPredictionsPage,
 } from "@/lib/sports/mlb/predictions-cache";
 import { siteOrigin } from "@/lib/site";
+import { mlClv, nrfiClv } from "@/lib/sports/mlb/clv";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -20,8 +21,10 @@ function isAuthorized(req: Request): boolean {
 
 // Bits of daily_raw.payload we read for scoring.
 type DailyRawLineInning = { num?: number; home?: { runs?: number }; away?: { runs?: number } };
+type DailyRawLineTeam   = { runs?: number; hits?: number; errors?: number };
 type DailyRawScheduleGame = {
   gamePk?: number;
+  gameDate?: string;                                          // ISO UTC; scheduled first pitch
   status?: { abstractGameState?: string; detailedState?: string };
   teams?: {
     away?: { score?: number; team?: { id?: number } };
@@ -30,8 +33,8 @@ type DailyRawScheduleGame = {
   linescore?: {
     innings?: DailyRawLineInning[];
     teams?: {
-      away?: { runs?: number };
-      home?: { runs?: number };
+      away?: DailyRawLineTeam;
+      home?: DailyRawLineTeam;
     };
   };
 };
@@ -53,13 +56,48 @@ type DailyRawBoxGame = {
   linescore?: DailyRawBoxLinescore;
 };
 
+// Full linescore shape written into prediction_results.linescore. Matches
+// SeasonHistoryLinescore in lib/sports/mlb/predictions-history.ts, which
+// is what the /mlb/predictions Season Picks table reads. Before this,
+// only scripts/backfill-prediction-linescore.ts populated the column —
+// so days after the last manual backfill run rendered as "AWAY @ HOME"
+// with no box score (observed 7/5: null linescores from 7/1 onward).
+// Now the comparator writes it on every scoring pass.
+type Linescore = {
+  innings: Array<{ a: number | null; h: number | null }>;
+  away: { r: number | null; h: number | null; e: number | null };
+  home: { r: number | null; h: number | null; e: number | null };
+};
+
 type GameOutcome = {
   status: string;
   awayScore: number | null;
   homeScore: number | null;
   awayFirstInning: number | null;
   homeFirstInning: number | null;
+  linescore: Linescore | null;
 };
+
+function extractLinescore(scheduleGame: DailyRawScheduleGame): Linescore | null {
+  const ls = scheduleGame.linescore;
+  if (!ls) return null;
+  const innings = (ls.innings ?? []).map((i) => ({
+    a: typeof i.away?.runs === "number" ? i.away.runs : null,
+    h: typeof i.home?.runs === "number" ? i.home.runs : null,
+  }));
+  const away = {
+    r: ls.teams?.away?.runs   ?? null,
+    h: ls.teams?.away?.hits   ?? null,
+    e: ls.teams?.away?.errors ?? null,
+  };
+  const home = {
+    r: ls.teams?.home?.runs   ?? null,
+    h: ls.teams?.home?.hits   ?? null,
+    e: ls.teams?.home?.errors ?? null,
+  };
+  if (innings.length === 0 && away.r === null && home.r === null) return null;
+  return { innings, away, home };
+}
 
 function gameOutcomeFromRaw(
   gamePk: number,
@@ -93,6 +131,7 @@ function gameOutcomeFromRaw(
     status, awayScore, homeScore,
     awayFirstInning: inning1Away,
     homeFirstInning: inning1Home,
+    linescore: extractLinescore(scheduleGame),
   };
 }
 
@@ -177,8 +216,89 @@ export async function GET(req: Request) {
     .limit(1);
   const payload = (rawRows?.[0]?.payload as DailyRawPayload | undefined) ?? {};
 
+  // 2b. Derive open + close prices per game from daily_odds (append-only
+  // since migration 0071). "Open" = earliest capture per (game, book);
+  // "close" = latest capture whose captured_at is still strictly BEFORE
+  // that game's scheduled first pitch (from schedule.gameDate). This is
+  // the sharp definition — we want the market's last word on the game
+  // before it locked, not any capture that happened after first pitch
+  // (which would be a delisted or in-play line for the afternoon slate).
+  // ML lines from ESPN→DraftKings; NRFI from FanDuel.
+  type OddsCaptureRow = {
+    game_pk: number;
+    book: string;
+    captured_at: string;
+    away_ml_odds: number | null;
+    home_ml_odds: number | null;
+    nrfi_odds: number | null;
+    yrfi_odds: number | null;
+  };
+  const { data: oddsCaptures } = await sb.from("daily_odds")
+    .select("game_pk, book, captured_at, away_ml_odds, home_ml_odds, nrfi_odds, yrfi_odds")
+    .eq("sport", sport).eq("date", date)
+    .in("book", ["DraftKings", "FanDuel"])
+    .order("captured_at", { ascending: true });
+
+  // Build first-pitch time per gamePk from the schedule payload. Games
+  // without a gameDate (rare — mostly stub rows for TBD reschedules)
+  // treat "close" as "any capture on this date" i.e. we fall back to the
+  // latest capture regardless of time.
+  const firstPitchByPk = new Map<number, number>();      // gamePk → epoch ms
+  for (const scheduleDate of payload.schedule?.dates ?? []) {
+    for (const g of scheduleDate.games ?? []) {
+      if (typeof g.gamePk === "number" && typeof g.gameDate === "string") {
+        const ms = Date.parse(g.gameDate);
+        if (Number.isFinite(ms)) firstPitchByPk.set(g.gamePk, ms);
+      }
+    }
+  }
+
+  type OddsPickPerBook = {
+    open: OddsCaptureRow | null;
+    close: OddsCaptureRow | null;
+  };
+  const perGameByBook = new Map<number, { DraftKings: OddsPickPerBook; FanDuel: OddsPickPerBook }>();
+  for (const cap of ((oddsCaptures ?? []) as OddsCaptureRow[])) {
+    if (cap.book !== "DraftKings" && cap.book !== "FanDuel") continue;
+    let entry = perGameByBook.get(cap.game_pk);
+    if (!entry) {
+      entry = {
+        DraftKings: { open: null, close: null },
+        FanDuel:    { open: null, close: null },
+      };
+      perGameByBook.set(cap.game_pk, entry);
+    }
+    const slot = entry[cap.book as "DraftKings" | "FanDuel"];
+    // Rows are pre-sorted by captured_at ASC, so the FIRST match sets
+    // open and any later match overwrites close — as long as it's still
+    // before first pitch (or unbounded when we lack a first-pitch time).
+    if (slot.open === null) slot.open = cap;
+    const capMs = Date.parse(cap.captured_at);
+    const pitchMs = firstPitchByPk.get(cap.game_pk) ?? Number.POSITIVE_INFINITY;
+    if (Number.isFinite(capMs) && capMs < pitchMs) slot.close = cap;
+  }
+
+  function pickForGame(gp: number) {
+    const entry = perGameByBook.get(gp);
+    const dkOpen  = entry?.DraftKings.open  ?? null;
+    const dkClose = entry?.DraftKings.close ?? null;
+    const fdOpen  = entry?.FanDuel.open     ?? null;
+    const fdClose = entry?.FanDuel.close    ?? null;
+    return {
+      open_away_ml_odds:  dkOpen?.away_ml_odds  ?? null,
+      open_home_ml_odds:  dkOpen?.home_ml_odds  ?? null,
+      close_away_ml_odds: dkClose?.away_ml_odds ?? null,
+      close_home_ml_odds: dkClose?.home_ml_odds ?? null,
+      open_nrfi_odds:  fdOpen?.nrfi_odds  ?? null,
+      open_yrfi_odds:  fdOpen?.yrfi_odds  ?? null,
+      close_nrfi_odds: fdClose?.nrfi_odds ?? null,
+      close_yrfi_odds: fdClose?.yrfi_odds ?? null,
+    };
+  }
+
   // 3. Score each prediction and upsert.
   const rows = preds.map((p) => {
+    const odds = pickForGame(p.game_pk);
     const outcome = gameOutcomeFromRaw(p.game_pk, payload.schedule, payload.games);
     if (!outcome) {
       return {
@@ -189,6 +309,8 @@ export async function GET(req: Request) {
         actual_winner: null, actual_nrfi: null,
         win_correct: null, nrfi_correct: null,
         win_brier: null, nrfi_brier: null,
+        linescore: null,
+        ...odds,
       };
     }
     const derived = scoreOne(p, outcome);
@@ -199,7 +321,9 @@ export async function GET(req: Request) {
       home_score: outcome.homeScore,
       away_first_inning: outcome.awayFirstInning,
       home_first_inning: outcome.homeFirstInning,
+      linescore: outcome.linescore,
       ...derived,
+      ...odds,
     };
   });
 
@@ -210,11 +334,107 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Linescore self-heal. Since 2026-07-05 the comparator writes the
+  // linescore JSONB inline on every scoring pass, but rows scored before
+  // that day (and rows the pre-2026-07-05 comparator wrote for the days
+  // 07-01/07-03/07-04 without linescore) still show `null` on the Season
+  // Picks table on /mlb/predictions. Scan the last 7 days for any row
+  // with null linescore, fetch each date's daily_raw once, and update.
+  // Bounded work — the null-set gets smaller over time and eventually
+  // this heal becomes a no-op.
+  let healedCount = 0;
+  try {
+    const healStart = new Date(date + "T00:00:00Z");
+    healStart.setUTCDate(healStart.getUTCDate() - 7);
+    const healStartIso = healStart.toISOString().slice(0, 10);
+    const { data: healRows } = await sb.from("prediction_results")
+      .select("date, game_pk")
+      .eq("sport", sport)
+      .gte("date", healStartIso)
+      .lte("date", date)
+      .is("linescore", null);
+    const nullByDate = new Map<string, number[]>();
+    for (const r of (healRows ?? []) as Array<{ date: string; game_pk: number }>) {
+      const list = nullByDate.get(r.date) ?? [];
+      list.push(r.game_pk);
+      nullByDate.set(r.date, list);
+    }
+    for (const [healDate, gamePks] of nullByDate) {
+      // The date we're currently scoring already used its daily_raw in
+      // the main pass — no need to re-fetch. For prior days pull once
+      // per date.
+      let healPayload: DailyRawPayload = payload;
+      if (healDate !== date) {
+        const { data: healRaw } = await sb.from("daily_raw")
+          .select("payload").eq("sport", sport).eq("date", healDate).limit(1);
+        healPayload = (healRaw?.[0]?.payload as DailyRawPayload | undefined) ?? {};
+      }
+      for (const gamePk of gamePks) {
+        const scheduleGame = (healPayload.schedule?.dates ?? [])
+          .flatMap((d) => d.games ?? [])
+          .find((g) => g.gamePk === gamePk);
+        if (!scheduleGame) continue;
+        const ls = extractLinescore(scheduleGame);
+        if (!ls) continue;
+        const { error: updateErr } = await sb.from("prediction_results")
+          .update({ linescore: ls })
+          .eq("sport", sport)
+          .eq("date", healDate)
+          .eq("game_pk", gamePk);
+        if (updateErr) {
+          console.warn(`[predictions-comparator] heal ${healDate}/${gamePk} failed: ${updateErr.message}`);
+          continue;
+        }
+        healedCount++;
+      }
+    }
+  } catch (e) {
+    // Heal is best-effort — a failure here shouldn't fail the whole cron.
+    console.warn(`[predictions-comparator] linescore heal failed: ${(e as Error).message}`);
+  }
+
   // Quick rollup so the cron logs convey what happened.
   const final = rows.filter((r) => r.win_correct !== null);
   const winHits = final.filter((r) => r.win_correct).length;
   const nrfiFinal = rows.filter((r) => r.nrfi_correct !== null);
   const nrfiHits = nrfiFinal.filter((r) => r.nrfi_correct).length;
+
+  // CLV rollup. Per-side de-vigged CLV in probability points; positive
+  // = we took a better price than the market closed at. We report the
+  // ML CLV averaged across the home-picked side (predictions.ts always
+  // picks home when it plays ML; see winPlayFor) and the NRFI CLV
+  // averaged across whichever side we picked (nrfi_pct >= 0.5 → NRFI,
+  // else YRFI). Games missing either open or close odds are excluded
+  // from the denominator. Uses ALL games on the slate, not just plays
+  // that cleared threshold, because CLV is a MODEL-level signal — the
+  // question "does our probability move in the market's direction?" is
+  // meaningful even on games we wouldn't have bet.
+  let mlClvCount = 0, mlClvSum = 0;
+  let nrfiClvCount = 0, nrfiClvSum = 0;
+  for (const r of rows) {
+    const ml = mlClv({
+      openAwayOdds:  r.open_away_ml_odds,
+      openHomeOdds:  r.open_home_ml_odds,
+      closeAwayOdds: r.close_away_ml_odds,
+      closeHomeOdds: r.close_home_ml_odds,
+    });
+    // We pick the model's favored side. Home when home_win_pct > 0.5,
+    // else away. (winPlayFor picks the home side above threshold; for
+    // rollup we want the modeled favorite regardless of threshold.)
+    const mlSide = Number(r.home_win_pct) >= 0.5 ? ml.home : ml.away;
+    if (mlSide !== null) { mlClvSum += mlSide; mlClvCount++; }
+
+    const nrfi = nrfiClv({
+      openNrfiOdds:  r.open_nrfi_odds,
+      openYrfiOdds:  r.open_yrfi_odds,
+      closeNrfiOdds: r.close_nrfi_odds,
+      closeYrfiOdds: r.close_yrfi_odds,
+    });
+    const nrfiSide = Number(r.nrfi_pct) >= 0.5 ? nrfi.nrfi : nrfi.yrfi;
+    if (nrfiSide !== null) { nrfiClvSum += nrfiSide; nrfiClvCount++; }
+  }
+  const mlClvAvg   = mlClvCount   > 0 ? mlClvSum   / mlClvCount   : null;
+  const nrfiClvAvg = nrfiClvCount > 0 ? nrfiClvSum / nrfiClvCount : null;
 
   // Refresh the /mlb/predictions render cache for TODAY, bust the
   // route cache, and warm it with a real request so the cron itself
@@ -242,6 +462,11 @@ export async function GET(req: Request) {
     finals: final.length,
     win_accuracy: final.length > 0 ? winHits / final.length : null,
     nrfi_accuracy: nrfiFinal.length > 0 ? nrfiHits / nrfiFinal.length : null,
+    ml_clv_pp: mlClvAvg,
+    ml_clv_n: mlClvCount,
+    nrfi_clv_pp: nrfiClvAvg,
+    nrfi_clv_n: nrfiClvCount,
+    linescore_healed: healedCount,
     ...(cacheError ? { cache_error: cacheError } : {}),
     ...(warm ? { warm_status: warm.status, warm_ms: warm.durationMs } : {}),
   });

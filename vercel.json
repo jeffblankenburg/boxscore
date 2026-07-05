@@ -61,8 +61,8 @@
       "schedule": "30 14 * * *"
     },
     {
-      "path": "/api/cron/odds-fanduel-nrfi?sport=mlb",
-      "schedule": "0 19 * * *"
+      "path": "/api/cron/predictions-odds-poll?sport=mlb",
+      "schedule": "*/30 15-23,0-3 * * *"
     },
     {
       "path": "/api/cron/fantasy-snapshot?sport=mlb",

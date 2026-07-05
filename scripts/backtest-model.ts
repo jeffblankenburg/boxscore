@@ -145,7 +145,7 @@ async function loadGradedSeason(startIso: string, endIso: string): Promise<Grade
 async function loadOdds(startIso: string, endIso: string): Promise<Map<string, GameOdds>> {
   const sb = supabaseAdmin();
   const { data, error } = await sb
-    .from("daily_odds")
+    .from("daily_odds_first")
     .select("date, game_pk, book, away_ml_odds, home_ml_odds, nrfi_odds, yrfi_odds")
     .eq("sport", "mlb")
     .in("book", ["DraftKings", "FanDuel"])

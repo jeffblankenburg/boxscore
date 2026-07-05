@@ -241,7 +241,7 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
       .gte("date", startIso)
       .lte("date", endIso)
       .range(from, to)),
-    paginateSelect<DkOddsRow>((from, to) => sb.from("daily_odds")
+    paginateSelect<DkOddsRow>((from, to) => sb.from("daily_odds_first")
       .select("date, game_pk, home_ml_odds")
       .eq("sport", "mlb").eq("book", "DraftKings")
       .gte("date", startIso).lte("date", endIso)
@@ -434,7 +434,7 @@ export type DayOdds = {
  *  the caller can silently render "—" for a missing price. */
 export async function loadOddsForDate(date: string): Promise<DayOdds> {
   const sb = supabaseAdmin();
-  const { data, error } = await sb.from("daily_odds")
+  const { data, error } = await sb.from("daily_odds_first")
     .select("date, game_pk, book, away_ml_odds, home_ml_odds, nrfi_odds, yrfi_odds")
     .eq("sport", "mlb")
     .eq("date", date)
@@ -481,7 +481,7 @@ export async function loadPlayRoi(
       .gte("date", startIso)
       .lte("date", endIso)
       .range(from, to)),
-    paginateSelect<OddsRowWithBook>((from, to) => sb.from("daily_odds")
+    paginateSelect<OddsRowWithBook>((from, to) => sb.from("daily_odds_first")
       .select("date, game_pk, book, away_ml_odds, home_ml_odds, nrfi_odds, yrfi_odds")
       .eq("sport", "mlb")
       .in("book", ["DraftKings", "FanDuel"])
@@ -651,7 +651,7 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
       .lte("date", endIso)
       .range(from, to)),
     paginateSelect<{ date: string; game_pk: number; home_ml_odds: number | null }>((from, to) =>
-      sb.from("daily_odds")
+      sb.from("daily_odds_first")
         .select("date, game_pk, home_ml_odds")
         .eq("sport", "mlb").eq("book", "DraftKings")
         .gte("date", startIso).lte("date", endIso)

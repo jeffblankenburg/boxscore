@@ -98,8 +98,19 @@ async function aggregateEventsForResendIds(ids: string[]): Promise<EventTotals> 
       else if (e.event_type === "email.clicked") clickedSet.add(e.resend_id);
     }
   }
+  // Delivered denominator: prefer Resend's email.delivered confirmations
+  // (canonical), fall back to the number of sends we successfully handed
+  // to Resend (`ids.length`) when the webhook stream is silent. This
+  // keeps the open-rate calculation resilient to Resend webhook outages
+  // — the 2026-07-02→07-05 gap was caused by a paused webhook + zero
+  // deliveredSet size, which zeroed out delivered even though our own
+  // boxscore.opened pixel kept firing normally. `ids` is already
+  // filtered to `error IS NULL` in fetchSendResendIds, so it represents
+  // "handed to Resend without error", the tightest send-side denominator
+  // we can compute without Resend confirmations.
+  const delivered = deliveredSet.size > 0 ? deliveredSet.size : ids.length;
   return {
-    delivered: deliveredSet.size,
+    delivered,
     opened:    openedSet.size,
     clicked:   clickedSet.size,
   };
