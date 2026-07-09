@@ -21,6 +21,30 @@ export async function getDigest(sport: string, date: string): Promise<Digest | n
   return data ?? null;
 }
 
+/**
+ * Returns the most recent in-season digest for a sport. Used by the
+ * bookmarkable /[sport] landing page so it stays fresh between midnight
+ * ET and the ~5 AM ET generate cron — the yesterday-in-ET row doesn't
+ * exist yet during that window, and returning a 404 for a bookmarkable
+ * URL is worse than showing the previous day's content.
+ *
+ * Filters on IN_SEASON_MODES so the page doesn't fall back to a stale
+ * preseason placeholder during the offseason. Callers that want the
+ * placeholder should ask for it explicitly by date via getDigest.
+ */
+export async function getLatestDigest(sport: string): Promise<Digest | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("daily_digests")
+    .select("sport, date, generated_at, game_count, mode, html, email_html")
+    .eq("sport", sport)
+    .in("mode", IN_SEASON_MODES)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle<Digest>();
+  if (error) throw new Error(`getLatestDigest: ${error.message}`);
+  return data ?? null;
+}
+
 // In-season modes — preseason and offseason rows exist in the cache but
 // represent placeholder pages, not navigable content.
 const IN_SEASON_MODES = ["regular", "no-games", "all-star", "postseason"];

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getDigest } from "@/lib/digests";
+import { getLatestDigest } from "@/lib/digests";
 import { prettyDate, yesterdayInET, nextDay } from "@/lib/dates";
 import { getSportById, isSportVisible } from "@/lib/sports";
 import { EMAIL_LINK_BASE } from "@/lib/site";
@@ -20,14 +20,19 @@ export async function generateMetadata({
   params: Promise<{ sport: string }>;
 }) {
   const { sport } = await params;
-  const row = await getSportById(sport);
+  const row = getSportById(sport);
   if (!row || row.visibility !== "public") return {};
   // Title shows the edition date (when the email goes out) rather than the
   // games date — matches the dateline at the top of the page and the way
   // a newspaper labels its day. Canonical points to the dated URL so the
   // bookmarkable /[sport] alias doesn't split ranking signal from the
-  // dated /[sport]/[date] page that serves the same content.
-  const editionDateIso = nextDay(yesterdayInET());
+  // dated /[sport]/[date] page that serves the same content. Read the
+  // latest available digest so the title/canonical match what the body
+  // will actually render (during the midnight-to-5AM window, "latest" is
+  // yesterday's edition, not today's).
+  const latest = await getLatestDigest(sport);
+  if (!latest) return {};
+  const editionDateIso = nextDay(latest.date);
   const editionDate = prettyDate(editionDateIso);
   return {
     title: `${row.name} Box Scores — ${editionDate} | boxscore`,
@@ -46,12 +51,16 @@ export default async function SportLatest({
   searchParams: Promise<{ paper?: string }>;
 }) {
   const { sport } = await params;
-  if (!(await isSportVisible(sport))) notFound();
+  if (!isSportVisible(sport)) notFound();
 
-  const date = yesterdayInET();
-  const digest = await getDigest(sport, date);
+  // Ask for the newest in-season digest rather than yesterday-in-ET. Between
+  // midnight ET and the ~5 AM ET generate cron, yesterday-in-ET has no row
+  // yet — the bookmarkable URL 404'd during that ~5-hour window before this
+  // fix. Latest-available preserves the "always shows fresh content" story.
+  const digest = await getLatestDigest(sport);
   if (!digest) notFound();
 
+  const date = digest.date;
   const { paper } = await searchParams;
   const paperMode = paper === "1";
   const editionDate = nextDay(date);
