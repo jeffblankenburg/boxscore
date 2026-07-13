@@ -28,6 +28,25 @@ export function sortGamesCanonically(games: MlbGame[]): MlbGame[] {
   });
 }
 
+// All-Star rosters for the "all-star-preview" edition (day before the ASG).
+// Each player carries a display-ready first-half season line — the ASG game's
+// own boxscore seasonStats is just the game line, so these come from a real
+// per-player season-stats fetch at raw-build time. Rate stats stay as display
+// strings (".247", "2.21") like the rest of the canonical model.
+export type AsgHitter = {
+  name: string; mlbId: number | null; pos: string; team: string; // team = abbreviation
+  order: number | null; // 1-9 batting-order slot once the lineup is announced; null = reserve
+  hr: number | null; rbi: number | null; ab: number | null;
+  avg: string | null; ops: string | null;
+};
+export type AsgPitcher = {
+  name: string; mlbId: number | null; role: "SP" | "RP"; team: string; // role derived from gamesStarted
+  starter: boolean; // true = announced ASG starting pitcher
+  ip: string | null; er: number | null; bb: number | null; k: number | null; era: string | null;
+};
+export type AsgSide = { hitters: AsgHitter[]; pitchers: AsgPitcher[] };
+export type AsgRosters = { AL: AsgSide; NL: AsgSide };
+
 export type CanonicalDailyData = {
   date:         string;                       // ISO YYYY-MM-DD
   games:        MlbGame[];
@@ -38,4 +57,6 @@ export type CanonicalDailyData = {
   wildCard:     MlbWildCardStandings[];       // one entry per league (AL, NL)
   leaderboards: MlbLeaderboard[];
   transactions: MlbTransaction[];
+  // Present only on the day before the All-Star Game (all-star-preview mode).
+  allStarRosters?: AsgRosters | null;
 };

@@ -14,7 +14,10 @@ const cspReportOnly = [
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
   "connect-src 'self' https://us.i.posthog.com https://us-assets.i.posthog.com https://vitals.vercel-insights.com https://in.getclicky.com https://api.actionnetwork.com",
-  "frame-ancestors 'none'",
+  // 'self' (not 'none') so first-party admin tools can iframe our own pages
+  // — e.g. /admin/preview embeds /admin/preview/[sport]/frame. Cross-origin
+  // framing (clickjacking) is still blocked.
+  "frame-ancestors 'self'",
   "form-action 'self'",
   "base-uri 'self'",
   "object-src 'none'",
@@ -23,7 +26,9 @@ const cspReportOnly = [
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
+  // SAMEORIGIN (not DENY) so first-party admin tools can iframe our own
+  // pages (see /admin/preview). Still blocks cross-origin clickjacking.
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
   // Start in report-only so we can see violations without breaking pages.

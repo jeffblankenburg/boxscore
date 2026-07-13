@@ -10,7 +10,7 @@
 // /admin/preview/canonical/[date]?source=statsapi&surface=web is the
 // validation surface for that contract.
 
-import type { CanonicalDailyData } from "../canonical";
+import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher } from "../canonical";
 import type {
   MlbBoxPlayer,
   MlbBoxScore,
@@ -24,6 +24,7 @@ import type {
   MlbLeaderCategory,
   MlbLeague,
   MlbPlayerRef,
+  MlbProbablePitcher,
   MlbScoringPlay,
   MlbStandingRow,
   MlbTransaction,
@@ -34,7 +35,7 @@ import type { DigestMode } from "@/lib/digest-mode";
 import { findTeam } from "@/lib/teams";
 import { nextDay, prettyDate, issueNumber, volumeNumber } from "@/lib/dates";
 import { lastName } from "@/lib/names";
-import { lastNameLinkWeb } from "@/lib/player-links";
+import { lastNameLinkWeb, fullNameLinkWeb } from "@/lib/player-links";
 
 // ─── Display tables (name-keyed) ─────────────────────────────────────────
 // Kept local rather than imported from lib/render.ts so this file stands
@@ -223,7 +224,7 @@ function diffAttrs(hl: HighlightMap, key: string, extra: string = ""): string {
 const POSTSEASON_TYPES = new Set(["wild-card", "division-series", "lcs", "world-series"]);
 const PRESEASON_TYPES  = new Set(["spring", "exhibition"]);
 
-function classifyMode(games: MlbGame[], date: string): DigestMode {
+function classifyMode(games: MlbGame[], date: string, nextDayGames: MlbGame[] = []): DigestMode {
   const types = new Set(games.map((g) => g.gameType));
   if (types.has("all-star")) return "all-star";
   for (const t of types) if (POSTSEASON_TYPES.has(t)) return "postseason";
@@ -231,6 +232,11 @@ function classifyMode(games: MlbGame[], date: string): DigestMode {
   for (const t of types) if (PRESEASON_TYPES.has(t)) return "preseason";
   const month = Number(date.slice(5, 7));
   if (month === 11 || month === 12 || month === 1 || month === 2) return "offseason";
+  // In-season with no games = the All-Star break (MLB has no other empty days).
+  // Day before the ASG (tomorrow's slate is the ASG) → preview; any other empty
+  // July day is a post-ASG break day → mid-season first-half recap.
+  if (nextDayGames.some((g) => g.gameType === "all-star")) return "all-star-preview";
+  if (month === 7) return "mid-season";
   return "no-games";
 }
 
@@ -304,7 +310,7 @@ export function renderCanonicalWeb(data: CanonicalDailyData, hl?: HighlightMap):
     issue:  issueNumber(editionDate),
   };
   const teamRecords = buildTeamRecordMap(data.standings);
-  const mode = classifyMode(data.games, data.date);
+  const mode = classifyMode(data.games, data.date, data.nextDayGames);
 
   if (mode === "no-games") {
     return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
@@ -336,6 +342,48 @@ ${renderAllStarGame(data, hl)}
 ${renderTransactions(data.transactions, hl)}`;
   }
 
+  // Day before the ASG: masthead + AL/NL rosters (with first-half season
+  // lines) + pitching matchup, then the normal first-half standings/leaders.
+  if (mode === "all-star-preview") {
+    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+
+${asgMasthead(data)}
+
+${asgMatchupByline(data)}
+
+${renderAsgRosters(data)}
+
+<div class="section">
+  ${renderLeague("American League", "AL", data, hl)}
+</div>
+
+<div class="section">
+  ${renderLeague("National League", "NL", data, hl)}
+</div>
+
+${renderTransactions(data.transactions, hl)}`;
+  }
+
+  // Day after the ASG: first-half recap — standings + extended leaders +
+  // Today's Games (second half resumes).
+  if (mode === "mid-season") {
+    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+
+<div class="asg-edition">First-Half Recap</div>
+
+<div class="section">
+  ${renderLeague("American League", "AL", data, hl, 10)}
+</div>
+
+<div class="section">
+  ${renderLeague("National League", "NL", data, hl, 10)}
+</div>
+
+${renderTodaysGames(data.nextDayGames, teamRecords, hl)}
+
+${renderTransactions(data.transactions, hl)}`;
+  }
+
   return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
 
 <div class="section">
@@ -354,6 +402,86 @@ ${renderTodaysGames(data.nextDayGames, teamRecords, hl)}
 ${renderGames(data, hl)}
 
 ${renderTransactions(data.transactions, hl)}`;
+}
+
+// ─── All-Star preview edition helpers ────────────────────────────────────
+
+// Masthead: kicker + stars + headline + a sub-line built from the ASG game
+// (matchup, venue, first pitch) — all real data, no placeholders.
+function asgMasthead(data: CanonicalDailyData): string {
+  const asg = data.nextDayGames.find((g) => g.gameType === "all-star");
+  let sub = "";
+  if (asg) {
+    const matchup = `${esc(asg.awayTeam.name)} vs. ${esc(asg.homeTeam.name)}`;
+    // Venue + first pitch travel together; on narrow screens they drop to
+    // their own line (before "Truist Park") rather than splitting mid-venue.
+    const loc = [asg.venueName ? esc(asg.venueName) : null, esc(timeInET(asg.startTime))]
+      .filter(Boolean).join(" &middot; ");
+    sub = `<div class="asg-venue">${matchup}<span class="asg-venue-sep"> &middot; </span><span class="asg-venue-loc">${loc}</span></div>`;
+  }
+  return `<div class="asg-mast">
+  <div class="asg-kicker">Midsummer Classic &middot; Special Edition</div>
+  <div class="asg-stars">&#9733; &#9733; &#9733;</div>
+  <h1 class="asg-headline">The All-Star Game</h1>
+  ${sub}
+</div>`;
+}
+
+// Pitching matchup byline — same "(W-L, ERA)" shape as the Today's Games strip.
+function asgMatchupByline(data: CanonicalDailyData): string {
+  const asg = data.nextDayGames.find((g) => g.gameType === "all-star");
+  if (!asg) return "";
+  const fmt = (p: MlbProbablePitcher | null): string => {
+    if (!p) return `<span class="asg-matchup-p">TBD</span>`;
+    const detail: string[] = [];
+    if (p.wins != null && p.losses != null) detail.push(`${p.wins}-${p.losses}`);
+    if (p.era != null && Number.isFinite(p.era)) detail.push(p.era.toFixed(2));
+    const label = detail.length ? `${esc(p.fullName)} (${detail.join(", ")})` : esc(p.fullName);
+    return `<span class="asg-matchup-p">${label}</span>`;
+  };
+  return `<div class="asg-matchup"><span class="asg-matchup-label">Pitching Matchup</span> ${fmt(asg.awayProbablePitcher)} vs ${fmt(asg.homeProbablePitcher)}</div>`;
+}
+
+function asgHitterTable(hitters: AsgHitter[]): string {
+  if (hitters.length === 0) return "";
+  const rows = hitters.map((p) => `<tr>
+    <td class="p-col"><span class="rtag">${esc(p.pos)}</span> ${fullNameLinkWeb({ id: p.mlbId, fullName: p.name })} <span class="rtm">${esc(p.team)}</span></td>
+    <td>${pad(p.hr)}</td><td>${pad(p.rbi)}</td><td>${pad(p.ab)}</td><td>${p.avg ?? "—"}</td><td>${p.ops ?? "—"}</td>
+  </tr>`).join("");
+  return `<table class="asg-roster"><thead><tr><th class="p-col">Player</th><th>HR</th><th>RBI</th><th>AB</th><th>AVG</th><th>OPS</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function asgPitcherTable(pitchers: AsgPitcher[]): string {
+  if (pitchers.length === 0) return "";
+  const rows = pitchers.map((p) => `<tr>
+    <td class="p-col"><span class="rtag">${esc(p.role)}</span> ${fullNameLinkWeb({ id: p.mlbId, fullName: p.name })} <span class="rtm">${esc(p.team)}</span></td>
+    <td>${p.ip ?? "—"}</td><td>${pad(p.er)}</td><td>${pad(p.bb)}</td><td>${pad(p.k)}</td><td>${p.era ?? "—"}</td>
+  </tr>`).join("");
+  return `<table class="asg-roster"><thead><tr><th class="p-col">Player</th><th>IP</th><th>ER</th><th>BB</th><th>K</th><th>ERA</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function asgRosterCard(label: string, side: AsgSide | undefined): string {
+  if (!side) return "";
+  const starters = side.hitters.filter((h) => h.order != null);
+  const bench    = side.hitters.filter((h) => h.order == null);
+  const sp       = side.pitchers.filter((p) => p.starter);
+  const bullpen  = side.pitchers.filter((p) => !p.starter);
+  // Once the lineup is announced (starters present), split starters vs. the
+  // rest; before that, fall back to the flat roster tables.
+  const body = starters.length > 0
+    ? `<div class="stats-subheader">Starting Lineup</div>${asgHitterTable(starters)}
+       <div class="stats-subheader">Bench</div>${asgHitterTable(bench)}
+       <div class="stats-subheader">Starting Pitcher</div>${asgPitcherTable(sp)}
+       <div class="stats-subheader">Bullpen</div>${asgPitcherTable(bullpen)}`
+    : `<div class="stats-subheader">Position Players</div>${asgHitterTable(side.hitters)}
+       <div class="stats-subheader">Pitchers</div>${asgPitcherTable(side.pitchers)}`;
+  return `<div>
+  <div class="boxscores-title">${esc(label)}</div>
+  ${body}
+</div>`;
+}
+function renderAsgRosters(data: CanonicalDailyData): string {
+  const r = data.allStarRosters;
+  if (!r) return "";
+  return `<div class="league-layout">${asgRosterCard("American League", r.AL)}${asgRosterCard("National League", r.NL)}</div>`;
 }
 
 // ─── Dateline + transactions ─────────────────────────────────────────────

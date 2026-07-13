@@ -53,7 +53,7 @@ export async function getLatestTeamDigest(
   return data ?? null;
 }
 
-const IN_SEASON_MODES = ["regular", "no-games", "all-star", "postseason"];
+const IN_SEASON_MODES = ["regular", "no-games", "all-star-preview", "all-star", "mid-season", "postseason"];
 
 /**
  * Every in-season (team_slug, date) pair for the sport, newest first.

@@ -91,7 +91,7 @@ const LOGO_SIZE = 256;
 // Modes that correspond to a real digest page worth feeding. Offseason /
 // preseason placeholder rows are skipped — they exist in `daily_digests` to
 // give the archive page something to return, but aren't navigable content.
-const IN_SEASON_MODES = ["regular", "no-games", "all-star", "postseason"];
+const IN_SEASON_MODES = ["regular", "no-games", "all-star-preview", "all-star", "mid-season", "postseason"];
 
 type DigestRow = {
   date: string;

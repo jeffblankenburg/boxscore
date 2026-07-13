@@ -24,6 +24,7 @@ const PRESEASON_TYPES = new Set(["S", "E"]);
 export function classifyDigestMode(
   games: ScheduleGame[],
   date: string,
+  nextDayGames: ScheduleGame[] = [],
 ): DigestMode {
   const types = new Set(
     games.map((g) => g.gameType).filter((t): t is string => !!t),
@@ -35,11 +36,15 @@ export function classifyDigestMode(
   for (const t of types) if (PRESEASON_TYPES.has(t)) return "preseason";
 
   // No games on the date. Distinguish offseason (Nov-Feb gap between the WS
-  // and spring training) from in-season no-game days (ASG break, playoff
-  // travel days, occasional league-wide off-day).
+  // and spring training) from in-season no-game days — which for MLB are
+  // exclusively the All-Star break.
   const month = Number(date.slice(5, 7));
   if (month === 11 || month === 12 || month === 1 || month === 2) {
     return "offseason";
   }
+  // Day before the ASG (tomorrow's slate is the ASG) → preview; any other
+  // empty July day is a post-ASG break day → mid-season first-half recap.
+  if (nextDayGames.some((g) => g.gameType === "A")) return "all-star-preview";
+  if (month === 7) return "mid-season";
   return "no-games";
 }

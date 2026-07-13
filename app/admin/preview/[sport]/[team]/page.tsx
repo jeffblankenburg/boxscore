@@ -37,6 +37,19 @@ function asWidth(s: string | undefined, surface: "web" | "email"): string {
   return surface === "email" ? "email" : "full";
 }
 
+// Team digests classify per-team (game / no-game / offseason), independent of
+// the league DigestMode. These games_dates reliably produce each state so an
+// operator can eyeball a team's different-day layouts. "Game day" assumes the
+// team played that day (true for most on a full slate); if a team was off,
+// it'll show the no-game layout — pick another date. Values below are stored
+// as games_dates and shifted to edition_date (games + 1) in the dropdown, to
+// match this page's edition-date model.
+const TEAM_PREVIEW_DAYS: Array<{ label: string; games: string }> = [
+  { label: "Game day", games: "2025-09-24" },
+  { label: "No games (All-Star break)", games: "2025-07-14" },
+  { label: "Offseason", games: "2026-01-08" },
+];
+
 export default async function TeamPreviewPage({
   params,
   searchParams,
@@ -120,6 +133,24 @@ export default async function TeamPreviewPage({
                 </a>
               ))}
             </div>
+            <form method="get" className="preview-date-form">
+              <label className="preview-date-label">
+                <span>Day type</span>
+                {/* Values are games_dates shifted to edition_date (games + 1)
+                    so the URL date stays consistent with this page's model. */}
+                <select name="date" defaultValue="" className="admin-input">
+                  <option value="" disabled>Jump to day…</option>
+                  {TEAM_PREVIEW_DAYS.map((d) => (
+                    <option key={d.label} value={nextDay(d.games)}>{d.label}</option>
+                  ))}
+                </select>
+              </label>
+              <input type="hidden" name="surface" value={surface} />
+              <input type="hidden" name="width" value={width} />
+              <button type="submit" className="admin-btn admin-btn-small">
+                Go
+              </button>
+            </form>
             <a
               className="preview-popout"
               href={frameSrc}

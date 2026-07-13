@@ -117,6 +117,10 @@ export const EMAIL_STYLES = `
   @media only screen and (max-width: 480px) {
     .es-table td { font-size: 11px; padding: 1px 2px; }
     .es-table th { font-size: 9px; padding-bottom: 2px; }
+    /* ASG masthead: venue+time on their own line; matchup label above pitchers. */
+    .es-asg-venue-sep { display: none; }
+    .es-asg-venue-loc { display: block; }
+    .es-asg-matchup-label { display: block; margin-bottom: 2px; }
   }
   .es-totals td { font-weight: 700; border-top: 1px solid #161410; }
   /* Highlight for the subscriber's own team inside a standings table —
@@ -129,6 +133,20 @@ export const EMAIL_STYLES = `
   .es-fixed { table-layout: fixed; }
   .es-mut { color: #6a6354; font-size: 11px; }
   .es-no-games { font-size: 13px; font-style: italic; color: #6a6354; text-align: center; margin: 8px 0 12px; }
+
+  /* All-Star preview + mid-season editions (Source Sans, no serif). */
+  .es-asg-mast { text-align: center; padding: 2px 0 10px; margin: 0 0 14px; border-bottom: 3px double #161410; }
+  .es-asg-kicker { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: #6a6354; }
+  .es-asg-stars { font-size: 13px; letter-spacing: 0.5em; margin: 4px 0 2px; }
+  .es-asg-headline { font-size: 34px; font-weight: 800; font-style: italic; letter-spacing: -0.01em; margin: 2px 0 6px; }
+  .es-asg-venue { font-size: 12px; font-weight: 600; color: #6a6354; }
+  .es-asg-venue-loc { white-space: nowrap; }
+  .es-asg-matchup-p { white-space: nowrap; }
+  .es-asg-edition { text-align: center; font-size: 22px; font-weight: 800; font-style: italic; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 2px solid #161410; }
+  .es-asg-matchup { text-align: center; font-size: 13px; padding: 6px 0; margin: 0 0 12px; border-top: 1px solid #161410; border-bottom: 1px solid #161410; }
+  .es-asg-matchup-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .es-rtag { color: #6a6354; font-weight: 700; font-size: 10px; }
+  .es-rtm { color: #6a6354; font-size: 11px; }
   .es-asg-note { font-size: 11px; font-style: italic; color: #6a6354; text-align: center; margin: 4px 0 8px; }
   .es-edition { font-family: 'Source Sans 3', Helvetica, Arial, sans-serif; font-style: italic; font-weight: 800; font-size: 18px; text-align: center; margin: 0 0 8px; padding: 2px 0 6px; color: #161410; border-bottom: 1px solid #c4baa5; }
 

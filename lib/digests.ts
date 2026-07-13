@@ -46,8 +46,9 @@ export async function getLatestDigest(sport: string): Promise<Digest | null> {
 }
 
 // In-season modes — preseason and offseason rows exist in the cache but
-// represent placeholder pages, not navigable content.
-const IN_SEASON_MODES = ["regular", "no-games", "all-star", "postseason"];
+// represent placeholder pages, not navigable content. The All-Star break
+// editions (preview / recap / mid-season) are real content and belong here.
+const IN_SEASON_MODES = ["regular", "no-games", "all-star-preview", "all-star", "mid-season", "postseason"];
 
 /**
  * Every in-season games_date for the sport, newest first. Paginates around

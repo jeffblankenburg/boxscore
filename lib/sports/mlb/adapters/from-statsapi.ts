@@ -613,6 +613,9 @@ function leaderboardsFromRaw(
   return out;
 }
 
+// statsapi All-Star team IDs (stable): 159 = AL All-Stars, 160 = NL All-Stars.
+const ALL_STAR_TEAM_IDS = new Set([159, 160]);
+
 function transactionsFromRaw(
   txnRaw: unknown,
   date: string,
@@ -622,6 +625,9 @@ function transactionsFromRaw(
   const txns = env?.transactions ?? [];
   return txns
     .filter((t) => typeof t.description === "string" && t.description.length > 0)
+    // MLB files All-Star selection as a "trade" to the AL/NL All-Star teams
+    // (159/160). These aren't real roster moves — drop any txn touching them.
+    .filter((t) => !ALL_STAR_TEAM_IDS.has(t.fromTeam?.id ?? -1) && !ALL_STAR_TEAM_IDS.has(t.toTeam?.id ?? -1))
     .map<MlbTransaction>((t) => {
       const player: MlbPlayerRef | null = t.person?.id
         ? playerRef("statsapi", t.person.id, t.person.fullName ?? `Player ${t.person.id}`)
@@ -675,5 +681,7 @@ export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDai
     wildCard:     wildCardFromRaw(raw.wildCard, teamIdx),
     leaderboards: leaderboardsFromRaw(raw.leaders, teamIdx),
     transactions: transactionsFromRaw(raw.transactions, date, teamIdx),
+    // Already display-ready (built in fetchDailyRaw); pass straight through.
+    allStarRosters: raw.allStarRosters ?? null,
   };
 }

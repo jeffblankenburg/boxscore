@@ -273,6 +273,55 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 }
 .asg-leaders-grid .leaders-section { break-inside: avoid; }
 
+/* ─── All-Star preview + mid-season editions ─────────────────────────────
+   Source Sans throughout (matches the .dateline masthead — no Georgia). The
+   roster tables ride the global table system (14px, table-layout:fixed); only
+   the player-column width is set so the stat columns distribute evenly. */
+.asg-mast {
+  text-align: center; padding: 2px 0 12px; margin-bottom: 16px;
+  border-bottom: 3px double var(--border-strong);
+}
+.asg-kicker {
+  text-transform: uppercase; letter-spacing: 0.18em; font-size: 11px;
+  font-weight: 700; color: var(--text-muted);
+}
+.asg-stars { letter-spacing: 0.5em; font-size: 13px; margin: 6px 0 2px; }
+.asg-headline {
+  font-weight: 900; font-style: italic; letter-spacing: -0.02em;
+  font-size: clamp(34px, 7vw, 54px); line-height: 1; margin: 4px 0 8px;
+}
+.asg-venue { font-size: 12.5px; color: var(--text-secondary); font-weight: 600; }
+.asg-venue-loc { white-space: nowrap; }
+.asg-matchup-p { white-space: nowrap; }
+/* Narrow screens: venue+time drop to their own line (before the venue name,
+   never mid-name), and the matchup label sits above the pitchers. */
+@media (max-width: 480px) {
+  .asg-venue-sep { display: none; }
+  .asg-venue-loc { display: block; }
+  .asg-matchup-label { display: block; margin-bottom: 2px; }
+}
+.asg-edition {
+  text-align: center; font-weight: 900; font-style: italic; font-size: 26px;
+  margin: -6px 0 14px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border-strong);
+}
+.asg-matchup {
+  text-align: center; font-size: 13.5px; margin: 0 0 14px; padding: 7px 0;
+  border-top: 1px solid var(--border-strong); border-bottom: 1px solid var(--border-strong);
+}
+.asg-matchup-label {
+  text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; font-weight: 700;
+}
+.asg-roster { margin-bottom: 10px; }
+.asg-roster th { border-top: none; border-bottom: 1px solid var(--border-strong); }
+.asg-roster .p-col { width: 42%; }
+.asg-roster tbody tr:nth-child(even) td { background-color: rgba(0, 0, 0, 0.025); }
+.asg-roster .rtag {
+  display: inline-block; min-width: 24px; color: var(--text-muted);
+  font-weight: 700; font-size: 11px;
+}
+.asg-roster .rtm { color: var(--text-muted); font-weight: 400; font-size: 12px; }
+
 .games-section { padding: 10px 0; border-top: 2px solid var(--border-strong); }
 .games-section-title {
   font-size: 16px; font-weight: 700; margin-bottom: 8px;
@@ -1985,6 +2034,8 @@ body:has(.paper-mode) .paper-toggle {
   .standings-table th, .standings-table td { padding: 0 1px; }
   .asg-standings-table { font-size: 9px; }
   .asg-standings-table th, .asg-standings-table td { padding: 1px 1px; }
+  .asg-roster { font-size: 11px; }
+  .asg-roster th, .asg-roster td { padding: 0 1px; }
 }
 
 /* Header collapses to a two-row layout earlier than the digest tables

@@ -325,10 +325,17 @@ type RawTxn = {
   person?: { id?: number };
 };
 
+// statsapi All-Star team IDs (stable): 159 = AL All-Stars, 160 = NL All-Stars.
+// MLB files All-Star selection as a "trade" to these teams; those aren't real
+// roster moves, so we drop any transaction touching them (mirrors the filter
+// in the canonical adapter's transactionsFromRaw).
+const ALL_STAR_TEAM_IDS = new Set([159, 160]);
+
 export function parseTransactions(raw: unknown): Transaction[] {
   const data = raw as { transactions?: RawTxn[] };
   return (data?.transactions ?? [])
     .filter((t) => typeof t.description === "string" && t.description.length > 0)
+    .filter((t) => !ALL_STAR_TEAM_IDS.has(t.fromTeam?.id ?? -1) && !ALL_STAR_TEAM_IDS.has(t.toTeam?.id ?? -1))
     .map((t) => ({
       typeCode: t.typeCode ?? "",
       typeDesc: t.typeDesc ?? "",
@@ -506,6 +513,20 @@ export function parsePersonWL(raw: unknown): { wins: number; losses: number; era
     losses: typeof stat?.losses === "number" ? stat.losses : 0,
     era: typeof stat?.era === "string" ? stat.era : null,
   };
+}
+
+// Season hitting OR pitching stats for one person — used to hydrate All-Star
+// rosters on the ASG-preview day (the ASG game's own seasonStats block is just
+// the game line, not season totals, so we fetch the real season split here).
+export async function fetchPersonSeasonStatsRaw(personId: number, season: number, group: "hitting" | "pitching"): Promise<unknown> {
+  return getRaw(`/v1/people/${personId}/stats?stats=season&group=${group}&season=${season}`);
+}
+
+// Pull the season stat object (splits[0].stat) from a /people/{id}/stats
+// envelope; {} when the player has no split yet.
+export function parsePersonSeasonStat(raw: unknown): Record<string, unknown> {
+  const data = raw as { stats?: Array<{ splits?: Array<{ stat?: Record<string, unknown> }> }> };
+  return data?.stats?.[0]?.splits?.[0]?.stat ?? {};
 }
 
 // ─── Team roster with season stats ────────────────────────────────────────

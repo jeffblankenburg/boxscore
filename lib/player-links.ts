@@ -46,3 +46,20 @@ export function lastNameLinkEmail(p: PersonRef): string {
     ? `<a class="es-player-link" href="${EMAIL_LINK_BASE}/mlb/player/${encodeURIComponent(slug)}" style="color:inherit;text-decoration:none">${text}</a>`
     : text;
 }
+
+// Full-name variants — used where we show the whole name (e.g. All-Star
+// rosters) rather than just the last name.
+export function fullNameLinkWeb(p: PersonRef): string {
+  const text = esc(p.fullName ?? "");
+  const slug = slugOf(p);
+  return slug
+    ? `<a class="player-link" href="/mlb/player/${encodeURIComponent(slug)}">${text}</a>`
+    : text;
+}
+export function fullNameLinkEmail(p: PersonRef): string {
+  const text = esc(p.fullName ?? "");
+  const slug = slugOf(p);
+  return slug
+    ? `<a class="es-player-link" href="${EMAIL_LINK_BASE}/mlb/player/${encodeURIComponent(slug)}" style="color:inherit;text-decoration:none">${text}</a>`
+    : text;
+}

@@ -15,7 +15,7 @@
 // markup against the same class names so the wrapping templates don't
 // have to know which renderer produced the body.
 
-import type { CanonicalDailyData } from "../canonical";
+import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher } from "../canonical";
 import type {
   MlbBoxPlayer,
   MlbBoxScore,
@@ -28,6 +28,7 @@ import type {
   MlbLeaderCategory,
   MlbLeague,
   MlbPlayerRef,
+  MlbProbablePitcher,
   MlbScoringPlay,
   MlbStandingRow,
   MlbTransaction,
@@ -38,7 +39,7 @@ import type { DigestMode } from "@/lib/digest-mode";
 import { findTeam } from "@/lib/teams";
 import { nextDay, prettyDate } from "@/lib/dates";
 import { lastName } from "@/lib/names";
-import { lastNameLinkEmail } from "@/lib/player-links";
+import { lastNameLinkEmail, fullNameLinkEmail } from "@/lib/player-links";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import {
   esc, pad, fmtAvg, fmtOps, fmtEra, dateline, sectionH,
@@ -148,14 +149,20 @@ const fmtIp = (v: number | null | undefined): string => {
 const POSTSEASON_TYPES = new Set(["wild-card", "division-series", "lcs", "world-series"]);
 const PRESEASON_TYPES  = new Set(["spring", "exhibition"]);
 
-function classifyMode(games: MlbGame[], date: string): DigestMode {
+function classifyMode(games: MlbGame[], date: string, nextDayGames: MlbGame[] = []): DigestMode {
   const types = new Set(games.map((g) => g.gameType));
-  if (games.length === 0) return "no-games";
-  if (games.every((g) => g.gameType === "all-star")) return "all-star";
-  if (games.some((g) => POSTSEASON_TYPES.has(g.gameType))) return "postseason";
-  if (games.every((g) => PRESEASON_TYPES.has(g.gameType))) return "preseason";
+  if (types.has("all-star")) return "all-star";
+  for (const t of types) if (POSTSEASON_TYPES.has(t)) return "postseason";
   if (types.has("regular")) return "regular";
-  return "regular";
+  for (const t of types) if (PRESEASON_TYPES.has(t)) return "preseason";
+  const month = Number(date.slice(5, 7));
+  if (month === 11 || month === 12 || month === 1 || month === 2) return "offseason";
+  // In-season with no games = the All-Star break (MLB has no other empty days).
+  // Day before the ASG (tomorrow's slate is the ASG) → preview; any other empty
+  // July day is a post-ASG break day → mid-season first-half recap.
+  if (nextDayGames.some((g) => g.gameType === "all-star")) return "all-star-preview";
+  if (month === 7) return "mid-season";
+  return "no-games";
 }
 
 // team.id → "W-L" for the Today's Games strip
@@ -762,12 +769,82 @@ function renderTransactions(txs: MlbTransaction[]): string {
   return `${sectionH("Transactions")}<div class="es-tx-block">${items}</div>`;
 }
 
+// ─── All-Star preview edition helpers ────────────────────────────────────
+
+function asgMasthead(data: CanonicalDailyData): string {
+  const asg = data.nextDayGames.find((g) => g.gameType === "all-star");
+  let sub = "";
+  if (asg) {
+    const matchup = `${esc(asg.awayTeam.name)} vs. ${esc(asg.homeTeam.name)}`;
+    const loc = [asg.venueName ? esc(asg.venueName) : null, esc(timeInET(asg.startTime))]
+      .filter(Boolean).join(" &middot; ");
+    sub = `<div class="es-asg-venue">${matchup}<span class="es-asg-venue-sep"> &middot; </span><span class="es-asg-venue-loc">${loc}</span></div>`;
+  }
+  return `<div class="es-asg-mast" align="center">
+    <div class="es-asg-kicker">Midsummer Classic &middot; Special Edition</div>
+    <div class="es-asg-stars">&#9733; &#9733; &#9733;</div>
+    <div class="es-asg-headline">The All-Star Game</div>
+    ${sub}
+  </div>`;
+}
+
+function asgMatchupByline(data: CanonicalDailyData): string {
+  const asg = data.nextDayGames.find((g) => g.gameType === "all-star");
+  if (!asg) return "";
+  const fmt = (p: MlbProbablePitcher | null): string => {
+    if (!p) return `<span class="es-asg-matchup-p">TBD</span>`;
+    const detail: string[] = [];
+    if (p.wins != null && p.losses != null) detail.push(`${p.wins}-${p.losses}`);
+    if (p.era != null && Number.isFinite(p.era)) detail.push(p.era.toFixed(2));
+    const label = detail.length ? `${esc(p.fullName)} (${detail.join(", ")})` : esc(p.fullName);
+    return `<span class="es-asg-matchup-p">${label}</span>`;
+  };
+  return `<div class="es-asg-matchup"><span class="es-asg-matchup-label">Pitching Matchup</span> ${fmt(asg.awayProbablePitcher)} vs ${fmt(asg.homeProbablePitcher)}</div>`;
+}
+
+const asgPlayerCell = (tag: string, p: { name: string; mlbId: number | null }, team: string) =>
+  `<td align="left" style="white-space:nowrap"><span class="es-rtag">${esc(tag)}</span> ${fullNameLinkEmail({ id: p.mlbId, fullName: p.name })} <span class="es-rtm">${esc(team)}</span></td>`;
+
+function asgHitterTable(hitters: AsgHitter[]): string {
+  if (hitters.length === 0) return "";
+  const colgroup = `<colgroup><col width="40%"><col width="12%"><col width="12%"><col width="12%"><col width="12%"><col width="12%"></colgroup>`;
+  const head = `<tr><th align="left">Player</th><th align="right">HR</th><th align="right">RBI</th><th align="right">AB</th><th align="right">AVG</th><th align="right">OPS</th></tr>`;
+  const rows = hitters.map((p) => `<tr>${asgPlayerCell(p.pos, p, p.team)}<td align="right">${p.hr ?? "—"}</td><td align="right">${p.rbi ?? "—"}</td><td align="right">${p.ab ?? "—"}</td><td align="right">${esc(p.avg ?? "—")}</td><td align="right">${esc(p.ops ?? "—")}</td></tr>`).join("");
+  return `<table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">${colgroup}<thead>${head}</thead><tbody>${rows}</tbody></table>`;
+}
+function asgPitcherTable(pitchers: AsgPitcher[]): string {
+  if (pitchers.length === 0) return "";
+  const colgroup = `<colgroup><col width="40%"><col width="12%"><col width="12%"><col width="12%"><col width="12%"><col width="12%"></colgroup>`;
+  const rows = pitchers.map((p) => `<tr>${asgPlayerCell(p.role, p, p.team)}<td align="right">${esc(p.ip ?? "—")}</td><td align="right">${p.er ?? "—"}</td><td align="right">${p.bb ?? "—"}</td><td align="right">${p.k ?? "—"}</td><td align="right">${esc(p.era ?? "—")}</td></tr>`).join("");
+  return `<table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">${colgroup}<thead><tr><th align="left">Player</th><th align="right">IP</th><th align="right">ER</th><th align="right">BB</th><th align="right">K</th><th align="right">ERA</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function asgRosterCard(label: string, side: AsgSide | undefined): string {
+  if (!side) return "";
+  const starters = side.hitters.filter((h) => h.order != null);
+  const bench    = side.hitters.filter((h) => h.order == null);
+  const sp       = side.pitchers.filter((p) => p.starter);
+  const bullpen  = side.pitchers.filter((p) => !p.starter);
+  const body = starters.length > 0
+    ? `${subH("Starting Lineup")}${asgHitterTable(starters)}
+${subH("Bench")}${asgHitterTable(bench)}
+${subH("Starting Pitcher")}${asgPitcherTable(sp)}
+${subH("Bullpen")}${asgPitcherTable(bullpen)}`
+    : `${subH("Position Players")}${asgHitterTable(side.hitters)}
+${subH("Pitchers")}${asgPitcherTable(side.pitchers)}`;
+  return `${sectionH(label)}${body}`;
+}
+function asgRosters(data: CanonicalDailyData): string {
+  const r = data.allStarRosters;
+  if (!r) return "";
+  return `${asgRosterCard("American League", r.AL)}${asgRosterCard("National League", r.NL)}`;
+}
+
 // ─── Entry ──────────────────────────────────────────────────────────────
 
 export function renderCanonicalEmail(data: CanonicalDailyData): string {
   const editionDate = nextDay(data.date);
   const teamRecords = buildTeamRecordMap(data.standings);
-  const mode = classifyMode(data.games, data.date);
+  const mode = classifyMode(data.games, data.date, data.nextDayGames);
 
   if (mode === "no-games") {
     return `<div class="es">
@@ -788,6 +865,37 @@ ${renderLeague("National League", "NL", data, editionDate)}
 ${renderSingleLeagueLeaders("National League", data.leaderboards.filter((b) => b.league === "NL"), 15)}
 ${renderTodaysGames(data.nextDayGames, teamRecords)}
 ${renderAllStarGame(data)}
+${renderTransactions(data.transactions)}
+</div>`;
+  }
+
+  // Day before the ASG: masthead + AL/NL rosters + matchup, then the normal
+  // first-half standings/leaders.
+  if (mode === "all-star-preview") {
+    return `<div class="es">
+${dateline(prettyDate(editionDate))}
+${asgMasthead(data)}
+${asgMatchupByline(data)}
+${asgRosters(data)}
+${renderLeague("American League", "AL", data, editionDate)}
+${renderSingleLeagueLeaders("American League", data.leaderboards.filter((b) => b.league === "AL"))}
+${renderLeague("National League", "NL", data, editionDate)}
+${renderSingleLeagueLeaders("National League", data.leaderboards.filter((b) => b.league === "NL"))}
+${renderTransactions(data.transactions)}
+</div>`;
+  }
+
+  // Day after the ASG: first-half recap — standings + extended leaders +
+  // Today's Games (second half resumes).
+  if (mode === "mid-season") {
+    return `<div class="es">
+${dateline(prettyDate(editionDate))}
+<div class="es-asg-edition">First-Half Recap</div>
+${renderLeague("American League", "AL", data, editionDate)}
+${renderSingleLeagueLeaders("American League", data.leaderboards.filter((b) => b.league === "AL"), 10)}
+${renderLeague("National League", "NL", data, editionDate)}
+${renderSingleLeagueLeaders("National League", data.leaderboards.filter((b) => b.league === "NL"), 10)}
+${renderTodaysGames(data.nextDayGames, teamRecords)}
 ${renderTransactions(data.transactions)}
 </div>`;
   }
