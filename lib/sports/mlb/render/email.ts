@@ -917,9 +917,9 @@ ${renderTransactions(data.transactions)}
 ${dateline(prettyDate(editionDate))}
 <div class="es-asg-edition">First-Half Recap</div>
 ${renderLeague("American League", "AL", data, editionDate)}
-${renderSingleLeagueLeaders("American League", data.leaderboards.filter((b) => b.league === "AL"), 10)}
+${renderSingleLeagueLeaders("American League", data.leaderboards.filter((b) => b.league === "AL"), 15)}
 ${renderLeague("National League", "NL", data, editionDate)}
-${renderSingleLeagueLeaders("National League", data.leaderboards.filter((b) => b.league === "NL"), 10)}
+${renderSingleLeagueLeaders("National League", data.leaderboards.filter((b) => b.league === "NL"), 15)}
 ${renderTodaysGames(data.nextDayGames, teamRecords)}
 ${renderTransactions(data.transactions)}
 </div>`;

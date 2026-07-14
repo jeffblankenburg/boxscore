@@ -136,7 +136,10 @@ export async function GET(req: Request) {
       // separate flow.
       let scoreboard_image_url: string | null = null;
       let scoreboard_image_error: string | null = null;
-      if (!skipTeams) {
+      // Skip the scoreboard image entirely on days with no completed games
+      // (All-Star break, offseason) — a blank grid isn't worth shipping.
+      const hasCompletedGames = canonical.games.some((g) => g.status === "final");
+      if (!skipTeams && hasCompletedGames) {
         try {
           const editionDate = nextDay(date);
           const origin = await siteOrigin();

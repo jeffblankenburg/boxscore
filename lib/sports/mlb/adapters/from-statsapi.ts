@@ -103,6 +103,8 @@ type StatsapiTeamRecord = {
   streak?: { streakCode?: string };
   records?: {
     splitRecords?: Array<{ type: string; wins: number; losses: number; pct: string }>;
+    divisionRecords?: Array<{ division: { id: number }; wins: number; losses: number; pct: string }>;
+    leagueRecords?: Array<{ league: { id: number }; wins: number; losses: number; pct: string }>;
   };
   leagueRecord?: { wins: number; losses: number; pct: string };
   clinched?: boolean;
@@ -309,6 +311,20 @@ function findSplit(rec: StatsapiTeamRecord | undefined, type: string): MlbRecord
   const split = rec?.records?.splitRecords?.find((s) => s.type === type);
   return parseRecord(split ?? null);
 }
+
+function findDivisionRecord(rec: StatsapiTeamRecord, divisionId: number): MlbRecord {
+  return parseRecord(rec.records?.divisionRecords?.find((d) => d.division.id === divisionId) ?? null);
+}
+function findLeagueRecord(rec: StatsapiTeamRecord, leagueId: number): MlbRecord {
+  return parseRecord(rec.records?.leagueRecords?.find((l) => l.league.id === leagueId) ?? null);
+}
+
+// Division ids per league (statsapi): AL East 201 / Central 202 / West 200,
+// NL East 204 / Central 205 / West 203.
+const DIVISION_IDS: Record<number, { east: number; central: number; west: number; other: number }> = {
+  103: { east: 201, central: 202, west: 200, other: 104 }, // AL
+  104: { east: 204, central: 205, west: 203, other: 103 }, // NL
+};
 
 // ─── Section adapters ────────────────────────────────────────────────────
 
@@ -517,8 +533,9 @@ function boxScoresFromGames(
   return out;
 }
 
-function teamRowFromStatsapi(tr: StatsapiTeamRecord, idx: Map<number, MlbTeamRef>): MlbStandingRow {
+function teamRowFromStatsapi(tr: StatsapiTeamRecord, idx: Map<number, MlbTeamRef>, leagueId: number): MlbStandingRow {
   const team = teamRefById(idx, tr.team.id, tr.team.name);
+  const div = DIVISION_IDS[leagueId];
   return {
     team,
     wins:                   tr.wins,
@@ -537,6 +554,17 @@ function teamRowFromStatsapi(tr: StatsapiTeamRecord, idx: Map<number, MlbTeamRef
     clinchedDivision:       Boolean(tr.divisionChamp) || tr.clinchIndicator === "z",
     clinchedWildCard:       Boolean(tr.hasWildcard),
     eliminatedFromPlayoffs: tr.eliminationNumber === "E",
+    // Expanded splits for the mid-season recap.
+    extraInning:            findSplit(tr, "extraInning"),
+    oneRun:                 findSplit(tr, "oneRun"),
+    day:                    findSplit(tr, "day"),
+    night:                  findSplit(tr, "night"),
+    ...(div ? {
+      vsEast:     findDivisionRecord(tr, div.east),
+      vsCentral:  findDivisionRecord(tr, div.central),
+      vsWest:     findDivisionRecord(tr, div.west),
+      interLeague: findLeagueRecord(tr, div.other),
+    } : {}),
   };
 }
 
@@ -546,7 +574,7 @@ function wildCardFromRaw(wildCardRaw: unknown, idx: Map<number, MlbTeamRef>): Ml
   for (const rec of env?.records ?? []) {
     const league = mapLeague(rec.league.id);
     if (!league) continue;
-    const rows = rec.teamRecords.map((tr) => teamRowFromStatsapi(tr, idx));
+    const rows = rec.teamRecords.map((tr) => teamRowFromStatsapi(tr, idx, rec.league.id));
     rows.sort((a, b) => (a.wildCardRank ?? 99) - (b.wildCardRank ?? 99));
     out.push({ league, teams: rows });
   }
@@ -560,7 +588,7 @@ function standingsFromRaw(standingsRaw: unknown, idx: Map<number, MlbTeamRef>): 
     const league   = mapLeague(rec.league.id);
     const division = mapDivision(rec.division.id);
     if (!league || !division) continue;
-    const rows: MlbStandingRow[] = rec.teamRecords.map((tr) => teamRowFromStatsapi(tr, idx));
+    const rows: MlbStandingRow[] = rec.teamRecords.map((tr) => teamRowFromStatsapi(tr, idx, rec.league.id));
     rows.sort((a, b) => a.divisionRank - b.divisionRank);
     out.push({ league, division, teams: rows });
   }

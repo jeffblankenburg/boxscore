@@ -310,6 +310,18 @@ export type MlbStandingRow = {
   clinchedDivision: boolean;
   clinchedWildCard: boolean;
   eliminatedFromPlayoffs: boolean;
+  // Expanded splits for the mid-season recap's wide standings table. Optional
+  // because only the statsapi adapter populates them (SDIO leaves them unset,
+  // and the renderer shows "—"). vsEast/Central/West are records vs the team's
+  // OWN league divisions; interLeague is vs the other league.
+  extraInning?: MlbRecord;
+  oneRun?: MlbRecord;
+  day?: MlbRecord;
+  night?: MlbRecord;
+  vsEast?: MlbRecord;
+  vsCentral?: MlbRecord;
+  vsWest?: MlbRecord;
+  interLeague?: MlbRecord;
 };
 
 /** Standings grouped by division for the divisional view. */

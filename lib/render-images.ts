@@ -291,18 +291,22 @@ export async function renderShareImages(args: {
       const sb = await captureScoreboardOnBrowser(browser, {
         editionDate: nextDay(date), baseUrl,
       });
-      results.push({
-        entry: {
-          file: "scoreboard.png",
-          subId: "scoreboard",
-          type: "scoreboard",
-          gameCount: sb.gameCount,
-        },
-        png: sb.png,
-        mime: "image/png",
-        width: sb.width,
-        height: sb.height,
-      });
+      // Skip an empty scoreboard (0 completed games — All-Star break, offseason);
+      // a blank grid isn't worth posting to social.
+      if (sb.gameCount > 0) {
+        results.push({
+          entry: {
+            file: "scoreboard.png",
+            subId: "scoreboard",
+            type: "scoreboard",
+            gameCount: sb.gameCount,
+          },
+          png: sb.png,
+          mime: "image/png",
+          width: sb.width,
+          height: sb.height,
+        });
+      }
     } catch (err) {
       console.error(`scoreboard capture failed: ${(err as Error).message}`);
     }

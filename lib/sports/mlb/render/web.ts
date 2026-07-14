@@ -25,6 +25,7 @@ import type {
   MlbLeague,
   MlbPlayerRef,
   MlbProbablePitcher,
+  MlbRecord,
   MlbScoringPlay,
   MlbStandingRow,
   MlbTransaction,
@@ -161,6 +162,9 @@ function fmtGbOrEm(v: number | null): string {
   if (v == null) return "—";
   return fmtGb(v);
 }
+// A W-L split record for the mid-season standings' extra columns; "—" when
+// the adapter didn't populate it.
+const fmtRec = (r?: MlbRecord): string => (r ? `${r.wins}-${r.losses}` : "—");
 // Wild-card games-behind has a richer sign convention than division GB:
 //   null     → "—" (not applicable, e.g. teams pre-filtered out)
 //   0        → "-" (at the cutoff line)
@@ -366,11 +370,11 @@ ${renderTransactions(data.transactions, hl)}`;
 <div class="asg-edition">First-Half Recap</div>
 
 <div class="section">
-  ${renderLeague("American League", "AL", data, hl, 10)}
+  ${renderAllStarLeague("American League", "AL", data, hl)}
 </div>
 
 <div class="section">
-  ${renderLeague("National League", "NL", data, hl, 10)}
+  ${renderAllStarLeague("National League", "NL", data, hl)}
 </div>
 
 ${renderTodaysGames(data.nextDayGames, teamRecords, hl)}
@@ -585,7 +589,7 @@ function renderDivisionTable(
 
 function renderWildCardTable(
   wc: MlbWildCardStandings,
-  opts: { date?: string } = {},
+  opts: { date?: string; tableClass?: string } = {},
   hl?: HighlightMap,
 ): string {
   const sorted = [...wc.teams]
@@ -627,7 +631,7 @@ function renderWildCardTable(
     </tr>`;
   }).join("");
   return `<div class="stats-subheader">Wild Card</div>
-<div class="standings-wrap"><table class="standings-table">
+<div class="standings-wrap"><table class="standings-table${opts.tableClass ? ` ${opts.tableClass}` : ""}">
   <thead>
     <tr>
       <th class="team-col">Team</th>
@@ -679,13 +683,10 @@ function standingsRow(
       </tr>`;
 }
 
-// All-Star Game variant of the standings (no links, wider split columns).
+// Wide split-standings table for the mid-season recap. The extra columns come
+// from statsapi's splitRecords / divisionRecords / leagueRecords (parsed in the
+// adapter); "—" only when a record is missing (e.g. the SDIO adapter).
 function renderAllStarDivisionTable(label: string, d: MlbDivisionStandings, hl?: HighlightMap): string {
-  // Canonical doesn't carry extraInning/oneRun/day/night/grass/turf/east/
-  // central/west/interLeague splits — those are an all-star-only deep dive.
-  // We emit "—" for each so the table structure and column count match the
-  // production renderer. When we want full ASG parity, expand MlbRecord with
-  // additional split fields and populate them on both adapters.
   const rows = [...d.teams]
     .sort((a, b) => a.divisionRank - b.divisionRank)
     .map((t) => `<tr${diffAttrs(hl, `standings:${d.league}/${d.division}/${t.team.id}`)}>
@@ -695,16 +696,14 @@ function renderAllStarDivisionTable(label: string, d: MlbDivisionStandings, hl?:
         <td class="pct-col">${fmtPct(t.leagueRecord.pct)}</td>
         <td class="gb-col">${fmtGb(t.gamesBehind)}</td>
         <td class="gb-col">${fmtWcgb(t.wildCardGamesBehind)}</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
-        <td class="rec-col">—</td>
+        <td class="rec-col">${fmtRec(t.extraInning)}</td>
+        <td class="rec-col">${fmtRec(t.oneRun)}</td>
+        <td class="rec-col">${fmtRec(t.day)}</td>
+        <td class="rec-col">${fmtRec(t.night)}</td>
+        <td class="rec-col">${fmtRec(t.vsEast)}</td>
+        <td class="rec-col">${fmtRec(t.vsCentral)}</td>
+        <td class="rec-col">${fmtRec(t.vsWest)}</td>
+        <td class="rec-col">${fmtRec(t.interLeague)}</td>
       </tr>`).join("");
   return `<div class="stats-subheader">${esc(label)}</div>
 <div class="standings-wrap"><table class="standings-table asg-standings-table">
@@ -720,8 +719,6 @@ function renderAllStarDivisionTable(label: string, d: MlbDivisionStandings, hl?:
       <th class="rec-col">1 RUN</th>
       <th class="rec-col">DAY</th>
       <th class="rec-col">NIGHT</th>
-      <th class="rec-col">GRASS</th>
-      <th class="rec-col">TURF</th>
       <th class="rec-col">EAST</th>
       <th class="rec-col">CENTRAL</th>
       <th class="rec-col">WEST</th>
@@ -738,17 +735,14 @@ function renderAllStarLeague(label: string, league: MlbLeague, data: CanonicalDa
     return rec ? renderAllStarDivisionTable(`${d} Division`, rec, hl) : "";
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league === league);
-  const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord, {}, hl) : "";
+  const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord, { tableClass: "asg-standings-table" }, hl) : "";
   const leagueBoards = data.leaderboards.filter((b) => b.league === league);
   const leadersHtml = renderAllStarLeaders(leagueBoards, hl);
-  return `<div class="league-band">
-  <div class="league-name">${esc(label)}</div>
-</div>
-<div class="asg-league-block">
-  <div class="boxscores-title">Standings</div>
+  return `<div class="asg-league-block">
+  <div class="boxscores-title">${esc(label)} Standings</div>
   ${standingsHtml}
   ${wildCardHtml}
-  <div class="boxscores-title">Leaders</div>
+  <div class="boxscores-title">${esc(label)} Leaders</div>
   ${leadersHtml}
 </div>`;
 }

@@ -15,7 +15,7 @@ export const MLB_PREVIEW_FIXTURES: Record<DigestMode, string> = {
   regular: "2025-09-24",
   "all-star-preview": "2025-07-14", // empty day; next day (07-15) is the ASG
   "all-star": "2025-07-15",         // the All-Star Game itself
-  "mid-season": "2025-07-16",       // empty post-ASG day → first-half recap
+  "mid-season": "2025-07-17",       // empty post-ASG day; next day (07-18) resumes → Today's Games shows
   "no-games": "2025-07-14",         // unreachable for MLB (see note above)
   postseason: "2024-10-30",
   preseason: "2026-03-04",
