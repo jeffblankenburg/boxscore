@@ -683,5 +683,6 @@ export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDai
     transactions: transactionsFromRaw(raw.transactions, date, teamIdx),
     // Already display-ready (built in fetchDailyRaw); pass straight through.
     allStarRosters: raw.allStarRosters ?? null,
+    allStarMvp: raw.allStarMvp ?? null,
   };
 }

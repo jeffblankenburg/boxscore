@@ -204,6 +204,7 @@ a { color: inherit; }
   margin: 10px 0; border-bottom: 2px solid var(--border-strong);
   padding-bottom: 4px;
 }
+.boxscores-title-left { text-align: left; }
 /* Team-page header sits right under the dateline. Pull it up with a negative
    margin so the gap above the text (dateline border → text) matches the gap
    below (text → its own border-bottom). Same visual weight as boxscores-title
@@ -304,6 +305,11 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
   text-align: center; font-weight: 900; font-style: italic; font-size: 26px;
   margin: -6px 0 14px; padding-bottom: 6px;
   border-bottom: 2px solid var(--border-strong);
+}
+.asg-mvp { text-align: center; font-size: 18px; font-weight: 800; margin: -4px 0 16px; }
+.asg-mvp-label {
+  display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--text-muted); margin-bottom: 1px;
 }
 .asg-matchup {
   text-align: center; font-size: 13.5px; margin: 0 0 14px; padding: 7px 0;

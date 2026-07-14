@@ -515,6 +515,18 @@ export function parsePersonWL(raw: unknown): { wins: number; losses: number; era
   };
 }
 
+// All-Star Game MVP (Ted Williams Award). Available shortly after the game;
+// returns null if statsapi hasn't recorded the season's recipient yet.
+export async function fetchAllStarMvpRaw(season: number): Promise<unknown> {
+  return getRaw(`/v1/awards/ASMVP/recipients?season=${season}`);
+}
+export function parseAllStarMvp(raw: unknown): { name: string; mlbId: number | null } | null {
+  const data = raw as { awards?: Array<{ player?: { id?: number; nameFirstLast?: string } }> };
+  const p = data?.awards?.[0]?.player;
+  if (!p?.nameFirstLast) return null;
+  return { name: p.nameFirstLast, mlbId: typeof p.id === "number" ? p.id : null };
+}
+
 // Season hitting OR pitching stats for one person — used to hydrate All-Star
 // rosters on the ASG-preview day (the ASG game's own seasonStats block is just
 // the game line, not season totals, so we fetch the real season split here).

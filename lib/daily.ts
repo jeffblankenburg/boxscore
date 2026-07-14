@@ -8,6 +8,7 @@ import {
   fetchTeamsRaw, parseTeams,
   fetchPersonSeasonPitchingRaw, parsePersonWL,
   fetchPersonSeasonStatsRaw, parsePersonSeasonStat,
+  fetchAllStarMvpRaw, parseAllStarMvp,
   fetchTransactionsRaw, parseTransactions,
 } from "./mlb";
 import type { AsgRosters, AsgSide, AsgHitter, AsgPitcher } from "./sports/mlb/canonical";
@@ -235,6 +236,11 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
   // "A"); otherwise a cheap schedule parse that returns undefined.
   const allStarRosters = await buildAllStarRosters(nextDayScheduleRaw, teamsRaw, season);
 
+  // On the ASG day itself (recap edition), pull the game's MVP — null if
+  // statsapi hasn't recorded it yet by generate time.
+  const isAsgDay = parseSchedule(scheduleRaw).some((g) => g.gameType === "A");
+  const allStarMvp = isAsgDay ? await fetchAllStarMvpSafe(season) : undefined;
+
   return {
     schedule: scheduleRaw,
     standings: standingsRaw,
@@ -246,7 +252,18 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
     probablePitcherStats,
     transactions: transactionsRaw,
     ...(allStarRosters ? { allStarRosters } : {}),
+    ...(isAsgDay ? { allStarMvp: allStarMvp ?? null } : {}),
   };
+}
+
+// MVP fetch, resilient to statsapi lag right after the game — a failure or a
+// not-yet-recorded MVP yields null (the recap simply omits the MVP line).
+async function fetchAllStarMvpSafe(season: number): Promise<{ name: string; mlbId: number | null } | null> {
+  try {
+    return parseAllStarMvp(await fetchAllStarMvpRaw(season));
+  } catch {
+    return null;
+  }
 }
 
 function upcomingFromRaw(
@@ -410,6 +427,11 @@ export async function loadDailyRaw(date: string, opts?: { refetch?: boolean }): 
       const season = Number(date.slice(0, 4));
       const allStarRosters = await buildAllStarRosters(raw.nextDaySchedule, raw.teams, season);
       if (allStarRosters) { raw = { ...raw, allStarRosters }; dirty = true; }
+    }
+    // ASG-day rows cached before the MVP field existed: backfill it.
+    if (raw.allStarMvp === undefined && raw.schedule != null && parseSchedule(raw.schedule).some((g) => g.gameType === "A")) {
+      raw = { ...raw, allStarMvp: await fetchAllStarMvpSafe(Number(date.slice(0, 4))) };
+      dirty = true;
     }
     if (dirty) await upsertDailyRaw("mlb", date, raw);
   }

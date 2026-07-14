@@ -322,20 +322,14 @@ ${renderTodaysGames(data.nextDayGames, teamRecords, hl)}
 ${renderTransactions(data.transactions, hl)}`;
   }
 
+  // Recap: exclusively the All-Star Game — masthead, MVP, the final box, and
+  // real transactions. No standings/leaders/Today's Games.
   if (mode === "all-star") {
     return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
 
-<div class="edition-subtitle">All-Star Game Edition</div>
+${asgRecapMasthead(data)}
 
-<div class="section">
-  ${renderAllStarLeague("American League", "AL", data, hl)}
-</div>
-
-<div class="section">
-  ${renderAllStarLeague("National League", "NL", data, hl)}
-</div>
-
-${renderTodaysGames(data.nextDayGames, teamRecords, hl)}
+${asgMvpLine(data)}
 
 ${renderAllStarGame(data, hl)}
 
@@ -425,6 +419,32 @@ function asgMasthead(data: CanonicalDailyData): string {
   <h1 class="asg-headline">The All-Star Game</h1>
   ${sub}
 </div>`;
+}
+
+// Recap masthead — same treatment as the preview, but the sub-line is the
+// final score + venue instead of the first-pitch time.
+function asgRecapMasthead(data: CanonicalDailyData): string {
+  const g = data.games.find((x) => x.gameType === "all-star");
+  let sub = "";
+  if (g && g.awayScore != null && g.homeScore != null) {
+    const score = `${esc(g.awayTeam.name)} ${g.awayScore}, ${esc(g.homeTeam.name)} ${g.homeScore}`;
+    sub = g.venueName
+      ? `<div class="asg-venue">${score}<span class="asg-venue-sep"> &middot; </span><span class="asg-venue-loc">${esc(g.venueName)}</span></div>`
+      : `<div class="asg-venue">${score}</div>`;
+  }
+  return `<div class="asg-mast">
+  <div class="asg-kicker">Midsummer Classic &middot; Special Edition</div>
+  <div class="asg-stars">&#9733; &#9733; &#9733;</div>
+  <h1 class="asg-headline">The All-Star Game</h1>
+  ${sub}
+</div>`;
+}
+
+// MVP one-liner — rendered only when statsapi has recorded the recipient.
+function asgMvpLine(data: CanonicalDailyData): string {
+  const mvp = data.allStarMvp;
+  if (!mvp) return "";
+  return `<div class="asg-mvp"><span class="asg-mvp-label">Most Valuable Player</span> ${fullNameLinkWeb({ id: mvp.mlbId, fullName: mvp.name })}</div>`;
 }
 
 // Pitching matchup byline — same "(W-L, ERA)" shape as the Today's Games strip.
@@ -891,12 +911,17 @@ function renderAllStarGame(data: CanonicalDailyData, hl?: HighlightMap): string 
   if (!asg) return "";
   const box = data.boxScores.get(asg.id);
   if (!box) return "";
-  return `<div class="boxscores-title">All-Star Game</div>
-<p class="all-star-note">Stats don't count toward season totals.</p>
+  // Abbreviate the league names inside the box ("AL All-Stars" / "NL
+  // All-Stars"); the masthead keeps the full names.
+  const g = { ...asg, awayTeam: { ...asg.awayTeam, name: asgShortTeam(asg.awayTeam.name) }, homeTeam: { ...asg.homeTeam, name: asgShortTeam(asg.homeTeam.name) } };
+  return `<div class="boxscores-title boxscores-title-left">Yesterday's Box Score</div>
 <div class="boxscores-container">
-${renderGame(asg, box, data.scoringPlays.get(asg.id) ?? [], hl)}
+${renderGame(g, box, data.scoringPlays.get(asg.id) ?? [], hl)}
 </div>`;
 }
+
+const asgShortTeam = (name: string): string =>
+  name.replace("American League", "AL").replace("National League", "NL");
 
 function inningCellWidth(innings: MlbInningLine[]): number {
   let w = 1;

@@ -143,6 +143,8 @@ export const EMAIL_STYLES = `
   .es-asg-venue-loc { white-space: nowrap; }
   .es-asg-matchup-p { white-space: nowrap; }
   .es-asg-edition { text-align: center; font-size: 22px; font-weight: 800; font-style: italic; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 2px solid #161410; }
+  .es-asg-mvp { text-align: center; font-size: 17px; font-weight: 800; margin: 0 0 14px; }
+  .es-asg-mvp-label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #6a6354; }
   .es-asg-matchup { text-align: center; font-size: 13px; padding: 6px 0; margin: 0 0 12px; border-top: 1px solid #161410; border-bottom: 1px solid #161410; }
   .es-asg-matchup-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
   .es-rtag { color: #6a6354; font-weight: 700; font-size: 10px; }

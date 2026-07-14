@@ -697,14 +697,18 @@ function renderBoxScores(data: CanonicalDailyData): string {
     ${completed.map((g) => renderGame(g, data.boxScores.get(g.id)!, data.scoringPlays.get(g.id) ?? [])).join("")}`;
 }
 
+const asgShortTeam = (name: string): string =>
+  name.replace("American League", "AL").replace("National League", "NL");
+
 function renderAllStarGame(data: CanonicalDailyData): string {
   const asg = data.games.find((g) => g.gameType === "all-star");
   if (!asg) return "";
   const box = data.boxScores.get(asg.id);
   if (!box) return "";
-  return `${sectionH("All-Star Game")}
-<p class="es-asg-note">Stats don't count toward season totals.</p>
-${renderGame(asg, box, data.scoringPlays.get(asg.id) ?? [])}`;
+  // Abbreviate league names inside the box; the masthead keeps full names.
+  const g = { ...asg, awayTeam: { ...asg.awayTeam, name: asgShortTeam(asg.awayTeam.name) }, homeTeam: { ...asg.homeTeam, name: asgShortTeam(asg.homeTeam.name) } };
+  return `${sectionH("Yesterday's Box Score")}
+${renderGame(g, box, data.scoringPlays.get(asg.id) ?? [])}`;
 }
 
 // ─── Today's Games ──────────────────────────────────────────────────────
@@ -788,6 +792,29 @@ function asgMasthead(data: CanonicalDailyData): string {
   </div>`;
 }
 
+function asgRecapMasthead(data: CanonicalDailyData): string {
+  const g = data.games.find((x) => x.gameType === "all-star");
+  let sub = "";
+  if (g && g.awayScore != null && g.homeScore != null) {
+    const score = `${esc(g.awayTeam.name)} ${g.awayScore}, ${esc(g.homeTeam.name)} ${g.homeScore}`;
+    sub = g.venueName
+      ? `<div class="es-asg-venue">${score}<span class="es-asg-venue-sep"> &middot; </span><span class="es-asg-venue-loc">${esc(g.venueName)}</span></div>`
+      : `<div class="es-asg-venue">${score}</div>`;
+  }
+  return `<div class="es-asg-mast" align="center">
+    <div class="es-asg-kicker">Midsummer Classic &middot; Special Edition</div>
+    <div class="es-asg-stars">&#9733; &#9733; &#9733;</div>
+    <div class="es-asg-headline">The All-Star Game</div>
+    ${sub}
+  </div>`;
+}
+
+function asgMvpLine(data: CanonicalDailyData): string {
+  const mvp = data.allStarMvp;
+  if (!mvp) return "";
+  return `<div class="es-asg-mvp"><span class="es-asg-mvp-label">Most Valuable Player</span> ${fullNameLinkEmail({ id: mvp.mlbId, fullName: mvp.name })}</div>`;
+}
+
 function asgMatchupByline(data: CanonicalDailyData): string {
   const asg = data.nextDayGames.find((g) => g.gameType === "all-star");
   if (!asg) return "";
@@ -855,15 +882,13 @@ ${renderTransactions(data.transactions)}
 </div>`;
   }
 
+  // Recap: exclusively the All-Star Game — masthead, MVP, the final box, and
+  // real transactions. No standings/leaders/Today's Games.
   if (mode === "all-star") {
     return `<div class="es">
 ${dateline(prettyDate(editionDate))}
-<div class="es-edition">All-Star Game Edition</div>
-${renderLeague("American League", "AL", data, editionDate)}
-${renderSingleLeagueLeaders("American League", data.leaderboards.filter((b) => b.league === "AL"), 15)}
-${renderLeague("National League", "NL", data, editionDate)}
-${renderSingleLeagueLeaders("National League", data.leaderboards.filter((b) => b.league === "NL"), 15)}
-${renderTodaysGames(data.nextDayGames, teamRecords)}
+${asgRecapMasthead(data)}
+${asgMvpLine(data)}
 ${renderAllStarGame(data)}
 ${renderTransactions(data.transactions)}
 </div>`;

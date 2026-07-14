@@ -47,6 +47,10 @@ export type AsgPitcher = {
 export type AsgSide = { hitters: AsgHitter[]; pitchers: AsgPitcher[] };
 export type AsgRosters = { AL: AsgSide; NL: AsgSide };
 
+// All-Star Game MVP (Ted Williams Award) — present on the recap edition once
+// statsapi records the recipient.
+export type AsgMvp = { name: string; mlbId: number | null };
+
 export type CanonicalDailyData = {
   date:         string;                       // ISO YYYY-MM-DD
   games:        MlbGame[];
@@ -59,4 +63,6 @@ export type CanonicalDailyData = {
   transactions: MlbTransaction[];
   // Present only on the day before the All-Star Game (all-star-preview mode).
   allStarRosters?: AsgRosters | null;
+  // Present on the All-Star recap edition once the MVP is recorded.
+  allStarMvp?: AsgMvp | null;
 };

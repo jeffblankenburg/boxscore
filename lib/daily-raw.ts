@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "./supabase";
-import type { AsgRosters } from "./sports/mlb/canonical";
+import type { AsgRosters, AsgMvp } from "./sports/mlb/canonical";
 
 // The raw MLB payloads for a single date. Stored as a single JSON blob in
 // daily_raw; consumed by lib/daily.ts to produce a DailyData without re-
@@ -50,6 +50,9 @@ export type DailyRaw = {
   // the ASG): full AL/NL rosters with first-half season lines. See
   // fetchDailyRaw. The canonical adapter passes this straight through.
   allStarRosters?: AsgRosters;
+  // Set on the ASG day (recap edition) once the MVP is recorded; null if not
+  // yet available at fetch time.
+  allStarMvp?: AsgMvp | null;
 };
 
 export async function getDailyRaw(sport: string, date: string): Promise<DailyRaw | null> {

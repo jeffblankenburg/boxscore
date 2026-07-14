@@ -64,6 +64,11 @@ function tlaFor(
   map: Record<string, string>,
   team: { id: number; name: string; abbreviation?: string },
 ): string {
+  // All-Star teams (159 AL / 160 NL) aren't in the 30-team abbrev map and
+  // carry no abbreviation — resolve them to "AL"/"NL" so the ASG scoreboard
+  // tile doesn't fall back to the "AME"/"NAT" name-slice.
+  if (team.id === 159) return "AL";
+  if (team.id === 160) return "NL";
   const fromMap = map[String(team.id)];
   if (fromMap) return fromMap;
   if (team.abbreviation) return team.abbreviation.toUpperCase();
