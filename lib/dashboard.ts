@@ -2039,6 +2039,68 @@ export async function getSubscriberSources(w: Window): Promise<SubscriberSources
   };
 }
 
+// ---- QR code funnel ----------------------------------------------------
+//
+// Joins the two halves of physical-QR tracking: scans (qr_scans, written by
+// /r/qr) against conversions (subscribers whose first-touch utm_source is
+// 'qr', written by the /subscribe attribution capture). The join key is
+// src == utm_campaign — /r/qr sets utm_campaign to the scan's src.
+//
+// Both sides are windowed on their own timestamp (scanned_at / created_at).
+// A scan and its eventual signup can straddle a window boundary, so per-src
+// conversion rate is an approximation near the edges — fine for "is this card
+// working?", not a cohort analysis.
+
+export type QrFunnelRow = { src: string; scans: number; conversions: number };
+export type QrFunnel = {
+  windowStartIso: string;
+  totalScans: number;
+  totalConversions: number;
+  rows: QrFunnelRow[];
+};
+
+export async function getQrFunnel(w: Window): Promise<QrFunnel> {
+  const windowStartMs = Date.now() - windowHours(w) * 3600 * 1000;
+  const windowStartIso = new Date(windowStartMs).toISOString();
+
+  type ScanRow = { src: string | null };
+  const scans = await fetchAll<ScanRow>(
+    () => supabaseAdmin()
+      .from("qr_scans")
+      .select("src")
+      .gte("scanned_at", windowStartIso) as unknown as QueryBuilder<ScanRow>,
+    "getQrFunnel/scans",
+  );
+
+  type SubRow = { utm_campaign: string | null };
+  const subs = await fetchAll<SubRow>(
+    () => supabaseAdmin()
+      .from("subscribers")
+      .select("utm_campaign")
+      .eq("utm_source", "qr")
+      .gte("created_at", windowStartIso) as unknown as QueryBuilder<SubRow>,
+    "getQrFunnel/subs",
+  );
+
+  const scanCounts = new Map<string, number>();
+  for (const s of scans) scanCounts.set(s.src ?? "unknown", (scanCounts.get(s.src ?? "unknown") ?? 0) + 1);
+
+  const convCounts = new Map<string, number>();
+  for (const s of subs) convCounts.set(s.utm_campaign ?? "unknown", (convCounts.get(s.utm_campaign ?? "unknown") ?? 0) + 1);
+
+  const srcs = new Set<string>([...scanCounts.keys(), ...convCounts.keys()]);
+  const rows: QrFunnelRow[] = Array.from(srcs)
+    .map((src) => ({ src, scans: scanCounts.get(src) ?? 0, conversions: convCounts.get(src) ?? 0 }))
+    .sort((a, b) => b.scans - a.scans || b.conversions - a.conversions || a.src.localeCompare(b.src));
+
+  return {
+    windowStartIso,
+    totalScans: scans.length,
+    totalConversions: subs.length,
+    rows,
+  };
+}
+
 // ---- Recent subscribers ------------------------------------------------
 
 export type RecentSubscriberRow = {

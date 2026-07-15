@@ -1,8 +1,10 @@
 import { requireAdmin } from "../../require-admin";
 import {
+  getQrFunnel,
   getSubscriberSources,
   getTrafficSources,
   parseWindow,
+  type QrFunnelRow,
   type SourceCount,
 } from "@/lib/dashboard";
 import { KpiCard, WindowSelector } from "../../_components/dashboard-bits";
@@ -27,10 +29,15 @@ export default async function SourcesMetricsPage({
   await requireAdmin();
   const { window: windowParam } = await searchParams;
   const w = parseWindow(windowParam);
-  const [sources, traffic] = await Promise.all([
+  const [sources, traffic, qr] = await Promise.all([
     getSubscriberSources(w),
     getTrafficSources(w),
+    getQrFunnel(w),
   ]);
+
+  const qrConvPct = qr.totalScans === 0
+    ? "—"
+    : `${((qr.totalConversions / qr.totalScans) * 100).toFixed(1)}%`;
 
   const knownPct = sources.total === 0
     ? "—"
@@ -104,6 +111,41 @@ export default async function SourcesMetricsPage({
 
       <Section title="Signups by landing path">
         <SourceTable rows={sources.byLandingPath} total={sources.total} keyHeader="first-touch path" />
+      </Section>
+
+      <h2 className="a-section-title">QR code scans</h2>
+      <p className="a-section-note">
+        Physical QR codes (business cards, flyers) route through{" "}
+        <code>/r/qr?src=&lt;label&gt;</code>, which logs the scan and forwards to
+        /subscribe with <code>utm_source=qr</code> and{" "}
+        <code>utm_campaign=&lt;label&gt;</code>. Scans count every phone that
+        opened the link; conversions are in-window signups whose first-touch
+        source was qr. Scan and signup are windowed independently, so per-src
+        rate is approximate near the window edge.
+      </p>
+
+      <Section>
+        <div className="admin-kpis">
+          <KpiCard
+            label={`Scans (${w})`}
+            value={qr.totalScans.toLocaleString()}
+            sub="qr_scans.scanned_at in window"
+          />
+          <KpiCard
+            label="Conversions"
+            value={qr.totalConversions.toLocaleString()}
+            sub="signups with utm_source=qr"
+          />
+          <KpiCard
+            label="Conversion rate"
+            value={qrConvPct}
+            sub="conversions ÷ scans"
+          />
+        </div>
+      </Section>
+
+      <Section title="By QR label (src)">
+        <QrTable rows={qr.rows} />
       </Section>
 
       <h2 className="a-section-title">Site traffic (all visitors)</h2>
@@ -183,6 +225,41 @@ function SourceTable({
           width: "100px",
           className: "num",
           cell: (r) => total === 0 ? "—" : `${((r.count / total) * 100).toFixed(1)}%`,
+        },
+      ]}
+    />
+  );
+}
+
+// QR funnel: one row per src label, scans vs conversions vs rate. Empty
+// state points at the /r/qr route so it's obvious how rows get created.
+function QrTable({ rows }: { rows: QrFunnelRow[] }) {
+  return (
+    <DataTable
+      rows={rows}
+      empty={<EmptyState message="No QR scans in window. Physical codes route through /r/qr?src=<label>." />}
+      columns={[
+        {
+          header: "src",
+          cell: (r) => <code>{r.src}</code>,
+        },
+        {
+          header: "scans",
+          width: "110px",
+          className: "num",
+          cell: (r) => r.scans.toLocaleString(),
+        },
+        {
+          header: "conversions",
+          width: "130px",
+          className: "num",
+          cell: (r) => r.conversions.toLocaleString(),
+        },
+        {
+          header: "conv rate",
+          width: "110px",
+          className: "num",
+          cell: (r) => r.scans === 0 ? "—" : `${((r.conversions / r.scans) * 100).toFixed(1)}%`,
         },
       ]}
     />
