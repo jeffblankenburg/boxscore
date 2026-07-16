@@ -46,6 +46,7 @@ const SECTIONS: NavSection[] = [
     links: [
       { href: "/admin/metrics/subscribers", label: "Subscribers" },
       { href: "/admin/metrics/sources", label: "Sources" },
+      { href: "/admin/metrics/qr", label: "QR codes" },
       { href: "/admin/metrics/sends", label: "Sends" },
       { href: "/admin/metrics/rss", label: "RSS" },
       // Chunk 2b: move /admin/clicks → /admin/metrics/clicks

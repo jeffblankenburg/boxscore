@@ -4,9 +4,11 @@
 //
 // Refresh once per quarter:
 //   1. Run scripts/_compute-static-stats.ts to print the current values
-//   2. Paste them into QUARTERLY_STATS below
-//   3. Bump the quarter title
-//   4. Re-render the PDF (`npx tsx --env-file=.env.local scripts/render-ad-onepager.ts`)
+//   2. For dailyImpressions, run:
+//        npx tsx --env-file=.env.local scripts/compute-daily-impressions.ts 14
+//   3. Paste them into QUARTERLY_STATS below
+//   4. Bump the quarter title
+//   5. Re-render the PDF (`npx tsx --env-file=.env.local scripts/render-ad-onepager.ts`)
 
 export const QUARTERLY_STATS = {
   reportTitle: "2nd Quarter 2026 Report",
@@ -37,9 +39,17 @@ export const QUARTERLY_STATS = {
     ["lad", 97],  ["stl", 93],  ["atl", 92],  ["cin", 91],
   ] as Array<[string, number]>,
 
-  // Trial campaign — anonymized, shown as "expected results."
-  // Daily averages computed across all five days of the run.
+  // Actual audience reach an advertiser's line gets per edition: unique
+  // league-digest email opens + production web pageviews on the dated page.
+  // Trailing 14-day average through 2026-07-15, measured with the same
+  // methodology as the advertiser dashboards (lib/ad-impressions.ts).
+  // Refresh: scripts/compute-daily-impressions.ts 14. (Was a stale 5-day
+  // trial figure of 3622 that undercounted the now-larger list.)
+  dailyImpressions: 3929,   // (unique league opens + web pageviews) / edition
+
+  // Trial campaign — anonymized, shown as "expected results." Clicks stay
+  // trial-derived because they require an ad to actually be present; unlike
+  // impressions, there's no audience-wide count to compute them from.
   trialDays: 5,
-  trialDailyImpressions: 3622,   // (email opens + web pageviews) / day
   trialDailyClicks: 95,
 } as const;

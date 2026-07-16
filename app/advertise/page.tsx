@@ -130,29 +130,20 @@ export default async function AdvertisePage() {
       </header>
 
       <Section eyebrow="By the numbers" title="An engaged, daily-read audience">
-        <p className="advertise-meta">
-          {Q.reportTitle}. MLB league + team digests, current as of the
-          quarter print. Team digests are a separate inventory — see below.
-        </p>
         <dl className="advertise-stats">
           <Stat
             value={<CountUp to={Q.totalSubscribers} />}
             label="Subscribers"
           />
           <Stat
-            value={<CountUp to={Q.trialDailyImpressions} />}
+            value={<CountUp to={Q.dailyImpressions} />}
             label="Avg daily impressions"
-            note="from a recent 5-day sponsor-line trial"
+            note="unique league-digest opens + web views, trailing 14-day avg"
           />
           <Stat
             value={<CountUp to={Q.openRate} format="percent" />}
             label="Open rate"
             note={`industry avg ${INDUSTRY_OPEN_RATE_LABEL}`}
-          />
-          <Stat
-            value={<CountUp to={Q.trialDailyClicks} />}
-            label="Avg daily clicks"
-            note="from the same trial"
           />
           <Stat
             value={<CountUp to={Q.sendsLast30d} />}

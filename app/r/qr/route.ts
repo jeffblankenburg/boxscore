@@ -14,7 +14,7 @@
 // `src` is a short label like "sabr-2026". Lowercase letters / digits /
 // hyphens only — keeps URLs readable and gives a stable group-by key.
 
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 
@@ -27,16 +27,21 @@ export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get("src") ?? "";
   const src = SRC_RE.test(raw) ? raw : "unknown";
 
-  void supabaseAdmin()
-    .from("qr_scans")
-    .insert({
-      src,
-      user_agent: req.headers.get("user-agent"),
-      referer: req.headers.get("referer"),
-    })
-    .then(({ error }) => {
-      if (error) console.error(`[r/qr] insert failed: ${error.message}`);
-    });
+  // Log via after() rather than fire-and-forget: on serverless the function
+  // is frozen once the 302 is sent, which drops a bare background insert on
+  // cold invocations (verified — a cold /r/qr hit lost its row while warm
+  // hits landed). after() registers the write with the platform (waitUntil
+  // on Vercel) so the function stays alive until it completes, without adding
+  // latency to the redirect or coupling it to DB health.
+  const scan = {
+    src,
+    user_agent: req.headers.get("user-agent"),
+    referer: req.headers.get("referer"),
+  };
+  after(async () => {
+    const { error } = await supabaseAdmin().from("qr_scans").insert(scan);
+    if (error) console.error(`[r/qr] insert failed: ${error.message}`);
+  });
 
   // Forward to the public subscribe page with attribution the existing
   // capture script understands. utm_medium=print because a QR on a physical

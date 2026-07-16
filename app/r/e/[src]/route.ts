@@ -15,7 +15,7 @@
 // Lowercase letters / digits / hyphens only — keeps URLs readable and
 // gives us a stable group-by key in the admin click-rate dashboard.
 
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { verifyEmailLink } from "@/lib/link-tracking";
 import { EMAIL_LINK_BASE } from "@/lib/site";
@@ -57,17 +57,20 @@ export async function GET(
   }
   if (!valid) return home;
 
-  void supabaseAdmin()
-    .from("email_link_clicks")
-    .insert({
-      src,
-      link_target: to,
-      user_agent: req.headers.get("user-agent"),
-      referer: req.headers.get("referer"),
-    })
-    .then(({ error }) => {
-      if (error) console.error(`[r/e] insert failed: ${error.message}`);
-    });
+  // Log via after(), not fire-and-forget: on serverless the function is
+  // frozen once the 302 is sent, dropping a bare background insert on cold
+  // invocations. after() keeps the function alive (waitUntil on Vercel)
+  // until the write completes without delaying the redirect.
+  const click = {
+    src,
+    link_target: to,
+    user_agent: req.headers.get("user-agent"),
+    referer: req.headers.get("referer"),
+  };
+  after(async () => {
+    const { error } = await supabaseAdmin().from("email_link_clicks").insert(click);
+    if (error) console.error(`[r/e] insert failed: ${error.message}`);
+  });
 
   const res = NextResponse.redirect(destUrl);
   res.headers.set("Cache-Control", "no-store");

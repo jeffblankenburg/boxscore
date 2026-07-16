@@ -1838,6 +1838,47 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .admin-kpi-delta-neutral { color: var(--text-muted); }
 .admin-kpi-sub { font-size: 12px; color: var(--text-muted); font-style: italic; }
 
+/* QR generator (/admin/metrics/qr) — controls on the left, live preview on
+   the right. Reuses the admin paper/border tokens so it sits flush with the
+   surrounding metrics cards. */
+.qrgen { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+         border: 1px solid var(--border-strong); background: var(--bg-paper);
+         padding: 16px 18px; }
+.qrgen-controls { flex: 1 1 320px; min-width: 0; }
+.qrgen-label { display: block; font-size: 11px; text-transform: uppercase;
+               letter-spacing: 0.1em; color: var(--text-muted); font-weight: 700;
+               margin-bottom: 6px; }
+.qrgen-input { width: 100%; max-width: 340px; font: 15px ui-monospace, monospace;
+               padding: 8px 10px; border: 1px solid var(--border-strong);
+               background: var(--bg-paper); color: var(--text-primary); }
+.qrgen-hint { font-size: 12px; color: var(--text-muted); margin: 6px 0 0;
+              line-height: 1.4; }
+.qrgen-target { font-size: 13px; margin: 14px 0 0; word-break: break-all; }
+.qrgen-invalid { font-size: 13px; color: #a40000; margin: 14px 0 0; }
+.qrgen-downloads { margin-top: 16px; }
+.qrgen-downloads-title { display: block; font-size: 11px; text-transform: uppercase;
+                         letter-spacing: 0.1em; color: var(--text-muted);
+                         font-weight: 700; margin: 12px 0 6px; }
+.qrgen-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.qrgen-btn { display: inline-flex; flex-direction: column; gap: 1px;
+             padding: 7px 12px; border: 1px solid var(--border-strong);
+             background: var(--bg-paper); color: var(--text-primary);
+             font: 700 13px/1.1 ui-monospace, monospace; text-decoration: none;
+             cursor: pointer; }
+.qrgen-btn:hover { background: var(--surface-muted, #f0ebde); }
+.qrgen-btn-primary { background: #1f1f1f; color: #fff; border-color: #1f1f1f; }
+.qrgen-btn-primary:hover { background: #333; }
+.qrgen-btn-note { font: 400 10px/1 ui-monospace, monospace; opacity: 0.7;
+                  text-transform: none; letter-spacing: 0; }
+.qrgen-preview { flex: 0 0 auto; display: flex; flex-direction: column;
+                 align-items: center; gap: 6px; }
+.qrgen-img { width: 280px; height: 280px; border: 1px solid var(--border-light);
+             background: #fff; image-rendering: pixelated; }
+.qrgen-img-empty { display: flex; align-items: center; justify-content: center;
+                   color: var(--text-muted); font-size: 13px;
+                   image-rendering: auto; }
+.qrgen-preview-note { font-size: 11px; color: var(--text-muted); }
+
 .admin-chart { margin: 8px 0 0; }
 .admin-chart svg { width: 100%; height: auto; max-width: 100%;
                    border: 1px solid var(--border-light); background: var(--bg-paper);

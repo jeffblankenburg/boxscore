@@ -11,7 +11,7 @@
 //   - Insert error              → still 302 to destination (don't block
 //                                 the click on a logging failure)
 
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { verifyAdLink } from "@/lib/link-tracking";
 import { isLikelyBot } from "@/lib/bot-detect";
@@ -57,21 +57,23 @@ export async function GET(
   }
   if (!valid) return home;
 
-  // Fire-and-forget insert. Don't await — we don't want to block the
-  // redirect on the DB. Errors are logged but never surface to the user.
+  // Log via after(), not fire-and-forget: on serverless the function is
+  // frozen once the 302 is sent, dropping a bare background insert on cold
+  // invocations. after() keeps the function alive (waitUntil on Vercel)
+  // until the write completes without delaying the redirect — important here
+  // because these rows are billable ad-click counts.
   const ua = req.headers.get("user-agent");
-  void supabaseAdmin()
-    .from("link_clicks")
-    .insert({
-      label: "ad",
-      placement_id,
-      destination: to,
-      user_agent: ua ? ua.slice(0, 200) : null,
-      is_bot: isLikelyBot(ua),
-    })
-    .then(({ error }) => {
-      if (error) console.error(`[r/ad] insert failed: ${error.message}`);
-    });
+  const click = {
+    label: "ad",
+    placement_id,
+    destination: to,
+    user_agent: ua ? ua.slice(0, 200) : null,
+    is_bot: isLikelyBot(ua),
+  };
+  after(async () => {
+    const { error } = await supabaseAdmin().from("link_clicks").insert(click);
+    if (error) console.error(`[r/ad] insert failed: ${error.message}`);
+  });
 
   const res = NextResponse.redirect(destUrl);
   res.headers.set("Cache-Control", "no-store");
