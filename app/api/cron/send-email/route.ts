@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDigest } from "@/lib/digests";
 import { getSportRow } from "@/lib/sports";
+import { featuresFor } from "@/lib/sport-features";
 import { getActiveSubscribersForSport } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
@@ -75,6 +76,21 @@ export async function GET(req: Request) {
 
     const digest = await getDigest(sport, date);
     if (!digest || !digest.email_html) {
+      // Football (sendsOnGameDaysOnly) skips persisting a digest on game-less
+      // days, so a missing digest is expected, not a failure — record a clean
+      // skip so the cron pulse stays green. Every other sport treats a missing
+      // digest as a real error (generate should always have produced one).
+      if (featuresFor(sport).sendsOnGameDaysOnly) {
+        const result = {
+          sport, date,
+          total_active_subscribers: 0,
+          sent: 0, skipped: 0, failed: 0,
+          skipped_reason: "no_games",
+        };
+        console.log(`[send-email] sport=${sport} date=${date} status=skipped reason=no_games`);
+        await finishCronRun(runId, { status: "ok", result });
+        return NextResponse.json({ ok: true, ...result });
+      }
       throw new Error(`no digest for ${sport} ${date}`);
     }
 

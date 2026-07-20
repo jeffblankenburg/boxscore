@@ -37,6 +37,12 @@ export type SportFeatures = {
   // grid use this to know what "missing" means — a route that's not in this
   // list is silently absent rather than red.
   expectedRoutes: readonly CronRoute[];
+  // True for sports that only email on days a game was played (football:
+  // NFL Thu/Sun/Mon, NCAAF mostly Saturdays). The generate cron runs daily
+  // and skips persisting a digest on game-less days; send-email treats a
+  // missing digest as a clean skip rather than a failure. Baseball/basketball
+  // send every day in-season, so they leave this false.
+  sendsOnGameDaysOnly?: boolean;
 };
 
 // MLB expects every per-sport route. supervise is excluded because it has no
@@ -53,6 +59,9 @@ export const SPORT_FEATURES: Record<string, SportFeatures> = {
   // show up as red rows for routes that aren't supposed to exist yet.
   nba:  { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"] },
   wnba: { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"] },
+  // Football: recap-only (no preview), and sends only on days with games.
+  nfl:   { hasPreview: false, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"], sendsOnGameDaysOnly: true },
+  ncaaf: { hasPreview: false, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"], sendsOnGameDaysOnly: true },
 };
 
 export function featuresFor(sport: string): SportFeatures {

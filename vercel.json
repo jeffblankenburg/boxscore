@@ -41,6 +41,22 @@
       "schedule": "40 9 * * *"
     },
     {
+      "path": "/api/cron/generate?sport=nfl&refetch=true",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/send-email?sport=nfl",
+      "schedule": "10 8 * * *"
+    },
+    {
+      "path": "/api/cron/generate?sport=ncaaf&refetch=true",
+      "schedule": "20 8 * * *"
+    },
+    {
+      "path": "/api/cron/send-email?sport=ncaaf",
+      "schedule": "30 8 * * *"
+    },
+    {
       "path": "/api/cron/send-team-email?sport=mlb",
       "schedule": "45 9 * * *"
     },

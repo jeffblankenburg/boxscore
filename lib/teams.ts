@@ -107,6 +107,43 @@ export const TEAMS: readonly Team[] = [
   { sport: "wnba", slug: "sea", name: "Seattle Storm", city: "Seattle", nickname: "Storm", abbreviation: "SEA" },
   { sport: "wnba", slug: "tor", name: "Toronto Tempo", city: "Toronto", nickname: "Tempo", abbreviation: "TOR" },
   { sport: "wnba", slug: "was", name: "Washington Mystics", city: "Washington", nickname: "Mystics", abbreviation: "WAS" },
+
+  // NFL. Slugs are the lowercased ESPN abbreviation so the football
+  // adapter's derived team slug (lib/sports/football/adapters/from-espn.ts)
+  // resolves here without a separate map. abbreviation matches ESPN's exactly
+  // (WSH, JAX, LV, LAC/LAR) — do not "normalize" it or the join breaks.
+  { sport: "nfl", slug: "ari", name: "Arizona Cardinals", city: "Arizona", nickname: "Cardinals", abbreviation: "ARI", primary: "#97233F" },
+  { sport: "nfl", slug: "atl", name: "Atlanta Falcons", city: "Atlanta", nickname: "Falcons", abbreviation: "ATL", primary: "#A71930" },
+  { sport: "nfl", slug: "bal", name: "Baltimore Ravens", city: "Baltimore", nickname: "Ravens", abbreviation: "BAL", primary: "#241773" },
+  { sport: "nfl", slug: "buf", name: "Buffalo Bills", city: "Buffalo", nickname: "Bills", abbreviation: "BUF", primary: "#00338D" },
+  { sport: "nfl", slug: "car", name: "Carolina Panthers", city: "Carolina", nickname: "Panthers", abbreviation: "CAR", primary: "#0085CA" },
+  { sport: "nfl", slug: "chi", name: "Chicago Bears", city: "Chicago", nickname: "Bears", abbreviation: "CHI", primary: "#0B162A" },
+  { sport: "nfl", slug: "cin", name: "Cincinnati Bengals", city: "Cincinnati", nickname: "Bengals", abbreviation: "CIN", primary: "#FB4F14" },
+  { sport: "nfl", slug: "cle", name: "Cleveland Browns", city: "Cleveland", nickname: "Browns", abbreviation: "CLE", primary: "#311D00" },
+  { sport: "nfl", slug: "dal", name: "Dallas Cowboys", city: "Dallas", nickname: "Cowboys", abbreviation: "DAL", primary: "#003594" },
+  { sport: "nfl", slug: "den", name: "Denver Broncos", city: "Denver", nickname: "Broncos", abbreviation: "DEN", primary: "#FB4F14" },
+  { sport: "nfl", slug: "det", name: "Detroit Lions", city: "Detroit", nickname: "Lions", abbreviation: "DET", primary: "#0076B6" },
+  { sport: "nfl", slug: "gb",  name: "Green Bay Packers", city: "Green Bay", nickname: "Packers", abbreviation: "GB", primary: "#203731" },
+  { sport: "nfl", slug: "hou", name: "Houston Texans", city: "Houston", nickname: "Texans", abbreviation: "HOU", primary: "#03202F" },
+  { sport: "nfl", slug: "ind", name: "Indianapolis Colts", city: "Indianapolis", nickname: "Colts", abbreviation: "IND", primary: "#002C5F" },
+  { sport: "nfl", slug: "jax", name: "Jacksonville Jaguars", city: "Jacksonville", nickname: "Jaguars", abbreviation: "JAX", primary: "#006778" },
+  { sport: "nfl", slug: "kc",  name: "Kansas City Chiefs", city: "Kansas City", nickname: "Chiefs", abbreviation: "KC", primary: "#E31837" },
+  { sport: "nfl", slug: "lv",  name: "Las Vegas Raiders", city: "Las Vegas", nickname: "Raiders", abbreviation: "LV", primary: "#000000" },
+  { sport: "nfl", slug: "lac", name: "Los Angeles Chargers", city: "Los Angeles", nickname: "Chargers", abbreviation: "LAC", primary: "#0080C6" },
+  { sport: "nfl", slug: "lar", name: "Los Angeles Rams", city: "Los Angeles", nickname: "Rams", abbreviation: "LAR", primary: "#003594" },
+  { sport: "nfl", slug: "mia", name: "Miami Dolphins", city: "Miami", nickname: "Dolphins", abbreviation: "MIA", primary: "#008E97" },
+  { sport: "nfl", slug: "min", name: "Minnesota Vikings", city: "Minnesota", nickname: "Vikings", abbreviation: "MIN", primary: "#4F2683" },
+  { sport: "nfl", slug: "ne",  name: "New England Patriots", city: "New England", nickname: "Patriots", abbreviation: "NE", primary: "#002244" },
+  { sport: "nfl", slug: "no",  name: "New Orleans Saints", city: "New Orleans", nickname: "Saints", abbreviation: "NO", primary: "#D3BC8D" },
+  { sport: "nfl", slug: "nyg", name: "New York Giants", city: "New York", nickname: "Giants", abbreviation: "NYG", primary: "#0B2265" },
+  { sport: "nfl", slug: "nyj", name: "New York Jets", city: "New York", nickname: "Jets", abbreviation: "NYJ", primary: "#125740" },
+  { sport: "nfl", slug: "phi", name: "Philadelphia Eagles", city: "Philadelphia", nickname: "Eagles", abbreviation: "PHI", primary: "#004C54" },
+  { sport: "nfl", slug: "pit", name: "Pittsburgh Steelers", city: "Pittsburgh", nickname: "Steelers", abbreviation: "PIT", primary: "#FFB612" },
+  { sport: "nfl", slug: "sf",  name: "San Francisco 49ers", city: "San Francisco", nickname: "49ers", abbreviation: "SF", primary: "#AA0000" },
+  { sport: "nfl", slug: "sea", name: "Seattle Seahawks", city: "Seattle", nickname: "Seahawks", abbreviation: "SEA", primary: "#002244" },
+  { sport: "nfl", slug: "tb",  name: "Tampa Bay Buccaneers", city: "Tampa Bay", nickname: "Buccaneers", abbreviation: "TB", primary: "#D50A0A" },
+  { sport: "nfl", slug: "ten", name: "Tennessee Titans", city: "Tennessee", nickname: "Titans", abbreviation: "TEN", primary: "#0C2340" },
+  { sport: "nfl", slug: "wsh", name: "Washington Commanders", city: "Washington", nickname: "Commanders", abbreviation: "WSH", primary: "#5A1414" },
 ];
 
 export function findTeam(sport: Sport, slug: string): Team | undefined {

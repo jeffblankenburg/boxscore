@@ -19,9 +19,15 @@ import {
 import { dailyEmail } from "@/lib/emails/templates";
 import { BRAND } from "@/lib/brand";
 import { SOCIAL_ICON_DATA_BY_SLUG } from "@/lib/brand-icon-data";
-import { isValidIsoDate } from "@/lib/dates";
+import { isValidIsoDate, prettyDate } from "@/lib/dates";
 import { MLB_PREVIEW_FIXTURES } from "@/lib/mlb-preview-fixtures";
 import { basketballFixtureDate } from "@/lib/basketball-preview-fixtures";
+import { loadFootballData } from "@/lib/sports/football/data";
+import {
+  renderFootballContent,
+  renderFootballEmailContent,
+} from "@/lib/sports/football/render/digest";
+import { FOOTBALL_PREVIEW_FIXTURES } from "@/lib/sports/football/preview-fixtures";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,7 +89,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
   }
 
   const { sport } = await params;
-  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba") {
+  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba" && sport !== "nfl" && sport !== "ncaaf") {
     return NextResponse.json({ error: `unknown sport: ${sport}` }, { status: 404 });
   }
 
@@ -95,9 +101,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
   // jump dropdown. Falls back to a known-good fixture per sport when no
   // date is supplied (first load of /admin/preview/{sport}).
   const dateParam = url.searchParams.get("date");
-  const fallbackDate = sport === "mlb"
-    ? MLB_PREVIEW_FIXTURES.regular
-    : basketballFixtureDate(sport, "current");
+  const fallbackDate =
+    sport === "mlb"
+      ? MLB_PREVIEW_FIXTURES.regular
+      : sport === "nfl"
+        ? FOOTBALL_PREVIEW_FIXTURES.nfl
+        : sport === "ncaaf"
+          ? FOOTBALL_PREVIEW_FIXTURES.ncaaf
+          : basketballFixtureDate(sport, "current");
   const targetDate = dateParam && isValidIsoDate(dateParam) ? dateParam : fallbackDate;
 
   // Load + render per sport. Both paths produce a { digestDate, digestPrettyDate,
@@ -120,6 +131,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
       renderCanonicalContentWithAds(canonical, sport),
       renderCanonicalEmailContentWithAds(canonical, sport),
     ]);
+  } else if (sport === "nfl" || sport === "ncaaf") {
+    const fb = await loadFootballData(sport, targetDate);
+    digestDate = fb.date;
+    digestPrettyDate = prettyDate(fb.date);
+    webBody = renderFootballContent(fb);
+    emailBody = renderFootballEmailContent(fb);
   } else {
     const data = sport === "nba"
       ? await loadNbaData(targetDate)

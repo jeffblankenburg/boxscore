@@ -24,9 +24,11 @@ export type Sport = {
 };
 
 export const SPORTS: readonly Sport[] = [
-  { id: "mlb",  name: "MLB",  visibility: "public" },
-  { id: "wnba", name: "WNBA", visibility: "admin_only" },
-  { id: "nba",  name: "NBA",  visibility: "admin_only" },
+  { id: "mlb",   name: "MLB",   visibility: "public" },
+  { id: "wnba",  name: "WNBA",  visibility: "admin_only" },
+  { id: "nba",   name: "NBA",   visibility: "admin_only" },
+  { id: "nfl",   name: "NFL",   visibility: "admin_only" },
+  { id: "ncaaf", name: "College Football", visibility: "admin_only" },
 ] as const;
 
 const BY_ID = new Map<string, Sport>(SPORTS.map((s) => [s.id, s]));

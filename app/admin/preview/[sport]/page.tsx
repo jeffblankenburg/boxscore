@@ -12,11 +12,12 @@ import {
   BASKETBALL_PREVIEW_MODES,
   basketballFixtureDate,
 } from "@/lib/basketball-preview-fixtures";
+import { FOOTBALL_PREVIEW_FIXTURES } from "@/lib/sports/football/preview-fixtures";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Preview · admin · boxscore", robots: { index: false } };
 
-const VALID_SPORTS = new Set(["mlb", "nba", "wnba"]);
+const VALID_SPORTS = new Set(["mlb", "nba", "wnba", "nfl", "ncaaf"]);
 
 // Preset preview widths. "full" means no constraint (fills the available column).
 const WIDTH_PRESETS: Array<{ key: string; label: string; px: number | null }> = [
@@ -45,6 +46,12 @@ function modeOptionsFor(sport: string): ModeOptions {
       ),
       defaultDate: MLB_PREVIEW_FIXTURES.regular,
     };
+  }
+  if (sport === "nfl" || sport === "ncaaf") {
+    // Football is recap-only — no classifier modes. A single known-good
+    // fixture per league backs the quick-jump; the date input drives the rest.
+    const d = FOOTBALL_PREVIEW_FIXTURES[sport];
+    return { modes: ["regular"], fixtures: { regular: d }, defaultDate: d };
   }
   const sportTyped = sport as "nba" | "wnba";
   return {

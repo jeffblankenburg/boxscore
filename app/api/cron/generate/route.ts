@@ -18,6 +18,11 @@ import {
   renderBasketballContent,
   renderBasketballEmailContent,
 } from "@/lib/render-basketball";
+import { loadFootballData, hasPlayedGames } from "@/lib/sports/football/data";
+import {
+  renderFootballContent,
+  renderFootballEmailContent,
+} from "@/lib/sports/football/render/digest";
 import { yesterdayInET, isValidIsoDate, nextDay } from "@/lib/dates";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 import { renderScoreboardShareImage } from "@/lib/render-images";
@@ -56,7 +61,7 @@ export async function GET(req: Request) {
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
-  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba") {
+  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba" && sport !== "nfl" && sport !== "ncaaf") {
     return NextResponse.json(
       { error: `no generator implemented for sport=${sport}` },
       { status: 501 },
@@ -173,6 +178,36 @@ export async function GET(req: Request) {
       // A new edition (or a regenerated one) means the sitemap's dated URL
       // list has changed — bust the 24h ISR cache so crawlers see the new
       // entries immediately instead of waiting for the natural expiry.
+      revalidatePath("/sitemap.xml");
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    // Football (nfl | ncaaf): load → render → upsert, recap-only. Unlike MLB
+    // and basketball, football sends only on days a game was played, so on a
+    // game-less day (most weekdays for the NFL, non-Saturdays for college) we
+    // record a clean skip and do NOT persist a digest — send-email then finds
+    // no digest and skips cleanly too.
+    if (sport === "nfl" || sport === "ncaaf") {
+      const fb = await loadFootballData(sport, date, { refetch });
+      if (!hasPlayedGames(fb)) {
+        const result = { sport, date, game_count: 0, skipped_reason: "no_games" as const };
+        await finishCronRun(runId, { status: "ok", result });
+        return NextResponse.json({ ok: true, ...result });
+      }
+      const html = renderFootballContent(fb);
+      const email_html = renderFootballEmailContent(fb);
+      await upsertDigest({
+        sport, date, html, email_html, game_count: fb.games.length,
+      });
+      const result = {
+        sport, date,
+        game_count: fb.games.length,
+        ranking_polls: fb.rankings.length,
+        standings_groups: fb.standings.length,
+        html_bytes: html.length,
+        email_bytes: email_html.length,
+      };
       revalidatePath("/sitemap.xml");
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });

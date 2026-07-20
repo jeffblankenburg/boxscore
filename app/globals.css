@@ -1288,6 +1288,113 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-st-team { text-align: left !important; font-size: 12px; }
 .bb-st-stat { min-width: 36px; }
 
+/* Football digest — NFL + NCAAF share the same renderer
+   (lib/sports/football/render/digest.ts) and classes. Mirrored in
+   FOOTBALL_EMAIL_STYLES for email; keep the two stylesheets in sync. Same
+   design tokens as MLB/basketball. */
+.fb-linescore th, .fb-linescore td,
+.fb-stat-table th, .fb-stat-table td,
+.fb-standings-table th, .fb-standings-table td,
+.fb-rank-table th, .fb-rank-table td { border-top: none; }
+
+.fb-section { margin: 18px 0 24px; }
+.fb-section-title {
+  font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
+  margin: 22px 0 6px; padding-bottom: 4px; border-bottom: 2px solid #161410;
+}
+.fb-dateline {
+  border-top: 3px double #161410; border-bottom: 1px solid #161410;
+  padding: 8px 0; margin: 0 0 14px; text-align: center;
+}
+.fb-dateline-text {
+  font-style: italic; font-weight: 800; letter-spacing: -0.005em;
+  font-size: 22px; font-size: clamp(16px, 4.2vw, 24px);
+}
+
+.fb-rank-grid { display: block; }
+.fb-rank-block { margin: 8px 0 14px; }
+.fb-rank-caption {
+  margin: 10px 0 2px; padding: 0 0 2px; font-size: 13px; font-weight: 700;
+  border-bottom: 1px solid #161410;
+}
+.fb-rank-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 12px; }
+.fb-rank-table th, .fb-rank-table td { padding: 2px 4px; white-space: nowrap; }
+.fb-rank-table th {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; border-bottom: 1px solid #161410; text-align: left;
+}
+.fb-rk-rank { width: 24px; text-align: right !important; color: #6a6354; }
+.fb-rk-team { text-align: left; }
+.fb-rk-fpv { color: #6a6354; font-size: 10px; }
+.fb-rk-rec { width: 44px; text-align: right !important; color: #6a6354; }
+.fb-rk-trend { width: 44px; text-align: right !important; color: #6a6354; font-size: 11px; }
+.fb-rk-new { color: #6a6354; font-style: italic; }
+
+.fb-game { margin: 18px 0 8px; padding-top: 6px; border-top: 1px solid #c4baa5; }
+.fb-game-context { font-size: 11px; font-style: italic; color: #6a6354;
+                   letter-spacing: 0.04em; margin-bottom: 2px; }
+.fb-game-header { display: flex; justify-content: space-between; align-items: baseline;
+                  margin: 0 0 4px; padding-bottom: 3px; border-bottom: 1px solid #161410; }
+.fb-game-matchup { font-size: 16px; font-weight: 700; }
+.fb-game-status  { font-size: 11px; color: #6a6354; font-style: italic; }
+.fb-rank-badge { font-size: 11px; font-weight: 700; color: #6a6354; }
+.fb-upset {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  border: 1px solid #161410; padding: 0 3px; margin-left: 4px; vertical-align: middle;
+}
+
+.fb-linescore { width: 100%; border-collapse: collapse; margin: 0 0 6px;
+                font-size: 12px; table-layout: fixed; }
+.fb-linescore th, .fb-linescore td { padding: 2px 4px; text-align: right; white-space: nowrap; }
+.fb-linescore thead th { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                         letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
+.fb-ls-team { text-align: left !important; font-weight: 700; width: 18%; font-size: 12px; }
+.fb-ls-team-head { text-align: left !important; }
+.fb-ls-total { font-weight: 700; }
+.fb-ls-cell { min-width: 22px; }
+
+.fb-score-list { list-style: none; padding: 0; margin: 4px 0 8px; }
+.fb-score-row { display: flex; gap: 8px; align-items: baseline; padding: 2px 0;
+                border-bottom: 1px dotted #e8e2d4; font-size: 11px; line-height: 1.35; }
+.fb-score-row:last-child { border-bottom: none; }
+.fb-score-clock { flex-shrink: 0; min-width: 72px; font-weight: 700; color: #2a2620;
+                  font-size: 10px; letter-spacing: 0.02em; }
+.fb-score-text { flex: 1; }
+.fb-score-tally { flex-shrink: 0; font-weight: 700; min-width: 44px; text-align: right; }
+
+.fb-box { display: block; margin: 6px 0 0; }
+.fb-team-box { margin: 8px 0 4px; }
+.fb-team-caption { margin: 10px 0 2px; padding: 0 0 2px; font-size: 13px; font-weight: 700;
+                   border-bottom: 1px solid #161410; }
+.fb-team-totals { font-size: 11px; color: #2a2620; margin: 2px 0 6px; }
+
+.fb-stat-table { width: 100%; border-collapse: collapse; font-size: 12px;
+                 margin: 4px 0 8px; table-layout: fixed; }
+.fb-stat-table th, .fb-stat-table td { padding: 2px 3px; text-align: right; white-space: nowrap; }
+.fb-stat-table thead th { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                          letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
+.fb-st-name { text-align: left !important; font-size: 12px; width: 40%;
+              white-space: normal; word-break: break-word; }
+.fb-stat-table thead .fb-st-name { font-weight: 700; }
+.fb-st-cell { min-width: 30px; }
+
+.fb-standings-grid { display: block; }
+.fb-standings-block { margin: 8px 0 14px; }
+.fb-standings-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 6px 0 14px; }
+.fb-conf-caption { margin: 10px 0 2px; padding: 0 0 2px; font-size: 13px; font-weight: 700;
+                   border-bottom: 1px solid #161410; }
+.fb-standings-table th, .fb-standings-table td { padding: 2px 4px; text-align: right; white-space: nowrap; }
+.fb-standings-table th { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                         letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
+.fb-sd-team { text-align: left !important; font-size: 12px; }
+.fb-sd-stat { min-width: 34px; }
+
+@media only screen and (max-width: 480px) {
+  .fb-stat-table td, .fb-standings-table td, .fb-rank-table td { font-size: 11px; padding: 1px 2px; }
+  .fb-stat-table th, .fb-standings-table th, .fb-rank-table th { font-size: 9px; }
+  .fb-score-clock { min-width: 60px; }
+}
+
 /* Cron pulse — today's status of each scheduled route for a league. */
 .cron-pulse { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
 .cron-pulse-pill {
