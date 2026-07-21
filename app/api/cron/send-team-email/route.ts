@@ -211,6 +211,7 @@ export async function GET(req: Request) {
             // unsubscribe the real user.
             const oneClickUrl = `${EMAIL_LINK_BASE}/api/u/${sub.unsubscribe_token}`;
             const { subject, html, text } = teamDailyEmail({
+              sport,
               teamName: team.name,
               digestDate: date,
               digestPrettyDate,

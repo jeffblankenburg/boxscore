@@ -8,6 +8,18 @@
 //     Gmail's ~102KB cap.
 
 import { EMAIL_STYLES } from "../render-email";
+import { BASKETBALL_EMAIL_STYLES } from "../render-basketball";
+import { FOOTBALL_EMAIL_STYLES } from "../sports/football/render/digest";
+
+// Each sport's digest email carries ONLY its own stylesheet (disjoint class
+// prefixes: es-* MLB, bb-* basketball, fb-* football). Never concatenate them
+// into one block — that bloats the shared <style> past the size Gmail silently
+// drops it, which broke the MLB email. See lib/render-email.ts.
+function stylesForSport(sport: string): string {
+  if (sport === "nba" || sport === "wnba") return BASKETBALL_EMAIL_STYLES;
+  if (sport === "nfl" || sport === "ncaaf") return FOOTBALL_EMAIL_STYLES;
+  return EMAIL_STYLES; // mlb + safe default
+}
 import { nextDay, prettyDate, shortPrettyDate } from "../dates";
 import { EMAIL_LINK_BASE } from "../site";
 
@@ -201,6 +213,7 @@ export function dailyEmail(opts: {
   const editionDateIso = nextDay(opts.digestDate);
   const subject = `${sportTag} - ${shortPrettyDate(editionDateIso)}`;
   const html = wrapWithDigest({
+    styles: stylesForSport(opts.sport),
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
@@ -221,6 +234,7 @@ export function dailyEmail(opts: {
  * specific team. Body comes from renderTeamEmailContent().
  */
 export function teamDailyEmail(opts: {
+  sport: string;               // picks the digest stylesheet (es-/bb-/fb-)
   teamName: string;
   digestDate: string;          // ISO "YYYY-MM-DD" of the digest
   digestPrettyDate: string;    // long form, used in preview text
@@ -240,6 +254,7 @@ export function teamDailyEmail(opts: {
   const editionDateIso = nextDay(opts.digestDate);
   const subject = `${opts.teamName} - ${shortPrettyDate(editionDateIso)}`;
   const html = wrapWithDigest({
+    styles: stylesForSport(opts.sport),
     digestEmailHtml: opts.digestEmailHtml,
     unsubscribeUrl: opts.unsubscribeUrl,
     digestUrl: opts.digestUrl,
@@ -264,6 +279,8 @@ export function teamDailyEmail(opts: {
  * the digest body so it survives the clip threshold.
  */
 function wrapWithDigest(opts: {
+  // The sport's stylesheet (es-/bb-/fb-). Defaults to MLB's es- rules.
+  styles?: string;
   welcomeBanner?: string;
   announcementBanner?: string;
   digestEmailHtml: string;
@@ -290,7 +307,7 @@ function wrapWithDigest(opts: {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap">
-<style>${EMAIL_STYLES}</style>
+<style>${opts.styles ?? EMAIL_STYLES}</style>
 </head>
 <body style="margin:0; padding:0; background:${PAPER}; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; color:${INK}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; text-size-adjust:100%;">
 ${pixel}${preview}

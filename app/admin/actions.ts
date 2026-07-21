@@ -95,6 +95,7 @@ export async function sendTeamAdminPreview(
     const { getAnnouncement } = await import("@/lib/announcements");
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
     const { subject, html, text } = teamDailyEmail({
+      sport,
       teamName: team.name,
       digestDate: date,
       digestPrettyDate: prettyDate(date),

@@ -39,6 +39,7 @@ export default async function AdminTeamEmailPreview({
   const { getAnnouncement } = await import("@/lib/announcements");
   const announcementBanner = (await getAnnouncement("mlb", date)) ?? undefined;
   const { html, subject } = teamDailyEmail({
+    sport: "mlb",
     teamName: team.name,
     digestDate: date,
     digestPrettyDate: prettyDate(date),

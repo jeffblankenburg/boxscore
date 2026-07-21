@@ -36,6 +36,7 @@ export async function GET(
   const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
 
   const { html } = teamDailyEmail({
+    sport,
     teamName: team.name,
     digestDate: date,
     digestPrettyDate: prettyDate(date),
