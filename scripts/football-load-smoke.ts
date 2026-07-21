@@ -9,10 +9,18 @@ import { loadFootballData, hasPlayedGames } from "../lib/sports/football/data";
 import { FOOTBALL_PREVIEW_FIXTURES } from "../lib/sports/football/preview-fixtures";
 
 async function main() {
-  for (const league of ["nfl", "ncaaf"] as const) {
-    const date = FOOTBALL_PREVIEW_FIXTURES[league];
+  // Optional args: <league> <date> to refetch one specific row; otherwise
+  // both fixture dates.
+  const argLeague = process.argv[2] as "nfl" | "ncaaf" | undefined;
+  const argDate = process.argv[3];
+  const targets: Array<readonly ["nfl" | "ncaaf", string]> =
+    argLeague && argDate ? [[argLeague, argDate]] :
+    [["nfl", FOOTBALL_PREVIEW_FIXTURES.nfl], ["ncaaf", FOOTBALL_PREVIEW_FIXTURES.ncaaf]];
+  for (const [league, date] of targets) {
     const t0 = Date.now();
-    const data = await loadFootballData(league, date);
+    // refetch so the cached daily_raw picks up feed/URL changes (e.g. the NFL
+    // standings level=3 division grouping) rather than serving a stale row.
+    const data = await loadFootballData(league, date, { refetch: true });
     console.log(
       `${league} ${date}: games=${data.games.length} boxes=${data.boxScores.size} ` +
       `rankings=${data.rankings.length} standings=${data.standings.length} ` +

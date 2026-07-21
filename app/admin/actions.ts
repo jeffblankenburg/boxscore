@@ -260,13 +260,43 @@ export async function setSportSends(formData: FormData): Promise<void> {
     if (!sport) throw new Error("missing sport");
     if (!confirmed) throw new Error("not confirmed");
     const { getSportById, setSportSendsEnabled } = await import("@/lib/sports");
-    const row = getSportById(sport);
+    const row = await getSportById(sport);
     if (!row) throw new Error(`Unknown sport: ${sport}`);
     await setSportSendsEnabled(sport, enable);
     const verb = enable ? "resumed" : "paused";
     target = `${returnTo}?ok=${encodeURIComponent(`${row.name} daily sends ${verb}.`)}`;
   } catch (err) {
     target = `${returnTo}?error=${encodeURIComponent(`sends-toggle: ${(err as Error).message}`)}`;
+  }
+  redirect(target);
+}
+
+/**
+ * Flip a sport's public/admin-only visibility. Independent of sends — this
+ * controls whether the sport appears on /subscribe and whether its public
+ * pages render for non-admins. Same two-step-confirm form as setSportSends.
+ */
+export async function setSportVisibility(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const sport = String(formData.get("sport") ?? "");
+  const makePublic = formData.get("public") === "1";
+  const confirmed = formData.get("confirmed") === "1";
+  const returnToRaw = formData.get("returnTo");
+  const returnTo =
+    typeof returnToRaw === "string" && returnToRaw.startsWith("/") ? returnToRaw : `/admin/${sport}`;
+
+  let target: string;
+  try {
+    if (!sport) throw new Error("missing sport");
+    if (!confirmed) throw new Error("not confirmed");
+    const { getSportById, setSportVisibility: applyVisibility } = await import("@/lib/sports");
+    const row = await getSportById(sport);
+    if (!row) throw new Error(`Unknown sport: ${sport}`);
+    await applyVisibility(sport, makePublic ? "public" : "admin_only");
+    const verb = makePublic ? "is now public" : "is now admin-only";
+    target = `${returnTo}?ok=${encodeURIComponent(`${row.name} ${verb}.`)}`;
+  } catch (err) {
+    target = `${returnTo}?error=${encodeURIComponent(`visibility-toggle: ${(err as Error).message}`)}`;
   }
   redirect(target);
 }

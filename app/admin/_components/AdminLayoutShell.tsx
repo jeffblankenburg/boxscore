@@ -8,18 +8,22 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Sidebar } from "./Sidebar";
+import { Sidebar, type SportLink } from "./Sidebar";
+import { TopNav } from "./TopNav";
 
 const BARE_PATHS = new Set(["/admin/login", "/admin/verify"]);
 
 export function AdminLayoutShell({
   email,
+  sports,
   children,
 }: {
   // Current admin's email, surfaced in the topbar. null when no valid
   // session — won't happen on a real admin page (requireAdmin redirects
   // first) but possible on the brief instant before a redirect resolves.
   email: string | null;
+  // Registry-driven sport list for the Sidebar's Sports section.
+  sports: SportLink[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -28,7 +32,8 @@ export function AdminLayoutShell({
   }
   return (
     <div className="a-shell">
-      <Sidebar />
+      <TopNav sports={sports} />
+      <Sidebar sports={sports} />
       <div className="a-topbar">
         <div /> {/* breadcrumbs slot — rendered per-page inside content */}
         <div className="a-topbar-right">

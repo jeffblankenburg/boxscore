@@ -19,11 +19,18 @@ async function main() {
   const browser = await puppeteer.launch({
     executablePath: chrome(),
     headless: true,
-    defaultViewport: { width: 720, height: 1200, deviceScaleFactor: 2 },
+    defaultViewport: { width: Number(process.env.SHOT_WIDTH ?? 720), height: 1200, deviceScaleFactor: 2 },
   });
+  const selector = process.argv[4]; // optional CSS selector to clip to one element
   const page = await browser.newPage();
   await page.goto(`file://${htmlPath}`, { waitUntil: "networkidle0" });
-  if (clipH) {
+  if (selector) {
+    const el = await page.$(selector);
+    if (!el) throw new Error(`selector not found: ${selector}`);
+    const box = await el.boundingBox();
+    console.log(`bbox ${selector}: ${box ? `${Math.round(box.width)}×${Math.round(box.height)}` : "?"}`);
+    await el.screenshot({ path: out });
+  } else if (clipH) {
     await page.screenshot({ path: out, clip: { x: 0, y: 0, width: 720, height: clipH } });
   } else {
     await page.screenshot({ path: out, fullPage: true });

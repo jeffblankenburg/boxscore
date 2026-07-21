@@ -33,8 +33,11 @@ import type {
   FootballDrive,
   FootballRanking,
   FootballRankingEntry,
+  FootballLeaderboard,
+  FootballLeaderEntry,
   FootballStandingsGroup,
   FootballStandingsRow,
+  FootballTransaction,
 } from "../types";
 
 // ─── Small parsing helpers ────────────────────────────────────────────────
@@ -422,6 +425,15 @@ function statByName(stats: Rec[], name: string): unknown {
   return rec(stats.find((s) => str(s.name) === name)).value;
 }
 
+// Record-type stats (home/road/vs-div/vs-conf) carry their value in
+// `displayValue` ("6-3"), not `value`, and are keyed by `type`. Returns
+// null when absent so the renderer can blank the cell.
+function recordByType(stats: Rec[], type: string): string | null {
+  const s = stats.find((x) => str(x.type) === type);
+  const dv = s ? str(rec(s).displayValue) : "";
+  return dv || null;
+}
+
 function adaptStandingsGroup(node: Rec, parentConference: string | null): FootballStandingsGroup[] {
   const groupName = str(node.name || node.abbreviation);
   const children = arr(node.children).map(rec);
@@ -439,11 +451,13 @@ function adaptStandingsGroup(node: Rec, parentConference: string | null): Footba
       losses: num(statByName(stats, "losses")),
       ties: num(statByName(stats, "ties")),
       pct: numOrNull(statByName(stats, "winPercent")),
-      confWins: numOrNull(statByName(stats, "vsConf_wins")),
-      confLosses: numOrNull(statByName(stats, "vsConf_losses")),
+      streak: recordByType(stats, "streak"),
       pointsFor: numOrNull(statByName(stats, "pointsFor")),
       pointsAgainst: numOrNull(statByName(stats, "pointsAgainst")),
-      streak: str(rec(stats.find((s) => str(s.name) === "streak")).displayValue) || null,
+      home: recordByType(stats, "home"),
+      road: recordByType(stats, "road"),
+      divisionRecord: recordByType(stats, "vsdiv"),
+      conferenceRecord: recordByType(stats, "vsconf"),
     };
   });
   return [{ group: groupName, conference: parentConference, rows }];
@@ -457,16 +471,68 @@ function adaptStandings(raw: FootballRaw): FootballStandingsGroup[] {
   return adaptStandingsGroup(root, null);
 }
 
+// ─── Season leaders ───────────────────────────────────────────────────────
+//
+// The byathlete blob stores each athlete's per-category stats as positional
+// `values` aligned to the category's `names` schema. For each configured stat
+// we look up its index in the schema, pull that value for every athlete, sort
+// desc, and keep the top five.
+
+function formatLeaderValue(v: number): string {
+  if (v % 1 !== 0) return v.toFixed(1);            // sacks like 12.5
+  return v.toLocaleString("en-US");                // yards like "4,394"
+}
+
+function adaptLeaders(raw: FootballRaw): FootballLeaderboard[] {
+  // raw.leaders is one entry per stat, already sorted by that stat.
+  return arr(raw.leaders).map(rec).map((e): FootballLeaderboard => {
+    const idx = arr(e.names).map(str).indexOf(str(e.stat));
+    const entries: FootballLeaderEntry[] = arr(e.athletes).map(rec)
+      .map((a): FootballLeaderEntry => {
+        const ath = rec(a.athlete);
+        const fullName = str(ath.displayName);
+        const v = idx >= 0 ? num(arr(a.values)[idx]) : 0;
+        return {
+          player: { id: str(ath.id), fullName, slug: slugifyName(fullName) },
+          teamAbbr: str(ath.teamAbbr).toUpperCase(),
+          value: v,
+          displayValue: formatLeaderValue(v),
+        };
+      })
+      .filter((x) => x.value > 0);
+    // Dedupe traded players: ESPN returns a per-team-stint row for anyone who
+    // changed teams mid-season, so the same player can appear twice. Keep their
+    // first (highest, since sorted) row so they show once. The renderer then
+    // trims to top-5-through-ties.
+    const seen = new Set<string>();
+    const deduped = entries.filter((x) => (seen.has(x.player.id) ? false : (seen.add(x.player.id), true)));
+    return { category: str(e.stat), label: str(e.label), entries: deduped };
+  }).filter((b) => b.entries.length > 0);
+}
+
+function adaptTransactions(raw: FootballRaw): FootballTransaction[] {
+  return arr(rec(raw.transactions).transactions).map(rec).map((t): FootballTransaction => ({
+    date: str(t.date),
+    description: str(t.description),
+    teamAbbr: str(rec(t.team).abbreviation).toUpperCase() || null,
+  }));
+}
+
 // ─── Top-level adapter ────────────────────────────────────────────────────
 
 export function adaptEspnFootball(
   cfg: FootballLeagueConfig,
   raw: FootballRaw,
 ): CanonicalFootballDailyData {
-  const events = arr(rec(raw.scoreboard).events);
-  const games = sortGamesCanonically(
-    events.map((e) => adaptGame(cfg, e)).filter((g): g is FootballGame => g != null),
-  );
+  const adaptSlate = (scoreboard: unknown): FootballGame[] =>
+    sortGamesCanonically(
+      arr(rec(scoreboard).events)
+        .map((e) => adaptGame(cfg, e))
+        .filter((g): g is FootballGame => g != null),
+    );
+
+  const games = adaptSlate(raw.scoreboard);
+  const nextGames = raw.nextScoreboard ? adaptSlate(raw.nextScoreboard) : [];
 
   const boxScores = new Map<string, FootballBoxScore>();
   for (const [id, summary] of Object.entries(raw.summaries)) {
@@ -479,7 +545,10 @@ export function adaptEspnFootball(
     league: cfg.league,
     games,
     boxScores,
+    nextGames,
     rankings: cfg.hasRankings ? adaptRankings(raw) : [],
+    leaders: raw.leaders ? adaptLeaders(raw) : [],
     standings: adaptStandings(raw),
+    transactions: raw.transactions ? adaptTransactions(raw) : [],
   };
 }

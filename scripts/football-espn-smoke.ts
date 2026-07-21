@@ -29,7 +29,32 @@ async function main() {
 
   console.log(`\n=== ${cfg.name} — ${bundle.date} ===`);
   console.log(`games: ${bundle.games.length} | boxes: ${bundle.boxScores.size} | ` +
-    `rankings polls: ${bundle.rankings.length} | standings groups: ${bundle.standings.length}\n`);
+    `next: ${bundle.nextGames.length} | rankings polls: ${bundle.rankings.length} | ` +
+    `leaders: ${bundle.leaders.length} | standings groups: ${bundle.standings.length} | ` +
+    `transactions: ${bundle.transactions.length}\n`);
+
+  if (bundle.leaders.length) {
+    console.log("--- leaders (top of each) ---");
+    for (const b of bundle.leaders) {
+      const top = b.entries[0];
+      console.log(`  ${b.label}: ${top ? `${top.player.fullName} (${top.teamAbbr}) ${top.displayValue}` : "—"}`);
+    }
+    console.log();
+  }
+  if (bundle.nextGames.length) {
+    console.log(`--- next matchups (first 3 of ${bundle.nextGames.length}) ---`);
+    for (const g of bundle.nextGames.slice(0, 3)) {
+      console.log(`  ${g.awayTeam.abbr} @ ${g.homeTeam.abbr}  ${g.startTime} [${g.statusDetail}]`);
+    }
+    console.log();
+  }
+  if (bundle.transactions.length) {
+    console.log(`--- transactions (first 3 of ${bundle.transactions.length}) ---`);
+    for (const t of bundle.transactions.slice(0, 3)) {
+      console.log(`  ${t.date.slice(0, 10)} ${t.teamAbbr ?? ""}: ${t.description}`);
+    }
+    console.log();
+  }
 
   for (const g of bundle.games) {
     const rank = (r: number | null | undefined) => (r ? `#${r} ` : "");

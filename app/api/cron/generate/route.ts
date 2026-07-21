@@ -9,7 +9,7 @@ import { upsertDigest } from "@/lib/digests";
 import { upsertTeamDigest } from "@/lib/team-digests";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
 import { renderTeamWebContent } from "@/lib/render-team-web";
-import { teamsBySport } from "@/lib/teams";
+import { teamsBySport, findTeam } from "@/lib/teams";
 import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
 import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
 import { loadNbaData } from "@/lib/nba";
@@ -19,10 +19,15 @@ import {
   renderBasketballEmailContent,
 } from "@/lib/render-basketball";
 import { loadFootballData, hasPlayedGames } from "@/lib/sports/football/data";
+import { assembleFootballTeamPage } from "@/lib/sports/football/team-data";
 import {
   renderFootballContent,
   renderFootballEmailContent,
 } from "@/lib/sports/football/render/digest";
+import {
+  renderFootballTeamContent,
+  renderFootballTeamEmailContent,
+} from "@/lib/sports/football/render/team";
 import { yesterdayInET, isValidIsoDate, nextDay } from "@/lib/dates";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 import { renderScoreboardShareImage } from "@/lib/render-images";
@@ -200,11 +205,45 @@ export async function GET(req: Request) {
       await upsertDigest({
         sport, date, html, email_html, game_count: fb.games.length,
       });
+
+      // Per-team recap digests. Weekly cadence (Jeff, 2026-07-20): a team's
+      // subscribers only get an email the morning after THEIR game, so we
+      // write a team_digest only for teams with a final today — not all 32.
+      // NCAAF stays league-only (130+ teams, no team pages / registry).
+      let team_digests_written = 0;
+      const team_fails: string[] = [];
+      if (sport === "nfl" && !skipTeams) {
+        const gameByTeam = new Map<string, string>(); // canonical slug → game id
+        for (const g of fb.games) {
+          if (g.status !== "final") continue;
+          gameByTeam.set(g.awayTeam.id, g.id);
+          gameByTeam.set(g.homeTeam.id, g.id);
+        }
+        for (const [slug, gameId] of gameByTeam) {
+          const team = findTeam(sport, slug);
+          if (!team) continue;
+          try {
+            const tp = assembleFootballTeamPage(sport, team, fb, gameId);
+            await upsertTeamDigest({
+              sport, team_slug: team.slug, date,
+              has_game: true, mode: null,
+              html: renderFootballTeamContent(tp),
+              email_html: renderFootballTeamEmailContent(tp),
+            });
+            team_digests_written++;
+          } catch (err) {
+            team_fails.push(`${slug}: ${(err as Error).message}`);
+          }
+        }
+      }
+
       const result = {
         sport, date,
         game_count: fb.games.length,
         ranking_polls: fb.rankings.length,
         standings_groups: fb.standings.length,
+        team_digests_written,
+        ...(team_fails.length ? { team_fails } : {}),
         html_bytes: html.length,
         email_bytes: email_html.length,
       };

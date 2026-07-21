@@ -1,8 +1,15 @@
 import { notFound } from "next/navigation";
 import { isSportVisible } from "@/lib/sports";
+import { isAdminSession } from "@/lib/admin-auth";
 import { loadPlayerPageData, renderPlayerContent } from "@/lib/render-player";
+import { loadFootballPlayerData } from "@/lib/sports/football/player-data";
+import { renderFootballPlayerContent } from "@/lib/sports/football/render/player";
+import { decodeAthleteId, footballPlayerPath } from "@/lib/sports/football/player-links";
+import type { FootballLeague } from "@/lib/sports/football/types";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
+
+const FOOTBALL_LEAGUES = new Set(["nfl", "ncaaf"]);
 
 // Player profile at /{sport}/player/{id}. The `id` URL segment accepts
 // either:
@@ -42,6 +49,21 @@ export async function generateMetadata({
   params: Promise<{ sport: string; id: string }>;
 }) {
   const { sport, id } = await params;
+  if (FOOTBALL_LEAGUES.has(sport)) {
+    const athleteId = decodeAthleteId(id);
+    if (!athleteId) return {};
+    const data = await loadFootballPlayerData(sport as FootballLeague, athleteId);
+    if (!data) return {};
+    const canonical = `${EMAIL_LINK_BASE}${footballPlayerPath(sport as FootballLeague, {
+      id: data.bio.id,
+      slug: data.bio.slug,
+    })}`;
+    return {
+      title: `${data.bio.fullName} — ${data.season} Game Log and Stats | boxscore`,
+      description: `${data.bio.fullName} game log, season stats, and recent games.`,
+      alternates: { canonical },
+    };
+  }
   if (sport !== "mlb") return {};
   const personId = await resolveToMlbId(id);
   if (personId == null) return {};
@@ -65,7 +87,41 @@ export default async function PlayerPage({
   params: Promise<{ sport: string; id: string }>;
 }) {
   const { sport, id } = await params;
-  if (!(await isSportVisible(sport))) notFound();
+  // Admins can view admin_only sports pre-launch (NFL); the public still 404s.
+  if (!isSportVisible(sport, { includeAdminOnly: await isAdminSession() })) notFound();
+
+  if (FOOTBALL_LEAGUES.has(sport)) {
+    const league = sport as FootballLeague;
+    const athleteId = decodeAthleteId(id);
+    if (!athleteId) notFound();
+    const data = await loadFootballPlayerData(league, athleteId);
+    if (!data) notFound();
+    const canonicalUrl = `${EMAIL_LINK_BASE}${footballPlayerPath(league, {
+      id: data.bio.id,
+      slug: data.bio.slug,
+    })}`;
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "@id": canonicalUrl,
+      name: data.bio.fullName,
+      url: canonicalUrl,
+      jobTitle: "Football Player",
+      ...(data.bio.teamName && {
+        affiliation: { "@type": "SportsTeam", name: data.bio.teamName },
+      }),
+    };
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        />
+        <div dangerouslySetInnerHTML={{ __html: renderFootballPlayerContent(data) }} />
+      </>
+    );
+  }
+
   if (sport !== "mlb") notFound();
   const personId = await resolveToMlbId(id);
   if (personId == null) notFound();

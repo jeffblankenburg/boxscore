@@ -6,6 +6,10 @@ import type { Metadata } from "next";
 import { getSportById, isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
 import { getScoreboardShareImageUrl } from "@/lib/share-storage";
+import { isAdminSession } from "@/lib/admin-auth";
+import { loadFootballTeamData, teamEditionDate as footballTeamEditionDate } from "@/lib/sports/football/team-data";
+import { renderFootballTeamContent } from "@/lib/sports/football/render/team";
+import type { FootballLeague } from "@/lib/sports/football/types";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { PaperMasthead } from "@/app/PaperMasthead";
 import { DateHeaderCalendar } from "@/app/DateHeaderCalendar";
@@ -104,7 +108,8 @@ export default async function DayPage({
   searchParams: Promise<{ paper?: string }>;
 }) {
   const { sport, date } = await params;
-  if (!(await isSportVisible(sport))) notFound();
+  // Admins can view admin_only sports pre-launch (NFL); the public still 404s.
+  if (!isSportVisible(sport, { includeAdminOnly: await isAdminSession() })) notFound();
 
   // Branch A: date-shaped → league digest. URL segment is the EDITION
   // date; the underlying digest is keyed by games_date = edition − 1.
@@ -125,11 +130,44 @@ export default async function DayPage({
     );
   }
 
-  // Branch B: team-slug-shaped → latest cached team digest. The page lives
-  // at /[sport]/[slug] and renders whatever's most recent in team_digests.
-  // Visiting a specific date uses the 3-segment route.
+  // Branch B: team-slug-shaped → the team's page.
   const team = findTeam(sport as Sport, date);
   if (!team) notFound();
+
+  // Football renders team pages live (ISR) rather than from team_digests —
+  // web-only, so there's no email_html to precompute, and live loading keeps
+  // the nightly cron off the per-athlete ESPN endpoints. See
+  // lib/sports/football/team-data.ts.
+  if (sport === "nfl" || sport === "ncaaf") {
+    const fbData = await loadFootballTeamData(sport as FootballLeague, team.slug);
+    if (!fbData) notFound();
+    const fbToday = nextDay(yesterdayInET());
+    const fbEdition = footballTeamEditionDate(fbData) ?? fbToday;
+    const fbSchema = {
+      "@context": "https://schema.org",
+      "@type": "SportsTeam",
+      "@id": `${EMAIL_LINK_BASE}/${sport}/${team.slug}`,
+      name: team.name,
+      url: `${EMAIL_LINK_BASE}/${sport}/${team.slug}`,
+      sport: "American Football",
+    };
+    return (
+      <div>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(fbSchema) }}
+        />
+        <div dangerouslySetInnerHTML={{ __html: renderFootballTeamContent(fbData) }} />
+        <DateHeaderCalendar
+          sport={sport}
+          currentDate={fbEdition}
+          today={fbToday}
+          teamSlug={team.slug}
+        />
+      </div>
+    );
+  }
+
   const cached = await getLatestTeamDigest(sport, team.slug);
   if (!cached) notFound();
   const teamEditionDate = nextDay(cached.date);

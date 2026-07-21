@@ -257,6 +257,32 @@ export type FootballRanking = {
   entries: FootballRankingEntry[];
 };
 
+// ─── Season leaders ───────────────────────────────────────────────────────
+
+export type FootballLeaderEntry = {
+  player: FootballPlayerRef;
+  teamAbbr: string;
+  value: number;                 // sortable numeric (4394)
+  displayValue: string;          // formatted for display ("4,394")
+};
+
+/** One statistical category's top players (passing yards, sacks, …). */
+export type FootballLeaderboard = {
+  category: string;              // schema key, e.g. "passingYards"
+  label: string;                // "Passing Yards"
+  entries: FootballLeaderEntry[]; // sorted desc, top N
+};
+
+// ─── Transactions ─────────────────────────────────────────────────────────
+
+/** A roster transaction. ESPN puts the whole thing in `description`
+ *  ("Signed WR …"), like baseball; the renderer surfaces it as-is. */
+export type FootballTransaction = {
+  date: string;                 // ISO 8601
+  description: string;
+  teamAbbr: string | null;
+};
+
 // ─── Standings ────────────────────────────────────────────────────────────
 //
 // NFL groups by division inside a conference (AFC East, …). NCAAF groups
@@ -269,16 +295,21 @@ export type FootballStandingsRow = {
   wins: number;
   losses: number;
   ties: number;
-  pct: number | null;            // win percentage
-  confWins: number | null;       // in-conference/in-division record, when the feed splits it
-  confLosses: number | null;
+  pct: number | null;               // win percentage (0.588 → renderer shows ".588")
+  streak: string | null;            // "W3", "L1"
   pointsFor: number | null;
   pointsAgainst: number | null;
-  streak: string | null;         // "W3", "L1"
+  // Split records kept as display strings ("6-3") — they're inherently
+  // W-L pairs, not scalars. null when the feed doesn't split them (some
+  // college conferences).
+  home: string | null;              // home record "6-3"
+  road: string | null;              // road/away record "4-4"
+  divisionRecord: string | null;    // in-division record "4-2" (NFL)
+  conferenceRecord: string | null;  // in-conference record "8-4"
 };
 
 export type FootballStandingsGroup = {
-  group: string;                 // "AFC East" (NFL) / "SEC" (NCAAF)
-  conference: string | null;     // "AFC" / "NFC" for NFL; null or same as group for college
+  group: string;                 // "AFC East" (NFL divisions) / "SEC" (NCAAF)
+  conference: string | null;     // "American Football Conference" (NFL); null/self for college
   rows: FootballStandingsRow[];  // pre-sorted by standing
 };

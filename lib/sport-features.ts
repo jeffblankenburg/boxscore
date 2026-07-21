@@ -59,9 +59,12 @@ export const SPORT_FEATURES: Record<string, SportFeatures> = {
   // show up as red rows for routes that aren't supposed to exist yet.
   nba:  { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"] },
   wnba: { hasPreview: true,  hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"] },
-  // Football: recap-only (no preview), and sends only on days with games.
-  nfl:   { hasPreview: false, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"], sendsOnGameDaysOnly: true },
-  ncaaf: { hasPreview: false, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"], sendsOnGameDaysOnly: true },
+  // Football: recap-only editions, but the admin still needs the render
+  // affordances (Content preview + "send today's email to me"), which is
+  // what hasPreview actually gates here — so it's true. sendsOnGameDaysOnly
+  // is the flag that encodes "no daily send on game-less days".
+  nfl:   { hasPreview: true, hasShareImages: false, hasTeamDigests: true,  hasRegenAll: false, expectedRoutes: ["generate", "send-email", "send-team-email"], sendsOnGameDaysOnly: true },
+  ncaaf: { hasPreview: true, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"], sendsOnGameDaysOnly: true },
 };
 
 export function featuresFor(sport: string): SportFeatures {

@@ -13,7 +13,9 @@ import type {
   FootballGame,
   FootballBoxScore,
   FootballRanking,
+  FootballLeaderboard,
   FootballStandingsGroup,
+  FootballTransaction,
 } from "./types";
 
 export type CanonicalFootballDailyData = {
@@ -21,8 +23,11 @@ export type CanonicalFootballDailyData = {
   league:    FootballLeague;
   games:     FootballGame[];                // every game whose local date is `date`
   boxScores: Map<string, FootballBoxScore>; // keyed by game id; only finals/in-progress
+  nextGames: FootballGame[];                // the upcoming week's slate (Next Matchups)
   rankings:  FootballRanking[];             // NCAAF polls; empty for NFL
+  leaders:   FootballLeaderboard[];         // season stat leaders
   standings: FootballStandingsGroup[];      // division (NFL) / conference (NCAAF) groups
+  transactions: FootballTransaction[];      // recent roster moves
 };
 
 // Canonical display order for a game list. Sort by start time ascending,

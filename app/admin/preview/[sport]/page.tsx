@@ -12,7 +12,11 @@ import {
   BASKETBALL_PREVIEW_MODES,
   basketballFixtureDate,
 } from "@/lib/basketball-preview-fixtures";
-import { FOOTBALL_PREVIEW_FIXTURES } from "@/lib/sports/football/preview-fixtures";
+import {
+  FOOTBALL_PREVIEW_FIXTURES,
+  NFL_PREVIEW_FIXTURES,
+  NFL_PREVIEW_MODES,
+} from "@/lib/sports/football/preview-fixtures";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Preview · admin · boxscore", robots: { index: false } };
@@ -47,11 +51,27 @@ function modeOptionsFor(sport: string): ModeOptions {
       defaultDate: MLB_PREVIEW_FIXTURES.regular,
     };
   }
-  if (sport === "nfl" || sport === "ncaaf") {
-    // Football is recap-only — no classifier modes. A single known-good
-    // fixture per league backs the quick-jump; the date input drives the rest.
-    const d = FOOTBALL_PREVIEW_FIXTURES[sport];
-    return { modes: ["regular"], fixtures: { regular: d }, defaultDate: d };
+  if (sport === "nfl") {
+    // Recap-only, but the NFL ships an email the morning after each game day.
+    // One variant per email (Friday/Sunday/Monday/Tuesday), all pinned to a
+    // single week so only the day's slate changes between them.
+    return {
+      modes: NFL_PREVIEW_MODES,
+      fixtures: Object.fromEntries(
+        NFL_PREVIEW_MODES.map((m) => [m, NFL_PREVIEW_FIXTURES[m]]),
+      ),
+      defaultDate: FOOTBALL_PREVIEW_FIXTURES.nfl,
+    };
+  }
+  if (sport === "ncaaf") {
+    // College plays a Saturday-dominated slate; one known-good fixture backs
+    // the quick-jump and the date input drives everything else.
+    const d = FOOTBALL_PREVIEW_FIXTURES.ncaaf;
+    return {
+      modes: ["Regular Season - Saturday"],
+      fixtures: { "Regular Season - Saturday": d },
+      defaultDate: d,
+    };
   }
   const sportTyped = sport as "nba" | "wnba";
   return {
@@ -87,7 +107,13 @@ export default async function PreviewPage({
   // email — the day a newspaper would be dated). Backend lookups use
   // games_date = edition - 1 day, since digests are stored under the
   // date the games were played.
-  const todayIsoEt = nextDay(yesterdayInET());
+  // Football is out of season most of the year, so default its preview to the
+  // known-good fixture edition (Week 18 of 2025) rather than an empty offseason
+  // "today". Other sports default to today's edition.
+  const footballFixture = sport === "nfl" || sport === "ncaaf"
+    ? nextDay(FOOTBALL_PREVIEW_FIXTURES[sport])
+    : null;
+  const todayIsoEt = footballFixture ?? nextDay(yesterdayInET());
   const date = dateParam && isValidIsoDate(dateParam) ? dateParam : todayIsoEt;
   const gamesDate = prevDay(date);
   const surface: "web" | "email" = surfaceParam === "email" ? "email" : "web";
@@ -104,8 +130,11 @@ export default async function PreviewPage({
   }
 
   // The /frame route still expects games_date as its `date` param, so we
-  // translate here. Same URL is reused for the "Pop out" link.
-  const frameSrc = `/admin/preview/${sport}/frame?date=${gamesDate}&surface=${surface}`;
+  // translate here. Same URL is reused for the "Pop out" link. The `_cb`
+  // cache-buster (per page render — this page is force-dynamic) guarantees the
+  // browser refetches the iframe instead of serving a stale cached render,
+  // which repeatedly showed old digest content after code changes.
+  const frameSrc = `/admin/preview/${sport}/frame?date=${gamesDate}&surface=${surface}&_cb=${Date.now()}`;
 
   const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string }) => {
     const d = overrides.date ?? date;

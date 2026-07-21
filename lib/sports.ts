@@ -1,19 +1,20 @@
 import { supabaseAdmin } from "./supabase";
 
 // Static registry of every sport the app knows about. Adding a sport is
-// a code change: add a row here, ship a deploy. Same for launching a
-// sport (flipping admin_only → public).
+// a code change: add a row here, ship a deploy.
 //
-// Why static instead of `select * from sports`: every `/[sport]/*` page
-// used to hit Supabase on render for existence + visibility + display
-// name. During the 2026-07-02 burst-I/O outage that path was ~50% of
-// our DB traffic — page renders blocked behind a lookup that only ever
-// returned one of three rows. A constant keeps public surfaces
-// rendering even when Supabase is down.
+// The static const is the deploy-time BASELINE and the outage FALLBACK.
+// Why it matters: every `/[sport]/*` page checks visibility on render.
+// During the 2026-07-02 burst-I/O outage a per-render `select * from sports`
+// was ~50% of our DB traffic. So visibility is DB-backed but read through a
+// short-TTL in-process cache (at most one DB read every OVERRIDES_TTL_MS per
+// instance, not per render), and falls back to this constant whenever the
+// read fails — public surfaces keep rendering even when Supabase is down. An
+// admin visibility flip writes the row and clears the local cache; other
+// instances pick it up within the TTL.
 //
-// The sports table still exists because `sends_enabled` is a runtime
-// kill switch flipped from /admin/[sport] without a redeploy. Read it
-// via `getSportRow` below; every other caller uses the sync helpers.
+// `sends_enabled` is a separate runtime kill switch (getSportRow /
+// setSportSendsEnabled), read directly from the DB in cron/admin contexts.
 
 export type SportVisibility = "admin_only" | "public";
 
@@ -23,6 +24,7 @@ export type Sport = {
   visibility: SportVisibility;
 };
 
+// Baseline visibility per sport. Overridden at runtime by the sports table.
 export const SPORTS: readonly Sport[] = [
   { id: "mlb",   name: "MLB",   visibility: "public" },
   { id: "wnba",  name: "WNBA",  visibility: "admin_only" },
@@ -33,40 +35,77 @@ export const SPORTS: readonly Sport[] = [
 
 const BY_ID = new Map<string, Sport>(SPORTS.map((s) => [s.id, s]));
 
-export function getSportById(id: string): Sport | null {
-  return BY_ID.get(id) ?? null;
+// In-process cache of DB visibility overrides. Short TTL so a per-render read
+// never hits the DB; on read failure we return the last good value (or {}),
+// so callers fall back to the static baseline — the outage-resilience contract.
+const OVERRIDES_TTL_MS = 30_000;
+let overridesCache: { at: number; value: Record<string, SportVisibility> } | null = null;
+
+async function readVisibilityOverrides(): Promise<Record<string, SportVisibility>> {
+  const now = Date.now();
+  if (overridesCache && now - overridesCache.at < OVERRIDES_TTL_MS) return overridesCache.value;
+  try {
+    const { data, error } = await supabaseAdmin().from("sports").select("id, visibility");
+    if (error) return overridesCache?.value ?? {};
+    const out: Record<string, SportVisibility> = {};
+    for (const r of data ?? []) {
+      if (r.visibility === "public" || r.visibility === "admin_only") out[r.id] = r.visibility;
+    }
+    overridesCache = { at: now, value: out };
+    return out;
+  } catch {
+    return overridesCache?.value ?? {};
+  }
+}
+
+// Effective visibility = DB override if present/reachable, else the baseline.
+async function effectiveVisibility(id: string, baseline: SportVisibility): Promise<SportVisibility> {
+  const overrides = await readVisibilityOverrides();
+  return overrides[id] ?? baseline;
+}
+
+export async function getSportById(id: string): Promise<Sport | null> {
+  const sport = BY_ID.get(id);
+  if (!sport) return null;
+  return { ...sport, visibility: await effectiveVisibility(id, sport.visibility) };
 }
 
 /**
- * Returns sports filtered by visibility. Pass `includeAdminOnly: true` for
- * admin contexts (admin dashboard, admin-authenticated settings page). Pass
- * false (the default) for any UI surface a non-admin user could see.
+ * Returns sports filtered by (effective) visibility. Pass
+ * `includeAdminOnly: true` for admin contexts (admin dashboard,
+ * admin-authenticated settings page). Pass false (the default) for any UI
+ * surface a non-admin user could see.
  */
-export function getVisibleSports(
+export async function getVisibleSports(
   opts: { includeAdminOnly?: boolean } = {},
-): Sport[] {
-  return SPORTS.filter((s) => s.visibility === "public" || Boolean(opts.includeAdminOnly));
+): Promise<Sport[]> {
+  const overrides = await readVisibilityOverrides();
+  return SPORTS
+    .map((s) => ({ ...s, visibility: overrides[s.id] ?? s.visibility }))
+    .filter((s) => s.visibility === "public" || Boolean(opts.includeAdminOnly));
 }
 
 /**
- * Returns every sport regardless of visibility. Use only in admin contexts
- * where the caller needs the full catalog.
+ * Returns every sport (effective visibility) regardless of filter. Use only
+ * in admin contexts where the caller needs the full catalog.
  */
-export function getAllSports(): Sport[] {
-  return [...SPORTS];
+export async function getAllSports(): Promise<Sport[]> {
+  const overrides = await readVisibilityOverrides();
+  return SPORTS.map((s) => ({ ...s, visibility: overrides[s.id] ?? s.visibility }));
 }
 
 /**
  * True if the sport exists and is visible to the caller. Centralizes the
  * "is this sport accessible right now" check for route guards.
  */
-export function isSportVisible(
+export async function isSportVisible(
   id: string,
   opts: { includeAdminOnly?: boolean } = {},
-): boolean {
+): Promise<boolean> {
   const sport = BY_ID.get(id);
   if (!sport) return false;
-  if (sport.visibility === "public") return true;
+  const visibility = await effectiveVisibility(id, sport.visibility);
+  if (visibility === "public") return true;
   return Boolean(opts.includeAdminOnly);
 }
 
@@ -89,11 +128,30 @@ export async function getSportRow(id: string): Promise<SportRow | null> {
   if (!sport) return null;
   const { data, error } = await supabaseAdmin()
     .from("sports")
-    .select("sends_enabled")
+    .select("visibility, sends_enabled")
     .eq("id", id)
-    .maybeSingle<{ sends_enabled: boolean }>();
+    .maybeSingle<{ visibility: SportVisibility | null; sends_enabled: boolean }>();
   if (error) throw new Error(`getSportRow: ${error.message}`);
-  return { ...sport, sends_enabled: data?.sends_enabled ?? true };
+  return {
+    ...sport,
+    visibility: data?.visibility ?? sport.visibility,
+    sends_enabled: data?.sends_enabled ?? true,
+  };
+}
+
+/**
+ * Admin-only: flip a sport's public/admin-only visibility. Writes the row and
+ * busts the cache tag so getVisibleSports/isSportVisible pick it up immediately
+ * on the next render. Independent of sends_enabled — a sport can be public with
+ * sends paused, or admin-only with sends on.
+ */
+export async function setSportVisibility(id: string, visibility: SportVisibility): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("sports")
+    .update({ visibility, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(`setSportVisibility: ${error.message}`);
+  overridesCache = null; // clear local cache so this instance reflects it now
 }
 
 /**

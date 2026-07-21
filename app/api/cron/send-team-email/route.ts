@@ -68,10 +68,10 @@ export async function GET(req: Request) {
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
-  // V1 only supports MLB team digests; NBA/WNBA team renderers don't exist
-  // yet. Fail loudly so we don't silently no-op when the cron is wired but
-  // the renderer isn't.
-  if (sport !== "mlb") {
+  // MLB and NFL have team-digest renderers + generate loops. NBA/WNBA/NCAAF
+  // don't yet — fail loudly so we don't silently no-op when a cron is wired
+  // but the renderer isn't.
+  if (sport !== "mlb" && sport !== "nfl") {
     return NextResponse.json(
       { error: `no team-digest renderer for sport=${sport}` },
       { status: 501 },
@@ -139,7 +139,16 @@ export async function GET(req: Request) {
         // team — the operator's expected to run /api/cron/generate first.
         const cached = await getTeamDigest(sport, team.slug, date);
         if (!cached) {
-          perTeam.push({ team: teamId, sent: 0, skipped: 0, failed: 0, error: "no team_digest row — run generate first" });
+          // MLB writes a row for every team daily, so a missing one is an
+          // operational error. NFL's weekly cadence only writes rows for teams
+          // that played today, so a subscribed-but-idle team legitimately has
+          // no row — a clean skip, not a failure.
+          if (sport === "mlb") {
+            perTeam.push({ team: teamId, sent: 0, skipped: 0, failed: 0, error: "no team_digest row — run generate first" });
+          } else {
+            totalEmpty++;
+            perTeam.push({ team: teamId, sent: 0, skipped: 0, failed: 0, empty: true });
+          }
           continue;
         }
 

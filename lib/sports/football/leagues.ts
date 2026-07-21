@@ -21,6 +21,10 @@ export type FootballLeagueConfig = {
   scoreboardLimit: number;
   /** NCAAF has AP/CFP/Coaches polls; the NFL has none. */
   hasRankings: boolean;
+  /** ESPN standings grouping depth. 3 = divisions (NFL: AFC East, …);
+   *  omitted = the feed's default, which is conference-level for both
+   *  leagues (right for NCAAF, which has no divisions). */
+  standingsLevel?: number;
 };
 
 // ESPN labels both football seasons by their START year: the 2025 season
@@ -42,6 +46,7 @@ export const NFL: FootballLeagueConfig = {
   scoreboardGroups: null,
   scoreboardLimit: 100,
   hasRankings: false,
+  standingsLevel: 3, // divisions (AFC/NFC × East/North/South/West)
 };
 
 export const NCAAF: FootballLeagueConfig = {

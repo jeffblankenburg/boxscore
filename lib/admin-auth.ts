@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { cookies } from "next/headers";
 import { supabaseAdmin } from "./supabase";
 
 // Multi-admin auth. Admin status lives on subscribers.is_admin (boolean);
@@ -216,3 +217,15 @@ export async function destroySession(token: string | undefined): Promise<void> {
 
 export const ADMIN_SESSION_COOKIE = "boxscore_admin_session";
 export const ADMIN_SESSION_TTL_SEC = SESSION_TTL_DAYS * 24 * 60 * 60;
+
+/**
+ * True if the current request carries a valid admin session — a
+ * non-redirecting counterpart to requireAdmin(). Lets public pages
+ * optionally reveal admin_only content (e.g. pre-launch NFL pages) to a
+ * logged-in admin while still 404-ing everyone else.
+ */
+export async function isAdminSession(): Promise<boolean> {
+  const jar = await cookies();
+  const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
+  return (await validateSession(token)) != null;
+}

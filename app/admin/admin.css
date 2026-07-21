@@ -59,9 +59,10 @@
   background: var(--a-bg);
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 240px 1fr;
-  grid-template-rows: auto 1fr;
+  grid-template-columns: 200px 1fr;
+  grid-template-rows: auto auto 1fr;
   grid-template-areas:
+    "topnav  topnav"
     "sidebar topbar"
     "sidebar content";
 }
@@ -95,6 +96,46 @@
 .a-shell .newspaper code,
 .a-shell .newspaper pre {
   font-family: var(--a-mono) !important;
+}
+
+/* ─── Top nav (two-zone: Leagues | Platform) ─────────────────────────── */
+
+.a-topnav {
+  grid-area: topnav;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 0 16px;
+  min-height: 48px;
+  background: var(--a-bg-sidebar);
+  border-bottom: 1px solid var(--a-border);
+}
+.a-topnav-brand {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--a-text);
+  padding-right: 12px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+.a-topnav-brand small { color: var(--a-text-subtle); font-weight: 500; margin-left: 4px; }
+.a-topnav-zone { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.a-topnav-divider {
+  width: 1px; align-self: stretch; margin: 8px 8px;
+  background: var(--a-border);
+}
+.a-topnav-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 6px;
+  font-size: 13px; color: var(--a-text); text-decoration: none;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.a-topnav-tab:hover { background: var(--a-bg-hover); }
+.a-topnav-tab.active {
+  font-weight: 600; color: var(--a-accent);
+  background: var(--a-bg-hover); border-color: var(--a-border);
 }
 
 /* ─── Sidebar ────────────────────────────────────────────────────────── */

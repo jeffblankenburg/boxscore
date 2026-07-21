@@ -3,12 +3,14 @@ import AttributionFields from "./AttributionFields";
 import { getVisibleSports } from "@/lib/sports";
 import { teamsBySport, type Sport } from "@/lib/teams";
 
-// Sports whose team pickers appear under Team Newsletters. MLB-only for now;
-// NBA and WNBA will join once their team renderers ship. When the list has
-// more than one entry the section becomes a tabbed picker; one entry renders
-// the team list inline.
+// Sports with a per-team digest pipeline (generate loop + send-team-email).
+// NBA/WNBA/NCAAF join once their team renderers ship. Filtered by visibility
+// below, so a sport's teams only appear once it's also public. When the
+// surviving list has more than one entry the section becomes a tabbed picker;
+// one entry renders the team list inline.
 const TEAM_TAB_SPORTS: Array<{ id: Sport; label: string }> = [
   { id: "mlb", label: "MLB" },
+  { id: "nfl", label: "NFL" },
 ];
 
 export const metadata = {
@@ -27,7 +29,9 @@ export default async function SubscribePage({
   // is ready. Flip to includeAdminOnly: true when previewing upcoming
   // sports on the public picker again.
   const sports = await getVisibleSports({ includeAdminOnly: false });
-  const teamTabs = TEAM_TAB_SPORTS.map(({ id, label }) => ({
+  // Team pickers only for sports that are BOTH public and have a team pipeline.
+  const visibleIds = new Set(sports.map((s) => s.id));
+  const teamTabs = TEAM_TAB_SPORTS.filter((t) => visibleIds.has(t.id)).map(({ id, label }) => ({
     id,
     label,
     teams: teamsBySport(id).slice().sort((a, b) => a.city.localeCompare(b.city)),

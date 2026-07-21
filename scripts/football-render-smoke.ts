@@ -30,7 +30,7 @@ async function main() {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap">
 <style>${globalsCss}</style>
-<style>body{margin:0;background:#f3efe5;} .newspaper{max-width:680px;margin:0 auto;padding:24px;background:#fbf9f3;}</style>
+<style>body{margin:0;background:#f3efe5;} .newspaper{max-width:${process.argv[4] ?? "680"}px;margin:0 auto;padding:24px;background:#fbf9f3;}</style>
 </head><body><div class="newspaper">${body}</div></body></html>`;
 
   const out = `/tmp/football-${league}-${date}.html`;

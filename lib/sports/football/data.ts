@@ -6,7 +6,7 @@
 
 import { supabaseAdmin } from "../../supabase";
 import { footballLeagueConfig, seasonForDate } from "./leagues";
-import { fetchFootballRaw, type FootballRaw } from "./sources/espn";
+import { fetchFootballRaw, FOOTBALL_LEADER_STATS, type FootballRaw } from "./sources/espn";
 import { adaptEspnFootball } from "./adapters/from-espn";
 import type { CanonicalFootballDailyData } from "./canonical";
 import type { FootballLeague } from "./types";
@@ -43,7 +43,22 @@ async function upsertFootballRaw(
 // the wrong league) is treated as a miss so the next load refetches and
 // rewrites. Cheap insurance at boxscore's scale.
 function isStaleShape(raw: FootballRaw, league: FootballLeague): boolean {
-  return raw.summaries === undefined || raw.league !== league;
+  if (raw.summaries === undefined || raw.league !== league) return true;
+  // `leaders` was added with the MLB-style multi-section digest, then reshaped
+  // to a per-stat array whose athletes carry a season `teamAbbr`. Rows from an
+  // earlier shape (missing leaders, the old byathlete object, or the pre-
+  // teamAbbr athlete) must refetch so old cached dates self-heal.
+  if (raw.leaders === undefined || !Array.isArray(raw.leaders)) return true;
+  const firstAthlete = (raw.leaders[0] as { athletes?: Array<{ athlete?: { teamAbbr?: unknown } }> } | undefined)
+    ?.athletes?.[0]?.athlete;
+  if (firstAthlete && firstAthlete.teamAbbr === undefined) return true;
+  // The set of leader stats changed (e.g. Interceptions → Tackles For Loss).
+  // Any date whose cache holds a different stat set refetches on next load, so
+  // an old edition can't keep showing a retired leader category.
+  const cached = new Set((raw.leaders as Array<{ stat?: unknown }>).map((e) => String(e?.stat)));
+  const want = FOOTBALL_LEADER_STATS.map((s) => s.stat);
+  if (cached.size !== want.length || !want.every((s) => cached.has(s))) return true;
+  return false;
 }
 
 /**

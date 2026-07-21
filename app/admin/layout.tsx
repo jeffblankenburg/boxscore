@@ -11,6 +11,7 @@
 
 import { cookies } from "next/headers";
 import { ADMIN_SESSION_COOKIE, validateSession } from "@/lib/admin-auth";
+import { getVisibleSports } from "@/lib/sports";
 import { AdminLayoutShell } from "./_components/AdminLayoutShell";
 import "./admin.css";
 
@@ -18,5 +19,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const jar = await cookies();
   const sessionToken = jar.get(ADMIN_SESSION_COOKIE)?.value;
   const email = sessionToken ? await validateSession(sessionToken) : null;
-  return <AdminLayoutShell email={email}>{children}</AdminLayoutShell>;
+  // Registry-driven so the Sidebar's Sports section (and any new sport)
+  // shows up without editing a hardcoded list. Admin context sees admin-only
+  // sports too. Passed as plain {id,name} since Sidebar is a client component.
+  const sports = (await getVisibleSports({ includeAdminOnly: true })).map((s) => ({ id: s.id, name: s.name }));
+  return <AdminLayoutShell email={email} sports={sports}>{children}</AdminLayoutShell>;
 }

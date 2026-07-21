@@ -770,13 +770,17 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .team-tab-panel { display: none; padding-top: 4px; }
 #tab-mlb:checked ~ .team-tab-strip label[for="tab-mlb"],
 #tab-nba:checked ~ .team-tab-strip label[for="tab-nba"],
-#tab-wnba:checked ~ .team-tab-strip label[for="tab-wnba"] {
+#tab-wnba:checked ~ .team-tab-strip label[for="tab-wnba"],
+#tab-nfl:checked ~ .team-tab-strip label[for="tab-nfl"],
+#tab-ncaaf:checked ~ .team-tab-strip label[for="tab-ncaaf"] {
   background: var(--text-primary); color: #fff;
   border-color: var(--text-primary);
 }
 #tab-mlb:checked ~ .team-tab-panel[data-sport="mlb"],
 #tab-nba:checked ~ .team-tab-panel[data-sport="nba"],
-#tab-wnba:checked ~ .team-tab-panel[data-sport="wnba"] {
+#tab-wnba:checked ~ .team-tab-panel[data-sport="wnba"],
+#tab-nfl:checked ~ .team-tab-panel[data-sport="nfl"],
+#tab-ncaaf:checked ~ .team-tab-panel[data-sport="ncaaf"] {
   display: block;
 }
 .settings-toggle-on { background: #000; color: #fff; border: 1px solid #000; }
@@ -1318,7 +1322,7 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   border-bottom: 1px solid #161410;
 }
 .fb-rank-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 12px; }
-.fb-rank-table th, .fb-rank-table td { padding: 2px 4px; white-space: nowrap; }
+.fb-rank-table th, .fb-rank-table td { padding: 1px 3px; white-space: nowrap; }
 .fb-rank-table th {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.04em; border-bottom: 1px solid #161410; text-align: left;
@@ -1345,18 +1349,20 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 
 .fb-linescore { width: 100%; border-collapse: collapse; margin: 0 0 6px;
                 font-size: 12px; table-layout: fixed; }
-.fb-linescore th, .fb-linescore td { padding: 2px 4px; text-align: right; white-space: nowrap; }
+.fb-linescore th, .fb-linescore td { padding: 1px 3px; text-align: right; white-space: nowrap; }
 .fb-linescore thead th { font-size: 10px; font-weight: 700; text-transform: uppercase;
                          letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
 .fb-ls-team { text-align: left !important; font-weight: 700; width: 18%; font-size: 12px; }
 .fb-ls-team-head { text-align: left !important; }
 .fb-ls-total { font-weight: 700; }
 .fb-ls-cell { min-width: 22px; }
+.fb-linescore tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
 
 .fb-score-list { list-style: none; padding: 0; margin: 4px 0 8px; }
 .fb-score-row { display: flex; gap: 8px; align-items: baseline; padding: 2px 0;
                 border-bottom: 1px dotted #e8e2d4; font-size: 11px; line-height: 1.35; }
 .fb-score-row:last-child { border-bottom: none; }
+.fb-score-row:nth-child(even) { background: rgba(0,0,0,0.025); }
 .fb-score-clock { flex-shrink: 0; min-width: 72px; font-weight: 700; color: #2a2620;
                   font-size: 10px; letter-spacing: 0.02em; }
 .fb-score-text { flex: 1; }
@@ -1366,32 +1372,137 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .fb-team-box { margin: 8px 0 4px; }
 .fb-team-caption { margin: 10px 0 2px; padding: 0 0 2px; font-size: 13px; font-weight: 700;
                    border-bottom: 1px solid #161410; }
-.fb-team-totals { font-size: 11px; color: #2a2620; margin: 2px 0 6px; }
+/* Team-stats comparison table (away vs home). */
+.fb-ts-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; margin: 4px 0 10px; }
+.fb-ts-table th, .fb-ts-table td { padding: 1px 8px; white-space: nowrap; }
+.fb-ts-table thead th { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                        letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
+.fb-ts-table tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
+.fb-ts-label { text-align: left; width: 60%; }
+.fb-ts-val { text-align: right; font-weight: 700; width: 20%; }
+.fb-ts-table thead .fb-ts-val { font-weight: 700; }
 
 .fb-stat-table { width: 100%; border-collapse: collapse; font-size: 12px;
                  margin: 4px 0 8px; table-layout: fixed; }
-.fb-stat-table th, .fb-stat-table td { padding: 2px 3px; text-align: right; white-space: nowrap; }
+.fb-stat-table th, .fb-stat-table td { padding: 1px 3px; text-align: right; white-space: nowrap; }
 .fb-stat-table thead th { font-size: 10px; font-weight: 700; text-transform: uppercase;
                           letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
-.fb-st-name { text-align: left !important; font-size: 12px; width: 40%;
-              white-space: normal; word-break: break-word; }
+.fb-st-name { text-align: left !important; font-size: 12px; width: 34%;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fb-stat-table thead .fb-st-name { font-weight: 700; }
 .fb-st-cell { min-width: 30px; }
+.fb-stat-table tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
 
+/* Player page (web only). The game-log tables reuse fb-stat-table but need
+   auto layout — a QB's passing log has ~14 stat columns, so a fixed 40% name
+   column would crush them. A totals footer row closes each table. */
+.fb-player .fb-stat-table { table-layout: auto; }
+.fb-player .fb-st-name { width: auto; white-space: nowrap; }
+.fb-player .fb-stat-table tfoot td { border-top: 1px solid #161410; font-weight: 700;
+                                     background: transparent; }
+.fb-pl-opp { text-align: left !important; }
+.fb-pl-header { margin: 2px 0 12px; padding-bottom: 10px; border-bottom: 2px solid #161410; }
+.fb-pl-name { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+.fb-pl-team { font-size: 14px; font-weight: 600; margin-top: 3px; }
+.fb-pl-detail { font-size: 12px; color: #6b6459; margin-top: 2px; }
+.fb-pl-summary { display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 12px 0 16px; }
+.fb-pl-chip { display: flex; flex-direction: column; line-height: 1.15; }
+.fb-pl-chip-val { font-size: 19px; font-weight: 700; }
+.fb-pl-chip-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+                    color: #6b6459; }
+.fb-pl-res { font-weight: 700; }
+.fb-pl-res-w { color: #1a7f37; }
+.fb-pl-res-l { color: #b42318; }
+.fb-pl-empty { font-size: 13px; color: #6b6459; }
+
+/* Team page (web only). Heading mirrors the player page; sections reuse
+   fb-section / fb-section-title and the shared standings/box renderers. */
+.fb-tm-header { margin: 2px 0 14px; padding-bottom: 10px; border-bottom: 2px solid #161410; }
+.fb-tm-name { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+.fb-tm-sub { font-size: 14px; font-weight: 600; margin-top: 3px; }
+.fb-tm-ldr-list { display: flex; flex-direction: column; gap: 3px; }
+.fb-tm-ldr-row { display: flex; gap: 10px; font-size: 13px; line-height: 1.35;
+                 padding: 2px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.fb-tm-ldr-cat { flex: 0 0 130px; font-weight: 700; text-transform: uppercase;
+                 font-size: 10px; letter-spacing: 0.04em; color: #6b6459; padding-top: 2px; }
+.fb-tm-ldr-vals { flex: 1 1 auto; min-width: 0; }
+
+/* Standings — mirrors the MLB standings look (base table rules above): 14px
+   fixed-layout table, centered conference title, division sub-headers, repeated
+   column-header row per division. Fixed layout + overflow:hidden fits the table
+   to any width (clipping over-long cells) like MLB, rather than scrolling. */
 .fb-standings-grid { display: block; }
-.fb-standings-block { margin: 8px 0 14px; }
-.fb-standings-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 6px 0 14px; }
-.fb-conf-caption { margin: 10px 0 2px; padding: 0 0 2px; font-size: 13px; font-weight: 700;
+.fb-standings-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 28px; align-items: start; }
+.fb-standings-col { min-width: 0; }
+.fb-standings-block { margin: 8px 0 14px; min-width: 0; }
+.fb-conf-title {
+  text-align: center; font-size: 22px; font-weight: 700;
+  margin: 10px 0; padding-bottom: 4px; border-bottom: 2px solid #161410;
+}
+.fb-conf-caption { margin: 10px 0 2px; padding: 0 0 2px; font-size: 14px; font-weight: 700;
                    border-bottom: 1px solid #161410; }
-.fb-standings-table th, .fb-standings-table td { padding: 2px 4px; text-align: right; white-space: nowrap; }
-.fb-standings-table th { font-size: 10px; font-weight: 700; text-transform: uppercase;
-                         letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
-.fb-sd-team { text-align: left !important; font-size: 12px; }
-.fb-sd-stat { min-width: 34px; }
+.fb-standings-table {
+  width: 100%; border-collapse: collapse; table-layout: fixed;
+  font-size: 14px; margin: 0 0 8px;
+}
+.fb-standings-table th, .fb-standings-table td {
+  text-align: right; overflow: hidden; line-height: 1.15; padding: 0 2px; white-space: nowrap;
+}
+.fb-standings-table th { font-weight: 700; border-bottom: 1px solid #161410; }
+.fb-sd-team { text-align: left !important; }
+.fb-sd-teamcol { width: 16%; }
+.fb-standings-table .fb-sd-divhead-cell {
+  text-align: left; font-weight: 700; padding: 8px 2px 2px; border-bottom: 1px solid #161410;
+}
 
+/* Game Scores (compact final-score list). */
+.fb-gs-grid { display: block; margin: 4px 0 0; }
+.fb-gs-line { font-size: 14px; padding: 2px 0; border-bottom: 1px dotted #e8e2d4; }
+.fb-gs-line:last-child { border-bottom: none; }
+.fb-gs-win { font-weight: 700; }
+.fb-gs-note { color: #6a6354; font-style: italic; font-size: 12px; }
+
+/* Next Matchups. */
+.fb-next-list { list-style: none; padding: 0; margin: 4px 0 0; }
+.fb-next-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+               padding: 3px 0; border-bottom: 1px dotted #e8e2d4; font-size: 14px; }
+.fb-next-row:last-child { border-bottom: none; }
+.fb-next-matchup { font-weight: 700; }
+.fb-next-time { color: #6a6354; font-style: italic; white-space: nowrap; }
+
+/* Leaders — two columns of small ranked tables. */
+/* Leaders — MLB template: cards flow into 2 balanced columns (column-count),
+   each a small "Rank. LastName, TEAM | value" table with a Player/unit header. */
+.fb-ldr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; align-items: start; }
+.fb-ldr-card { min-width: 0; margin: 0 0 12px; }
+.fb-ldr-caption { margin: 0 0 3px; padding: 0 0 2px; font-size: 14px; font-weight: 700;
+                  border-bottom: 1px solid #161410; }
+.fb-ldr-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.fb-ldr-table th, .fb-ldr-table td { padding: 0 2px; white-space: nowrap; text-align: right; line-height: 1.35; }
+.fb-ldr-table th { font-weight: 700; border-bottom: 1px solid #161410; }
+.fb-ldr-player { text-align: left !important; width: 78%; overflow: hidden; text-overflow: ellipsis; }
+.fb-ldr-val { text-align: right; }
+
+/* Transactions. */
+.fb-tx-list { list-style: none; padding: 0; margin: 4px 0 0; }
+.fb-tx-row { display: flex; gap: 10px; padding: 3px 0; border-bottom: 1px dotted #e8e2d4;
+             font-size: 13px; line-height: 1.4; }
+.fb-tx-row:last-child { border-bottom: none; }
+.fb-tx-team { flex-shrink: 0; min-width: 34px; font-weight: 700; color: #2a2620;
+              font-size: 12px; padding-top: 1px; }
+.fb-tx-desc { font-size: 13px; }
+
+@media only screen and (max-width: 1250px) {
+  .fb-standings-2col { display: block; }
+}
+@media only screen and (max-width: 600px) {
+  .fb-standings-table { font-size: 11px; }
+  .fb-standings-table th, .fb-standings-table td { padding: 0 1px; }
+  .fb-conf-title { font-size: 18px; }
+}
 @media only screen and (max-width: 480px) {
-  .fb-stat-table td, .fb-standings-table td, .fb-rank-table td { font-size: 11px; padding: 1px 2px; }
-  .fb-stat-table th, .fb-standings-table th, .fb-rank-table th { font-size: 9px; }
+  .fb-stat-table td, .fb-rank-table td { font-size: 11px; padding: 1px 2px; }
+  .fb-stat-table th, .fb-rank-table th { font-size: 9px; }
   .fb-score-clock { min-width: 60px; }
 }
 
@@ -1423,6 +1534,8 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .league-badge-mlb  { border-left-color: #002d72; }
 .league-badge-nba  { border-left-color: #c8102e; }
 .league-badge-wnba { border-left-color: #ff671f; }
+.league-badge-nfl  { border-left-color: #013369; }
+.league-badge-ncaaf { border-left-color: #4b3621; }
 .admin-nav a:hover { color: var(--text-primary); background: rgba(0,0,0,0.03); }
 .admin-team-picker { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 0 14px;
                      font-family: ui-monospace, monospace; font-size: 12px; }

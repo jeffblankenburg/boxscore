@@ -20,7 +20,7 @@ export async function generateMetadata({
   params: Promise<{ sport: string }>;
 }) {
   const { sport } = await params;
-  const row = getSportById(sport);
+  const row = await getSportById(sport);
   if (!row || row.visibility !== "public") return {};
   // Title shows the edition date (when the email goes out) rather than the
   // games date — matches the dateline at the top of the page and the way
@@ -51,7 +51,7 @@ export default async function SportLatest({
   searchParams: Promise<{ paper?: string }>;
 }) {
   const { sport } = await params;
-  if (!isSportVisible(sport)) notFound();
+  if (!(await isSportVisible(sport))) notFound();
 
   // Ask for the newest in-season digest rather than yesterday-in-ET. Between
   // midnight ET and the ~5 AM ET generate cron, yesterday-in-ET has no row

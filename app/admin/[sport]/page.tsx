@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "../require-admin";
 import { SubmitButton } from "../SubmitButton";
-import { sendAdminPreview, sendTeamAdminPreview, setAnnouncement, removeAnnouncement, setSportSends } from "../actions";
+import { sendAdminPreview, sendTeamAdminPreview, setAnnouncement, removeAnnouncement, setSportSends, setSportVisibility } from "../actions";
 import { RegenerateAllRunner } from "./RegenerateAllRunner";
 import { CronPanel } from "./CronPanel";
 import { CopyButton } from "./CopyButton";
@@ -38,7 +38,7 @@ export default async function LeagueDashboard({
 }) {
   await requireAdmin();
   const { sport } = await params;
-  if (!isSportVisible(sport, { includeAdminOnly: true })) notFound();
+  if (!(await isSportVisible(sport, { includeAdminOnly: true }))) notFound();
   const sportRow = await getSportRow(sport);
   if (!sportRow) notFound();
   const { ok, error } = await searchParams;
@@ -84,6 +84,13 @@ export default async function LeagueDashboard({
 
       {ok && <p className="admin-success"><strong>✓</strong> {ok}</p>}
       {error && <p className="admin-error"><strong>Failed:</strong> {error}</p>}
+
+      <VisibilityToggleBanner
+        sport={sport}
+        sportName={sportRow.name}
+        visibility={sportRow.visibility}
+        returnTo={returnTo}
+      />
 
       <SendsToggleBanner
         sport={sport}
@@ -240,7 +247,7 @@ export default async function LeagueDashboard({
             )}
             {features.hasPreview && (
               <li>
-                <a href={`/admin/email/${gamesDate}`} target="_blank" rel="noreferrer">
+                <a href={`/admin/email/${gamesDate}?sport=${sport}`} target="_blank" rel="noreferrer">
                   Email preview ({gamesDate}) →
                 </a>
                 <span className="admin-meta"> · rendered email for the day</span>
@@ -527,6 +534,57 @@ async function getCronPulseForDate(
 }
 
 // ---- components -----------------------------------------------------------
+
+function VisibilityToggleBanner({
+  sport,
+  sportName,
+  visibility,
+  returnTo,
+}: {
+  sport: string;
+  sportName: string;
+  visibility: "admin_only" | "public";
+  returnTo: string;
+}) {
+  // Same <details> two-step confirm as the sends banner. Reuses the on/off
+  // banner CSS: public = "on" (green), admin-only = "off" (amber). Launching
+  // a sport public is the higher-stakes direction, so both get a guard.
+  const isPublic = visibility === "public";
+  const cls = isPublic ? "admin-sends-on" : "admin-sends-off";
+  const stateLabel = isPublic ? "PUBLIC" : "ADMIN-ONLY";
+  const explainer = isPublic
+    ? `${sportName} is live: it appears on /subscribe and its pages are public.`
+    : `${sportName} is hidden from the public — only logged-in admins can see its pages, and it is not on /subscribe.`;
+  const buttonLabel = isPublic ? "Make admin-only…" : "Make public…";
+  const confirmHeading = isPublic ? `Hide ${sportName} from the public?` : `Launch ${sportName} to the public?`;
+  const confirmBody = isPublic
+    ? `${sportName} will disappear from /subscribe and its public pages will 404 for non-admins. Existing subscribers keep their subscription; the sport just stops being discoverable.`
+    : `${sportName} will appear on /subscribe and its pages go live for everyone. This does NOT start emails — that's the separate sends switch below. Check the digest (Preview) first.`;
+  const confirmLabel = isPublic ? `Confirm: Hide ${sportName}` : `Confirm: Launch ${sportName}`;
+
+  return (
+    <section className={`admin-sends-banner ${cls}`}>
+      <div className="admin-sends-banner-row">
+        <div>
+          <div className="admin-sends-banner-state">VISIBILITY · {stateLabel}</div>
+          <div className="admin-sends-banner-explain">{explainer}</div>
+        </div>
+        <details className="admin-sends-banner-action">
+          <summary className="admin-btn">{buttonLabel}</summary>
+          <form action={setSportVisibility} className="admin-sends-confirm">
+            <input type="hidden" name="sport" value={sport} />
+            <input type="hidden" name="public" value={isPublic ? "0" : "1"} />
+            <input type="hidden" name="confirmed" value="1" />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <p className="admin-sends-confirm-heading"><strong>{confirmHeading}</strong></p>
+            <p className="admin-sends-confirm-body">{confirmBody}</p>
+            <SubmitButton idleLabel={confirmLabel} pendingLabel="Saving…" />
+          </form>
+        </details>
+      </div>
+    </section>
+  );
+}
 
 function SendsToggleBanner({
   sport,

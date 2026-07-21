@@ -58,7 +58,16 @@ async function main() {
     await page.goto(ORIGIN + path, { waitUntil: "networkidle0", timeout: 60_000 });
     await page.evaluate(() => document.fonts.ready);
 
-    await page.screenshot({ path: outPath as `${string}.png`, fullPage: true });
+    const selector = process.env.SHOT_SELECTOR;
+    if (selector) {
+      const el = await page.$(selector);
+      if (!el) throw new Error(`selector not found: ${selector}`);
+      const box = await el.boundingBox();
+      console.log(`bbox ${selector}: ${box ? `${Math.round(box.width)}×${Math.round(box.height)}` : "?"}`);
+      await el.screenshot({ path: outPath as `${string}.png` });
+    } else {
+      await page.screenshot({ path: outPath as `${string}.png`, fullPage: true });
+    }
     console.log(outPath);
   } finally {
     await browser.close();

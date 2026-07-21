@@ -14,15 +14,41 @@ import type { FootballLeagueConfig } from "../leagues";
 
 const FOOTBALL_BASE = "https://site.api.espn.com/apis/site/v2/sports/football";
 const FOOTBALL_WEB_BASE = "https://site.web.api.espn.com/apis/v2/sports/football";
+const FOOTBALL_LEADERS_BASE = "https://site.web.api.espn.com/apis/common/v3/sports/football";
+
+// How many days past the recap date the "Next Matchups" window covers — a bit
+// over two weeks catches the next NFL week even across the regular-season →
+// playoff gap, and the next Saturday for college.
+const NEXT_WINDOW_DAYS = 16;
+
+// Season leaders to surface, in display order. `category` is the byathlete
+// category name used to READ the athlete's values; `sortCategory` (when it
+// differs) is the case-sensitive prefix the `sort=` param needs — ESPN reads
+// "defensiveinterceptions" but only sorts on "defensiveInterceptions".
+export const FOOTBALL_LEADER_STATS: ReadonlyArray<{ category: string; stat: string; label: string; sortCategory?: string }> = [
+  { category: "passing", stat: "passingYards", label: "Passing Yards" },
+  { category: "passing", stat: "passingTouchdowns", label: "Passing TD" },
+  { category: "rushing", stat: "rushingYards", label: "Rushing Yards" },
+  { category: "rushing", stat: "rushingTouchdowns", label: "Rushing TD" },
+  { category: "receiving", stat: "receivingYards", label: "Receiving Yards" },
+  { category: "receiving", stat: "receivingTouchdowns", label: "Receiving TD" },
+  { category: "receiving", stat: "receptions", label: "Receptions" },
+  { category: "defensive", stat: "sacks", label: "Sacks" },
+  { category: "defensive", stat: "totalTackles", label: "Tackles" },
+  { category: "defensive", stat: "tacklesForLoss", label: "Tackles For Loss" },
+];
 
 // The envelope persisted to daily_raw.payload and consumed by the adapter.
 export type FootballRaw = {
   league: FootballLeagueConfig["league"];
   date: string;                             // YYYY-MM-DD
   scoreboard: unknown;                      // /scoreboard?dates=
+  nextScoreboard: unknown | null;           // /scoreboard for the upcoming window (Next Matchups)
   summaries: Record<string, unknown>;       // event id → /summary?event=
   standings: unknown | null;                // /standings; null if the fetch failed
   rankings: unknown | null;                 // /rankings (college only); null otherwise
+  leaders: unknown | null;                  // /statistics/byathlete season leaders
+  transactions: unknown | null;             // /transactions recent roster moves
 };
 
 // ---- Network --------------------------------------------------------------
@@ -77,11 +103,44 @@ export function summaryUrl(cfg: FootballLeagueConfig, eventId: string): string {
 }
 
 export function standingsUrl(cfg: FootballLeagueConfig, season: number): string {
-  return `${FOOTBALL_WEB_BASE}/${cfg.espnSlug}/standings?season=${season}`;
+  const level = cfg.standingsLevel != null ? `&level=${cfg.standingsLevel}` : "";
+  return `${FOOTBALL_WEB_BASE}/${cfg.espnSlug}/standings?season=${season}${level}`;
 }
 
 export function rankingsUrl(cfg: FootballLeagueConfig): string {
   return `${FOOTBALL_BASE}/${cfg.espnSlug}/rankings`;
+}
+
+// Upcoming slate for the "Next Matchups" section — the scoreboard over an
+// inclusive date range starting the day after the recap date.
+export function nextScoreboardUrl(cfg: FootballLeagueConfig, date: string, windowDays: number): string {
+  const start = addDaysIso(date, 1).replace(/-/g, "");
+  const end = addDaysIso(date, windowDays).replace(/-/g, "");
+  const params = new URLSearchParams({ dates: `${start}-${end}`, limit: String(cfg.scoreboardLimit) });
+  if (cfg.scoreboardGroups != null) params.set("groups", String(cfg.scoreboardGroups));
+  return `${FOOTBALL_BASE}/${cfg.espnSlug}/scoreboard?${params}`;
+}
+
+// Season stat leaders (byathlete): one big blob carrying every athlete's
+// per-category stat values, which the adapter sorts into per-stat top-N lists.
+// byathlete sorted by a specific stat — the endpoint's default (unsorted) blob
+// is QB-heavy and misses the rushing/receiving/sack leaders, so we ask for each
+// stat's own top-6 via `sort=category.stat:desc`.
+export function leaderStatUrl(cfg: FootballLeagueConfig, season: number, category: string, stat: string): string {
+  // limit=20 (not 6) leaves headroom for "top 5 through ties" — TD and sack
+  // leaders routinely have many players tied at the 5th-place value.
+  return `${FOOTBALL_LEADERS_BASE}/${cfg.espnSlug}/statistics/byathlete?season=${season}&seasontype=2&limit=20&sort=${category}.${stat}:desc`;
+}
+
+export function transactionsUrl(cfg: FootballLeagueConfig): string {
+  return `${FOOTBALL_BASE}/${cfg.espnSlug}/transactions`;
+}
+
+// Add whole days to an ISO date (UTC math, no timezone drift).
+function addDaysIso(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const t = new Date(Date.UTC(y!, m! - 1, d!) + days * 86_400_000);
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
 }
 
 // ---- Payload slimming -----------------------------------------------------
@@ -101,6 +160,7 @@ export function rankingsUrl(cfg: FootballLeagueConfig): string {
 type Any = Record<string, unknown>;
 const obj = (v: unknown): Any => (v && typeof v === "object" ? (v as Any) : {});
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const str = (v: unknown): string => (v == null ? "" : String(v));
 const pick = (v: unknown, keys: string[]): Any => {
   const o = obj(v);
   const out: Any = {};
@@ -225,6 +285,48 @@ function slimScoreboard(scoreboard: unknown): Any {
   };
 }
 
+// One stat's leader response (already sorted by the stat). Keep the category's
+// schema `names` (to find the value index) and, per athlete, identity + that
+// category's positional `values`.
+function slimLeaderStat(spec: { category: string; stat: string; label: string }, response: unknown): Any {
+  const r = obj(response);
+  const catSchema = list(r.categories).map(obj).find((c) => str(c.name) === spec.category);
+  return {
+    category: spec.category,
+    stat: spec.stat,
+    label: spec.label,
+    names: catSchema ? catSchema.names : [],
+    athletes: list(r.athletes).map((a) => {
+      const ae = obj(a);
+      const ath = obj(ae.athlete);
+      const cat = list(ae.categories).map(obj).find((c) => str(c.name) === spec.category);
+      // `teamShortName` is the player's CURRENT team; `teams[0]` is the team
+      // they played for in THIS season — use the latter so a leader from a past
+      // season shows the right team even after a trade (e.g. Garrett was CLE in
+      // 2025, not his later team).
+      const seasonTeam = str(obj(list(ath.teams)[0]).abbreviation) || str(ath.teamShortName);
+      return {
+        athlete: {
+          id: ath.id,
+          displayName: ath.displayName,
+          teamAbbr: seasonTeam,
+          position: { abbreviation: obj(ath.position).abbreviation },
+        },
+        values: cat ? cat.values : [],
+      };
+    }),
+  };
+}
+
+function slimTransactions(transactions: unknown): Any {
+  return {
+    transactions: list(obj(transactions).transactions).map((t) => {
+      const te = obj(t);
+      return { date: te.date, description: te.description, team: { abbreviation: obj(te.team).abbreviation } };
+    }),
+  };
+}
+
 // ---- Raw envelope assembly ------------------------------------------------
 
 // Pull the event ids out of a scoreboard payload. Minimal structural read —
@@ -268,17 +370,32 @@ export async function fetchFootballRaw(
     if (payload != null) summaries[id] = payload;
   }
 
+  // Secondary sections — all best-effort (null on failure) so a hiccup in any
+  // one doesn't sink the digest. Fetched after the boxes to keep peak
+  // concurrency down.
   const standings = await getJson(standingsUrl(cfg, season)).catch(() => null);
   const rankings = cfg.hasRankings
     ? await getJson(rankingsUrl(cfg)).catch(() => null)
     : null;
+  const nextRaw = await getJson(nextScoreboardUrl(cfg, date, NEXT_WINDOW_DAYS)).catch(() => null);
+  const leaders = (await pooledMap([...FOOTBALL_LEADER_STATS], 4, async (spec) => {
+    try {
+      return slimLeaderStat(spec, await getJson(leaderStatUrl(cfg, season, spec.sortCategory ?? spec.category, spec.stat)));
+    } catch {
+      return null;
+    }
+  })).filter((x): x is Any => x != null);
+  const transactionsRaw = await getJson(transactionsUrl(cfg)).catch(() => null);
 
   return {
     league: cfg.league,
     date,
     scoreboard: slimScoreboard(fullScoreboard),
+    nextScoreboard: nextRaw ? slimScoreboard(nextRaw) : null,
     summaries,
     standings,
     rankings,
+    leaders: leaders.length ? leaders : null,
+    transactions: transactionsRaw ? slimTransactions(transactionsRaw) : null,
   };
 }

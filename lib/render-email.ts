@@ -37,8 +37,13 @@ export { lastName };
 // the same stylesheet is injected into every digest email regardless of
 // sport. Both stylesheets use disjoint class prefixes (es-* for MLB, bb-*
 // for basketball) so no collisions; the cost of the extra ~2 KB is trivial.
+//
+// Football styles are intentionally NOT concatenated here: adding the ~9.5 KB
+// FOOTBALL_EMAIL_STYLES pushed the shared <style> block past the size where
+// Gmail silently drops it, which stripped the es-* rules and wrecked the MLB
+// email. Football emails must inject FOOTBALL_EMAIL_STYLES per-send (only into
+// football emails) before launch — see lib/emails/templates.ts.
 import { BASKETBALL_EMAIL_STYLES } from "./render-basketball";
-import { FOOTBALL_EMAIL_STYLES } from "./sports/football/render/digest";
 
 // ─── styles ───────────────────────────────────────────────────────────────
 
@@ -179,7 +184,7 @@ export const EMAIL_STYLES = `
   .es-tx-type { display: block; font-size: 10px; font-weight: 700;
                 text-transform: uppercase; letter-spacing: 0.03em;
                 color: #6a6354; margin-bottom: 1px; }
-` + BASKETBALL_EMAIL_STYLES + FOOTBALL_EMAIL_STYLES;
+` + BASKETBALL_EMAIL_STYLES;
 
 // ─── data ────────────────────────────────────────────────────────────────
 

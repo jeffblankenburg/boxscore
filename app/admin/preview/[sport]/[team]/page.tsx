@@ -21,7 +21,11 @@ export const metadata = {
   robots: { index: false },
 };
 
-const VALID_SPORTS = new Set(["mlb", "nba", "wnba"]);
+const VALID_SPORTS = new Set(["mlb", "nba", "wnba", "nfl", "ncaaf"]);
+// Football team pages are web-only (no per-team email) and render live at
+// their public URL (admin-visible pre-launch), so the preview skips the
+// email surface + the MLB games_date day-type dropdown.
+const WEB_ONLY_SPORTS = new Set(["nfl", "ncaaf"]);
 
 const WIDTH_PRESETS: Array<{ key: string; label: string; px: number | null }> = [
   { key: "mobile", label: "Mobile", px: 375 },
@@ -63,6 +67,7 @@ export default async function TeamPreviewPage({
   const team = findTeam(sport as Sport, slug);
   if (!team) notFound();
 
+  const webOnly = WEB_ONLY_SPORTS.has(sport);
   const { date: dateParam, surface: surfaceParam, width: widthParam } = await searchParams;
   // `date` is the EDITION date the operator sees on the masthead; the
   // team digest URL and frame route both expect games_date, so we
@@ -70,16 +75,18 @@ export default async function TeamPreviewPage({
   const todayIsoEt = nextDay(yesterdayInET());
   const date = dateParam && isValidIsoDate(dateParam) ? dateParam : todayIsoEt;
   const gamesDate = prevDay(date);
-  const surface: "web" | "email" = surfaceParam === "email" ? "email" : "web";
+  const surface: "web" | "email" = !webOnly && surfaceParam === "email" ? "email" : "web";
   const width = asWidth(widthParam, surface);
   const widthPx = WIDTH_PRESETS.find((p) => p.key === width)?.px ?? null;
 
-  // Web surface points at the public team-digest page, which now expects
-  // edition_date in its URL. Email frame route still keys by games_date
-  // because that's the column in team_digests.html.
-  const frameSrc = surface === "web"
-    ? `/${sport}/${team.slug}/${date}`
-    : `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}`;
+  // Football renders live at its 2-segment latest URL (Branch B), which shows
+  // the team's most recent game and ignores a date. MLB/NBA point the web
+  // iframe at the dated public page and email at the frame route.
+  const frameSrc = webOnly
+    ? `/${sport}/${team.slug}`
+    : surface === "web"
+      ? `/${sport}/${team.slug}/${date}`
+      : `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}`;
 
   const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string }) => {
     const d = overrides.date ?? date;
@@ -108,20 +115,22 @@ export default async function TeamPreviewPage({
                 Go
               </button>
             </form>
-            <div className="preview-toggle">
-              <a
-                className={surface === "web" ? "active" : ""}
-                href={link({ surface: "web" })}
-              >
-                Web
-              </a>
-              <a
-                className={surface === "email" ? "active" : ""}
-                href={link({ surface: "email" })}
-              >
-                Email
-              </a>
-            </div>
+            {!webOnly && (
+              <div className="preview-toggle">
+                <a
+                  className={surface === "web" ? "active" : ""}
+                  href={link({ surface: "web" })}
+                >
+                  Web
+                </a>
+                <a
+                  className={surface === "email" ? "active" : ""}
+                  href={link({ surface: "email" })}
+                >
+                  Email
+                </a>
+              </div>
+            )}
             <div className="preview-toggle">
               {WIDTH_PRESETS.map((p) => (
                 <a
@@ -133,24 +142,26 @@ export default async function TeamPreviewPage({
                 </a>
               ))}
             </div>
-            <form method="get" className="preview-date-form">
-              <label className="preview-date-label">
-                <span>Day type</span>
-                {/* Values are games_dates shifted to edition_date (games + 1)
-                    so the URL date stays consistent with this page's model. */}
-                <select name="date" defaultValue="" className="admin-input">
-                  <option value="" disabled>Jump to day…</option>
-                  {TEAM_PREVIEW_DAYS.map((d) => (
-                    <option key={d.label} value={nextDay(d.games)}>{d.label}</option>
-                  ))}
-                </select>
-              </label>
-              <input type="hidden" name="surface" value={surface} />
-              <input type="hidden" name="width" value={width} />
-              <button type="submit" className="admin-btn admin-btn-small">
-                Go
-              </button>
-            </form>
+            {!webOnly && (
+              <form method="get" className="preview-date-form">
+                <label className="preview-date-label">
+                  <span>Day type</span>
+                  {/* Values are games_dates shifted to edition_date (games + 1)
+                      so the URL date stays consistent with this page's model. */}
+                  <select name="date" defaultValue="" className="admin-input">
+                    <option value="" disabled>Jump to day…</option>
+                    {TEAM_PREVIEW_DAYS.map((d) => (
+                      <option key={d.label} value={nextDay(d.games)}>{d.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <input type="hidden" name="surface" value={surface} />
+                <input type="hidden" name="width" value={width} />
+                <button type="submit" className="admin-btn admin-btn-small">
+                  Go
+                </button>
+              </form>
+            )}
             <a
               className="preview-popout"
               href={frameSrc}

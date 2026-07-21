@@ -18,6 +18,8 @@ const SPORT_EMOJI: Record<string, string> = {
   mlb: "\u26BE",   // ⚾
   nba: "\u{1F3C0}", // 🏀
   wnba: "\u{1F3C0}", // 🏀
+  nfl: "\u{1F3C8}",  // 🏈
+  ncaaf: "\u{1F3C8}", // 🏈 — league name + edge stripe disambiguate from NFL
 };
 
 // `basePath` controls where each badge links — defaults to "/admin" so
