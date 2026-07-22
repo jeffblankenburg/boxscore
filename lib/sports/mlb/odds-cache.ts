@@ -24,7 +24,7 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { findTeamByMlbApiId, TEAMS } from "@/lib/teams";
 import { fetchEspnOddsForDate, indexOddsByMatchup, type EspnOddsRow } from "./odds-espn";
-import { fetchFanDuelNrfiForDate, indexFanDuelByMatchup } from "./odds-fanduel";
+import { fetchFanDuelNrfiForDate, type FanDuelNrfiRow } from "./odds-fanduel";
 
 type PredictionGameKey = {
   game_pk: number;
@@ -169,14 +169,18 @@ export async function captureFanDuelNrfiForDate(
   }
 
   const fdRows = await fetchFanDuelNrfiForDate(date);
-  const byMatchup = indexFanDuelByMatchup(fdRows);
 
-  // Reindex predictions by (away mlbApiId, home mlbApiId) so we can
-  // probe with FanDuel's team-name → mlbApiId resolution.
-  const predByPair = new Map<string, number>();
+  // Reindex predictions by (away mlbApiId, home mlbApiId). A doubleheader
+  // shares a team-pair across TWO game_pks, so the value is a LIST, sorted
+  // ascending (game_pk order ≈ chronological, game 1 first).
+  const predByPair = new Map<string, number[]>();
   for (const p of predictions) {
-    predByPair.set(`${p.away_team_id}|${p.home_team_id}`, p.game_pk);
+    const k = `${p.away_team_id}|${p.home_team_id}`;
+    const list = predByPair.get(k) ?? [];
+    list.push(p.game_pk);
+    predByPair.set(k, list);
   }
+  for (const list of predByPair.values()) list.sort((a, b) => a - b);
 
   const insertRows: Array<{
     sport: string; date: string; game_pk: number;
@@ -189,33 +193,48 @@ export async function captureFanDuelNrfiForDate(
   let matched = 0;
   let withNrfi = 0;
 
+  // Group FanDuel rows by resolved team-pair so a doubleheader's two events
+  // map to its two game_pks instead of collapsing onto one. Both events
+  // carry identical team names, so without this they'd produce two insert
+  // rows with the same (game_pk, book, captured_at) and the whole append
+  // batch would fail on the daily_odds PK (a real prod bug: FanDuel capture
+  // died on every doubleheader day). Aligned by start time = game_pk order.
+  const fdByPair = new Map<string, FanDuelNrfiRow[]>();
   for (const fd of fdRows) {
     const awayId = NAME_TO_TEAM_ID.get(fd.awayTeamName.toLowerCase());
     const homeId = NAME_TO_TEAM_ID.get(fd.homeTeamName.toLowerCase());
-    if (typeof awayId !== "number" || typeof homeId !== "number") {
+    const pair = `${awayId}|${homeId}`;
+    if (typeof awayId !== "number" || typeof homeId !== "number" || !predByPair.has(pair)) {
       unmatched.push({ awayName: fd.awayTeamName, homeName: fd.homeTeamName });
       continue;
     }
-    const gamePk = predByPair.get(`${awayId}|${homeId}`);
-    if (typeof gamePk !== "number") {
-      unmatched.push({ awayName: fd.awayTeamName, homeName: fd.homeTeamName });
-      continue;
+    const group = fdByPair.get(pair) ?? [];
+    group.push(fd);
+    fdByPair.set(pair, group);
+  }
+
+  for (const [pair, group] of fdByPair) {
+    const gamePks = predByPair.get(pair)!;
+    group.sort((a, b) => a.startTimeUtc.localeCompare(b.startTimeUtc));
+    // Zip events → game_pks in order; extras (either side) are dropped so
+    // the batch never carries a duplicate game_pk.
+    for (let i = 0; i < group.length && i < gamePks.length; i++) {
+      const fd = group[i]!;
+      matched++;
+      if (typeof fd.nrfiOdds === "number" && typeof fd.yrfiOdds === "number") withNrfi++;
+      insertRows.push({
+        sport: "mlb",
+        date,
+        game_pk: gamePks[i]!,
+        book: "FanDuel",
+        source: "fanduel-event-page",
+        away_ml_odds: null,
+        home_ml_odds: null,
+        nrfi_odds: fd.nrfiOdds,
+        yrfi_odds: fd.yrfiOdds,
+        raw: fd.raw,
+      });
     }
-    matched++;
-    if (typeof fd.nrfiOdds === "number" && typeof fd.yrfiOdds === "number") withNrfi++;
-    insertRows.push({
-      sport: "mlb",
-      date,
-      game_pk: gamePk,
-      book: "FanDuel",
-      source: "fanduel-event-page",
-      away_ml_odds: null,
-      home_ml_odds: null,
-      nrfi_odds: fd.nrfiOdds,
-      yrfi_odds: fd.yrfiOdds,
-      raw: fd.raw,
-    });
-    void byMatchup; // index built but iterating fdRows directly is fine here
   }
 
   if (insertRows.length > 0) {
