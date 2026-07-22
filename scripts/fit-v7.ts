@@ -131,7 +131,10 @@ async function main() {
     console.log(`  ${thr.toFixed(2)}   ${String(ml.plays).padStart(7)}  ${pct(ml.hits, ml.plays).padStart(6)}  ${roi(ml).padStart(6)}  |  ${String(nr.plays).padStart(9)}  ${pct(nr.hits, nr.plays).padStart(7)}  ${roi(nr).padStart(7)}`);
   }
 
-  // ─── Recommendation policy: ≥1 ML + ≥1 NRFI, ≤5/day (Jeff's rule) ────────
+  // ─── Recommendation-policy HEAD-TO-HEAD: v6 vs v7, same rule ────────────
+  // Same policy (≥1 ML + ≥1 NRFI, ≤5/day, best-of-slate guarantee), each
+  // model with its OWN calibrated thresholds. Answers: would v7's daily
+  // picks actually beat v6's daily picks?
   const gradePick = (t: Tally, win: boolean, odds: number | null) => {
     t.plays++; if (win) t.hits++;
     if (odds != null) { t.staked += STAKE; t.profit += win ? STAKE * americanToProfitMultiplier(odds) : -STAKE; }
@@ -139,32 +142,42 @@ async function main() {
   const byDay = new Map<string, Array<{ g: EvalGame; p: Probs }>>();
   for (const e of oos) { const l = byDay.get(e.g.date) ?? []; l.push(e); byDay.set(e.g.date, l); }
 
-  const recAll = mk(), recMl = mk(), recNrfi = mk(), recGuar = mk();
-  let totalPicks = 0; const dist: Record<number, number> = {};
-  for (const [, entries] of byDay) {
-    const cands: RecCandidate[] = entries.map((e) => ({
-      gamePk: e.g.gamePk, awayAbbr: e.g.awayAbbr, homeAbbr: e.g.homeAbbr,
-      homeWin: e.p.homeWin, nrfi: e.p.nrfi, homeMlOdds: e.g.mlHomeOdds,
-    }));
-    const recs = selectDailyRecommendations(cands, { mlThreshold: REC_ML_THR, nrfiThreshold: REC_NRFI_THR, maxPicks: MAX_PICKS, oddsBandOk: mlOddsInPlayableRange });
-    totalPicks += recs.length; dist[recs.length] = (dist[recs.length] ?? 0) + 1;
-    const gByPk = new Map(entries.map((e) => [e.g.gamePk, e.g]));
-    for (const r of recs) {
-      const g = gByPk.get(r.gamePk)!;
-      const win = r.market === "ML" ? g.actualWinner === "home" : g.actualNrfi === (r.side === "NRFI");
-      const odds = r.market === "ML" ? g.mlHomeOdds : r.side === "NRFI" ? g.nrfiOdds : g.yrfiOdds;
-      gradePick(recAll, win, odds);
-      gradePick(r.market === "ML" ? recMl : recNrfi, win, odds);
-      if (r.guaranteed) gradePick(recGuar, win, odds);
+  type Entry = { g: EvalGame; p: Probs };
+  function evalRecSet(getHome: (e: Entry) => number, getNrfi: (e: Entry) => number, mlThr: number, nrfiThr: number) {
+    const all = mk(), ml = mk(), nrfi = mk(), guar = mk();
+    let total = 0;
+    for (const [, entries] of byDay) {
+      const cands: RecCandidate[] = entries.map((e) => ({
+        gamePk: e.g.gamePk, awayAbbr: e.g.awayAbbr, homeAbbr: e.g.homeAbbr,
+        homeWin: getHome(e), nrfi: getNrfi(e), homeMlOdds: e.g.mlHomeOdds,
+      }));
+      const recs = selectDailyRecommendations(cands, { mlThreshold: mlThr, nrfiThreshold: nrfiThr, maxPicks: MAX_PICKS, oddsBandOk: mlOddsInPlayableRange });
+      total += recs.length;
+      const gByPk = new Map(entries.map((e) => [e.g.gamePk, e.g]));
+      for (const r of recs) {
+        const g = gByPk.get(r.gamePk)!;
+        const win = r.market === "ML" ? g.actualWinner === "home" : g.actualNrfi === (r.side === "NRFI");
+        const odds = r.market === "ML" ? g.mlHomeOdds : r.side === "NRFI" ? g.nrfiOdds : g.yrfiOdds;
+        gradePick(all, win, odds); gradePick(r.market === "ML" ? ml : nrfi, win, odds);
+        if (r.guaranteed) gradePick(guar, win, odds);
+      }
     }
+    return { all, ml, nrfi, guar, total };
   }
-  console.log(`\n═══ RECOMMENDATION SET (≥1 ML + ≥1 NRFI, ≤${MAX_PICKS}/day; ML≥${REC_ML_THR}, NRFI≥${REC_NRFI_THR}) ═══`);
-  console.log(`  ${byDay.size} days, ${totalPicks} picks (${(totalPicks / byDay.size).toFixed(1)}/day). picks/day: ${Object.entries(dist).sort().map(([k, v]) => `${k}→${v}d`).join("  ")}`);
-  const recLine = (label: string, t: Tally) => `  ${label.padEnd(20)} picks ${String(t.plays).padStart(4)}  hit ${pct(t.hits, t.plays).padStart(6)}  ROI ${roi(t).padStart(7)}  (odds on ${t.staked / STAKE}/${t.plays})`;
-  console.log(recLine("ALL recommendations", recAll));
-  console.log(recLine("  ML picks", recMl));
-  console.log(recLine("  NRFI picks", recNrfi));
-  console.log(recLine("  guaranteed top picks", recGuar));
+
+  const recLine = (label: string, t: Tally) => `  ${label.padEnd(16)} picks ${String(t.plays).padStart(4)}  hit ${pct(t.hits, t.plays).padStart(6)}  ROI ${roi(t).padStart(7)}  (odds ${t.staked / STAKE}/${t.plays})`;
+  const v6rec = evalRecSet((e) => e.g.v6HomeWin, (e) => e.g.v6Nrfi, 0.545, 0.545);
+  const v7rec = evalRecSet((e) => e.p.homeWin, (e) => e.p.nrfi, REC_ML_THR, REC_NRFI_THR);
+  // Best-of-breed: v6's ML (its strength) + v7's NRFI (its strength).
+  const hybrid = evalRecSet((e) => e.g.v6HomeWin, (e) => e.p.nrfi, 0.545, REC_NRFI_THR);
+
+  console.log(`\n═══ RECOMMENDATION-SET HEAD-TO-HEAD (≥1 ML + ≥1 NRFI, ≤${MAX_PICKS}/day), OOS ${byDay.size} days ═══`);
+  console.log(`\nv6 (thr 0.545/0.545) — ${(v6rec.total / byDay.size).toFixed(1)} picks/day`);
+  console.log(recLine("ALL", v6rec.all)); console.log(recLine("ML", v6rec.ml)); console.log(recLine("NRFI", v6rec.nrfi)); console.log(recLine("guaranteed top", v6rec.guar));
+  console.log(`\nv7 (thr ${REC_ML_THR}/${REC_NRFI_THR}) — ${(v7rec.total / byDay.size).toFixed(1)} picks/day`);
+  console.log(recLine("ALL", v7rec.all)); console.log(recLine("ML", v7rec.ml)); console.log(recLine("NRFI", v7rec.nrfi)); console.log(recLine("guaranteed top", v7rec.guar));
+  console.log(`\nHYBRID  v6 ML + v7 NRFI  — ${(hybrid.total / byDay.size).toFixed(1)} picks/day`);
+  console.log(recLine("ALL", hybrid.all)); console.log(recLine("ML", hybrid.ml)); console.log(recLine("NRFI", hybrid.nrfi)); console.log(recLine("guaranteed top", hybrid.guar));
   console.log("");
 }
 
