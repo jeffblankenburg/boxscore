@@ -185,12 +185,3 @@ export async function fetchFanDuelNrfiForDate(
     };
   });
 }
-
-/** Index by (away team name, home team name) for caller-side lookup. */
-export function indexFanDuelByMatchup(rows: FanDuelNrfiRow[]): Map<string, FanDuelNrfiRow> {
-  const out = new Map<string, FanDuelNrfiRow>();
-  for (const r of rows) {
-    out.set(`${r.awayTeamName}|${r.homeTeamName}`, r);
-  }
-  return out;
-}
