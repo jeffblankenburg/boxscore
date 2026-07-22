@@ -16,11 +16,11 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { parseSlate, type SlateGame } from "@/lib/mlb";
 import { prevDay } from "@/lib/dates";
 import {
+  predictGames,
   type PredictionsResult,
   type TeamSeasonRecord,
   type ProbableSpStats,
 } from "./predictions";
-import { predictGamesV7 } from "./predictions-v7";
 import { loadSeasonAggregates } from "./season-aggregates";
 
 const PYTHAG_FALLBACK_SP_ERA = 4.20;
@@ -144,22 +144,23 @@ export async function loadPredictionInputsForDate(date: string): Promise<{
 export async function loadPredictionsForDate(date: string): Promise<PredictionsResult> {
   const inputs = await loadPredictionInputsForDate(date);
   if (!inputs) return { date, gameCount: 0, games: [], generatedAt: new Date().toISOString() };
-  return predictGamesV7(inputs);
+  return predictGames(inputs);
 }
 
-/** Primary model version — what the public page, render cache, history, and
- *  odds capture key on. Bump when the model formula changes (or calibration
- *  is refit) so historical attribution stays clean.
+/** Stable version string for predictions snapshots. Bump when the model
+ *  formula changes (or calibration is refit) so historical attribution
+ *  stays clean.
  *
- *  Promoted v6 → v7 on 2026-07-22. v7 is the unified run-distribution engine
- *  (lib/sports/mlb/run-model.ts + predictions-v7.ts): one negative-binomial
- *  λ-per-half-inning model from which ML/NRFI/O-U are derived, replacing v6's
- *  three formulas + post-hoc shrinkage. Fitted walk-forward on 2026
- *  (scripts/fit-v7.ts) — beat v6 on log-loss for both markets; recommendation
- *  set backtested 58.5% hit / +3.1% ROI (top picks 63.5% / +8.0%).
+ *  v4 layers empirical linear shrinkage onto v3: WIN_SHRINKAGE=0.20,
+ *  NRFI_SHRINKAGE=0.15 fit by Brier-minimizing least squares on 313
+ *  graded June games. Threshold bands re-anchored to the calibrated
+ *  scale (0.545 play / 0.555 strong) so the displayed probability and
+ *  the play logic agree.
  *
- *  v6 stays snapshotted as a comparison SHADOW (see the snapshot cron), so
- *  its stored history stays attributable and A/B stays possible. */
-export const PREDICTIONS_MODEL_VERSION = "v7-run-model";
-/** Retired-to-shadow model, still written nightly for comparison. */
-export const SHADOW_MODEL_VERSION = "v6-nrfi-rebased";
+ *  Note (2026-07-01): v5-empirical was tried and reverted — bumping
+ *  HOME_FIELD_BUMP to 0.060 diluted the ML pick pool (56% vs 61.6% on
+ *  home picks), and NRFI shrinkage of 0.05 killed all NRFI plays.
+ *  Instead of retuning calibration, the play-selection rule was
+ *  changed to home-only ML (winPlayFor). The stored calibrated
+ *  probabilities are unchanged. */
+export const PREDICTIONS_MODEL_VERSION = "v6-nrfi-rebased";
