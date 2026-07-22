@@ -10,9 +10,10 @@ import { siteOrigin } from "@/lib/site";
 import {
   loadPredictionInputsForDate,
   PREDICTIONS_MODEL_VERSION,
+  SHADOW_MODEL_VERSION,
 } from "@/lib/sports/mlb/predictions-data";
 import { predictGames, type PredictionsResult } from "@/lib/sports/mlb/predictions";
-import { predictGamesV7, V7_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
+import { predictGamesV7 } from "@/lib/sports/mlb/predictions-v7";
 import { captureEspnOddsForDate } from "@/lib/sports/mlb/odds-cache";
 
 export const runtime = "nodejs";
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
 
-  // Load inputs once; run v6 (production) AND v7 (graded shadow) off the
+  // Load inputs once; run v7 (production) AND v6 (comparison shadow) off the
   // same as-of-date data so their track records are strictly comparable.
   const inputs = await loadPredictionInputsForDate(date);
   if (!inputs || inputs.slate.length === 0) {
@@ -52,8 +53,8 @@ export async function GET(req: Request) {
 
   const sb = supabaseAdmin();
   const producers: Array<[string, PredictionsResult]> = [
-    [PREDICTIONS_MODEL_VERSION, predictGames(inputs)],
-    [V7_MODEL_VERSION, predictGamesV7(inputs)],
+    [PREDICTIONS_MODEL_VERSION, predictGamesV7(inputs)],
+    [SHADOW_MODEL_VERSION, predictGames(inputs)],
   ];
   const rows = producers.flatMap(([modelVersion, res]) =>
     res.games.map((g) => ({
@@ -131,7 +132,7 @@ export async function GET(req: Request) {
     ok: true,
     date,
     written: rows.length,
-    models: [PREDICTIONS_MODEL_VERSION, V7_MODEL_VERSION],
+    models: [PREDICTIONS_MODEL_VERSION, SHADOW_MODEL_VERSION],
     ...(oddsReport ? {
       odds_matched: oddsReport.matched,
       odds_upserted: oddsReport.upserted,
