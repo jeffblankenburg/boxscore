@@ -25,6 +25,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { findTeamByMlbApiId, TEAMS } from "@/lib/teams";
 import { fetchEspnOddsForDate, indexOddsByMatchup, type EspnOddsRow } from "./odds-espn";
 import { fetchFanDuelNrfiForDate, type FanDuelNrfiRow } from "./odds-fanduel";
+import { PREDICTIONS_MODEL_VERSION } from "./predictions-data";
 
 type PredictionGameKey = {
   game_pk: number;
@@ -54,6 +55,7 @@ export async function captureEspnOddsForDate(
     .from("daily_predictions")
     .select("game_pk, away_team_id, home_team_id")
     .eq("sport", "mlb")
+    .eq("model_version", PREDICTIONS_MODEL_VERSION)  // one row/game — daily_predictions is now multi-version (v6 + v7 shadow)
     .eq("date", date);
   if (predsErr) {
     throw new Error(`captureEspnOddsForDate(${date}): predictions read: ${predsErr.message}`);
@@ -158,6 +160,7 @@ export async function captureFanDuelNrfiForDate(
     .from("daily_predictions")
     .select("game_pk, away_team_id, home_team_id")
     .eq("sport", "mlb")
+    .eq("model_version", PREDICTIONS_MODEL_VERSION)  // one row/game — daily_predictions is now multi-version (v6 + v7 shadow)
     .eq("date", date);
   if (predsErr) {
     throw new Error(`captureFanDuelNrfiForDate(${date}): predictions read: ${predsErr.message}`);

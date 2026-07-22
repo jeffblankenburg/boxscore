@@ -8,9 +8,11 @@ import {
 } from "@/lib/sports/mlb/predictions-cache";
 import { siteOrigin } from "@/lib/site";
 import {
-  loadPredictionsForDate,
+  loadPredictionInputsForDate,
   PREDICTIONS_MODEL_VERSION,
 } from "@/lib/sports/mlb/predictions-data";
+import { predictGames, type PredictionsResult } from "@/lib/sports/mlb/predictions";
+import { predictGamesV7, V7_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
 import { captureEspnOddsForDate } from "@/lib/sports/mlb/odds-cache";
 
 export const runtime = "nodejs";
@@ -41,45 +43,53 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
 
-  const result = await loadPredictionsForDate(date);
-  if (result.games.length === 0) {
+  // Load inputs once; run v6 (production) AND v7 (graded shadow) off the
+  // same as-of-date data so their track records are strictly comparable.
+  const inputs = await loadPredictionInputsForDate(date);
+  if (!inputs || inputs.slate.length === 0) {
     return NextResponse.json({ ok: true, date, written: 0, note: "no games on slate" });
   }
 
   const sb = supabaseAdmin();
-  const rows = result.games.map((g) => ({
-    sport,
-    date,
-    game_pk: g.gamePk,
-    model_version: PREDICTIONS_MODEL_VERSION,
-    away_team_id: g.away.teamId,
-    home_team_id: g.home.teamId,
-    away_win_pct: Number(g.away.winProbability.toFixed(4)),
-    home_win_pct: Number(g.home.winProbability.toFixed(4)),
-    nrfi_pct:     Number(g.nrfiProbability.toFixed(4)),
-    inputs: {
-      away: {
-        abbr: g.away.abbr,
-        record: g.away.record,
-        runsPerGame: g.away.runsPerGame,
-        runsAllowedPerGame: g.away.runsAllowedPerGame,
-        pythagWinPct: g.away.pythagWinPct,
-        probableSp: g.away.probableSp,
+  const producers: Array<[string, PredictionsResult]> = [
+    [PREDICTIONS_MODEL_VERSION, predictGames(inputs)],
+    [V7_MODEL_VERSION, predictGamesV7(inputs)],
+  ];
+  const rows = producers.flatMap(([modelVersion, res]) =>
+    res.games.map((g) => ({
+      sport,
+      date,
+      game_pk: g.gamePk,
+      model_version: modelVersion,
+      away_team_id: g.away.teamId,
+      home_team_id: g.home.teamId,
+      away_win_pct: Number(g.away.winProbability.toFixed(4)),
+      home_win_pct: Number(g.home.winProbability.toFixed(4)),
+      nrfi_pct:     Number(g.nrfiProbability.toFixed(4)),
+      inputs: {
+        away: {
+          abbr: g.away.abbr,
+          record: g.away.record,
+          runsPerGame: g.away.runsPerGame,
+          runsAllowedPerGame: g.away.runsAllowedPerGame,
+          pythagWinPct: g.away.pythagWinPct,
+          probableSp: g.away.probableSp,
+        },
+        home: {
+          abbr: g.home.abbr,
+          record: g.home.record,
+          runsPerGame: g.home.runsPerGame,
+          runsAllowedPerGame: g.home.runsAllowedPerGame,
+          pythagWinPct: g.home.pythagWinPct,
+          probableSp: g.home.probableSp,
+        },
       },
-      home: {
-        abbr: g.home.abbr,
-        record: g.home.record,
-        runsPerGame: g.home.runsPerGame,
-        runsAllowedPerGame: g.home.runsAllowedPerGame,
-        pythagWinPct: g.home.pythagWinPct,
-        probableSp: g.home.probableSp,
-      },
-    },
-  }));
+    })),
+  );
 
   const { error } = await sb
     .from("daily_predictions")
-    .upsert(rows, { onConflict: "sport,date,game_pk" });
+    .upsert(rows, { onConflict: "sport,date,game_pk,model_version" });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -121,7 +131,7 @@ export async function GET(req: Request) {
     ok: true,
     date,
     written: rows.length,
-    model: PREDICTIONS_MODEL_VERSION,
+    models: [PREDICTIONS_MODEL_VERSION, V7_MODEL_VERSION],
     ...(oddsReport ? {
       odds_matched: oddsReport.matched,
       odds_upserted: oddsReport.upserted,

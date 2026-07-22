@@ -11,11 +11,10 @@ import { parseSlate, type SlateGame } from "@/lib/mlb";
 import { prevDay } from "@/lib/dates";
 import { predictGames, type TeamSeasonRecord, type ProbableSpStats } from "@/lib/sports/mlb/predictions";
 import { computeSeasonAggregatesFromRows } from "@/lib/sports/mlb/season-aggregates";
-import { parkFactorForHomeTeam } from "@/lib/sports/mlb/park-factors";
-import { offenseFromRunsPerGame, pitcherFromRA9, bullpenFromRA9, type TeamInputs } from "@/lib/sports/mlb/run-model";
+import { type TeamInputs } from "@/lib/sports/mlb/run-model";
+import { buildV7TeamInputs } from "@/lib/sports/mlb/predictions-v7";
 
 const V6_VERSION = "v6-nrfi-rebased";
-const ERA_TO_RA9 = 1.08; // earned-run ERA → all-runs allowed/9 (ER ≈ 92% of R)
 
 export type EvalGame = {
   date: string; gamePk: number; awayAbbr: string; homeAbbr: string;
@@ -78,31 +77,6 @@ function parsePayload(payload: Record<string, unknown>) {
   return { slate, records, spStats };
 }
 
-type Aggs = ReturnType<typeof computeSeasonAggregatesFromRows>;
-function teamInputs(teamId: number, spId: number | null, homeTeamId: number, records: Map<number, TeamSeasonRecord>, spStats: Map<number, ProbableSpStats>, aggs: Aggs): TeamInputs {
-  const rec = records.get(teamId);
-  const rpg = rec && rec.gamesPlayed > 0 ? rec.runsScored / rec.gamesPlayed : 4.5;
-
-  let spEra = 4.20;
-  if (spId != null) {
-    const season = spStats.get(spId)?.era ?? 4.20;
-    const recent = aggs.spRecentForm.get(spId);
-    spEra = recent && recent.starts >= 2 && Number.isFinite(recent.era) ? 0.5 * recent.era + 0.5 * season : season;
-  }
-  const recentSp = spId != null ? aggs.spRecentForm.get(spId) : undefined;
-  const expIP = recentSp && recentSp.starts >= 2 && recentSp.innings > 0 ? recentSp.innings / recentSp.starts : 5.3;
-
-  const bp = aggs.teamBullpen.get(teamId);
-  const bpEra = bp && bp.innings >= 60 ? bp.era : aggs.league.avgBullpenEra;
-
-  return {
-    offense: offenseFromRunsPerGame(rpg),
-    starter: pitcherFromRA9(spEra * ERA_TO_RA9, expIP),
-    bullpen: bullpenFromRA9(bpEra * ERA_TO_RA9),
-    parkLogFactor: 0.5 * Math.log(parkFactorForHomeTeam(homeTeamId)),
-  };
-}
-
 /** Reconstruct all graded games for the season with cached v7 inputs. */
 export async function loadEvalGames(year: string): Promise<EvalGame[]> {
   const sb = supabaseAdmin();
@@ -155,8 +129,8 @@ export async function loadEvalGames(year: string): Promise<EvalGame[]> {
       const v6g = v6ByPk.get(res.game_pk);
       if (!g || !v6g) continue;
       const k = `${res.date}|${res.game_pk}`;
-      const away = teamInputs(g.away.teamId, g.away.probablePitcher?.id ?? null, g.home.teamId, records, spStats, aggs);
-      const home = teamInputs(g.home.teamId, g.home.probablePitcher?.id ?? null, g.home.teamId, records, spStats, aggs);
+      const away = buildV7TeamInputs(g.away.teamId, g.away.probablePitcher?.id ?? null, g.home.teamId, records, spStats, aggs);
+      const home = buildV7TeamInputs(g.home.teamId, g.home.probablePitcher?.id ?? null, g.home.teamId, records, spStats, aggs);
       games.push({
         date: res.date, gamePk: res.game_pk, awayAbbr: g.away.abbr, homeAbbr: g.home.abbr,
         away, home,
