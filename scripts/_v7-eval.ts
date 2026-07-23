@@ -28,6 +28,15 @@ export type EvalGame = {
    *  games): plate umpire + total 1st-inning runs. fit-umpire-nrfi.ts. */
   plateUmpId: number | null;
   firstInningRuns: number | null;
+  /** League 1st-inning run rate as of the prediction date (per team per
+   *  game = per half-inning), with its team-game sample size — the
+   *  season-adaptive firstInningBump input. fit-first-inning-drift.ts. */
+  league1stRpgAsOf: number;
+  league1stGamesAsOf: number;
+  /** Same, but over the trailing 30 days only — tracks the within-season
+   *  scoring curve (summer heat) a season-to-date average lags. */
+  league1stRpg30AsOf: number;
+  league1stGames30AsOf: number;
 };
 
 type ResultRow = {
@@ -72,6 +81,33 @@ function parseGameDayFacts(payload: Record<string, unknown> | undefined): Map<nu
     }
   }
   return out;
+}
+
+/** Trailing-30-day league 1st-inning run rate as of `asOf` (inclusive) —
+ *  final games only, per team-game (= per half-inning of inning 1). */
+function league1stLast30(rows: RawRow[], asOf: string): { rpg: number; games: number } {
+  const cutoff = new Date(asOf + "T00:00:00Z");
+  cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+  const cutIso = cutoff.toISOString().slice(0, 10);
+  let runs = 0, teamGames = 0;
+  type SG = {
+    status?: { detailedState?: string; abstractGameState?: string };
+    linescore?: { innings?: Array<{ num?: number; away?: { runs?: number }; home?: { runs?: number } }> };
+  };
+  for (const r of rows) {
+    if (r.date < cutIso || r.date > asOf) continue;
+    const sched = (r.payload as { schedule?: { dates?: Array<{ games?: SG[] }> } }).schedule;
+    for (const d of sched?.dates ?? []) {
+      for (const g of d.games ?? []) {
+        const state = g.status?.detailedState ?? g.status?.abstractGameState ?? "";
+        if (!/final/i.test(state)) continue;
+        const first = g.linescore?.innings?.find((i) => i.num === 1);
+        const a = first?.away?.runs, h = first?.home?.runs;
+        if (typeof a === "number" && typeof h === "number") { runs += a + h; teamGames += 2; }
+      }
+    }
+  }
+  return { rpg: teamGames ? runs / teamGames : 0, games: teamGames };
 }
 
 // Mirrors loadPredictionInputsForDate (predictions-data.ts §3–4).
@@ -191,6 +227,7 @@ export async function loadEvalGames(year: string): Promise<EvalGame[]> {
     const { slate, records, spStats } = parsePayload(prevPayload);
     const aggRows = rows.filter((r) => r.date <= prevDay(date)) as Parameters<typeof computeSeasonAggregatesFromRows>[0];
     const aggs = computeSeasonAggregatesFromRows(aggRows, prevDay(date));
+    const last30 = league1stLast30(rows, prevDay(date));
     const v6Result = predictGames({ date, slate, recordsByTeamId: records, spStatsById: spStats, aggregates: aggs });
     const v6ByPk = new Map(v6Result.games.map((g) => [g.gamePk, g]));
     const slateByPk = new Map(slate.map((g) => [g.gamePk, g]));
@@ -211,6 +248,10 @@ export async function loadEvalGames(year: string): Promise<EvalGame[]> {
         reV6HomeWin: v6g.home.winProbability, reV6Nrfi: v6g.nrfiProbability,
         plateUmpId: dayFacts.get(res.game_pk)?.plateUmpId ?? null,
         firstInningRuns: dayFacts.get(res.game_pk)?.firstInningRuns ?? null,
+        league1stRpgAsOf: aggs.league.avgFirstInningRpg,
+        league1stGamesAsOf: [...aggs.team1stInning.values()].reduce((s, t) => s + t.games, 0),
+        league1stRpg30AsOf: last30.rpg,
+        league1stGames30AsOf: last30.games,
       });
     }
   }

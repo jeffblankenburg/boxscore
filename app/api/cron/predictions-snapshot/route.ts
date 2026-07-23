@@ -12,7 +12,7 @@ import {
   PREDICTIONS_MODEL_VERSION,
 } from "@/lib/sports/mlb/predictions-data";
 import { predictGames, type PredictionsResult } from "@/lib/sports/mlb/predictions";
-import { predictGamesV7, V7_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
+import { predictGamesV7, predictGamesV71, V7_MODEL_VERSION, V71_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
 import { captureEspnOddsForDate } from "@/lib/sports/mlb/odds-cache";
 import { buildDailyCard, CARD_MARKETS, CARD_VERSION, type CardGameOdds } from "@/lib/sports/mlb/market-registry";
 
@@ -55,6 +55,7 @@ export async function GET(req: Request) {
   const producers: Array<[string, PredictionsResult]> = [
     [PREDICTIONS_MODEL_VERSION, predictGames(inputs)],
     [V7_MODEL_VERSION, predictGamesV7(inputs)],
+    [V71_MODEL_VERSION, predictGamesV71(inputs)],
   ];
   const rows = producers.flatMap(([modelVersion, res]) =>
     res.games.map((g) => ({
@@ -184,7 +185,7 @@ export async function GET(req: Request) {
     ok: true,
     date,
     written: rows.length,
-    models: [PREDICTIONS_MODEL_VERSION, V7_MODEL_VERSION],
+    models: [PREDICTIONS_MODEL_VERSION, V7_MODEL_VERSION, V71_MODEL_VERSION],
     card_written: cardWritten,
     ...(cardError ? { card_error: cardError } : {}),
     ...(oddsReport ? {

@@ -16,11 +16,32 @@ import type { SeasonAggregates } from "./season-aggregates";
 import type { SlateTeam } from "@/lib/mlb";
 import { parkFactorForHomeTeam } from "./park-factors";
 import {
-  deriveMarkets, offenseFromRunsPerGame, pitcherFromRA9, bullpenFromRA9,
+  deriveMarkets, halfInningLambdas, scorelessProb, shrinkRate,
+  offenseFromRunsPerGame, pitcherFromRA9, bullpenFromRA9,
   DEFAULT_V7_CONFIG, type TeamInputs, type V7Config,
 } from "./run-model";
 
 export const V7_MODEL_VERSION = "v7-run-model";
+
+// v7.1 — v7 with a SEASON-ADAPTIVE first-inning read for NRFI. Runs as a
+// second graded shadow; the card keeps reading v7 until v7.1's live
+// record earns the swap.
+//
+// Why: v7's static firstInningBump (fit on 2024-25 linescores) went stale
+// — 2026 first innings are hotter AND differently shaped (lower scoreless
+// prob at the same mean; plausibly ABS-challenge-driven), leaving v7's
+// NRFI ~4.6pp overstated in the mean (52.3% vs 47.7% actual, a z≈3
+// calibration rejection on 1,044 OOS games). v7.1 derives the bump from
+// the season-to-date league 1st-inning rate the aggregates already
+// compute (EB-shrunk toward the 2024-25 prior) and reads NRFI with a
+// first-inning-specific dispersion. Fitted walk-forward 2026-07-23 by
+// scripts/fit-first-inning-drift.ts: src=season, K=100, r1=0.55 (fold-
+// stable); OOS calibration 47.8% vs 47.7% actual, picks@0.57 61.4% hit.
+// ML/totals are v7-identical by construction — only the NRFI read moves.
+export const V71_MODEL_VERSION = "v7.1-adaptive-nrfi";
+const V71_PRIOR_RPG1 = 0.5209;  // 2024-25 league 1st-inning runs/half (fixtures)
+const V71_PRIOR_K = 100;        // EB prior weight, in team-games
+const V71_R1 = 0.55;            // first-inning NB dispersion, 2026 walk-forward
 
 // Fitted 2026-07-22, walk-forward on the 2026 season (scripts/fit-v7.ts):
 // betaOff heavily shrunk (team run-rate is noisy → lean on pitching),
@@ -105,15 +126,16 @@ function toSide(t: SlateTeam, isHome: boolean, winProbability: number, inputs: P
   };
 }
 
-export function predictGamesV7(inputs: PredictionInputs): PredictionsResult {
+function runV7(inputs: PredictionInputs, nrfiOverride?: (away: TeamInputs, home: TeamInputs) => number): PredictionsResult {
   const games: GamePrediction[] = inputs.slate.map((g) => {
     const away = buildV7TeamInputs(g.away.teamId, g.away.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates);
     const home = buildV7TeamInputs(g.home.teamId, g.home.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates);
     const m = deriveMarkets(away, home, V7_CONFIG);
+    const rawNrfi = nrfiOverride ? nrfiOverride(away, home) : m.nrfi;
     // Guard the rare missing-input NaN so one game can't break the batch.
     const homeWin = Number.isFinite(m.homeWin) ? m.homeWin : 0.5;
     const awayWin = Number.isFinite(m.awayWin) ? m.awayWin : 0.5;
-    const nrfi = Number.isFinite(m.nrfi) ? m.nrfi : 0.49;
+    const nrfi = Number.isFinite(rawNrfi) ? rawNrfi : 0.49;
     return {
       gamePk: g.gamePk,
       startTime: g.gameDate,
@@ -127,4 +149,24 @@ export function predictGamesV7(inputs: PredictionInputs): PredictionsResult {
     };
   });
   return { date: inputs.date, generatedAt: new Date().toISOString(), games, gameCount: games.length };
+}
+
+export function predictGamesV7(inputs: PredictionInputs): PredictionsResult {
+  return runV7(inputs);
+}
+
+/** v7.1 — identical to v7 except the NRFI read: season-adaptive
+ *  first-inning bump + first-inning dispersion (see V71_* constants). */
+export function predictGamesV71(inputs: PredictionInputs): PredictionsResult {
+  const aggs = inputs.aggregates;
+  const leagueGames = aggs ? [...aggs.team1stInning.values()].reduce((s, t) => s + t.games, 0) : 0;
+  const rpg1 = aggs && leagueGames > 0
+    ? shrinkRate(aggs.league.avgFirstInningRpg, leagueGames, V71_PRIOR_RPG1, V71_PRIOR_K)
+    : V71_PRIOR_RPG1;
+  const cfg: V7Config = { ...V7_CONFIG, firstInningBump: Math.log(rpg1 / V7_CONFIG.leagueLambda) };
+  return runV7(inputs, (away, home) => {
+    const a1 = halfInningLambdas(away, home, false, cfg)[0]!;
+    const h1 = halfInningLambdas(home, away, true, cfg)[0]!;
+    return scorelessProb(a1, V71_R1) * scorelessProb(h1, V71_R1);
+  });
 }
