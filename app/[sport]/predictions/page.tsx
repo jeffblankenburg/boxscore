@@ -185,7 +185,7 @@ function buildTodaysPlays(
     if (!game) continue;
     const entry = byPk.get(p.gamePk) ?? { game, win: null, nrfi: null };
     if (p.market === "ML") {
-      entry.win = { side: p.side as "away" | "home", abbr: p.side === "home" ? game.home.abbr : game.away.abbr, winPct: p.probability, strong: p.strong };
+      entry.win = { side: p.side as "away" | "home", abbr: p.side === "home" ? game.home.abbr : game.away.abbr, winPct: p.probability, strong: p.strong, dog: p.dog };
     } else {
       entry.nrfi = { side: p.side as "NRFI" | "YRFI", probability: p.probability, strong: p.strong };
     }
@@ -231,7 +231,7 @@ function PlaysSection({
                   </td>
                   <td className="pr-plays-play">
                     {!win && !nrfi && <span className="pr-na">—</span>}
-                    {win && <span className="pr-play-plain">{win.abbr} ML</span>}
+                    {win && <span className="pr-play-plain">{win.abbr} ML{win.dog ? " 🐕" : ""}</span>}
                     {nrfi && <span className="pr-play-plain">{nrfiSideLabel(nrfi.side)}</span>}
                   </td>
                 </tr>
@@ -270,7 +270,7 @@ function YesterdayResults({
     if (!o) continue;
     const entry = rowsByPk.get(p.gamePk) ?? { o, win: null, nrfi: null };
     if (p.market === "ML") {
-      entry.win = { side: p.side as "away" | "home", abbr: p.side === "home" ? o.homeAbbr : o.awayAbbr, winPct: p.probability, strong: p.strong };
+      entry.win = { side: p.side as "away" | "home", abbr: p.side === "home" ? o.homeAbbr : o.awayAbbr, winPct: p.probability, strong: p.strong, dog: p.dog };
     } else {
       entry.nrfi = { side: p.side as "NRFI" | "YRFI", probability: p.probability, strong: p.strong };
     }
@@ -480,7 +480,7 @@ function ResultCell({ game }: { game: SeasonHistoryGame }) {
         <PlayCell
           badgeClass="pr-play-ml"
           strong={game.mlPick.strong}
-          label={`${game.mlPick.label} ML`}
+          label={`${game.mlPick.label} ML${game.mlPick.dog ? " 🐕" : ""}`}
           hit={game.mlPick.hit}
         />
       )}
@@ -548,7 +548,7 @@ function YesterdayRow({
       <td>{finalScore}</td>
       <td className="pr-yesterday-play">
         {!win && !nrfi && <span className="pr-na">—</span>}
-        {win && <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML`} hit={o.winCorrect} />}
+        {win && <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML${win.dog ? " 🐕" : ""}`} hit={o.winCorrect} />}
         {nrfi && <PlayCell badgeClass="pr-play-nrfi" strong={nrfi.strong} label={nrfiSideLabel(nrfi.side)} hit={o.nrfiCorrect} />}
       </td>
       <td className="pr-yesterday-odds">

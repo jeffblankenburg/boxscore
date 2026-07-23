@@ -472,7 +472,7 @@ export type SeasonHistoryGame = {
   homeAbbr:  string;
   status:    string;
   linescore: SeasonHistoryLinescore | null;
-  mlPick:    { label: string; strong: boolean; hit: boolean | null } | null;
+  mlPick:    { label: string; strong: boolean; hit: boolean | null; dog: boolean } | null;
   nrfiPick:  { label: string; strong: boolean; hit: boolean | null } | null;
 };
 export type SeasonHistoryDay = {
@@ -582,13 +582,13 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
       cardCandidateFor(o.gamePk, o.awayWinPct, o.homeWinPct, o.nrfiPct, dkOddsByKey.get(`${date}|${o.gamePk}`)),
     ));
 
-    const mlByPk = new Map<number, { label: string; strong: boolean; hit: boolean | null }>();
+    const mlByPk = new Map<number, { label: string; strong: boolean; hit: boolean | null; dog: boolean }>();
     const nrfiByPk = new Map<number, { label: string; strong: boolean; hit: boolean | null }>();
     for (const p of card) {
       const o = outcomesByPk.get(p.gamePk);
       if (!o) continue;
       if (p.market === "ML") {
-        mlByPk.set(p.gamePk, { label: p.side === "away" ? o.awayAbbr : o.homeAbbr, strong: p.strong, hit: o.winCorrect });
+        mlByPk.set(p.gamePk, { label: p.side === "away" ? o.awayAbbr : o.homeAbbr, strong: p.strong, hit: o.winCorrect, dog: p.dog });
       } else {
         nrfiByPk.set(p.gamePk, { label: nrfiSideLabel(p.side as "NRFI" | "YRFI"), strong: p.strong, hit: o.nrfiCorrect });
       }

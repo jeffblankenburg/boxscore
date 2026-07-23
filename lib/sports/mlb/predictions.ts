@@ -174,6 +174,10 @@ export type WinPlay = {
   abbr: string;
   winPct: number;
   strong: boolean;
+  /** True when the picked side is a betting underdog (plus-money) — a
+   *  model-vs-market disagreement, our highest-ROI pick type. Flagged in
+   *  the UI (🐕) without ever showing the price. */
+  dog: boolean;
 };
 export type NrfiPlay = {
   side: "NRFI" | "YRFI";
@@ -217,7 +221,7 @@ export type CardMarket = "ML" | "NRFI";
  *  present — every game has a first-inning lean. */
 export type CardCandidate = {
   gamePk: number;
-  ml: { side: "away" | "home"; winPct: number; edge: number } | null;
+  ml: { side: "away" | "home"; winPct: number; edge: number; dog: boolean } | null;
   nrfi: { side: "NRFI" | "YRFI"; probability: number };
 };
 
@@ -227,6 +231,8 @@ export type CardPick = {
   side: "away" | "home" | "NRFI" | "YRFI";
   probability: number;   // picked side's probability (>= 0.5)
   strong: boolean;
+  /** ML only: picked side is a plus-money underdog. Always false for NRFI. */
+  dog: boolean;
   /** Rank metric in its market's terms: EV edge (ML) or conviction (NRFI),
    *  both in probability points — used to order within and across markets. */
   rank: number;
@@ -250,7 +256,7 @@ export function cardCandidateFor(
   const nrfiProb = nrfiProbability >= 0.5 ? nrfiProbability : 1 - nrfiProbability;
   return {
     gamePk,
-    ml: edge !== null && edge > 0 ? { side: favSide, winPct, edge } : null,
+    ml: edge !== null && edge > 0 ? { side: favSide, winPct, edge, dog: (sideOdds ?? 0) > 0 } : null,
     nrfi: { side: nrfiSide, probability: nrfiProb },
   };
 }
@@ -265,9 +271,9 @@ export function selectDailyCard(cands: CardCandidate[]): CardPick[] {
   const nrfi: CardPick[] = [];
   for (const c of cands) {
     if (c.ml) {
-      ml.push({ gamePk: c.gamePk, market: "ML", side: c.ml.side, probability: c.ml.winPct, strong: c.ml.winPct >= ML_STRONG_THRESHOLD, rank: c.ml.edge });
+      ml.push({ gamePk: c.gamePk, market: "ML", side: c.ml.side, probability: c.ml.winPct, strong: c.ml.winPct >= ML_STRONG_THRESHOLD, dog: c.ml.dog, rank: c.ml.edge });
     }
-    nrfi.push({ gamePk: c.gamePk, market: "NRFI", side: c.nrfi.side, probability: c.nrfi.probability, strong: c.nrfi.probability >= NRFI_STRONG_THRESHOLD, rank: c.nrfi.probability - 0.5 });
+    nrfi.push({ gamePk: c.gamePk, market: "NRFI", side: c.nrfi.side, probability: c.nrfi.probability, strong: c.nrfi.probability >= NRFI_STRONG_THRESHOLD, dog: false, rank: c.nrfi.probability - 0.5 });
   }
   ml.sort((a, b) => b.rank - a.rank);
   nrfi.sort((a, b) => b.rank - a.rank);
