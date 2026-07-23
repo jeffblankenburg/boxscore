@@ -179,72 +179,47 @@ export type WinPlay = {
    *  the UI (🐕) without ever showing the price. */
   dog: boolean;
 };
-export type NrfiPlay = {
-  side: "NRFI" | "YRFI";
-  probability: number;            // probability of the side we're betting (>= 0.60)
-  strong: boolean;
-};
-
-/** Display label for a NRFI/YRFI play — appends a directional arrow so
- *  glancing at the badge tells you which way you're betting without
- *  parsing the acronym. Down = "no runs" (NRFI), up = "runs" (YRFI). */
-export function nrfiSideLabel(side: "NRFI" | "YRFI"): string {
-  return side === "NRFI" ? "NRFI ↓" : "YRFI ↑";
-}
-
 // ─── Daily card selection ────────────────────────────────────────────────
 //
-// The public card is capped at CARD_MAX picks/day, balanced to
-// CARD_ML_TARGET moneyline + CARD_NRFI_TARGET NRFI, with any remaining
-// slot(s) filled by the best-ranked leftover from either market. Jeff's
-// rule (2026-07-23): surface the model's best few picks, not every
-// qualifier — ONE capped card drives the display AND the graded stats.
-//
-// Ranking differs by market because the edge lives in different places:
-//   * ML  → by EV vs the market price (model prob − break-even implied),
-//     favored side only, positive-EV only. That's where the money is:
-//     over the 2026 season v7.1's favored-UNDERDOG picks (market prices
-//     our side as a dog) returned +19.3% ROI vs favorites' single digits
-//     (scripts/fit-v71-card.ts). Ranking by raw win% would bury those
-//     under chalk, so we rank by edge. Needs the picked side's odds.
-//   * NRFI → by conviction (picked side's prob − 0.5). NRFI has almost no
-//     historical price feed to compute EV against, so conviction is all
-//     we can rank on.
-export const CARD_MAX = 5;
-export const CARD_ML_TARGET = 2;
-export const CARD_NRFI_TARGET = 2;
+// The public card is ML-only (NRFI was dropped 2026-07-23 — its hit rate
+// didn't justify the slot). Size scales with the slate: CARD_GAME_FRACTION
+// of the day's games, floor 1 — a 15-game day shows 3, a 5-game day shows 1.
+// Picks are the model's favored side ranked by EV vs the market price
+// (model prob − break-even implied), favored side only, positive-EV only.
+// That's where the money is: over the 2026 season v7.1's favored-UNDERDOG
+// picks (market prices our side as a dog) returned +19.3% ROI vs favorites'
+// single digits (scripts/fit-v71-card.ts). Ranking by raw win% would bury
+// those under chalk, so we rank by edge — which needs the picked side's odds.
+export const CARD_GAME_FRACTION = 0.20;
 
-export type CardMarket = "ML" | "NRFI";
+/** Number of ML picks to show for a slate of `numGames` games: 20% of the
+ *  slate, rounded, floor 1. 15 → 3, 10 → 2, 5 → 1. */
+export function cardSize(numGames: number): number {
+  return Math.max(1, Math.round(CARD_GAME_FRACTION * numGames));
+}
 
-/** One game's card-eligible picks. `ml` is null when we have no odds for
- *  the favored side or its EV is non-positive (no bet). `nrfi` is always
- *  present — every game has a first-inning lean. */
+/** One game's card-eligible ML pick. Null when we have no odds for the
+ *  favored side or its EV is non-positive (no bet). */
 export type CardCandidate = {
   gamePk: number;
   ml: { side: "away" | "home"; winPct: number; edge: number; dog: boolean } | null;
-  nrfi: { side: "NRFI" | "YRFI"; probability: number };
 };
 
 export type CardPick = {
   gamePk: number;
-  market: CardMarket;
-  side: "away" | "home" | "NRFI" | "YRFI";
-  probability: number;   // picked side's probability (>= 0.5)
+  side: "away" | "home";
+  winPct: number;      // picked side's win probability
   strong: boolean;
-  /** ML only: picked side is a plus-money underdog. Always false for NRFI. */
-  dog: boolean;
-  /** Rank metric in its market's terms: EV edge (ML) or conviction (NRFI),
-   *  both in probability points — used to order within and across markets. */
-  rank: number;
+  dog: boolean;        // picked side is a plus-money underdog
+  edge: number;        // EV vs market break-even — the rank metric
 };
 
-/** Build a card candidate from a game's model probabilities + the picked
+/** Build a card candidate from a game's win probabilities + the favored
  *  side's DraftKings odds. Pure — the caller supplies the odds. */
 export function cardCandidateFor(
   gamePk: number,
   awayWinPct: number,
   homeWinPct: number,
-  nrfiProbability: number,
   dkOdds?: { away: number | null; home: number | null },
 ): CardCandidate {
   const favSide: "away" | "home" = homeWinPct >= awayWinPct ? "home" : "away";
@@ -252,38 +227,19 @@ export function cardCandidateFor(
   const sideOdds = favSide === "home" ? dkOdds?.home ?? null : dkOdds?.away ?? null;
   const implied = impliedFromAmerican(sideOdds);
   const edge = implied === null ? null : winPct - implied;
-  const nrfiSide: "NRFI" | "YRFI" = nrfiProbability >= 0.5 ? "NRFI" : "YRFI";
-  const nrfiProb = nrfiProbability >= 0.5 ? nrfiProbability : 1 - nrfiProbability;
   return {
     gamePk,
     ml: edge !== null && edge > 0 ? { side: favSide, winPct, edge, dog: (sideOdds ?? 0) > 0 } : null,
-    nrfi: { side: nrfiSide, probability: nrfiProb },
   };
 }
 
-/** Select the day's card: top CARD_ML_TARGET ML by EV edge + top
- *  CARD_NRFI_TARGET NRFI by conviction, then fill to CARD_MAX with the
- *  best remaining pick from either market (compared on their pp-scale
- *  rank metrics). Returns fewer than CARD_MAX only when the slate is
- *  that small. */
-export function selectDailyCard(cands: CardCandidate[]): CardPick[] {
-  const ml: CardPick[] = [];
-  const nrfi: CardPick[] = [];
-  for (const c of cands) {
-    if (c.ml) {
-      ml.push({ gamePk: c.gamePk, market: "ML", side: c.ml.side, probability: c.ml.winPct, strong: c.ml.winPct >= ML_STRONG_THRESHOLD, dog: c.ml.dog, rank: c.ml.edge });
-    }
-    nrfi.push({ gamePk: c.gamePk, market: "NRFI", side: c.nrfi.side, probability: c.nrfi.probability, strong: c.nrfi.probability >= NRFI_STRONG_THRESHOLD, dog: false, rank: c.nrfi.probability - 0.5 });
-  }
-  ml.sort((a, b) => b.rank - a.rank);
-  nrfi.sort((a, b) => b.rank - a.rank);
-  const chosen: CardPick[] = [...ml.slice(0, CARD_ML_TARGET), ...nrfi.slice(0, CARD_NRFI_TARGET)];
-  const rest = [...ml.slice(CARD_ML_TARGET), ...nrfi.slice(CARD_NRFI_TARGET)].sort((a, b) => b.rank - a.rank);
-  for (const p of rest) {
-    if (chosen.length >= CARD_MAX) break;
-    chosen.push(p);
-  }
-  return chosen;
+/** The day's card: the top `count` positive-EV ML plays ranked by edge. */
+export function selectDailyCard(cands: CardCandidate[], count: number): CardPick[] {
+  const picks = cands
+    .filter((c): c is CardCandidate & { ml: NonNullable<CardCandidate["ml"]> } => c.ml !== null)
+    .map((c) => ({ gamePk: c.gamePk, side: c.ml.side, winPct: c.ml.winPct, strong: c.ml.winPct >= ML_STRONG_THRESHOLD, dog: c.ml.dog, edge: c.ml.edge }));
+  picks.sort((a, b) => b.edge - a.edge);
+  return picks.slice(0, Math.max(0, count));
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────

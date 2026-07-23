@@ -42,7 +42,7 @@ function daysSinceSeasonStart(todayIso: string): number {
 }
 
 export type PredictionsRenderBlob = {
-  version: 6;
+  version: 7;
   date: string;               // ISO — the slate date (today, from the cron's perspective)
   yesterday: string;          // ISO — date we read outcomes/accuracy for
   generatedAt: string;        // ISO timestamp at build time
@@ -82,7 +82,7 @@ export async function buildPredictionsRenderBlob(date: string): Promise<Predicti
   ]);
 
   return {
-    version: 6,
+    version: 7,
     date,
     yesterday,
     generatedAt:  new Date().toISOString(),
@@ -120,7 +120,7 @@ export async function rebuildPredictionsRenderCache(date: string): Promise<void>
  *  model version; otherwise null so the caller can fall back to live
  *  compute. Stale-model rows are treated as missing so a refit doesn't
  *  show old probabilities until the cron repopulates. */
-const CURRENT_BLOB_VERSION = 6;
+const CURRENT_BLOB_VERSION = 7;
 
 export async function readPredictionsRenderBlob(date: string): Promise<PredictionsRenderBlob | null> {
   const { data, error } = await supabaseAdmin()

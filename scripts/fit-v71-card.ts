@@ -23,7 +23,7 @@
 
 import { supabaseAdmin } from "../lib/supabase";
 import { americanToProfitMultiplier } from "../lib/sports/mlb/clv";
-import { selectDailyCard, cardCandidateFor } from "../lib/sports/mlb/predictions";
+import { selectDailyCard, cardCandidateFor, cardSize } from "../lib/sports/mlb/predictions";
 
 const STAKE = 10;
 type R = { date: string; game_pk: number; away_win_pct: number; home_win_pct: number; nrfi_pct: number; actual_winner: "away" | "home" | null; actual_nrfi: boolean | null };
@@ -72,31 +72,27 @@ async function main() {
     console.log(lbl.padEnd(22) + " | " + `${String(cells.fav.n).padStart(3)} ${pct(cells.fav.h, cells.fav.n).padStart(6)} ${roi(cells.fav.pl, cells.fav.s).padStart(7)}`.padEnd(30) + " | " + `${String(cells.dog.n).padStart(3)} ${pct(cells.dog.h, cells.dog.n).padStart(6)} ${roi(cells.dog.pl, cells.dog.s).padStart(7)}`);
   }
 
-  // ── Simulate the actual card rule over the season ──────────────────────
+  // ── Simulate the actual ML card rule over the season ───────────────────
   const byDate = new Map<string, R[]>();
   for (const r of rows) (byDate.get(r.date) ?? byDate.set(r.date, []).get(r.date)!).push(r);
-  let mlN = 0, mlH = 0, mlWO = 0, mlS = 0, mlPl = 0, nN = 0, nH = 0, nWO = 0, nS = 0, nPl = 0, days = 0, cardPicks = 0;
+  let mlN = 0, mlH = 0, mlWO = 0, mlS = 0, mlPl = 0, days = 0, cardPicks = 0;
   for (const [date, day] of byDate) {
     const byPk = new Map(day.map((r) => [r.game_pk, r]));
-    const card = selectDailyCard(day.map((r) => cardCandidateFor(r.game_pk, r.away_win_pct, r.home_win_pct, r.nrfi_pct, dk.get(`${date}|${r.game_pk}`))));
-    if (card.length) days++; cardPicks += card.length;
+    const card = selectDailyCard(
+      day.map((r) => cardCandidateFor(r.game_pk, r.away_win_pct, r.home_win_pct, dk.get(`${date}|${r.game_pk}`))),
+      cardSize(day.length),
+    );
+    if (card.length) days++;
+    cardPicks += card.length;
     for (const p of card) {
       const r = byPk.get(p.gamePk)!;
-      if (p.market === "ML") {
-        if (r.actual_winner === null) continue;
-        mlN++; const won = r.actual_winner === p.side; if (won) mlH++;
-        const price = p.side === "away" ? dk.get(`${date}|${p.gamePk}`)?.away : dk.get(`${date}|${p.gamePk}`)?.home;
-        if (price != null) { mlWO++; mlS += STAKE; mlPl += won ? STAKE * americanToProfitMultiplier(price) : -STAKE; }
-      } else {
-        if (r.actual_nrfi === null) continue;
-        nN++; const pick = p.side === "NRFI"; const won = pick === r.actual_nrfi; if (won) nH++;
-        const price = pick ? fd.get(`${date}|${p.gamePk}`)?.nrfi : fd.get(`${date}|${p.gamePk}`)?.yrfi;
-        if (price != null) { nWO++; nS += STAKE; nPl += won ? STAKE * americanToProfitMultiplier(price) : -STAKE; }
-      }
+      if (r.actual_winner === null) continue;
+      mlN++; const won = r.actual_winner === p.side; if (won) mlH++;
+      const price = p.side === "away" ? dk.get(`${date}|${p.gamePk}`)?.away : dk.get(`${date}|${p.gamePk}`)?.home;
+      if (price != null) { mlWO++; mlS += STAKE; mlPl += won ? STAKE * americanToProfitMultiplier(price) : -STAKE; }
     }
   }
-  console.log(`\nCARD RULE over ${days} days (${(cardPicks / days).toFixed(1)} picks/day):`);
-  console.log(`  ML  : ${pct(mlH, mlN)} hit (${mlH}/${mlN})   ROI ${roi(mlPl, mlS)} on ${mlWO} priced ($${mlPl.toFixed(2)})`);
-  console.log(`  NRFI: ${pct(nH, nN)} hit (${nH}/${nN})   ROI ${roi(nPl, nS)} on ${nWO} priced ($${nPl.toFixed(2)})`);
+  console.log(`\nML CARD RULE (top-EV, 20% of slate) over ${days} days (${(cardPicks / days).toFixed(1)} picks/day):`);
+  console.log(`  ${pct(mlH, mlN)} hit (${mlH}/${mlN})   ROI ${roi(mlPl, mlS)} on ${mlWO} priced ($${mlPl.toFixed(2)})`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
