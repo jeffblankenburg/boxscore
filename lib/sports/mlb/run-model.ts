@@ -25,8 +25,12 @@ export type OffenseRating = { logRunsPerInning: number };
 /** Pitcher run prevention: log expected runs allowed per inning, plus how
  *  deep into the game they're expected to go (drives the SP→bullpen split). */
 export type PitcherRating = { logRAPerInning: number; expectedInnings: number };
-/** Team bullpen run prevention: log expected runs allowed per inning. */
-export type BullpenRating = { logRAPerInning: number };
+/** Team bullpen run prevention: log expected runs allowed per inning.
+ *  `fatigueExcessIp` is reliever IP thrown over the last 2 days minus the
+ *  league average — heavily-used pens pitch worse tonight (tired arms or
+ *  the mop-up tier covering). Optional so callers without recent-usage
+ *  data (tests, early season) degrade to no adjustment. */
+export type BullpenRating = { logRAPerInning: number; fatigueExcessIp?: number };
 
 /** Everything the engine needs for one side of a matchup: this team's OWN
  *  offense and OWN pitching staff. deriveMarkets crosses them — a team's
@@ -47,6 +51,9 @@ export type V7Config = {
   betaPitch: number;         // pitcher composition weight (fit; 1 = raw)
   firstInningBump: number;   // additive to log λ for inning 1 only
   hfaMultiplier: number;     // multiply home offense λ (fit; ~1.02–1.04)
+  /** Additive to bullpen log-RA per excess reliever IP over the last 2
+   *  days (fit; 0 = fatigue off). scripts/fit-bullpen-fatigue.ts. */
+  fatigueLogRaPerIp: number;
   maxRunsPerInning: number;  // NB PMF truncation per half-inning
   maxTotalRuns: number;      // team run-total distribution truncation
 };
@@ -63,6 +70,7 @@ export const DEFAULT_V7_CONFIG: V7Config = {
   betaPitch: 1.0,
   firstInningBump: 0.0348,
   hfaMultiplier: 1.03,
+  fatigueLogRaPerIp: 0,
   maxRunsPerInning: 12,
   maxTotalRuns: 30,
 };
@@ -89,13 +97,18 @@ export function halfInningLambdas(batting: TeamInputs, fielding: TeamInputs, isH
   const offTerm = cfg.betaOff * (batting.offense.logRunsPerInning - logLg);
   const spIP = fielding.starter?.expectedInnings ?? 0;
 
+  // Fatigue moves the bullpen's log-RA before the SP/bullpen blend, so a
+  // gassed pen only hurts the innings it actually covers.
+  const bullpenLogRA = fielding.bullpen.logRAPerInning
+    + cfg.fatigueLogRaPerIp * (fielding.bullpen.fatigueExcessIp ?? 0);
+
   const out: number[] = [];
   for (let i = 1; i <= 9; i++) {
     // Fraction of this inning the opposing starter is expected to pitch (0..1).
     const spFrac = fielding.starter ? Math.max(0, Math.min(1, spIP - (i - 1))) : 0;
     const pitcherLogRA = fielding.starter
-      ? spFrac * fielding.starter.logRAPerInning + (1 - spFrac) * fielding.bullpen.logRAPerInning
-      : fielding.bullpen.logRAPerInning;
+      ? spFrac * fielding.starter.logRAPerInning + (1 - spFrac) * bullpenLogRA
+      : bullpenLogRA;
 
     let logLambda = logLg
       + offTerm

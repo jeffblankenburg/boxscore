@@ -69,10 +69,17 @@ export type SeasonAggregates = {
   teamRecentForm: Map<number, TeamRecentForm>;
   /** Last-N-starts per-pitcher ERA for blending with season ERA. */
   spRecentForm:   Map<number, SpRecentForm>;
+  /** Reliever IP thrown over the last 2 cached days (asOfDate and the day
+   *  before) — the bullpen-fatigue input for the v7 run model. Teams that
+   *  didn't play in the window are simply absent (treat as 0 IP). */
+  teamBullpenRecentIp: Map<number, number>;
   league: {
     avgFirstInningRpg: number;     // average 1st-inning runs per TEAM per game
     avgBullpenEra:     number;     // league-wide bullpen ERA
     avgSpFirstInningEra: number;   // league-wide SP 1st-inning ERA
+    /** League mean of teamBullpenRecentIp across all 30 teams (absent
+     *  teams count as 0), so fatigueExcess = team − league is centered. */
+    avgBullpenRecentIp: number;
   };
 };
 
@@ -256,6 +263,13 @@ export function computeSeasonAggregatesFromRows(
   const cutoffMs = cutoff.getTime();
   const rawTeamRecent = new Map<number, { games: number; rs: number; ra: number }>();
   const rawSpRecent = new Map<number, { starts: number; er: number; ip: number }>();
+  // Bullpen-fatigue window: the 2 most recent cached days. 2 days because
+  // one heavy day is routine; back-to-back heavy days is what empties the
+  // leverage tier (scripts/fit-bullpen-fatigue.ts fits the sensitivity).
+  const fatigueCutoff = new Date(throughDate + "T00:00:00Z");
+  fatigueCutoff.setUTCDate(fatigueCutoff.getUTCDate() - 1);
+  const fatigueCutoffMs = fatigueCutoff.getTime();
+  const rawBullpenRecentIp = new Map<number, number>();
   let daysCovered = 0;
 
   for (const row of rows) {
@@ -264,6 +278,7 @@ export function computeSeasonAggregatesFromRows(
     const scheduleGames = (payload.schedule?.dates ?? []).flatMap((d) => d.games ?? []);
     const rowDateMs = new Date(row.date + "T00:00:00Z").getTime();
     const inRecentWindow = rowDateMs >= cutoffMs;
+    const inFatigueWindow = rowDateMs >= fatigueCutoffMs;
 
     for (const g of scheduleGames) {
       if (typeof g.gamePk !== "number") continue;
@@ -350,6 +365,9 @@ export function computeSeasonAggregatesFromRows(
           const ip = ipStringToDecimal(pi.inningsPitched);
           if (ip <= 0) continue;
           bumpBullpen(rawBullpen, teamId, ip, pi.earnedRuns ?? 0, pi.baseOnBalls ?? 0, pi.strikeOuts ?? 0);
+          if (inFatigueWindow) {
+            rawBullpenRecentIp.set(teamId, (rawBullpenRecentIp.get(teamId) ?? 0) + ip);
+          }
         }
       }
     }
@@ -401,6 +419,12 @@ export function computeSeasonAggregatesFromRows(
     spRecentForm.set(pitcherId, { pitcherId, starts: s.starts, earnedRuns: s.er, innings: s.ip, era });
   }
 
+  // League mean over all 30 teams, not just teams that pitched in the
+  // window — off days ARE the rest signal, so absent teams count as 0.
+  let fatigueIpSum = 0;
+  for (const ip of rawBullpenRecentIp.values()) fatigueIpSum += ip;
+  const avgBullpenRecentIp = fatigueIpSum / 30;
+
   return {
     asOfDate: throughDate,
     daysCovered,
@@ -409,6 +433,7 @@ export function computeSeasonAggregatesFromRows(
     spFirstInning,
     teamRecentForm,
     spRecentForm,
-    league: { avgFirstInningRpg, avgBullpenEra, avgSpFirstInningEra },
+    teamBullpenRecentIp: rawBullpenRecentIp,
+    league: { avgFirstInningRpg, avgBullpenEra, avgSpFirstInningEra, avgBullpenRecentIp },
   };
 }

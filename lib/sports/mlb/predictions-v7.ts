@@ -66,10 +66,16 @@ export function buildV7TeamInputs(
   const leagueBpEra = aggregates?.league.avgBullpenEra ?? 4.2;
   const bpEra = bp && bp.innings >= 60 ? bp.era : leagueBpEra;
 
+  // Bullpen fatigue: last-2-day reliever IP vs league mean. Zero when
+  // aggregates are missing (early season) → no adjustment in the engine.
+  const fatigueExcessIp = aggregates
+    ? (aggregates.teamBullpenRecentIp.get(teamId) ?? 0) - aggregates.league.avgBullpenRecentIp
+    : 0;
+
   return {
     offense: offenseFromRunsPerGame(rpg),
     starter: pitcherFromRA9(spEra * ERA_TO_RA9, expIP),
-    bullpen: bullpenFromRA9(bpEra * ERA_TO_RA9),
+    bullpen: { ...bullpenFromRA9(bpEra * ERA_TO_RA9), fatigueExcessIp },
     parkLogFactor: 0.5 * Math.log(parkFactorForHomeTeam(homeTeamId)),
   };
 }
