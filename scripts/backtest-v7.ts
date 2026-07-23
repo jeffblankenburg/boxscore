@@ -8,7 +8,7 @@
 import { loadEvalGames } from "./_v7-eval";
 import { DEFAULT_V7_CONFIG, deriveMarkets } from "@/lib/sports/mlb/run-model";
 import { ML_PLAY_THRESHOLD, NRFI_PLAY_THRESHOLD, mlOddsInPlayableRange } from "@/lib/sports/mlb/predictions";
-import { americanToProfitMultiplier } from "@/lib/sports/mlb/predictions-history";
+import { americanToProfitMultiplier } from "@/lib/sports/mlb/clv";
 
 const YEAR = process.argv[2] ?? "2026";
 const STAKE = 10;

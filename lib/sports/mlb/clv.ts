@@ -20,6 +20,14 @@
 // Everything is null-tolerant so callers don't have to pre-filter —
 // missing odds on either side just yield null CLV.
 
+/** American-odds → profit multiplier on a winning bet. e.g. +150
+ *  with $10 → $15 profit (150/100 * 10). -150 with $10 → $6.67 profit
+ *  (100/150 * 10). Caller multiplies by stake. */
+export function americanToProfitMultiplier(odds: number): number {
+  if (odds >= 0) return odds / 100;
+  return 100 / Math.abs(odds);
+}
+
 /** Convert American odds to a raw implied probability (0-1). +150 → 0.4,
  *  -150 → 0.6. Returns null if odds is null or 0 (0 is not a valid
  *  American line and would divide by zero). */

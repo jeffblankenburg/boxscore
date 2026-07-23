@@ -18,7 +18,6 @@ import {
   loadPlayRoi,
   loadSeasonHistory,
   loadOddsForDate,
-  americanToProfitMultiplier,
   outcomeWinPlay,
   outcomeNrfiPlay,
   bestOfDayWinPlay,
@@ -30,6 +29,7 @@ import {
   type SeasonHistoryGame,
   type DayOdds,
 } from "@/lib/sports/mlb/predictions-history";
+import { americanToProfitMultiplier } from "@/lib/sports/mlb/clv";
 import { readPredictionsRenderBlob } from "@/lib/sports/mlb/predictions-cache";
 import "./predictions.css";
 

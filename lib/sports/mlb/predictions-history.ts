@@ -23,6 +23,7 @@ import {
   type NrfiPlay,
 } from "./predictions";
 import { PREDICTIONS_MODEL_VERSION } from "./predictions-data";
+import { americanToProfitMultiplier } from "./clv";
 
 // A full season of MLB games (~15/day × 180 days = ~2700 rows) blows
 // past Supabase's silent 1000-row default. Every query that ranges
@@ -133,14 +134,6 @@ export type PlayRoiSummary = {
   nrfiProfit:        number;
   nrfiRoi:           number | null;
 };
-
-/** American-odds → profit multiplier on a winning bet. e.g. +150
- *  with $10 → $15 profit (150/100 * 10). -150 with $10 → $6.67 profit
- *  (100/150 * 10). Caller multiplies by stake. */
-export function americanToProfitMultiplier(odds: number): number {
-  if (odds >= 0) return odds / 100;
-  return 100 / Math.abs(odds);
-}
 
 function teamAbbr(daily: { away_team_id?: number; home_team_id?: number }, side: "away" | "home"): string {
   const id = side === "away" ? daily.away_team_id : daily.home_team_id;

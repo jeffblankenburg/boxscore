@@ -1,72 +1,128 @@
-// Daily recommendation selector (house rule from Jeff, 2026-07-22):
-//   - MINIMUM 1 ML + 1 NRFI every day — our "top picks", surfaced even if
-//     nothing clears threshold (best-of-slate fallback).
-//   - MAXIMUM 5 picks/day total, filled by conviction in any ML/NRFI mix.
+// Daily card selector — edge-aware (2026-07-22 redesign).
 //
-// Pure function: takes each game's derived probabilities for a single day,
-// returns the ordered rec set. Engine-agnostic (v6 or v7 can feed it).
+// House policy (Jeff, 2026-07-22): every day's card carries a MINIMUM of
+// one pick per required market (ML + NRFI — the "top picks", surfaced even
+// when nothing clears the bar) and a MAXIMUM of 5 picks total.
 //
-// ML is HOME-ONLY by design — away-side ML picks hit ~50–55% (noise) vs
-// ~62% for home; see predictions.ts winPlayFor. So the guaranteed daily ML
-// is the slate's best home favorite.
+// Filler picks are ranked by estimated EV per $1 staked, NOT raw
+// conviction. The naive conviction-ranked hybrid proved why: cross-market
+// probabilities aren't comparable (a 0.60 NRFI at -115 and a 0.60 ML at
+// -150 are different-value picks), so high-volume NRFI candidates crowded
+// out v6's rarer elite ML and the hybrid card landed BELOW v6-alone
+// (+5.2% vs +7.1% ROI). Both baselines are reproduced in
+// scripts/fit-registry.ts.
+//
+// Two hard-won calibration rules (scripts/fit-registry.ts, 2026-07-22):
+//   * EV is computed at the market's TYPICAL price (defaultOdds), never
+//     the per-game captured line. Ranking by per-game EV selects the games
+//     where the model disagrees most with the market — and when our model
+//     disagrees with the ML market, the market is usually right (per-game
+//     EV ranking scored 42% on ML vs 68% for conviction ranking). Per-game
+//     lines are used only for the odds-band filter and grading. Revisit
+//     once closing-line history is deep enough to measure real CLV.
+//   * recal is a PICK-REGION shift, not a global linear fit: p' = p + a
+//     where a = (realized hit rate − mean stated prob) over the market's
+//     historical pick region. Global OLS says v6 ML is calibrated on
+//     average (slope ≈ 1.0) while its >0.545 picks hit 68% — the
+//     miscalibration lives in the tail where we actually bet, so that's
+//     where it must be measured.
+//
+// Each market's policy: recal shift, defaultOdds, filler threshold on the
+// STATED probability scale, required flag, optional odds-band filter.
+//
+// Pure function: plain data in, ordered card out. Engine-agnostic — the
+// per-market registry decides which model's probability feeds each
+// market's candidates (ML=v6, NRFI=v7 today; player props later).
 
-export type RecCandidate = {
-  gamePk: number;
-  awayAbbr: string;
-  homeAbbr: string;
-  homeWin: number;          // P(home wins)
-  nrfi: number;             // P(no run in the 1st)
-  homeMlOdds?: number | null;
-};
+import { americanToProfitMultiplier } from "./clv";
 
-export type Recommendation = {
+export type Market = "ML" | "NRFI";
+
+export type CardCandidate = {
   gamePk: number;
-  market: "ML" | "NRFI";
+  market: Market;
+  /** The recommended side, already resolved by the caller (ML is
+   *  home-only by design; NRFI vs YRFI follows the favored side). */
   side: "home" | "NRFI" | "YRFI";
-  probability: number;      // win prob of the recommended side
-  guaranteed: boolean;      // the min-1 top pick for its market
+  /** The engine's stated P(side wins), pre-recalibration. */
+  probability: number;
+  /** Captured American price for the side, if any. Internal-only; used
+   *  for the odds-band filter, never for EV ranking (see header). */
+  odds: number | null;
 };
 
-export type RecOptions = {
-  mlThreshold: number;      // e.g. 0.58 (v7 scale)
-  nrfiThreshold: number;    // e.g. 0.55 (v7 scale)
-  maxPicks?: number;        // default 5
-  /** Odds-band filter for FILLER ML plays; guaranteed top ML ignores it. */
-  oddsBandOk?: (odds: number | null | undefined) => boolean;
+export type MarketPolicy = {
+  /** Pick-region recalibration shift: p' = clamp(p + recalShift).
+   *  Fit by scripts/fit-registry.ts. */
+  recalShift: number;
+  /** Market-typical American price; EV for ranking is computed here. */
+  defaultOdds: number;
+  /** Filler picks need stated probability ≥ threshold. */
+  threshold: number;
+  /** Whether the daily card guarantees one pick from this market. */
+  required: boolean;
+  /** Odds-band filter for filler picks; guaranteed picks ignore it. */
+  oddsOk?: (odds: number | null) => boolean;
 };
 
-const nrfiConv = (nrfi: number) => Math.max(nrfi, 1 - nrfi);
-const nrfiSide = (nrfi: number): "NRFI" | "YRFI" => (nrfi >= 0.5 ? "NRFI" : "YRFI");
+export type CardPick = {
+  gamePk: number;
+  market: Market;
+  side: "home" | "NRFI" | "YRFI";
+  /** Recalibrated win probability of the side. */
+  probability: number;
+  /** Estimated EV per $1 at the market's typical price. */
+  ev: number;
+  /** The min-1 top pick for its market. */
+  guaranteed: boolean;
+};
 
-export function selectDailyRecommendations(games: RecCandidate[], opts: RecOptions): Recommendation[] {
-  const maxPicks = opts.maxPicks ?? 5;
-  if (games.length === 0) return [];
+// Recal extrapolation guard: the card should never claim certainty.
+const clampP = (p: number) => Math.min(0.99, Math.max(0.01, p));
 
-  // Guaranteed top picks: best home favorite, best first-inning lean.
-  const topMl = games.reduce((b, g) => (g.homeWin > b.homeWin ? g : b));
-  const topNrfi = games.reduce((b, g) => (nrfiConv(g.nrfi) > nrfiConv(b.nrfi) ? g : b));
+export function selectDailyCard(
+  candidates: CardCandidate[],
+  policies: Record<Market, MarketPolicy>,
+  maxPicks = 5,
+): CardPick[] {
+  type Scored = { pick: CardPick; stated: number; odds: number | null };
+  const scored: Scored[] = candidates.map((c) => {
+    const pol = policies[c.market];
+    const p = clampP(c.probability + pol.recalShift);
+    const mult = americanToProfitMultiplier(pol.defaultOdds);
+    return {
+      stated: c.probability, odds: c.odds,
+      pick: {
+        gamePk: c.gamePk, market: c.market, side: c.side,
+        probability: p, ev: p * mult - (1 - p), guaranteed: false,
+      },
+    };
+  });
 
-  const picks: Recommendation[] = [
-    { gamePk: topMl.gamePk, market: "ML", side: "home", probability: topMl.homeWin, guaranteed: true },
-    { gamePk: topNrfi.gamePk, market: "NRFI", side: nrfiSide(topNrfi.nrfi), probability: nrfiConv(topNrfi.nrfi), guaranteed: true },
-  ];
-  const taken = new Set(picks.map((p) => `${p.gamePk}|${p.market}`));
-
-  // Filler pool: everything else that clears its threshold, by conviction.
-  const pool: Recommendation[] = [];
-  for (const g of games) {
-    if (g.homeWin >= opts.mlThreshold && (opts.oddsBandOk?.(g.homeMlOdds) ?? true) && !taken.has(`${g.gamePk}|ML`)) {
-      pool.push({ gamePk: g.gamePk, market: "ML", side: "home", probability: g.homeWin, guaranteed: false });
-    }
-    if ((g.nrfi >= opts.nrfiThreshold || g.nrfi <= 1 - opts.nrfiThreshold) && !taken.has(`${g.gamePk}|NRFI`)) {
-      pool.push({ gamePk: g.gamePk, market: "NRFI", side: nrfiSide(g.nrfi), probability: nrfiConv(g.nrfi), guaranteed: false });
+  // Guaranteed top picks: best EV per required market, no filters — the
+  // house rule wants a best-of-slate lean even on a thin day.
+  const picks: CardPick[] = [];
+  const taken = new Set<string>();
+  for (const market of Object.keys(policies) as Market[]) {
+    if (!policies[market].required) continue;
+    const best = scored.filter((s) => s.pick.market === market)
+      .reduce<Scored | null>((b, s) => (b === null || s.pick.ev > b.pick.ev ? s : b), null);
+    if (best) {
+      picks.push({ ...best.pick, guaranteed: true });
+      taken.add(`${best.pick.gamePk}|${best.pick.market}`);
     }
   }
-  pool.sort((a, b) => b.probability - a.probability);
 
-  for (const p of pool) {
+  // Filler: everything that clears its market's stated threshold and odds
+  // band, by EV descending.
+  const pool = scored
+    .filter((s) => !taken.has(`${s.pick.gamePk}|${s.pick.market}`))
+    .filter((s) => s.stated >= policies[s.pick.market].threshold)
+    .filter((s) => policies[s.pick.market].oddsOk?.(s.odds) ?? true)
+    .sort((a, b) => b.pick.ev - a.pick.ev);
+  for (const s of pool) {
     if (picks.length >= maxPicks) break;
-    picks.push(p);
+    picks.push(s.pick);
   }
   return picks;
 }

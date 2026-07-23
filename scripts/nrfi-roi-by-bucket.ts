@@ -7,7 +7,7 @@
 
 import { supabaseAdmin } from "@/lib/supabase";
 import { NRFI_PLAY_THRESHOLD } from "@/lib/sports/mlb/predictions";
-import { americanToProfitMultiplier } from "@/lib/sports/mlb/predictions-history";
+import { americanToProfitMultiplier } from "@/lib/sports/mlb/clv";
 import { PREDICTIONS_MODEL_VERSION } from "@/lib/sports/mlb/predictions-data";
 
 const DAYS = Number(process.argv[2] ?? 30);

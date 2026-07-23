@@ -14,6 +14,7 @@ import {
 import { predictGames, type PredictionsResult } from "@/lib/sports/mlb/predictions";
 import { predictGamesV7, V7_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
 import { captureEspnOddsForDate } from "@/lib/sports/mlb/odds-cache";
+import { buildDailyCard, CARD_MARKETS, CARD_VERSION, type CardGameOdds } from "@/lib/sports/mlb/market-registry";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -107,6 +108,58 @@ export async function GET(req: Request) {
     console.error(`[predictions-snapshot] odds capture failed: ${oddsError}`);
   }
 
+  // Freeze today's daily card (per-market registry + edge-aware selector)
+  // into daily_picks. Runs AFTER odds capture so the ML band filter sees
+  // this morning's DK lines; FanDuel NRFI lines usually arrive later via
+  // the odds-poll cron, which is fine — ranking is at market-typical
+  // prices, captured lines only gate the ML odds band. Non-fatal so the
+  // predictions snapshot never fails on a card problem.
+  let cardWritten = 0;
+  let cardError: string | null = null;
+  try {
+    const [, v6Res] = producers[0]!;
+    const [, v7Res] = producers[1]!;
+    const { data: oddsRows } = await sb
+      .from("daily_odds_first")
+      .select("game_pk, book, home_ml_odds, nrfi_odds, yrfi_odds")
+      .eq("sport", sport)
+      .eq("date", date)
+      .in("book", ["DraftKings", "FanDuel"]);
+    const oddsByGamePk = new Map<number, CardGameOdds>();
+    for (const o of (oddsRows ?? []) as Array<{ game_pk: number; book: string; home_ml_odds: number | null; nrfi_odds: number | null; yrfi_odds: number | null }>) {
+      const entry = oddsByGamePk.get(o.game_pk) ?? { homeMlOdds: null, nrfiOdds: null, yrfiOdds: null };
+      if (o.book === "DraftKings" && o.home_ml_odds != null) entry.homeMlOdds = o.home_ml_odds;
+      if (o.book === "FanDuel") {
+        if (o.nrfi_odds != null) entry.nrfiOdds = o.nrfi_odds;
+        if (o.yrfi_odds != null) entry.yrfiOdds = o.yrfi_odds;
+      }
+      oddsByGamePk.set(o.game_pk, entry);
+    }
+    const card = buildDailyCard(v6Res, v7Res, oddsByGamePk);
+    const cardRows = card.map((p, i) => ({
+      sport,
+      date,
+      game_pk: p.gamePk,
+      market: p.market,
+      subject: "game",
+      card_version: CARD_VERSION,
+      side: p.side,
+      probability: Number(p.probability.toFixed(4)),
+      ev: Number(p.ev.toFixed(4)),
+      guaranteed: p.guaranteed,
+      rank: i + 1,
+      model_version: CARD_MARKETS[p.market].modelVersion,
+    }));
+    const { error: cardErr } = await sb
+      .from("daily_picks")
+      .upsert(cardRows, { onConflict: "sport,date,game_pk,market,subject,card_version" });
+    if (cardErr) throw new Error(cardErr.message);
+    cardWritten = cardRows.length;
+  } catch (e) {
+    cardError = (e as Error).message;
+    console.error(`[predictions-snapshot] card write failed: ${cardError}`);
+  }
+
   // Rebuild the /mlb/predictions render cache so the page picks up
   // today's just-written predictions, bust the route cache, and then
   // warm it by issuing a real request against the page so the cron
@@ -132,6 +185,8 @@ export async function GET(req: Request) {
     date,
     written: rows.length,
     models: [PREDICTIONS_MODEL_VERSION, V7_MODEL_VERSION],
+    card_written: cardWritten,
+    ...(cardError ? { card_error: cardError } : {}),
     ...(oddsReport ? {
       odds_matched: oddsReport.matched,
       odds_upserted: oddsReport.upserted,

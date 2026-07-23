@@ -334,6 +334,59 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Grade the daily card (daily_picks) for this date — every card_version
+  // present, same policy as grading every model_version. Graded price is
+  // closing preferred / opening fallback: closing is what a subscriber
+  // could actually still get near lock, opening is better than dropping
+  // the pick from ROI when the poll missed the close. Non-fatal.
+  let cardGraded = 0, cardHits = 0;
+  let cardError: string | null = null;
+  try {
+    type PickRow = { game_pk: number; market: string; subject: string; card_version: string; side: string };
+    const { data: pickRows } = await sb
+      .from("daily_picks")
+      .select("game_pk, market, subject, card_version, side")
+      .eq("sport", sport)
+      .eq("date", date);
+    for (const p of ((pickRows ?? []) as PickRow[])) {
+      const outcome = gameOutcomeFromRaw(p.game_pk, payload.schedule, payload.games);
+      const odds = pickForGame(p.game_pk);
+      let won: boolean | null = null;
+      let gradedOdds: number | null = null;
+      if (outcome && outcome.status.toLowerCase().includes("final")) {
+        if (p.market === "ML" && outcome.awayScore !== null && outcome.homeScore !== null && outcome.awayScore !== outcome.homeScore) {
+          won = (outcome.homeScore > outcome.awayScore) === (p.side === "home");
+          gradedOdds = odds.close_home_ml_odds ?? odds.open_home_ml_odds;
+        }
+        if (p.market === "NRFI" && outcome.awayFirstInning !== null && outcome.homeFirstInning !== null) {
+          const actualNrfi = outcome.awayFirstInning + outcome.homeFirstInning === 0;
+          won = actualNrfi === (p.side === "NRFI");
+          gradedOdds = p.side === "NRFI"
+            ? (odds.close_nrfi_odds ?? odds.open_nrfi_odds)
+            : (odds.close_yrfi_odds ?? odds.open_yrfi_odds);
+        }
+      }
+      const { error: gradeErr } = await sb
+        .from("daily_picks")
+        .update({
+          status: outcome?.status ?? "missing",
+          won,
+          odds_american: gradedOdds,
+          graded_at: new Date().toISOString(),
+        })
+        .eq("sport", sport).eq("date", date).eq("game_pk", p.game_pk)
+        .eq("market", p.market).eq("subject", p.subject).eq("card_version", p.card_version);
+      if (gradeErr) {
+        console.warn(`[predictions-comparator] card grade ${date}/${p.game_pk}/${p.market} failed: ${gradeErr.message}`);
+        continue;
+      }
+      if (won !== null) { cardGraded++; if (won) cardHits++; }
+    }
+  } catch (e) {
+    cardError = (e as Error).message;
+    console.warn(`[predictions-comparator] card grading failed: ${cardError}`);
+  }
+
   // Linescore self-heal. Since 2026-07-05 the comparator writes the
   // linescore JSONB inline on every scoring pass, but rows scored before
   // that day (and rows the pre-2026-07-05 comparator wrote for the days
@@ -466,6 +519,9 @@ export async function GET(req: Request) {
     ml_clv_n: mlClvCount,
     nrfi_clv_pp: nrfiClvAvg,
     nrfi_clv_n: nrfiClvCount,
+    card_graded: cardGraded,
+    card_hits: cardHits,
+    ...(cardError ? { card_error: cardError } : {}),
     linescore_healed: healedCount,
     ...(cacheError ? { cache_error: cacheError } : {}),
     ...(warm ? { warm_status: warm.status, warm_ms: warm.durationMs } : {}),

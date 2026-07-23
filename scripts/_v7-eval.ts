@@ -11,7 +11,7 @@ import { parseSlate, type SlateGame } from "@/lib/mlb";
 import { prevDay } from "@/lib/dates";
 import { predictGames, type TeamSeasonRecord, type ProbableSpStats } from "@/lib/sports/mlb/predictions";
 import { computeSeasonAggregatesFromRows } from "@/lib/sports/mlb/season-aggregates";
-import { type TeamInputs } from "@/lib/sports/mlb/run-model";
+import { DEFAULT_V7_CONFIG, deriveMarkets, type TeamInputs, type V7Config } from "@/lib/sports/mlb/run-model";
 import { buildV7TeamInputs } from "@/lib/sports/mlb/predictions-v7";
 
 const V6_VERSION = "v6-nrfi-rebased";
@@ -75,6 +75,46 @@ function parsePayload(payload: Record<string, unknown>) {
     }
   }
   return { slate, records, spStats };
+}
+
+// ─── shared walk-forward v7 fitting (fit-v7.ts + fit-registry.ts) ────────
+
+export const clampProb = (p: number) => Math.min(1 - 1e-6, Math.max(1e-6, p));
+export const logLoss = (p: number, y: boolean) => -(y ? Math.log(clampProb(p)) : Math.log(1 - clampProb(p)));
+
+const GRID_BETA = [0.3, 0.5, 0.7, 0.9, 1.1, 1.3];
+const GRID_HFA = [1.0, 1.01, 1.02, 1.03, 1.04, 1.05];
+
+export type V7Probs = { homeWin: number; nrfi: number };
+export function predictV7(g: EvalGame, cfg: V7Config): V7Probs | null {
+  const m = deriveMarkets(g.away, g.home, cfg);
+  if (!Number.isFinite(m.homeWin) || !Number.isFinite(m.nrfi)) return null;
+  return { homeWin: m.homeWin, nrfi: m.nrfi };
+}
+
+// Combined ML+NRFI log-loss over a game set for a candidate cfg.
+function trainLoss(games: EvalGame[], cfg: V7Config): number {
+  let sum = 0, n = 0;
+  for (const g of games) {
+    const p = predictV7(g, cfg);
+    if (!p) continue;
+    sum += logLoss(p.homeWin, g.actualWinner === "home") + logLoss(p.nrfi, g.actualNrfi);
+    n++;
+  }
+  return n ? sum / n : Infinity;
+}
+
+/** Min-log-loss grid fit of the v7 composition weights on a training set. */
+export function fitV7Grid(train: EvalGame[]): V7Config {
+  let best = DEFAULT_V7_CONFIG, bestLoss = Infinity;
+  for (const betaOff of GRID_BETA)
+    for (const betaPitch of GRID_BETA)
+      for (const hfaMultiplier of GRID_HFA) {
+        const cfg = { ...DEFAULT_V7_CONFIG, betaOff, betaPitch, hfaMultiplier };
+        const loss = trainLoss(train, cfg);
+        if (loss < bestLoss) { bestLoss = loss; best = cfg; }
+      }
+  return best;
 }
 
 /** Reconstruct all graded games for the season with cached v7 inputs. */
