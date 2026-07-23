@@ -298,7 +298,6 @@ function YesterdayResults({
             <tr>
               <th>Final</th>
               <th>Play</th>
-              <th>Odds</th>
               <th>Profit</th>
             </tr>
           </thead>
@@ -310,7 +309,7 @@ function YesterdayResults({
           {priced > 0 && (
             <tfoot>
               <tr className="pr-yesterday-total">
-                <td colSpan={3}>Day total</td>
+                <td colSpan={2}>Day total</td>
                 <td className="pr-yesterday-profit">
                   <span className={dayTotal >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>{formatProfit(dayTotal)}</span>
                   {anyPartial && <span className="pr-profit-partial" title="Some odds missing">*</span>}
@@ -547,17 +546,6 @@ function YesterdayRow({
       ? `${o.awayAbbr} ${o.awayScore} · ${o.homeAbbr} ${o.homeScore}`
       : <span className="pr-na">{o.status}</span>;
 
-  const oddsCells: string[] = [];
-  if (win && o.winCorrect !== null) {
-    const mlOdds = odds.mlByGamePk.get(o.gamePk);
-    const price = win.side === "away" ? mlOdds?.away : mlOdds?.home;
-    oddsCells.push(price == null ? "—" : formatOdds(price));
-  }
-  if (nrfi && o.nrfiCorrect !== null) {
-    const nrfiOdds = odds.nrfiByGamePk.get(o.gamePk);
-    const price = nrfi.side === "NRFI" ? nrfiOdds?.nrfi : nrfiOdds?.yrfi;
-    oddsCells.push(price == null ? "—" : formatOdds(price));
-  }
   const { profit: totalProfit, partial: missingOdds } = pickProfit(o, win, nrfi, odds);
 
   return (
@@ -567,11 +555,6 @@ function YesterdayRow({
         {!win && !nrfi && <span className="pr-na">—</span>}
         {win && <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML${win.dog ? " 🐕" : ""}`} hit={o.winCorrect} />}
         {nrfi && <PlayCell badgeClass="pr-play-nrfi" strong={nrfi.strong} label={nrfiSideLabel(nrfi.side)} hit={o.nrfiCorrect} />}
-      </td>
-      <td className="pr-yesterday-odds">
-        {oddsCells.length === 0
-          ? <span className="pr-na">—</span>
-          : oddsCells.join(" / ")}
       </td>
       <td className="pr-yesterday-profit">
         {totalProfit === null
@@ -588,9 +571,6 @@ function YesterdayRow({
 function formatProfit(v: number): string {
   const sign = v >= 0 ? "+" : "−";
   return `${sign}$${Math.abs(v).toFixed(2)}`;
-}
-function formatOdds(v: number): string {
-  return v >= 0 ? `+${v}` : `${v}`;
 }
 
 /** $10/play P/L for one game's card picks against captured odds — used

@@ -376,8 +376,9 @@
 .pr-yesterday .pr-recap-table th { background: #f4f4f4; }
 .pr-yesterday .pr-recap-subhead { color: var(--text-muted); }
 
-/* Yesterday's Results — Final | Play | Odds | Profit. Play badge
- * colored by hit/miss; profit signed by green (positive) / red (negative). */
+/* Yesterday's Results — Final | Play | Profit. Play badge colored by
+ * hit/miss; profit signed by green (positive) / red (negative). Per-game
+ * odds are internal-only and never shown here. */
 .pr-yesterday-table th,
 .pr-yesterday-table td {
   padding: 4px 6px;
@@ -389,12 +390,6 @@
 .pr-yesterday-play .pr-play-cell {
   display: inline-flex;
   margin: 0 2px;
-}
-.pr-yesterday-odds {
-  text-align: center !important;
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  white-space: nowrap;
 }
 .pr-yesterday-profit {
   text-align: right !important;
