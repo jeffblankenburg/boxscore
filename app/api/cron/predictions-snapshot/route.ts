@@ -12,7 +12,11 @@ import {
   PREDICTIONS_MODEL_VERSION,
 } from "@/lib/sports/mlb/predictions-data";
 import { predictGames, type PredictionsResult } from "@/lib/sports/mlb/predictions";
-import { predictGamesV7, predictGamesV71, V7_MODEL_VERSION, V71_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
+import { predictGamesV7, predictGamesV71, V7_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
+
+// v6 is no longer the production model (v7.1 is, via PREDICTIONS_MODEL_VERSION)
+// but we keep snapshotting + grading it as a shadow for the live head-to-head.
+const V6_SHADOW_VERSION = "v6-nrfi-rebased";
 import { captureEspnOddsForDate } from "@/lib/sports/mlb/odds-cache";
 import { buildDailyCard, CARD_MARKETS, CARD_VERSION, type CardGameOdds } from "@/lib/sports/mlb/market-registry";
 
@@ -44,18 +48,24 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
 
-  // Load inputs once; run v6 (production) AND v7 (graded shadow) off the
-  // same as-of-date data so their track records are strictly comparable.
+  // Load inputs once; run v7.1 (production) AND v6 + v7 (graded shadows)
+  // off the same as-of-date data so their track records are strictly
+  // comparable.
   const inputs = await loadPredictionInputsForDate(date);
   if (!inputs || inputs.slate.length === 0) {
     return NextResponse.json({ ok: true, date, written: 0, note: "no games on slate" });
   }
 
   const sb = supabaseAdmin();
+  const v6Res  = predictGames(inputs);
+  const v7Res  = predictGamesV7(inputs);
+  const v71Res = predictGamesV71(inputs);
+  // v7.1 is primary (PREDICTIONS_MODEL_VERSION === "v7.1"); v6 + v7 are
+  // retained as graded shadows.
   const producers: Array<[string, PredictionsResult]> = [
-    [PREDICTIONS_MODEL_VERSION, predictGames(inputs)],
-    [V7_MODEL_VERSION, predictGamesV7(inputs)],
-    [V71_MODEL_VERSION, predictGamesV71(inputs)],
+    [PREDICTIONS_MODEL_VERSION, v71Res],
+    [V6_SHADOW_VERSION, v6Res],
+    [V7_MODEL_VERSION, v7Res],
   ];
   const rows = producers.flatMap(([modelVersion, res]) =>
     res.games.map((g) => ({
@@ -118,8 +128,6 @@ export async function GET(req: Request) {
   let cardWritten = 0;
   let cardError: string | null = null;
   try {
-    const [, v6Res] = producers[0]!;
-    const [, v7Res] = producers[1]!;
     const { data: oddsRows } = await sb
       .from("daily_odds_first")
       .select("game_pk, book, home_ml_odds, nrfi_odds, yrfi_odds")
@@ -185,7 +193,7 @@ export async function GET(req: Request) {
     ok: true,
     date,
     written: rows.length,
-    models: [PREDICTIONS_MODEL_VERSION, V7_MODEL_VERSION, V71_MODEL_VERSION],
+    models: [PREDICTIONS_MODEL_VERSION, V6_SHADOW_VERSION, V7_MODEL_VERSION],
     card_written: cardWritten,
     ...(cardError ? { card_error: cardError } : {}),
     ...(oddsReport ? {

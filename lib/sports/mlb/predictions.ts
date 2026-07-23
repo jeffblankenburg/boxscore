@@ -35,6 +35,7 @@ import type {
   SpRecentForm,
 } from "./season-aggregates";
 import { parkFactorForHomeTeam } from "./park-factors";
+import { impliedFromAmerican } from "./clv";
 
 // ─── Inputs ──────────────────────────────────────────────────────────────
 
@@ -173,100 +174,94 @@ export type WinPlay = {
   abbr: string;
   winPct: number;
   strong: boolean;
+  /** True when the picked side is a betting underdog (plus-money) — a
+   *  model-vs-market disagreement, our highest-ROI pick type. Flagged in
+   *  the UI (🐕) without ever showing the price. */
+  dog: boolean;
 };
-export type NrfiPlay = {
-  side: "NRFI" | "YRFI";
-  probability: number;            // probability of the side we're betting (>= 0.60)
-  strong: boolean;
-};
+// ─── Daily card selection ────────────────────────────────────────────────
+//
+// The public card is ML-only (NRFI was dropped 2026-07-23 — its hit rate
+// didn't justify the slot). Its BASE size scales with the slate:
+// CARD_GAME_FRACTION of the day's games, floor 1 — a 15-game day shows 3,
+// a 5-game day shows 1. But 20% is a FLOOR, not a cap: any additional
+// positive-EV pick whose win probability clears CARD_VERY_CONFIDENT_WINPCT
+// is kept too, so a light slate with two elite plays still shows both.
+// (Fitted 2026-07-23, scripts/fit-v71-card.ts: at 0.68 the override adds
+// only ~0.37 picks/day and those extras hit 86% — genuinely "very
+// confident," rare enough to keep the card ~20% on a typical day.)
+//
+// Picks are the model's favored side ranked by EV vs the market price
+// (model prob − break-even implied), favored side only, positive-EV only.
+// That's where the money is: over the 2026 season v7.1's favored-UNDERDOG
+// picks (market prices our side as a dog) returned +19.3% ROI vs favorites'
+// single digits. Ranking by raw win% would bury those under chalk, so we
+// rank by edge — which needs the picked side's odds.
+export const CARD_GAME_FRACTION = 0.20;
+export const CARD_VERY_CONFIDENT_WINPCT = 0.68;
 
-/** Display label for a NRFI/YRFI play — appends a directional arrow so
- *  glancing at the badge tells you which way you're betting without
- *  parsing the acronym. Down = "no runs" (NRFI), up = "runs" (YRFI). */
-export function nrfiSideLabel(side: "NRFI" | "YRFI"): string {
-  return side === "NRFI" ? "NRFI ↓" : "YRFI ↑";
+/** Base number of ML picks for a slate of `numGames` games: 20% of the
+ *  slate, rounded, floor 1. 15 → 3, 10 → 2, 5 → 1. selectDailyCard may
+ *  add very-confident picks on top of this. */
+export function cardSize(numGames: number): number {
+  return Math.max(1, Math.round(CARD_GAME_FRACTION * numGames));
 }
 
-/** Returns the moneyline play for this game, or null.
- *
- *  Home-team only. Empirical sweep across 262 v4 plays showed away
- *  picks hit 50-55% at every threshold band; home picks hit 61.6%.
- *  Away picks are noise around break-even, so we filter them out
- *  rather than pretending a play exists. Fallback `bestOfSlateWinPlay`
- *  can still surface an away favorite when no home team clears — those
- *  are labeled as best-of-slate, not threshold-qualifying plays.
- *
- *  When DraftKings odds are provided, plays outside [ML_ODDS_MIN,
- *  ML_ODDS_MAX] are filtered. Heavy chalk (< -200) and underdogs
- *  (> -100) both lose money at this hit rate. */
-export function winPlayFor(game: GamePrediction, dkHomeOdds?: number | null): WinPlay | null {
-  if (game.home.winProbability < ML_PLAY_THRESHOLD) return null;
-  if (!mlOddsInPlayableRange(dkHomeOdds)) return null;
+/** One game's card-eligible ML pick. Null when we have no odds for the
+ *  favored side or its EV is non-positive (no bet). */
+export type CardCandidate = {
+  gamePk: number;
+  ml: { side: "away" | "home"; winPct: number; edge: number; dog: boolean } | null;
+};
+
+export type CardPick = {
+  gamePk: number;
+  side: "away" | "home";
+  winPct: number;      // picked side's win probability
+  strong: boolean;
+  dog: boolean;        // picked side is a plus-money underdog
+  edge: number;        // EV vs market break-even — the rank metric
+};
+
+/** Build a card candidate from a game's win probabilities + the favored
+ *  side's DraftKings odds. Pure — the caller supplies the odds. */
+export function cardCandidateFor(
+  gamePk: number,
+  awayWinPct: number,
+  homeWinPct: number,
+  dkOdds?: { away: number | null; home: number | null },
+): CardCandidate {
+  const favSide: "away" | "home" = homeWinPct >= awayWinPct ? "home" : "away";
+  const winPct = favSide === "home" ? homeWinPct : awayWinPct;
+  const sideOdds = favSide === "home" ? dkOdds?.home ?? null : dkOdds?.away ?? null;
+  const implied = impliedFromAmerican(sideOdds);
+  const edge = implied === null ? null : winPct - implied;
   return {
-    side: "home",
-    abbr: game.home.abbr,
-    winPct: game.home.winProbability,
-    strong: game.home.winProbability >= ML_STRONG_THRESHOLD,
+    gamePk,
+    ml: edge !== null && edge > 0 ? { side: favSide, winPct, edge, dog: (sideOdds ?? 0) > 0 } : null,
   };
 }
 
-/** Always-pick rule: even when no game clears the threshold, return
- *  the slate's strongest favorite so we never have a day without a
- *  moneyline pick. Tested over June: forced picks hit 6/6 with no
- *  drop in aggregate win rate, so we surface them by default. */
-export function bestOfSlateWinPlay(games: GamePrediction[]): { gamePk: number; play: WinPlay } | null {
-  let best: { gamePk: number; favPct: number; play: WinPlay } | null = null;
-  for (const g of games) {
-    const a = g.away.winProbability, h = g.home.winProbability;
-    const fav = a >= h ? a : h;
-    if (!best || fav > best.favPct) {
-      const play: WinPlay = a >= h
-        ? { side: "away", abbr: g.away.abbr, winPct: a, strong: a >= ML_STRONG_THRESHOLD }
-        : { side: "home", abbr: g.home.abbr, winPct: h, strong: h >= ML_STRONG_THRESHOLD };
-      best = { gamePk: g.gamePk, favPct: fav, play };
+/** The day's card: the top `count` positive-EV ML plays by edge (the 20%
+ *  floor), PLUS any other positive-EV pick whose win probability clears
+ *  CARD_VERY_CONFIDENT_WINPCT. Returned ordered by edge. */
+export function selectDailyCard(cands: CardCandidate[], count: number): CardPick[] {
+  const picks = cands
+    .filter((c): c is CardCandidate & { ml: NonNullable<CardCandidate["ml"]> } => c.ml !== null)
+    .map((c) => ({ gamePk: c.gamePk, side: c.ml.side, winPct: c.ml.winPct, strong: c.ml.winPct >= ML_STRONG_THRESHOLD, dog: c.ml.dog, edge: c.ml.edge }));
+  picks.sort((a, b) => b.edge - a.edge);
+
+  const chosen = picks.slice(0, Math.max(0, count));
+  const chosenPks = new Set(chosen.map((p) => p.gamePk));
+  // 20% is a floor: keep very-confident picks even past the base count.
+  for (const p of picks) {
+    if (!chosenPks.has(p.gamePk) && p.winPct >= CARD_VERY_CONFIDENT_WINPCT) {
+      chosen.push(p);
+      chosenPks.add(p.gamePk);
     }
   }
-  return best ? { gamePk: best.gamePk, play: best.play } : null;
-}
-
-/** NRFI analogue of bestOfSlateWinPlay: picks the slate's strongest
- *  lean (max |p - 0.5|), going NRFI when p >= 0.5 and YRFI when below. */
-export function bestOfSlateNrfiPlay(games: GamePrediction[]): { gamePk: number; play: NrfiPlay } | null {
-  let best: { gamePk: number; dev: number; play: NrfiPlay } | null = null;
-  for (const g of games) {
-    const p = g.nrfiProbability;
-    const dev = Math.abs(p - 0.5);
-    if (!best || dev > best.dev) {
-      const play: NrfiPlay = p >= 0.5
-        ? { side: "NRFI", probability: p,     strong: p >= NRFI_STRONG_THRESHOLD }
-        : { side: "YRFI", probability: 1 - p, strong: (1 - p) >= NRFI_STRONG_THRESHOLD };
-      best = { gamePk: g.gamePk, dev, play };
-    }
-  }
-  return best ? { gamePk: best.gamePk, play: best.play } : null;
-}
-
-/** Returns the first-inning play for this game, or null if NRFI sits in
- *  the 40–60% no-play zone. NRFI side fires when nrfi >= threshold;
- *  YRFI side fires symmetrically when nrfi <= 1 - threshold. */
-export function nrfiPlayFor(game: GamePrediction): NrfiPlay | null {
-  const nrfi = game.nrfiProbability;
-  if (nrfi >= NRFI_PLAY_THRESHOLD) {
-    return {
-      side: "NRFI",
-      probability: nrfi,
-      strong: nrfi >= NRFI_STRONG_THRESHOLD,
-    };
-  }
-  if (nrfi <= 1 - NRFI_PLAY_THRESHOLD) {
-    const yrfi = 1 - nrfi;
-    return {
-      side: "YRFI",
-      probability: yrfi,
-      strong: yrfi >= NRFI_STRONG_THRESHOLD,
-    };
-  }
-  return null;
+  chosen.sort((a, b) => b.edge - a.edge);
+  return chosen;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────

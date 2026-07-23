@@ -13,14 +13,9 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { findTeamByMlbApiId } from "@/lib/teams";
 import {
-  ML_PLAY_THRESHOLD,
-  ML_STRONG_THRESHOLD,
-  NRFI_PLAY_THRESHOLD,
-  NRFI_STRONG_THRESHOLD,
-  nrfiSideLabel,
-  mlOddsInPlayableRange,
-  type WinPlay,
-  type NrfiPlay,
+  selectDailyCard,
+  cardCandidateFor,
+  cardSize,
 } from "./predictions";
 import { PREDICTIONS_MODEL_VERSION } from "./predictions-data";
 import { americanToProfitMultiplier } from "./clv";
@@ -100,23 +95,17 @@ export type AccuracySummary = {
   nrfiBrier:    number | null;
 };
 
-// Pick-only accuracy — applies ML_PLAY_THRESHOLD / NRFI_PLAY_THRESHOLD
-// after the fact so the denominator is "of the games we'd have actually
-// flagged as a play, how many hit." This is the number a partner asks
-// about ("of your picks, what's your hit rate") — the all-game accuracy
-// above is a calibration metric, not a results metric.
+// Pick-only accuracy — "of the ML picks we'd have actually played (the
+// day's card), how many hit." The all-game accuracy above is a
+// calibration metric; this is the results metric.
 export type PlayAccuracySummary = {
   mlPlays:        number;
   mlPlayHits:     number;
   mlHitRate:      number | null;
-  nrfiPlays:      number;
-  nrfiPlayHits:   number;
-  nrfiHitRate:    number | null;
 };
 
-// "If you'd bet $10 on every play, what's the P/L?" — same denominator
-// as PlayAccuracySummary (one ML + one NRFI per day, always-pick rule
-// applies) but graded against captured odds instead of win/loss. Plays
+// "If you'd bet $10 on every card ML pick, what's the P/L?" — same
+// denominator as PlayAccuracySummary, graded against captured odds. Plays
 // with no recorded odds are tracked separately so the user can see
 // "won 14 of 20, but ROI is on 17 because 3 games had no odds row."
 export type PlayRoiSummary = {
@@ -128,11 +117,6 @@ export type PlayRoiSummary = {
   mlStaked:         number; // sum of stakes wagered on ML
   mlProfit:         number; // signed P/L on ML
   mlRoi:            number | null; // mlProfit / mlStaked
-  nrfiPlaysGraded:   number;
-  nrfiPlaysWithOdds: number;
-  nrfiStaked:        number;
-  nrfiProfit:        number;
-  nrfiRoi:           number | null;
 };
 
 function teamAbbr(daily: { away_team_id?: number; home_team_id?: number }, side: "away" | "home"): string {
@@ -224,7 +208,7 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
     actual_winner: "away" | "home" | null;
     actual_nrfi: boolean | null;
   };
-  type DkOddsRow = { date: string; game_pk: number; home_ml_odds: number | null };
+  type DkOddsRow = { date: string; game_pk: number; away_ml_odds: number | null; home_ml_odds: number | null };
   const [data, dkRows] = await Promise.all([
     paginateSelect<Row>((from, to) => sb
       .from("prediction_results")
@@ -235,13 +219,13 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
       .lte("date", endIso)
       .range(from, to)),
     paginateSelect<DkOddsRow>((from, to) => sb.from("daily_odds_first")
-      .select("date, game_pk, home_ml_odds")
+      .select("date, game_pk, away_ml_odds, home_ml_odds")
       .eq("sport", "mlb").eq("book", "DraftKings")
       .gte("date", startIso).lte("date", endIso)
       .range(from, to)),
   ]);
-  const dkHomeOdds = new Map<string, number | null>();
-  for (const r of dkRows) dkHomeOdds.set(`${r.date}|${r.game_pk}`, r.home_ml_odds);
+  const dkOdds = new Map<string, { away: number | null; home: number | null }>();
+  for (const r of dkRows) dkOdds.set(`${r.date}|${r.game_pk}`, { away: r.away_ml_odds, home: r.home_ml_odds });
 
   // Group by date so the always-pick rule (one ML + one NRFI per day,
   // even when nothing clears threshold) can be applied per slate.
@@ -252,23 +236,17 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
     byDate.set(r.date, list);
   }
 
-  // Aggregate stats across the window. All-games Brier / accuracy still
-  // sweep every row (calibration signal, not "did we pick well"). Pick
-  // counters use the always-pick rule: threshold qualifiers first, plus
-  // a best-of-slate fallback on any day with no threshold qualifier.
+  // Aggregate stats across the window. All-games Brier / accuracy sweep
+  // every row (calibration signal, not "did we pick well"). Pick counters
+  // grade the capped daily card (selectDailyCard) — the exact set the page
+  // shows — so displayed hit rates and ROI measure the same picks.
   let finals = 0, winHits = 0, winBrierSum = 0;
   let nrfiFinals = 0, nrfiAllHits = 0, nrfiBrierSum = 0;
   let mlPlays = 0, mlPlayHits = 0;
-  let nrfiPlays = 0, nrfiPlayHits = 0;
 
   for (const dayRows of byDate.values()) {
-    let mlDayPicked = false;
-    let nrfiDayPicked = false;
-    let bestMl:   { side: "away" | "home"; favPct: number; winner: "away" | "home" } | null = null;
-    let bestNrfi: { pickNrfi: boolean;     dev: number;     actual: boolean        } | null = null;
-
+    // All-games calibration tallies (kept for the internal blob; not shown).
     for (const r of dayRows) {
-      // All-games calibration tallies.
       if (r.win_correct !== null) {
         finals++;
         if (r.win_correct) winHits++;
@@ -279,57 +257,20 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
         if (r.nrfi_correct) nrfiAllHits++;
         if (r.nrfi_brier !== null) nrfiBrierSum += Number(r.nrfi_brier);
       }
-
-      // Threshold-qualifying ML pick for this game. Home-only per
-      // winPlayFor's selection rule (see its docstring), and only when
-      // DK home odds are in the playable range.
-      if (r.win_correct !== null && r.actual_winner !== null) {
-        const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
-        const homeOdds = dkHomeOdds.get(`${r.date}|${r.game_pk}`) ?? null;
-        if (h >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(homeOdds)) {
-          mlPlays++;
-          if (r.actual_winner === "home") mlPlayHits++;
-          mlDayPicked = true;
-        }
-        // Track best-of-slate candidate for the fallback.
-        const fav  = a >= h ? a : h;
-        const side: "away" | "home" = a >= h ? "away" : "home";
-        if (!bestMl || fav > bestMl.favPct) {
-          bestMl = { side, favPct: fav, winner: r.actual_winner };
-        }
-      }
-
-      // Threshold-qualifying NRFI/YRFI pick for this game.
-      if (r.nrfi_correct !== null && r.actual_nrfi !== null) {
-        const p = Number(r.nrfi_pct);
-        let picked: boolean | null = null;
-        if (p >= NRFI_PLAY_THRESHOLD) picked = true;
-        else if (p <= 1 - NRFI_PLAY_THRESHOLD) picked = false;
-        if (picked !== null) {
-          nrfiPlays++;
-          if (picked === r.actual_nrfi) nrfiPlayHits++;
-          nrfiDayPicked = true;
-        }
-        const dev = Math.abs(p - 0.5);
-        if (!bestNrfi || dev > bestNrfi.dev) {
-          bestNrfi = { pickNrfi: p >= 0.5, dev, actual: r.actual_nrfi };
-        }
-      }
     }
 
-    // Always-pick fallbacks: fire when no threshold pick existed for
-    // the metric on this date AND a candidate game graded. Keeping
-    // fallbacks IN the tally ensures every day surfaces at least one
-    // ML and one NRFI, matching what the display shows. The ROI
-    // number naturally reflects that fallbacks are lower-quality
-    // picks (they're rarely at good prices), which is honest.
-    if (!mlDayPicked && bestMl) {
+    // Grade the day's ML card (top-EV picks, 20% of the slate). A pick
+    // whose game didn't reach a decision is skipped from the denominator.
+    const rowByPk = new Map(dayRows.map((r) => [r.game_pk, r]));
+    const card = selectDailyCard(
+      dayRows.map((r) => cardCandidateFor(r.game_pk, Number(r.away_win_pct), Number(r.home_win_pct), dkOdds.get(`${r.date}|${r.game_pk}`))),
+      cardSize(dayRows.length),
+    );
+    for (const p of card) {
+      const r = rowByPk.get(p.gamePk);
+      if (!r || r.win_correct === null || r.actual_winner === null) continue;
       mlPlays++;
-      if (bestMl.side === bestMl.winner) mlPlayHits++;
-    }
-    if (!nrfiDayPicked && bestNrfi) {
-      nrfiPlays++;
-      if (bestNrfi.pickNrfi === bestNrfi.actual) nrfiPlayHits++;
+      if (r.actual_winner === p.side) mlPlayHits++;
     }
   }
 
@@ -345,70 +286,16 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
     mlPlays,
     mlPlayHits,
     mlHitRate:    mlPlays   > 0 ? mlPlayHits   / mlPlays   : null,
-    nrfiPlays,
-    nrfiPlayHits,
-    nrfiHitRate:  nrfiPlays > 0 ? nrfiPlayHits / nrfiPlays : null,
   };
-}
-
-// Mirror winPlayFor/nrfiPlayFor from predictions.ts, but against a
-// graded historical outcome row. Both return null when no side cleared
-// the threshold (no play would have been made).
-export function outcomeWinPlay(o: GamePredictionOutcome, dkHomeOdds?: number | null): WinPlay | null {
-  // Home only, and only when DK odds are in the playable range —
-  // mirrors winPlayFor. See its docstring for why.
-  if (o.homeWinPct < ML_PLAY_THRESHOLD) return null;
-  if (!mlOddsInPlayableRange(dkHomeOdds)) return null;
-  return { side: "home", abbr: o.homeAbbr, winPct: o.homeWinPct, strong: o.homeWinPct >= ML_STRONG_THRESHOLD };
-}
-
-export function outcomeNrfiPlay(o: GamePredictionOutcome): NrfiPlay | null {
-  if (o.nrfiPct >= NRFI_PLAY_THRESHOLD) {
-    return { side: "NRFI", probability: o.nrfiPct, strong: o.nrfiPct >= NRFI_STRONG_THRESHOLD };
-  }
-  if (o.nrfiPct <= 1 - NRFI_PLAY_THRESHOLD) {
-    const yrfi = 1 - o.nrfiPct;
-    return { side: "YRFI", probability: yrfi, strong: yrfi >= NRFI_STRONG_THRESHOLD };
-  }
-  return null;
-}
-
-/** Always-pick fallback for a graded day: pick the strongest favorite
- *  on the slate when no game cleared the ML threshold. Mirrors
- *  bestOfSlateWinPlay in predictions.ts but against outcome rows. */
-export function bestOfDayWinPlay(outcomes: GamePredictionOutcome[]): { gamePk: number; play: WinPlay } | null {
-  let best: { gamePk: number; favPct: number; play: WinPlay } | null = null;
-  for (const o of outcomes) {
-    const fav  = o.awayWinPct >= o.homeWinPct ? o.awayWinPct : o.homeWinPct;
-    const play: WinPlay = o.awayWinPct >= o.homeWinPct
-      ? { side: "away", abbr: o.awayAbbr, winPct: o.awayWinPct, strong: o.awayWinPct >= ML_STRONG_THRESHOLD }
-      : { side: "home", abbr: o.homeAbbr, winPct: o.homeWinPct, strong: o.homeWinPct >= ML_STRONG_THRESHOLD };
-    if (!best || fav > best.favPct) best = { gamePk: o.gamePk, favPct: fav, play };
-  }
-  return best ? { gamePk: best.gamePk, play: best.play } : null;
-}
-
-/** Same idea for NRFI: pick the slate's strongest lean. */
-export function bestOfDayNrfiPlay(outcomes: GamePredictionOutcome[]): { gamePk: number; play: NrfiPlay } | null {
-  let best: { gamePk: number; dev: number; play: NrfiPlay } | null = null;
-  for (const o of outcomes) {
-    const dev = Math.abs(o.nrfiPct - 0.5);
-    const play: NrfiPlay = o.nrfiPct >= 0.5
-      ? { side: "NRFI", probability: o.nrfiPct,     strong: o.nrfiPct     >= NRFI_STRONG_THRESHOLD }
-      : { side: "YRFI", probability: 1 - o.nrfiPct, strong: (1 - o.nrfiPct) >= NRFI_STRONG_THRESHOLD };
-    if (!best || dev > best.dev) best = { gamePk: o.gamePk, dev, play };
-  }
-  return best ? { gamePk: best.gamePk, play: best.play } : null;
 }
 
 // ─── ROI ($10/play P/L on graded picks against captured odds) ──────────
 
 type RoiResultRow = {
   date: string; game_pk: number;
-  away_win_pct: number; home_win_pct: number; nrfi_pct: number;
-  win_correct: boolean | null; nrfi_correct: boolean | null;
+  away_win_pct: number; home_win_pct: number;
+  win_correct: boolean | null;
   actual_winner: "away" | "home" | null;
-  actual_nrfi: boolean | null;
 };
 type OddsLookupRow = {
   date: string; game_pk: number;
@@ -462,34 +349,26 @@ export async function loadPlayRoi(
   const endIso = end.toISOString().slice(0, 10);
 
   const sb = supabaseAdmin();
-  // ML odds come from ESPN→DraftKings; NRFI odds come from FanDuel.
-  // Pull both books in one query so the join is cheap, then split into
-  // two lookups by book.
-  type OddsRowWithBook = OddsLookupRow & { book: string };
+  // ML odds come from ESPN→DraftKings.
   const [resRows, oddsRows] = await Promise.all([
     paginateSelect<RoiResultRow>((from, to) => sb.from("prediction_results")
-      .select("date, game_pk, away_win_pct, home_win_pct, nrfi_pct, win_correct, nrfi_correct, actual_winner, actual_nrfi")
+      .select("date, game_pk, away_win_pct, home_win_pct, win_correct, actual_winner")
       .eq("sport", "mlb")
       .eq("model_version", PREDICTIONS_MODEL_VERSION)
       .gte("date", startIso)
       .lte("date", endIso)
       .range(from, to)),
-    paginateSelect<OddsRowWithBook>((from, to) => sb.from("daily_odds_first")
-      .select("date, game_pk, book, away_ml_odds, home_ml_odds, nrfi_odds, yrfi_odds")
+    paginateSelect<OddsLookupRow>((from, to) => sb.from("daily_odds_first")
+      .select("date, game_pk, away_ml_odds, home_ml_odds")
       .eq("sport", "mlb")
-      .in("book", ["DraftKings", "FanDuel"])
+      .eq("book", "DraftKings")
       .gte("date", startIso)
       .lte("date", endIso)
       .range(from, to)),
   ]);
 
   const mlOddsByKey = new Map<string, OddsLookupRow>();
-  const nrfiOddsByKey = new Map<string, OddsLookupRow>();
-  for (const o of oddsRows) {
-    const k = `${o.date}|${o.game_pk}`;
-    if (o.book === "DraftKings") mlOddsByKey.set(k, o);
-    if (o.book === "FanDuel")    nrfiOddsByKey.set(k, o);
-  }
+  for (const o of oddsRows) mlOddsByKey.set(`${o.date}|${o.game_pk}`, o);
 
   const byDate = new Map<string, RoiResultRow[]>();
   for (const r of resRows) {
@@ -499,76 +378,33 @@ export async function loadPlayRoi(
   }
 
   let mlPlaysGraded = 0, mlPlaysWithOdds = 0, mlStaked = 0, mlProfit = 0;
-  let nrfiPlaysGraded = 0, nrfiPlaysWithOdds = 0, nrfiStaked = 0, nrfiProfit = 0;
 
-  // For each day: find threshold-qualifying ML and NRFI picks; if none,
-  // pick the always-pick fallback. Then look up odds and book P/L.
+  // Grade the same ML card the page shows, per day, against captured odds.
+  // Picks whose game didn't decide are skipped; picks with no captured
+  // odds count toward mlPlaysGraded but not staked/ROI.
   for (const dayRows of byDate.values()) {
-    // ── ML ─────────────────────────────────────────────────────────
-    type MlPick = { gamePk: number; side: "away" | "home"; winner: "away" | "home" };
-    const mlPicks: MlPick[] = [];
-    let bestMl: { gamePk: number; favPct: number; side: "away" | "home"; winner: "away" | "home" } | null = null;
-    for (const r of dayRows) {
-      if (r.win_correct === null || r.actual_winner === null) continue;
-      const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
-      // Home-only ML picks + DK odds range filter — matches
-      // outcomeWinPlay and the accuracy tally.
-      const homeOdds = mlOddsByKey.get(`${r.date}|${r.game_pk}`)?.home_ml_odds ?? null;
-      if (h >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(homeOdds)) {
-        mlPicks.push({ gamePk: r.game_pk, side: "home", winner: r.actual_winner });
-      }
-      // Track best-of-day candidate for the fallback (unfiltered so
-      // we can always surface *something* on quiet slates).
-      const fav = a >= h ? a : h;
-      const side: "away" | "home" = a >= h ? "away" : "home";
-      if (!bestMl || fav > bestMl.favPct) {
-        bestMl = { gamePk: r.game_pk, favPct: fav, side, winner: r.actual_winner };
-      }
-    }
-    if (mlPicks.length === 0 && bestMl) {
-      mlPicks.push({ gamePk: bestMl.gamePk, side: bestMl.side, winner: bestMl.winner });
-    }
-    for (const p of mlPicks) {
+    const date = dayRows[0]?.date;
+    if (!date) continue;
+    const rowByPk = new Map(dayRows.map((r) => [r.game_pk, r]));
+    const card = selectDailyCard(
+      dayRows.map((r) => {
+        const o = mlOddsByKey.get(`${date}|${r.game_pk}`);
+        return cardCandidateFor(r.game_pk, Number(r.away_win_pct), Number(r.home_win_pct), { away: o?.away_ml_odds ?? null, home: o?.home_ml_odds ?? null });
+      }),
+      cardSize(dayRows.length),
+    );
+
+    for (const p of card) {
+      const r = rowByPk.get(p.gamePk);
+      if (!r || r.win_correct === null || r.actual_winner === null) continue;
       mlPlaysGraded++;
-      const o = mlOddsByKey.get(`${dayRows[0]?.date}|${p.gamePk}`);
+      const o = mlOddsByKey.get(`${date}|${p.gamePk}`);
       const odds = p.side === "away" ? o?.away_ml_odds : o?.home_ml_odds;
       if (odds == null) continue;
       mlPlaysWithOdds++;
       mlStaked += stake;
-      if (p.side === p.winner) mlProfit += stake * americanToProfitMultiplier(odds);
+      if (r.actual_winner === p.side) mlProfit += stake * americanToProfitMultiplier(odds);
       else mlProfit -= stake;
-    }
-
-    // ── NRFI ───────────────────────────────────────────────────────
-    type NrfiPick = { gamePk: number; pickNrfi: boolean; actual: boolean };
-    const nrfiPicks: NrfiPick[] = [];
-    let bestNrfi: { gamePk: number; dev: number; pickNrfi: boolean; actual: boolean } | null = null;
-    for (const r of dayRows) {
-      if (r.nrfi_correct === null || r.actual_nrfi === null) continue;
-      const p = Number(r.nrfi_pct);
-      let pickNrfi: boolean | null = null;
-      if (p >= NRFI_PLAY_THRESHOLD) pickNrfi = true;
-      else if (p <= 1 - NRFI_PLAY_THRESHOLD) pickNrfi = false;
-      if (pickNrfi !== null) {
-        nrfiPicks.push({ gamePk: r.game_pk, pickNrfi, actual: r.actual_nrfi });
-      }
-      const dev = Math.abs(p - 0.5);
-      if (!bestNrfi || dev > bestNrfi.dev) {
-        bestNrfi = { gamePk: r.game_pk, dev, pickNrfi: p >= 0.5, actual: r.actual_nrfi };
-      }
-    }
-    if (nrfiPicks.length === 0 && bestNrfi) {
-      nrfiPicks.push({ gamePk: bestNrfi.gamePk, pickNrfi: bestNrfi.pickNrfi, actual: bestNrfi.actual });
-    }
-    for (const p of nrfiPicks) {
-      nrfiPlaysGraded++;
-      const o = nrfiOddsByKey.get(`${dayRows[0]?.date}|${p.gamePk}`);
-      const odds = p.pickNrfi ? o?.nrfi_odds : o?.yrfi_odds;
-      if (odds == null) continue;
-      nrfiPlaysWithOdds++;
-      nrfiStaked += stake;
-      if (p.pickNrfi === p.actual) nrfiProfit += stake * americanToProfitMultiplier(odds);
-      else nrfiProfit -= stake;
     }
   }
 
@@ -576,8 +412,6 @@ export async function loadPlayRoi(
     stake,
     mlPlaysGraded, mlPlaysWithOdds,
     mlStaked,  mlProfit,  mlRoi:   mlStaked  > 0 ? mlProfit  / mlStaked  : null,
-    nrfiPlaysGraded, nrfiPlaysWithOdds,
-    nrfiStaked, nrfiProfit, nrfiRoi: nrfiStaked > 0 ? nrfiProfit / nrfiStaked : null,
   };
 }
 
@@ -594,12 +428,17 @@ export type SeasonHistoryGame = {
   homeAbbr:  string;
   status:    string;
   linescore: SeasonHistoryLinescore | null;
-  mlPick:    { label: string; strong: boolean; hit: boolean | null } | null;
-  nrfiPick:  { label: string; strong: boolean; hit: boolean | null } | null;
+  mlPick:    { label: string; strong: boolean; hit: boolean | null; dog: boolean } | null;
 };
 export type SeasonHistoryDay = {
   date:  string;
   games: SeasonHistoryGame[];
+  /** $10/play P/L of the day's card against captured odds (ML from
+   *  DraftKings, NRFI from FanDuel). null when no pick that day had a
+   *  captured price. `profitPartial` flags days where some picks were
+   *  unpriced, so the total covers only part of the card. */
+  profit: number | null;
+  profitPartial: boolean;
 };
 
 /** Returns one row per graded day in the window, each with the
@@ -643,9 +482,9 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
       .gte("date", startIso)
       .lte("date", endIso)
       .range(from, to)),
-    paginateSelect<{ date: string; game_pk: number; home_ml_odds: number | null }>((from, to) =>
+    paginateSelect<{ date: string; game_pk: number; away_ml_odds: number | null; home_ml_odds: number | null }>((from, to) =>
       sb.from("daily_odds_first")
-        .select("date, game_pk, home_ml_odds")
+        .select("date, game_pk, away_ml_odds, home_ml_odds")
         .eq("sport", "mlb").eq("book", "DraftKings")
         .gte("date", startIso).lte("date", endIso)
         .range(from, to)),
@@ -689,60 +528,62 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
     linescoreByKey.set(`${r.date}|${r.game_pk}`, r.linescore ?? null);
   }
 
-  const dkHomeOddsByKey = new Map<string, number | null>();
-  for (const r of dkOddsRows) dkHomeOddsByKey.set(`${r.date}|${r.game_pk}`, r.home_ml_odds);
+  const dkOddsByKey = new Map<string, { away: number | null; home: number | null }>();
+  for (const r of dkOddsRows) dkOddsByKey.set(`${r.date}|${r.game_pk}`, { away: r.away_ml_odds, home: r.home_ml_odds });
+  const SEASON_STAKE = 10;
 
-  // One row per game (rowspanned per day in the renderer). Days with
-  // no threshold qualifier still get exactly one best-of-day fallback
-  // pick per market so the season history has no empty days.
+  // One row per game (rowspanned per day in the renderer). Each day shows
+  // exactly the ML card (top-EV picks, 20% of the slate) the page and the
+  // stat loaders use.
   const days: SeasonHistoryDay[] = [];
   const dateKeys = [...outcomesByDate.keys()].sort((a, b) => b.localeCompare(a));
   for (const date of dateKeys) {
     const outcomes = outcomesByDate.get(date) ?? [];
     const outcomesByPk = new Map(outcomes.map((o) => [o.gamePk, o]));
+    const card = selectDailyCard(
+      outcomes.map((o) => cardCandidateFor(o.gamePk, o.awayWinPct, o.homeWinPct, dkOddsByKey.get(`${date}|${o.gamePk}`))),
+      cardSize(outcomes.length),
+    );
 
-    const mlPlaysByPk = new Map<number, WinPlay>();
-    const nrfiPlaysByPk = new Map<number, NrfiPlay>();
-    for (const o of outcomes) {
-      const homeOdds = dkHomeOddsByKey.get(`${date}|${o.gamePk}`) ?? null;
-      const ml = outcomeWinPlay(o, homeOdds);
-      if (ml) mlPlaysByPk.set(o.gamePk, ml);
-      const nrfi = outcomeNrfiPlay(o);
-      if (nrfi) nrfiPlaysByPk.set(o.gamePk, nrfi);
-    }
-    if (mlPlaysByPk.size === 0) {
-      const fb = bestOfDayWinPlay(outcomes);
-      if (fb) mlPlaysByPk.set(fb.gamePk, fb.play);
-    }
-    if (nrfiPlaysByPk.size === 0) {
-      const fb = bestOfDayNrfiPlay(outcomes);
-      if (fb) nrfiPlaysByPk.set(fb.gamePk, fb.play);
+    const mlByPk = new Map<number, { label: string; strong: boolean; hit: boolean | null; dog: boolean }>();
+    // $10/play P/L of the day's card. `dayPriced` counts picks with a
+    // captured price; `dayGraded` counts decided picks — a gap means the
+    // total is partial.
+    let dayProfit = 0, dayPriced = 0, dayGraded = 0;
+    for (const p of card) {
+      const o = outcomesByPk.get(p.gamePk);
+      if (!o) continue;
+      mlByPk.set(p.gamePk, { label: p.side === "away" ? o.awayAbbr : o.homeAbbr, strong: p.strong, hit: o.winCorrect, dog: p.dog });
+      if (o.winCorrect === null) continue;
+      dayGraded++;
+      const odds = p.side === "away" ? dkOddsByKey.get(`${date}|${p.gamePk}`)?.away : dkOddsByKey.get(`${date}|${p.gamePk}`)?.home;
+      if (odds == null) continue;
+      dayPriced++;
+      dayProfit += o.winCorrect ? SEASON_STAKE * americanToProfitMultiplier(odds) : -SEASON_STAKE;
     }
 
-    // Any game touched by an ML or NRFI pick gets a row for the day.
-    const gamePks = new Set<number>([...mlPlaysByPk.keys(), ...nrfiPlaysByPk.keys()]);
     const games: SeasonHistoryGame[] = [];
-    for (const pk of [...gamePks].sort((a, b) => a - b)) {
+    for (const pk of [...mlByPk.keys()].sort((a, b) => a - b)) {
       const o = outcomesByPk.get(pk);
       if (!o) continue;
-      const ml   = mlPlaysByPk.get(pk);
-      const nrfi = nrfiPlaysByPk.get(pk);
       games.push({
         gamePk:   o.gamePk,
         awayAbbr: o.awayAbbr,
         homeAbbr: o.homeAbbr,
         status:   o.status,
         linescore: linescoreByKey.get(`${date}|${pk}`) ?? null,
-        mlPick: ml
-          ? { label: ml.side === "away" ? o.awayAbbr : o.homeAbbr, strong: ml.strong, hit: o.winCorrect }
-          : null,
-        nrfiPick: nrfi
-          ? { label: nrfiSideLabel(nrfi.side), strong: nrfi.strong, hit: o.nrfiCorrect }
-          : null,
+        mlPick: mlByPk.get(pk) ?? null,
       });
     }
 
-    if (games.length > 0) days.push({ date, games });
+    if (games.length > 0) {
+      days.push({
+        date,
+        games,
+        profit: dayPriced > 0 ? dayProfit : null,
+        profitPartial: dayPriced < dayGraded,
+      });
+    }
   }
   return days;
 }

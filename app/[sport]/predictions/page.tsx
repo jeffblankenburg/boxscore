@@ -3,14 +3,11 @@ import { todayInET, timeInET, prevDay } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { loadPredictionsForDate } from "@/lib/sports/mlb/predictions-data";
 import {
-  winPlayFor,
-  nrfiPlayFor,
-  bestOfSlateWinPlay,
-  bestOfSlateNrfiPlay,
-  nrfiSideLabel,
+  selectDailyCard,
+  cardCandidateFor,
+  cardSize,
   type GamePrediction,
   type WinPlay,
-  type NrfiPlay,
 } from "@/lib/sports/mlb/predictions";
 import {
   loadPredictionOutcomesForDate,
@@ -18,10 +15,6 @@ import {
   loadPlayRoi,
   loadSeasonHistory,
   loadOddsForDate,
-  outcomeWinPlay,
-  outcomeNrfiPlay,
-  bestOfDayWinPlay,
-  bestOfDayNrfiPlay,
   type PlayAccuracySummary,
   type PlayRoiSummary,
   type GamePredictionOutcome,
@@ -42,7 +35,7 @@ export const revalidate = 3600;
 
 const META_TITLE = "Daily Predictions | boxscore";
 const META_DESC =
-  "Daily MLB win-probability and NRFI (no-runs-in-the-first-inning) predictions for tonight's slate. Built on pythagorean expectation, log5, and league-average matchup factors.";
+  "Daily MLB win-probability and NRFI (no-runs-in-the-first-inning) predictions for tonight's slate. Built on a run-distribution model that derives moneyline and first-inning odds from one expected-runs engine.";
 const META_URL = `${EMAIL_LINK_BASE}/mlb/predictions`;
 const META_IMG = `${EMAIL_LINK_BASE}/icon.png`;
 
@@ -153,7 +146,7 @@ export default async function PredictionsPage({
         {plays.length > 0 && <> &middot; <strong>{plays.length} play{plays.length === 1 ? "" : "s"}</strong></>}
       </p>
 
-      <PlaysSection plays={plays} date={today} />
+      <PlaysSection plays={plays} />
 
       <YesterdayResults yesterday={yesterday} outcomes={yesterdayOutcomes} odds={yesterdayOdds} />
 
@@ -172,63 +165,36 @@ export default async function PredictionsPage({
   );
 }
 
-/** Build today's pick list with the always-pick rule: every day shows
- *  at least one ML and one NRFI play, even if nothing clears threshold.
- *  Threshold qualifiers are listed first; if no ML qualifier exists we
- *  attach the slate's strongest favorite, and same for NRFI. */
+/** Build today's card: the top-EV ML plays, count = 20% of the slate.
+ *  ML-only (NRFI dropped from the page). */
 function buildTodaysPlays(
   games: GamePrediction[],
   todayOdds: DayOdds,
-): Array<{ game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }> {
+): Array<{ game: GamePrediction; win: WinPlay }> {
   if (games.length === 0) return [];
 
-  const byPk = new Map<number, { game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }>();
-  for (const g of games) {
-    const homeOdds = todayOdds.mlByGamePk.get(g.gamePk)?.home ?? null;
-    const win = winPlayFor(g, homeOdds);
-    const nrfi = nrfiPlayFor(g);
-    if (win || nrfi) byPk.set(g.gamePk, { game: g, win, nrfi });
-  }
-
-  const hasMl   = Array.from(byPk.values()).some((p) => p.win !== null);
-  const hasNrfi = Array.from(byPk.values()).some((p) => p.nrfi !== null);
-
-  if (!hasMl) {
-    const fb = bestOfSlateWinPlay(games);
-    if (fb) {
-      const game = games.find((g) => g.gamePk === fb.gamePk);
-      if (game) {
-        const existing = byPk.get(fb.gamePk);
-        if (existing) existing.win = fb.play;
-        else byPk.set(fb.gamePk, { game, win: fb.play, nrfi: null });
-      }
-    }
-  }
-  if (!hasNrfi) {
-    const fb = bestOfSlateNrfiPlay(games);
-    if (fb) {
-      const game = games.find((g) => g.gamePk === fb.gamePk);
-      if (game) {
-        const existing = byPk.get(fb.gamePk);
-        if (existing) existing.nrfi = fb.play;
-        else byPk.set(fb.gamePk, { game, win: null, nrfi: fb.play });
-      }
-    }
-  }
-
-  return Array.from(byPk.values()).sort((a, b) =>
-    a.game.startTime.localeCompare(b.game.startTime),
+  const card = selectDailyCard(
+    games.map((g) => cardCandidateFor(g.gamePk, g.away.winProbability, g.home.winProbability, todayOdds.mlByGamePk.get(g.gamePk))),
+    cardSize(games.length),
   );
+  const gameByPk = new Map(games.map((g) => [g.gamePk, g]));
+  const rows: Array<{ game: GamePrediction; win: WinPlay }> = [];
+  for (const p of card) {
+    const game = gameByPk.get(p.gamePk);
+    if (!game) continue;
+    rows.push({
+      game,
+      win: { side: p.side, abbr: p.side === "home" ? game.home.abbr : game.away.abbr, winPct: p.winPct, strong: p.strong, dog: p.dog },
+    });
+  }
+  return rows.sort((a, b) => a.game.startTime.localeCompare(b.game.startTime));
 }
 
 function PlaysSection({
   plays,
-  date,
 }: {
-  plays: Array<{ game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }>;
-  date: string;
+  plays: Array<{ game: GamePrediction; win: WinPlay }>;
 }) {
-  void date;
   return (
     <section className="pr-plays">
       <h2 className="pr-plays-head">Today&apos;s Plays</h2>
@@ -245,7 +211,7 @@ function PlaysSection({
               </tr>
             </thead>
             <tbody>
-              {plays.map(({ game, win, nrfi }) => (
+              {plays.map(({ game, win }) => (
                 <tr key={game.gamePk}>
                   <td className="pr-col-time">{timeInET(game.startTime)}</td>
                   <td className="pr-pick-cell">
@@ -254,9 +220,7 @@ function PlaysSection({
                     <a className="pr-team-link" href={teamHref(game.home.abbr)}>{game.home.abbr}</a>
                   </td>
                   <td className="pr-plays-play">
-                    {!win && !nrfi && <span className="pr-na">—</span>}
-                    {win && <span className="pr-play-plain">{win.abbr} ML</span>}
-                    {nrfi && <span className="pr-play-plain">{nrfiSideLabel(nrfi.side)}</span>}
+                    <span className="pr-play-plain">{win.abbr} ML{win.dog ? " 🐕" : ""}</span>
                   </td>
                 </tr>
               ))}
@@ -282,45 +246,30 @@ function YesterdayResults({
   outcomes: GamePredictionOutcome[];
   odds: DayOdds;
 }) {
-  // Threshold + odds-qualifying picks per game.
-  const rowsByPk = new Map<number, { o: GamePredictionOutcome; win: WinPlay | null; nrfi: NrfiPlay | null }>();
-  for (const o of outcomes) {
-    const win = outcomeWinPlay(o, odds.mlByGamePk.get(o.gamePk)?.home ?? null);
-    const nrfi = outcomeNrfiPlay(o);
-    if (win || nrfi) rowsByPk.set(o.gamePk, { o, win, nrfi });
+  // Same ML card as buildTodaysPlays / the stat loaders — graded against
+  // yesterday's outcomes.
+  const oByPk = new Map(outcomes.map((o) => [o.gamePk, o]));
+  const card = selectDailyCard(
+    outcomes.map((o) => cardCandidateFor(o.gamePk, o.awayWinPct, o.homeWinPct, odds.mlByGamePk.get(o.gamePk))),
+    cardSize(outcomes.length),
+  );
+  const playedRows: Array<{ o: GamePredictionOutcome; win: WinPlay }> = [];
+  for (const p of card) {
+    const o = oByPk.get(p.gamePk);
+    if (!o) continue;
+    playedRows.push({ o, win: { side: p.side, abbr: p.side === "home" ? o.homeAbbr : o.awayAbbr, winPct: p.winPct, strong: p.strong, dog: p.dog } });
   }
-
-  // Always-pick fallbacks — same rule as buildTodaysPlays and
-  // loadSeasonHistory: if no ML/NRFI cleared threshold on the slate,
-  // surface the day's strongest lean so the table always shows at
-  // least one ML and one NRFI.
-  const hasMl   = Array.from(rowsByPk.values()).some((p) => p.win !== null);
-  const hasNrfi = Array.from(rowsByPk.values()).some((p) => p.nrfi !== null);
-  if (!hasMl) {
-    const fb = bestOfDayWinPlay(outcomes);
-    if (fb) {
-      const o = outcomes.find((x) => x.gamePk === fb.gamePk);
-      if (o) {
-        const existing = rowsByPk.get(fb.gamePk);
-        if (existing) existing.win = fb.play;
-        else rowsByPk.set(fb.gamePk, { o, win: fb.play, nrfi: null });
-      }
-    }
-  }
-  if (!hasNrfi) {
-    const fb = bestOfDayNrfiPlay(outcomes);
-    if (fb) {
-      const o = outcomes.find((x) => x.gamePk === fb.gamePk);
-      if (o) {
-        const existing = rowsByPk.get(fb.gamePk);
-        if (existing) existing.nrfi = fb.play;
-        else rowsByPk.set(fb.gamePk, { o, win: null, nrfi: fb.play });
-      }
-    }
-  }
-  const playedRows = Array.from(rowsByPk.values()).sort((a, b) => a.o.gamePk - b.o.gamePk);
+  playedRows.sort((a, b) => a.o.gamePk - b.o.gamePk);
 
   if (playedRows.length === 0) return null;
+
+  // Day total P/L across the card's priced picks.
+  let dayTotal = 0, priced = 0, anyPartial = false;
+  for (const { o, win } of playedRows) {
+    const { profit, partial } = pickProfit(o, win, odds);
+    if (profit !== null) { dayTotal += profit; priced++; }
+    if (partial) anyPartial = true;
+  }
 
   return (
     <section className="pr-recap pr-yesterday">
@@ -332,15 +281,25 @@ function YesterdayResults({
             <tr>
               <th>Final</th>
               <th>Play</th>
-              <th>Odds</th>
               <th>Profit</th>
             </tr>
           </thead>
           <tbody>
-            {playedRows.map(({ o, win, nrfi }) => (
-              <YesterdayRow key={o.gamePk} o={o} win={win} nrfi={nrfi} odds={odds} />
+            {playedRows.map(({ o, win }) => (
+              <YesterdayRow key={o.gamePk} o={o} win={win} odds={odds} />
             ))}
           </tbody>
+          {priced > 0 && (
+            <tfoot>
+              <tr className="pr-yesterday-total">
+                <td colSpan={2}>Day total</td>
+                <td className="pr-yesterday-profit">
+                  <span className={dayTotal >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>{formatProfit(dayTotal)}</span>
+                  {anyPartial && <span className="pr-profit-partial" title="Some odds missing">*</span>}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </section>
@@ -364,7 +323,7 @@ function StatBoxes({
   roiSeason: PlayRoiSummary | null;
   seasonDays: number;
 }) {
-  const hasAny = rolling30.mlPlays > 0 || rolling30.nrfiPlays > 0 || rolling7.mlPlays > 0 || rolling7.nrfiPlays > 0;
+  const hasAny = rolling30.mlPlays > 0 || rolling7.mlPlays > 0;
   if (!hasAny) return null;
 
   const seasonLabel = seasonDays > 0 ? `Season (${seasonDays}d)` : "Season";
@@ -407,20 +366,6 @@ function WindowStat({
           <span className="pr-window-sub">{formatPctSigned(roi.mlRoi)} ROI</span>
         </div>
       )}
-      <div className="pr-window-row">
-        <span className="pr-window-tag">NRFI</span>
-        <span className="pr-window-pct">{pctOrDash(summary.nrfiHitRate)}</span>
-        <span className="pr-window-sub">{summary.nrfiPlays > 0 ? `${summary.nrfiPlayHits} of ${summary.nrfiPlays}` : "—"}</span>
-      </div>
-      {roi && roi.nrfiPlaysWithOdds > 0 && (
-        <div className="pr-window-row pr-window-row-roi">
-          <span className="pr-window-tag pr-window-tag-sub">${roi.stake}/play</span>
-          <span className={`pr-window-pl${roi.nrfiProfit >= 0 ? " pr-window-pl-pos" : " pr-window-pl-neg"}`}>
-            {formatDollarSigned(roi.nrfiProfit)}
-          </span>
-          <span className="pr-window-sub">{formatPctSigned(roi.nrfiRoi)} ROI</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -435,11 +380,15 @@ function formatPctSigned(v: number | null): string {
   return `${sign}${(Math.abs(v) * 100).toFixed(1)}%`;
 }
 
+const SEASON_PICKS_DAYS = 14;
+
 function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
   if (days.length === 0) return null;
+  const shown = days.slice(0, SEASON_PICKS_DAYS);
   return (
     <section className="pr-recap">
       <h2 className="pr-recap-head">Season Picks</h2>
+      <div className="pr-recap-subhead">Last {shown.length} days</div>
       <div className="pr-scroll">
         <table className="pr-recap-table pr-season-table">
           <thead>
@@ -450,12 +399,17 @@ function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
             </tr>
           </thead>
           <tbody>
-            {days.flatMap((d) =>
+            {shown.flatMap((d) =>
               d.games.map((g, gi) => (
                 <tr key={`${d.date}|${g.gamePk}`}>
                   {gi === 0 && (
                     <td className="pr-season-date" rowSpan={d.games.length}>
-                      {shortDate(d.date)}
+                      <span className="pr-season-date-label">{shortDate(d.date)}</span>
+                      {d.profit !== null && (
+                        <span className={`pr-day-pl ${d.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}`}>
+                          {formatProfit(d.profit)}{d.profitPartial ? "*" : ""}
+                        </span>
+                      )}
                     </td>
                   )}
                   <td className="pr-season-box"><BoxScoreCell game={g} /></td>
@@ -515,25 +469,15 @@ function BoxScoreCell({ game }: { game: SeasonHistoryGame }) {
 }
 
 function ResultCell({ game }: { game: SeasonHistoryGame }) {
-  if (!game.mlPick && !game.nrfiPick) return <span className="pr-na">—</span>;
+  if (!game.mlPick) return <span className="pr-na">—</span>;
   return (
     <span className="pr-result-stack">
-      {game.mlPick && (
-        <PlayCell
-          badgeClass="pr-play-ml"
-          strong={game.mlPick.strong}
-          label={`${game.mlPick.label} ML`}
-          hit={game.mlPick.hit}
-        />
-      )}
-      {game.nrfiPick && (
-        <PlayCell
-          badgeClass="pr-play-nrfi"
-          strong={game.nrfiPick.strong}
-          label={game.nrfiPick.label}
-          hit={game.nrfiPick.hit}
-        />
-      )}
+      <PlayCell
+        badgeClass="pr-play-ml"
+        strong={game.mlPick.strong}
+        label={`${game.mlPick.label} ML${game.mlPick.dog ? " 🐕" : ""}`}
+        hit={game.mlPick.hit}
+      />
     </span>
   );
 }
@@ -548,12 +492,10 @@ function shortDate(iso: string): string {
 function YesterdayRow({
   o,
   win,
-  nrfi,
   odds,
 }: {
   o: GamePredictionOutcome;
-  win: WinPlay | null;
-  nrfi: NrfiPlay | null;
+  win: WinPlay;
   odds: DayOdds;
 }) {
   const finalScore =
@@ -561,42 +503,13 @@ function YesterdayRow({
       ? `${o.awayAbbr} ${o.awayScore} · ${o.homeAbbr} ${o.homeScore}`
       : <span className="pr-na">{o.status}</span>;
 
-  const STAKE = 10;
-  const oddsCells: string[] = [];
-  const profits: number[] = [];
-  let missingOdds = false;
-  if (win && o.winCorrect !== null) {
-    const mlOdds = odds.mlByGamePk.get(o.gamePk);
-    const price = win.side === "away" ? mlOdds?.away : mlOdds?.home;
-    if (price == null) { missingOdds = true; oddsCells.push("—"); }
-    else {
-      oddsCells.push(formatOdds(price));
-      profits.push(o.winCorrect ? STAKE * americanToProfitMultiplier(price) : -STAKE);
-    }
-  }
-  if (nrfi && o.nrfiCorrect !== null) {
-    const nrfiOdds = odds.nrfiByGamePk.get(o.gamePk);
-    const price = nrfi.side === "NRFI" ? nrfiOdds?.nrfi : nrfiOdds?.yrfi;
-    if (price == null) { missingOdds = true; oddsCells.push("—"); }
-    else {
-      oddsCells.push(formatOdds(price));
-      profits.push(o.nrfiCorrect ? STAKE * americanToProfitMultiplier(price) : -STAKE);
-    }
-  }
-  const totalProfit = profits.length > 0 ? profits.reduce((a, b) => a + b, 0) : null;
+  const { profit: totalProfit, partial: missingOdds } = pickProfit(o, win, odds);
 
   return (
     <tr>
       <td>{finalScore}</td>
       <td className="pr-yesterday-play">
-        {!win && !nrfi && <span className="pr-na">—</span>}
-        {win && <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML`} hit={o.winCorrect} />}
-        {nrfi && <PlayCell badgeClass="pr-play-nrfi" strong={nrfi.strong} label={nrfiSideLabel(nrfi.side)} hit={o.nrfiCorrect} />}
-      </td>
-      <td className="pr-yesterday-odds">
-        {oddsCells.length === 0
-          ? <span className="pr-na">—</span>
-          : oddsCells.join(" / ")}
+        <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML${win.dog ? " 🐕" : ""}`} hit={o.winCorrect} />
       </td>
       <td className="pr-yesterday-profit">
         {totalProfit === null
@@ -614,8 +527,24 @@ function formatProfit(v: number): string {
   const sign = v >= 0 ? "+" : "−";
   return `${sign}$${Math.abs(v).toFixed(2)}`;
 }
-function formatOdds(v: number): string {
-  return v >= 0 ? `+${v}` : `${v}`;
+
+/** $10 P/L for one game's ML card pick against the captured price — used
+ *  per-row and summed for the day total. `partial` = the pick had no
+ *  captured price (excluded from the sum). */
+const YESTERDAY_STAKE = 10;
+function pickProfit(
+  o: GamePredictionOutcome,
+  win: WinPlay,
+  odds: DayOdds,
+): { profit: number | null; partial: boolean } {
+  const profits: number[] = [];
+  let partial = false;
+  if (o.winCorrect !== null) {
+    const price = win.side === "away" ? odds.mlByGamePk.get(o.gamePk)?.away : odds.mlByGamePk.get(o.gamePk)?.home;
+    if (price == null) partial = true;
+    else profits.push(o.winCorrect ? YESTERDAY_STAKE * americanToProfitMultiplier(price) : -YESTERDAY_STAKE);
+  }
+  return { profit: profits.length > 0 ? profits.reduce((a, b) => a + b, 0) : null, partial };
 }
 
 function PlayCell({
@@ -629,15 +558,12 @@ function PlayCell({
   label: string;
   hit: boolean | null;
 }) {
+  // Outcome is coded two ways for colorblind safety: color (green/red)
+  // AND strikethrough on misses. No ✓/✗ — the styling carries it.
   const outcomeClass = hit === true ? " pr-play-hit" : hit === false ? " pr-play-miss" : "";
   return (
     <span className="pr-play-cell">
       <span className={`pr-play-badge ${badgeClass}${strong ? " pr-play-strong" : ""}${outcomeClass}`}>{label}</span>
-      {hit === null
-        ? <span className="pr-na"> —</span>
-        : hit
-          ? <span className="pr-hit"> ✓</span>
-          : <span className="pr-miss"> ✗</span>}
     </span>
   );
 }
