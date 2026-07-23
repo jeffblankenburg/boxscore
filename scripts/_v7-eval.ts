@@ -13,6 +13,7 @@ import { predictGames, type TeamSeasonRecord, type ProbableSpStats } from "@/lib
 import { computeSeasonAggregatesFromRows } from "@/lib/sports/mlb/season-aggregates";
 import { DEFAULT_V7_CONFIG, deriveMarkets, type TeamInputs, type V7Config } from "@/lib/sports/mlb/run-model";
 import { buildV7TeamInputs } from "@/lib/sports/mlb/predictions-v7";
+import { parkFactorForHomeTeam } from "@/lib/sports/mlb/park-factors";
 
 const V6_VERSION = "v6-nrfi-rebased";
 
@@ -41,6 +42,21 @@ export type EvalGame = {
    *  weather fixture. fit-weather-nrfi.ts. */
   homeTeamId: number;
   startTimeUtc: string;
+  /** Raw input ingredients per side, pre-blend — so input-construction
+   *  weights (SP form blend, offense form blend, expIP fallback) can be
+   *  swept without reloading. fit-input-blends.ts. */
+  awayRaw: SideRaw;
+  homeRaw: SideRaw;
+};
+
+export type SideRaw = {
+  seasonRpg: number;
+  recentRpg: number | null;      // 21-day team RS/g; null under 8 games
+  spSeasonEra: number;
+  spRecentEra: number | null;    // null under 2 recent starts
+  spRecentIpPerStart: number | null;
+  bpEra: number;                 // already min-innings-resolved
+  parkLogFactor: number;
 };
 
 type ResultRow = {
@@ -145,6 +161,31 @@ function parsePayload(payload: Record<string, unknown>) {
     }
   }
   return { slate, records, spStats };
+}
+
+// Mirrors buildV7TeamInputs's ingredient resolution (predictions-v7.ts),
+// but stops BEFORE the blends so fit-input-blends.ts can sweep them.
+function buildSideRaw(
+  teamId: number,
+  spId: number | null,
+  homeTeamId: number,
+  records: Map<number, TeamSeasonRecord>,
+  spStats: Map<number, ProbableSpStats>,
+  aggs: ReturnType<typeof computeSeasonAggregatesFromRows>,
+): SideRaw {
+  const rec = records.get(teamId);
+  const recent = aggs.teamRecentForm.get(teamId);
+  const rf = spId != null ? aggs.spRecentForm.get(spId) : undefined;
+  const bp = aggs.teamBullpen.get(teamId);
+  return {
+    seasonRpg: rec && rec.gamesPlayed > 0 ? rec.runsScored / rec.gamesPlayed : 4.5,
+    recentRpg: recent && recent.games >= 8 ? recent.runsScored / recent.games : null,
+    spSeasonEra: (spId != null ? spStats.get(spId)?.era : null) ?? 4.2,
+    spRecentEra: rf && rf.starts >= 2 && Number.isFinite(rf.era) ? rf.era : null,
+    spRecentIpPerStart: rf && rf.starts >= 2 && rf.innings > 0 ? rf.innings / rf.starts : null,
+    bpEra: bp && bp.innings >= 60 ? bp.era : aggs.league.avgBullpenEra,
+    parkLogFactor: 0.5 * Math.log(parkFactorForHomeTeam(homeTeamId)),
+  };
 }
 
 // ─── shared walk-forward v7 fitting (fit-v7.ts + fit-registry.ts) ────────
@@ -258,6 +299,8 @@ export async function loadEvalGames(year: string): Promise<EvalGame[]> {
         league1stGames30AsOf: last30.games,
         homeTeamId: g.home.teamId,
         startTimeUtc: g.gameDate,
+        awayRaw: buildSideRaw(g.away.teamId, g.away.probablePitcher?.id ?? null, g.home.teamId, records, spStats, aggs),
+        homeRaw: buildSideRaw(g.home.teamId, g.home.probablePitcher?.id ?? null, g.home.teamId, records, spStats, aggs),
       });
     }
   }

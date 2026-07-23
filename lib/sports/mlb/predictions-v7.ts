@@ -23,22 +23,25 @@ import {
 
 export const V7_MODEL_VERSION = "v7-run-model";
 
-// v7.1 — v7 with a SEASON-ADAPTIVE first-inning read for NRFI. Runs as a
-// second graded shadow; the card keeps reading v7 until v7.1's live
-// record earns the swap.
+// v7.1 — the improvement loop's shadow challenger. Runs as a second
+// graded shadow; the card keeps reading v7 until v7.1's live record
+// earns the swap. Two loop-fitted changes vs v7:
 //
-// Why: v7's static firstInningBump (fit on 2024-25 linescores) went stale
-// — 2026 first innings are hotter AND differently shaped (lower scoreless
-// prob at the same mean; plausibly ABS-challenge-driven), leaving v7's
-// NRFI ~4.6pp overstated in the mean (52.3% vs 47.7% actual, a z≈3
-// calibration rejection on 1,044 OOS games). v7.1 derives the bump from
-// the season-to-date league 1st-inning rate the aggregates already
-// compute (EB-shrunk toward the 2024-25 prior) and reads NRFI with a
-// first-inning-specific dispersion. Fitted walk-forward 2026-07-23 by
-// scripts/fit-first-inning-drift.ts: src=season, K=100, r1=0.55 (fold-
-// stable); OOS calibration 47.8% vs 47.7% actual, picks@0.57 61.4% hit.
-// ML/totals are v7-identical by construction — only the NRFI read moves.
-export const V71_MODEL_VERSION = "v7.1-adaptive-nrfi";
+// 1. SEASON-ADAPTIVE first-inning read for NRFI (loop iteration #4,
+//    scripts/fit-first-inning-drift.ts). v7's static firstInningBump (fit
+//    on 2024-25 linescores) went stale — 2026 first innings are hotter
+//    AND differently shaped (lower scoreless prob at the same mean;
+//    plausibly ABS-challenge-driven), leaving v7's NRFI ~4.6pp overstated
+//    in the mean (52.3% vs 47.7% actual, a z≈3 calibration rejection on
+//    1,044 OOS games). v7.1 derives the bump from the season-to-date
+//    league 1st-inning rate (EB-shrunk toward the 2024-25 prior) and
+//    reads NRFI with a first-inning-specific dispersion. Fitted: src=
+//    season, K=100, r1=0.55 (fold-stable); OOS calibration 47.8% vs
+//    47.7% actual, picks@0.57 61.4% hit.
+// 2. SEASON-ONLY SP ERA (loop iteration #7, scripts/fit-input-blends.ts):
+//    the recent-form blend weight fit to 0 in every fold — 2-5 starts of
+//    ERA is variance, not signal. OOS ML log-loss +0.00449 (z=1.41).
+export const V71_MODEL_VERSION = "v7.1";
 export const V71_PRIOR_RPG1 = 0.5209;  // 2024-25 league 1st-inning runs/half (fixtures)
 export const V71_PRIOR_K = 100;        // EB prior weight, in team-games
 export const V71_R1 = 0.55;            // first-inning NB dispersion, 2026 walk-forward
@@ -54,10 +57,16 @@ export const V7_CONFIG: V7Config = {
   hfaMultiplier: 1.05,
 };
 
-const ERA_TO_RA9 = 1.08; // earned-run ERA → all-runs allowed/9 (ER ≈ 92% of R)
+export const ERA_TO_RA9 = 1.08; // earned-run ERA → all-runs allowed/9 (ER ≈ 92% of R)
 
 /** Map the same as-of-date inputs v6 uses into the run-model's TeamInputs.
- *  Exported so the offline backtest loader shares one mapping. */
+ *  Exported so the offline backtest loader shares one mapping.
+ *
+ *  `spRecentWeight`: weight on recent-form ERA in the SP blend. v7 shipped
+ *  0.5 by eyeball; the walk-forward fit (scripts/fit-input-blends.ts,
+ *  2026-07-23) chose 0 in every fold — 2-5 starts of ERA is variance, not
+ *  signal (OOS ML log-loss +0.00449 at 0). v7 keeps 0.5 (frozen contract);
+ *  v7.1 passes 0. */
 export function buildV7TeamInputs(
   teamId: number,
   spId: number | null,
@@ -65,17 +74,17 @@ export function buildV7TeamInputs(
   records: Map<number, TeamSeasonRecord>,
   spStats: Map<number, ProbableSpStats>,
   aggregates: SeasonAggregates | undefined,
+  spRecentWeight = 0.5,
 ): TeamInputs {
   const rec = records.get(teamId);
   const rpg = rec && rec.gamesPlayed > 0 ? rec.runsScored / rec.gamesPlayed : 4.5;
 
-  // SP RA9: season ERA blended 50/50 with recent-form ERA (≥2 starts), → RA9.
   let spEra = 4.2;
   if (spId != null) {
     const season = spStats.get(spId)?.era ?? 4.2;
     const recent = aggregates?.spRecentForm.get(spId);
     spEra = recent && recent.starts >= 2 && Number.isFinite(recent.era)
-      ? 0.5 * recent.era + 0.5 * season
+      ? spRecentWeight * recent.era + (1 - spRecentWeight) * season
       : season;
   }
   const recentSp = spId != null ? aggregates?.spRecentForm.get(spId) : undefined;
@@ -126,10 +135,10 @@ function toSide(t: SlateTeam, isHome: boolean, winProbability: number, inputs: P
   };
 }
 
-function runV7(inputs: PredictionInputs, nrfiOverride?: (away: TeamInputs, home: TeamInputs) => number): PredictionsResult {
+function runV7(inputs: PredictionInputs, spRecentWeight: number, nrfiOverride?: (away: TeamInputs, home: TeamInputs) => number): PredictionsResult {
   const games: GamePrediction[] = inputs.slate.map((g) => {
-    const away = buildV7TeamInputs(g.away.teamId, g.away.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates);
-    const home = buildV7TeamInputs(g.home.teamId, g.home.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates);
+    const away = buildV7TeamInputs(g.away.teamId, g.away.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates, spRecentWeight);
+    const home = buildV7TeamInputs(g.home.teamId, g.home.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates, spRecentWeight);
     const m = deriveMarkets(away, home, V7_CONFIG);
     const rawNrfi = nrfiOverride ? nrfiOverride(away, home) : m.nrfi;
     // Guard the rare missing-input NaN so one game can't break the batch.
@@ -152,11 +161,11 @@ function runV7(inputs: PredictionInputs, nrfiOverride?: (away: TeamInputs, home:
 }
 
 export function predictGamesV7(inputs: PredictionInputs): PredictionsResult {
-  return runV7(inputs);
+  return runV7(inputs, 0.5);
 }
 
-/** v7.1 — identical to v7 except the NRFI read: season-adaptive
- *  first-inning bump + first-inning dispersion (see V71_* constants). */
+/** v7.1 — v7 with the loop-fitted changes: season-only SP ERA and the
+ *  season-adaptive NRFI read (see the V71 block comment above). */
 export function predictGamesV71(inputs: PredictionInputs): PredictionsResult {
   const aggs = inputs.aggregates;
   const leagueGames = aggs ? [...aggs.team1stInning.values()].reduce((s, t) => s + t.games, 0) : 0;
@@ -164,7 +173,7 @@ export function predictGamesV71(inputs: PredictionInputs): PredictionsResult {
     ? shrinkRate(aggs.league.avgFirstInningRpg, leagueGames, V71_PRIOR_RPG1, V71_PRIOR_K)
     : V71_PRIOR_RPG1;
   const cfg: V7Config = { ...V7_CONFIG, firstInningBump: Math.log(rpg1 / V7_CONFIG.leagueLambda) };
-  return runV7(inputs, (away, home) => {
+  return runV7(inputs, 0, (away, home) => {
     const a1 = halfInningLambdas(away, home, false, cfg)[0]!;
     const h1 = halfInningLambdas(home, away, true, cfg)[0]!;
     return scorelessProb(a1, V71_R1) * scorelessProb(h1, V71_R1);
