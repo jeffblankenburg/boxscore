@@ -3,10 +3,8 @@ import { todayInET, timeInET, prevDay } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { loadPredictionsForDate } from "@/lib/sports/mlb/predictions-data";
 import {
-  winPlayFor,
-  nrfiPlayFor,
-  bestOfSlateWinPlay,
-  bestOfSlateNrfiPlay,
+  selectDailyCard,
+  cardCandidateFor,
   nrfiSideLabel,
   type GamePrediction,
   type WinPlay,
@@ -18,10 +16,6 @@ import {
   loadPlayRoi,
   loadSeasonHistory,
   loadOddsForDate,
-  outcomeWinPlay,
-  outcomeNrfiPlay,
-  bestOfDayWinPlay,
-  bestOfDayNrfiPlay,
   type PlayAccuracySummary,
   type PlayRoiSummary,
   type GamePredictionOutcome,
@@ -172,47 +166,30 @@ export default async function PredictionsPage({
   );
 }
 
-/** Build today's pick list with the always-pick rule: every day shows
- *  at least one ML and one NRFI play, even if nothing clears threshold.
- *  Threshold qualifiers are listed first; if no ML qualifier exists we
- *  attach the slate's strongest favorite, and same for NRFI. */
+/** Build today's card: the capped 5-pick set (2 ML by EV edge + 2 NRFI
+ *  by conviction + 1 flex), grouped by game for the table. A game can
+ *  contribute both its ML and NRFI pick if both make the card. */
 function buildTodaysPlays(
   games: GamePrediction[],
   todayOdds: DayOdds,
 ): Array<{ game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }> {
   if (games.length === 0) return [];
 
+  const card = selectDailyCard(
+    games.map((g) => cardCandidateFor(g.gamePk, g.away.winProbability, g.home.winProbability, g.nrfiProbability, todayOdds.mlByGamePk.get(g.gamePk))),
+  );
+  const gameByPk = new Map(games.map((g) => [g.gamePk, g]));
   const byPk = new Map<number, { game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }>();
-  for (const g of games) {
-    const win = winPlayFor(g, todayOdds.mlByGamePk.get(g.gamePk));
-    const nrfi = nrfiPlayFor(g);
-    if (win || nrfi) byPk.set(g.gamePk, { game: g, win, nrfi });
-  }
-
-  const hasMl   = Array.from(byPk.values()).some((p) => p.win !== null);
-  const hasNrfi = Array.from(byPk.values()).some((p) => p.nrfi !== null);
-
-  if (!hasMl) {
-    const fb = bestOfSlateWinPlay(games);
-    if (fb) {
-      const game = games.find((g) => g.gamePk === fb.gamePk);
-      if (game) {
-        const existing = byPk.get(fb.gamePk);
-        if (existing) existing.win = fb.play;
-        else byPk.set(fb.gamePk, { game, win: fb.play, nrfi: null });
-      }
+  for (const p of card) {
+    const game = gameByPk.get(p.gamePk);
+    if (!game) continue;
+    const entry = byPk.get(p.gamePk) ?? { game, win: null, nrfi: null };
+    if (p.market === "ML") {
+      entry.win = { side: p.side as "away" | "home", abbr: p.side === "home" ? game.home.abbr : game.away.abbr, winPct: p.probability, strong: p.strong };
+    } else {
+      entry.nrfi = { side: p.side as "NRFI" | "YRFI", probability: p.probability, strong: p.strong };
     }
-  }
-  if (!hasNrfi) {
-    const fb = bestOfSlateNrfiPlay(games);
-    if (fb) {
-      const game = games.find((g) => g.gamePk === fb.gamePk);
-      if (game) {
-        const existing = byPk.get(fb.gamePk);
-        if (existing) existing.nrfi = fb.play;
-        else byPk.set(fb.gamePk, { game, win: null, nrfi: fb.play });
-      }
-    }
+    byPk.set(p.gamePk, entry);
   }
 
   return Array.from(byPk.values()).sort((a, b) =>
@@ -281,41 +258,23 @@ function YesterdayResults({
   outcomes: GamePredictionOutcome[];
   odds: DayOdds;
 }) {
-  // Threshold + odds-qualifying picks per game.
+  // Same capped 5-pick card as buildTodaysPlays / the stat loaders —
+  // graded against yesterday's outcomes.
+  const oByPk = new Map(outcomes.map((o) => [o.gamePk, o]));
+  const card = selectDailyCard(
+    outcomes.map((o) => cardCandidateFor(o.gamePk, o.awayWinPct, o.homeWinPct, o.nrfiPct, odds.mlByGamePk.get(o.gamePk))),
+  );
   const rowsByPk = new Map<number, { o: GamePredictionOutcome; win: WinPlay | null; nrfi: NrfiPlay | null }>();
-  for (const o of outcomes) {
-    const win = outcomeWinPlay(o, odds.mlByGamePk.get(o.gamePk));
-    const nrfi = outcomeNrfiPlay(o);
-    if (win || nrfi) rowsByPk.set(o.gamePk, { o, win, nrfi });
-  }
-
-  // Always-pick fallbacks — same rule as buildTodaysPlays and
-  // loadSeasonHistory: if no ML/NRFI cleared threshold on the slate,
-  // surface the day's strongest lean so the table always shows at
-  // least one ML and one NRFI.
-  const hasMl   = Array.from(rowsByPk.values()).some((p) => p.win !== null);
-  const hasNrfi = Array.from(rowsByPk.values()).some((p) => p.nrfi !== null);
-  if (!hasMl) {
-    const fb = bestOfDayWinPlay(outcomes);
-    if (fb) {
-      const o = outcomes.find((x) => x.gamePk === fb.gamePk);
-      if (o) {
-        const existing = rowsByPk.get(fb.gamePk);
-        if (existing) existing.win = fb.play;
-        else rowsByPk.set(fb.gamePk, { o, win: fb.play, nrfi: null });
-      }
+  for (const p of card) {
+    const o = oByPk.get(p.gamePk);
+    if (!o) continue;
+    const entry = rowsByPk.get(p.gamePk) ?? { o, win: null, nrfi: null };
+    if (p.market === "ML") {
+      entry.win = { side: p.side as "away" | "home", abbr: p.side === "home" ? o.homeAbbr : o.awayAbbr, winPct: p.probability, strong: p.strong };
+    } else {
+      entry.nrfi = { side: p.side as "NRFI" | "YRFI", probability: p.probability, strong: p.strong };
     }
-  }
-  if (!hasNrfi) {
-    const fb = bestOfDayNrfiPlay(outcomes);
-    if (fb) {
-      const o = outcomes.find((x) => x.gamePk === fb.gamePk);
-      if (o) {
-        const existing = rowsByPk.get(fb.gamePk);
-        if (existing) existing.nrfi = fb.play;
-        else rowsByPk.set(fb.gamePk, { o, win: null, nrfi: fb.play });
-      }
-    }
+    rowsByPk.set(p.gamePk, entry);
   }
   const playedRows = Array.from(rowsByPk.values()).sort((a, b) => a.o.gamePk - b.o.gamePk);
 
