@@ -39,9 +39,9 @@ export const V7_MODEL_VERSION = "v7-run-model";
 // stable); OOS calibration 47.8% vs 47.7% actual, picks@0.57 61.4% hit.
 // ML/totals are v7-identical by construction — only the NRFI read moves.
 export const V71_MODEL_VERSION = "v7.1-adaptive-nrfi";
-const V71_PRIOR_RPG1 = 0.5209;  // 2024-25 league 1st-inning runs/half (fixtures)
-const V71_PRIOR_K = 100;        // EB prior weight, in team-games
-const V71_R1 = 0.55;            // first-inning NB dispersion, 2026 walk-forward
+export const V71_PRIOR_RPG1 = 0.5209;  // 2024-25 league 1st-inning runs/half (fixtures)
+export const V71_PRIOR_K = 100;        // EB prior weight, in team-games
+export const V71_R1 = 0.55;            // first-inning NB dispersion, 2026 walk-forward
 
 // Fitted 2026-07-22, walk-forward on the 2026 season (scripts/fit-v7.ts):
 // betaOff heavily shrunk (team run-rate is noisy → lean on pitching),

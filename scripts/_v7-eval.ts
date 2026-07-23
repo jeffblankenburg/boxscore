@@ -37,6 +37,10 @@ export type EvalGame = {
    *  scoring curve (summer heat) a season-to-date average lags. */
   league1stRpg30AsOf: number;
   league1stGames30AsOf: number;
+  /** Venue + scheduled first pitch (UTC ISO) — join keys for the park
+   *  weather fixture. fit-weather-nrfi.ts. */
+  homeTeamId: number;
+  startTimeUtc: string;
 };
 
 type ResultRow = {
@@ -252,6 +256,8 @@ export async function loadEvalGames(year: string): Promise<EvalGame[]> {
         league1stGamesAsOf: [...aggs.team1stInning.values()].reduce((s, t) => s + t.games, 0),
         league1stRpg30AsOf: last30.rpg,
         league1stGames30AsOf: last30.games,
+        homeTeamId: g.home.teamId,
+        startTimeUtc: g.gameDate,
       });
     }
   }
