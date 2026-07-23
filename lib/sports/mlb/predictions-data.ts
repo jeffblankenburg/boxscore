@@ -16,11 +16,11 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { parseSlate, type SlateGame } from "@/lib/mlb";
 import { prevDay } from "@/lib/dates";
 import {
-  predictGames,
   type PredictionsResult,
   type TeamSeasonRecord,
   type ProbableSpStats,
 } from "./predictions";
+import { predictGamesV71 } from "./predictions-v7";
 import { loadSeasonAggregates } from "./season-aggregates";
 
 const PYTHAG_FALLBACK_SP_ERA = 4.20;
@@ -144,23 +144,22 @@ export async function loadPredictionInputsForDate(date: string): Promise<{
 export async function loadPredictionsForDate(date: string): Promise<PredictionsResult> {
   const inputs = await loadPredictionInputsForDate(date);
   if (!inputs) return { date, gameCount: 0, games: [], generatedAt: new Date().toISOString() };
-  return predictGames(inputs);
+  return predictGamesV71(inputs);
 }
 
 /** Stable version string for predictions snapshots. Bump when the model
  *  formula changes (or calibration is refit) so historical attribution
  *  stays clean.
  *
- *  v4 layers empirical linear shrinkage onto v3: WIN_SHRINKAGE=0.20,
- *  NRFI_SHRINKAGE=0.15 fit by Brier-minimizing least squares on 313
- *  graded June games. Threshold bands re-anchored to the calibrated
- *  scale (0.545 play / 0.555 strong) so the displayed probability and
- *  the play logic agree.
- *
- *  Note (2026-07-01): v5-empirical was tried and reverted — bumping
- *  HOME_FIELD_BUMP to 0.060 diluted the ML pick pool (56% vs 61.6% on
- *  home picks), and NRFI shrinkage of 0.05 killed all NRFI plays.
- *  Instead of retuning calibration, the play-selection rule was
- *  changed to home-only ML (winPlayFor). The stored calibrated
- *  probabilities are unchanged. */
-export const PREDICTIONS_MODEL_VERSION = "v6-nrfi-rebased";
+ *  v7.1 is the run-distribution engine (run-model.ts / predictions-v7.ts):
+ *  one latent expected-runs-per-half-inning model that derives ML and
+ *  NRFI from the same negative-binomial run distribution, replacing v6's
+ *  three disconnected formulas (Pythagorean → log5 ML + a separate NRFI
+ *  factor model). Promoted 2026-07-23 after a full-2026 regeneration
+ *  backtest: over all ~1,524 graded games v7.1 beat v6 on directional
+ *  accuracy (58.7% vs 53.7% ML, 55.1% vs 51.8% NRFI), Brier, and
+ *  log-loss in both markets — see scripts/backfill-v71.ts (which wrote
+ *  the historical prediction_results) and the loop-iteration commits
+ *  that fit it (season-adaptive NRFI, season-only SP ERA). v6 and
+ *  v7-run-model keep running as graded shadows for ongoing comparison. */
+export const PREDICTIONS_MODEL_VERSION = "v7.1";

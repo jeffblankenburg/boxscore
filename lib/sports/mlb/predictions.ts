@@ -187,26 +187,30 @@ export function nrfiSideLabel(side: "NRFI" | "YRFI"): string {
   return side === "NRFI" ? "NRFI ↓" : "YRFI ↑";
 }
 
-/** Returns the moneyline play for this game, or null.
+/** Returns the moneyline play for this game (the model's favored side),
+ *  or null.
  *
- *  Home-team only. Empirical sweep across 262 v4 plays showed away
- *  picks hit 50-55% at every threshold band; home picks hit 61.6%.
- *  Away picks are noise around break-even, so we filter them out
- *  rather than pretending a play exists. Fallback `bestOfSlateWinPlay`
- *  can still surface an away favorite when no home team clears — those
- *  are labeled as best-of-slate, not threshold-qualifying plays.
+ *  Picks whichever side the model favors when its win probability clears
+ *  ML_PLAY_THRESHOLD. v6 restricted this to home teams because its away
+ *  picks hit only 50-55% (home hit 61.6%); v7.1's run-distribution model
+ *  is calibrated symmetrically — over the backfilled 2026 season both-
+ *  sides plays hit 62.5% at +7.3% ROI vs 61.7% / +5.1% home-only, on 50%
+ *  more plays (scripts/fit-v71-pick-rule.ts). So we take either side.
  *
- *  When DraftKings odds are provided, plays outside [ML_ODDS_MIN,
- *  ML_ODDS_MAX] are filtered. Heavy chalk (< -200) and underdogs
- *  (> -100) both lose money at this hit rate. */
-export function winPlayFor(game: GamePrediction, dkHomeOdds?: number | null): WinPlay | null {
-  if (game.home.winProbability < ML_PLAY_THRESHOLD) return null;
-  if (!mlOddsInPlayableRange(dkHomeOdds)) return null;
+ *  When DraftKings odds are provided for the picked side, plays outside
+ *  [ML_ODDS_MIN, ML_ODDS_MAX] are filtered. Heavy chalk (< -200) and
+ *  underdogs (> -100) both lose money at this hit rate. */
+export function winPlayFor(game: GamePrediction, dkOdds?: { away: number | null; home: number | null }): WinPlay | null {
+  const favSide: "away" | "home" = game.home.winProbability >= game.away.winProbability ? "home" : "away";
+  const side = favSide === "home" ? game.home : game.away;
+  if (side.winProbability < ML_PLAY_THRESHOLD) return null;
+  const sideOdds = favSide === "home" ? dkOdds?.home : dkOdds?.away;
+  if (!mlOddsInPlayableRange(sideOdds)) return null;
   return {
-    side: "home",
-    abbr: game.home.abbr,
-    winPct: game.home.winProbability,
-    strong: game.home.winProbability >= ML_STRONG_THRESHOLD,
+    side: favSide,
+    abbr: side.abbr,
+    winPct: side.winProbability,
+    strong: side.winProbability >= ML_STRONG_THRESHOLD,
   };
 }
 

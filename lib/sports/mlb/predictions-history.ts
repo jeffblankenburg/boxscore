@@ -224,7 +224,7 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
     actual_winner: "away" | "home" | null;
     actual_nrfi: boolean | null;
   };
-  type DkOddsRow = { date: string; game_pk: number; home_ml_odds: number | null };
+  type DkOddsRow = { date: string; game_pk: number; away_ml_odds: number | null; home_ml_odds: number | null };
   const [data, dkRows] = await Promise.all([
     paginateSelect<Row>((from, to) => sb
       .from("prediction_results")
@@ -235,13 +235,13 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
       .lte("date", endIso)
       .range(from, to)),
     paginateSelect<DkOddsRow>((from, to) => sb.from("daily_odds_first")
-      .select("date, game_pk, home_ml_odds")
+      .select("date, game_pk, away_ml_odds, home_ml_odds")
       .eq("sport", "mlb").eq("book", "DraftKings")
       .gte("date", startIso).lte("date", endIso)
       .range(from, to)),
   ]);
-  const dkHomeOdds = new Map<string, number | null>();
-  for (const r of dkRows) dkHomeOdds.set(`${r.date}|${r.game_pk}`, r.home_ml_odds);
+  const dkOdds = new Map<string, { away: number | null; home: number | null }>();
+  for (const r of dkRows) dkOdds.set(`${r.date}|${r.game_pk}`, { away: r.away_ml_odds, home: r.home_ml_odds });
 
   // Group by date so the always-pick rule (one ML + one NRFI per day,
   // even when nothing clears threshold) can be applied per slate.
@@ -280,22 +280,23 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
         if (r.nrfi_brier !== null) nrfiBrierSum += Number(r.nrfi_brier);
       }
 
-      // Threshold-qualifying ML pick for this game. Home-only per
-      // winPlayFor's selection rule (see its docstring), and only when
-      // DK home odds are in the playable range.
+      // Threshold-qualifying ML pick for this game — favored side (either
+      // team) per winPlayFor's rule, gated on the picked side's DK odds
+      // being in the playable range.
       if (r.win_correct !== null && r.actual_winner !== null) {
         const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
-        const homeOdds = dkHomeOdds.get(`${r.date}|${r.game_pk}`) ?? null;
-        if (h >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(homeOdds)) {
+        const favSide: "away" | "home" = h >= a ? "home" : "away";
+        const favPct = favSide === "home" ? h : a;
+        const odds = dkOdds.get(`${r.date}|${r.game_pk}`);
+        const sideOdds = favSide === "home" ? odds?.home ?? null : odds?.away ?? null;
+        if (favPct >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(sideOdds)) {
           mlPlays++;
-          if (r.actual_winner === "home") mlPlayHits++;
+          if (r.actual_winner === favSide) mlPlayHits++;
           mlDayPicked = true;
         }
         // Track best-of-slate candidate for the fallback.
-        const fav  = a >= h ? a : h;
-        const side: "away" | "home" = a >= h ? "away" : "home";
-        if (!bestMl || fav > bestMl.favPct) {
-          bestMl = { side, favPct: fav, winner: r.actual_winner };
+        if (!bestMl || favPct > bestMl.favPct) {
+          bestMl = { side: favSide, favPct, winner: r.actual_winner };
         }
       }
 
@@ -354,12 +355,16 @@ export async function loadPredictionAccuracy(days: number, endDate: string): Pro
 // Mirror winPlayFor/nrfiPlayFor from predictions.ts, but against a
 // graded historical outcome row. Both return null when no side cleared
 // the threshold (no play would have been made).
-export function outcomeWinPlay(o: GamePredictionOutcome, dkHomeOdds?: number | null): WinPlay | null {
-  // Home only, and only when DK odds are in the playable range —
-  // mirrors winPlayFor. See its docstring for why.
-  if (o.homeWinPct < ML_PLAY_THRESHOLD) return null;
-  if (!mlOddsInPlayableRange(dkHomeOdds)) return null;
-  return { side: "home", abbr: o.homeAbbr, winPct: o.homeWinPct, strong: o.homeWinPct >= ML_STRONG_THRESHOLD };
+export function outcomeWinPlay(o: GamePredictionOutcome, dkOdds?: { away: number | null; home: number | null }): WinPlay | null {
+  // Favored side (either team), gated on the picked side's DK odds being
+  // in the playable range — mirrors winPlayFor. See its docstring for why
+  // v7.1 dropped v6's home-only restriction.
+  const favSide: "away" | "home" = o.homeWinPct >= o.awayWinPct ? "home" : "away";
+  const winPct = favSide === "home" ? o.homeWinPct : o.awayWinPct;
+  if (winPct < ML_PLAY_THRESHOLD) return null;
+  const sideOdds = favSide === "home" ? dkOdds?.home : dkOdds?.away;
+  if (!mlOddsInPlayableRange(sideOdds)) return null;
+  return { side: favSide, abbr: favSide === "home" ? o.homeAbbr : o.awayAbbr, winPct, strong: winPct >= ML_STRONG_THRESHOLD };
 }
 
 export function outcomeNrfiPlay(o: GamePredictionOutcome): NrfiPlay | null {
@@ -511,18 +516,19 @@ export async function loadPlayRoi(
     for (const r of dayRows) {
       if (r.win_correct === null || r.actual_winner === null) continue;
       const a = Number(r.away_win_pct), h = Number(r.home_win_pct);
-      // Home-only ML picks + DK odds range filter — matches
-      // outcomeWinPlay and the accuracy tally.
-      const homeOdds = mlOddsByKey.get(`${r.date}|${r.game_pk}`)?.home_ml_odds ?? null;
-      if (h >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(homeOdds)) {
-        mlPicks.push({ gamePk: r.game_pk, side: "home", winner: r.actual_winner });
+      // Favored side (either team) + picked-side DK odds range filter —
+      // matches outcomeWinPlay and the accuracy tally.
+      const favSide: "away" | "home" = h >= a ? "home" : "away";
+      const favPct = favSide === "home" ? h : a;
+      const o = mlOddsByKey.get(`${r.date}|${r.game_pk}`);
+      const sideOdds = favSide === "home" ? o?.home_ml_odds ?? null : o?.away_ml_odds ?? null;
+      if (favPct >= ML_PLAY_THRESHOLD && mlOddsInPlayableRange(sideOdds)) {
+        mlPicks.push({ gamePk: r.game_pk, side: favSide, winner: r.actual_winner });
       }
       // Track best-of-day candidate for the fallback (unfiltered so
       // we can always surface *something* on quiet slates).
-      const fav = a >= h ? a : h;
-      const side: "away" | "home" = a >= h ? "away" : "home";
-      if (!bestMl || fav > bestMl.favPct) {
-        bestMl = { gamePk: r.game_pk, favPct: fav, side, winner: r.actual_winner };
+      if (!bestMl || favPct > bestMl.favPct) {
+        bestMl = { gamePk: r.game_pk, favPct, side: favSide, winner: r.actual_winner };
       }
     }
     if (mlPicks.length === 0 && bestMl) {
@@ -643,9 +649,9 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
       .gte("date", startIso)
       .lte("date", endIso)
       .range(from, to)),
-    paginateSelect<{ date: string; game_pk: number; home_ml_odds: number | null }>((from, to) =>
+    paginateSelect<{ date: string; game_pk: number; away_ml_odds: number | null; home_ml_odds: number | null }>((from, to) =>
       sb.from("daily_odds_first")
-        .select("date, game_pk, home_ml_odds")
+        .select("date, game_pk, away_ml_odds, home_ml_odds")
         .eq("sport", "mlb").eq("book", "DraftKings")
         .gte("date", startIso).lte("date", endIso)
         .range(from, to)),
@@ -689,8 +695,8 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
     linescoreByKey.set(`${r.date}|${r.game_pk}`, r.linescore ?? null);
   }
 
-  const dkHomeOddsByKey = new Map<string, number | null>();
-  for (const r of dkOddsRows) dkHomeOddsByKey.set(`${r.date}|${r.game_pk}`, r.home_ml_odds);
+  const dkOddsByKey = new Map<string, { away: number | null; home: number | null }>();
+  for (const r of dkOddsRows) dkOddsByKey.set(`${r.date}|${r.game_pk}`, { away: r.away_ml_odds, home: r.home_ml_odds });
 
   // One row per game (rowspanned per day in the renderer). Days with
   // no threshold qualifier still get exactly one best-of-day fallback
@@ -704,8 +710,7 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
     const mlPlaysByPk = new Map<number, WinPlay>();
     const nrfiPlaysByPk = new Map<number, NrfiPlay>();
     for (const o of outcomes) {
-      const homeOdds = dkHomeOddsByKey.get(`${date}|${o.gamePk}`) ?? null;
-      const ml = outcomeWinPlay(o, homeOdds);
+      const ml = outcomeWinPlay(o, dkOddsByKey.get(`${date}|${o.gamePk}`));
       if (ml) mlPlaysByPk.set(o.gamePk, ml);
       const nrfi = outcomeNrfiPlay(o);
       if (nrfi) nrfiPlaysByPk.set(o.gamePk, nrfi);

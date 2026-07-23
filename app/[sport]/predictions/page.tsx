@@ -42,7 +42,7 @@ export const revalidate = 3600;
 
 const META_TITLE = "Daily Predictions | boxscore";
 const META_DESC =
-  "Daily MLB win-probability and NRFI (no-runs-in-the-first-inning) predictions for tonight's slate. Built on pythagorean expectation, log5, and league-average matchup factors.";
+  "Daily MLB win-probability and NRFI (no-runs-in-the-first-inning) predictions for tonight's slate. Built on a run-distribution model that derives moneyline and first-inning odds from one expected-runs engine.";
 const META_URL = `${EMAIL_LINK_BASE}/mlb/predictions`;
 const META_IMG = `${EMAIL_LINK_BASE}/icon.png`;
 
@@ -184,8 +184,7 @@ function buildTodaysPlays(
 
   const byPk = new Map<number, { game: GamePrediction; win: WinPlay | null; nrfi: NrfiPlay | null }>();
   for (const g of games) {
-    const homeOdds = todayOdds.mlByGamePk.get(g.gamePk)?.home ?? null;
-    const win = winPlayFor(g, homeOdds);
+    const win = winPlayFor(g, todayOdds.mlByGamePk.get(g.gamePk));
     const nrfi = nrfiPlayFor(g);
     if (win || nrfi) byPk.set(g.gamePk, { game: g, win, nrfi });
   }
@@ -285,7 +284,7 @@ function YesterdayResults({
   // Threshold + odds-qualifying picks per game.
   const rowsByPk = new Map<number, { o: GamePredictionOutcome; win: WinPlay | null; nrfi: NrfiPlay | null }>();
   for (const o of outcomes) {
-    const win = outcomeWinPlay(o, odds.mlByGamePk.get(o.gamePk)?.home ?? null);
+    const win = outcomeWinPlay(o, odds.mlByGamePk.get(o.gamePk));
     const nrfi = outcomeNrfiPlay(o);
     if (win || nrfi) rowsByPk.set(o.gamePk, { o, win, nrfi });
   }

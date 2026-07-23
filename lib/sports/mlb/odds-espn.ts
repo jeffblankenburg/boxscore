@@ -38,8 +38,16 @@ export type EspnOddsRow = {
   awayAbbr: string;
   homeAbbr: string;
   startTimeUtc: string;
-  awayMl: number | null;
+  awayMl: number | null;   // "current" moneyLine — what a live capture sees
   homeMl: number | null;
+  // Opening + closing moneyLines. ESPN's core feed carries these on
+  // completed games, so a historical backfill can reconstruct both the
+  // morning ("open") and pre-first-pitch ("close") DraftKings price
+  // without any live capture. Null on games where ESPN omits the split.
+  awayMlOpen: number | null;
+  homeMlOpen: number | null;
+  awayMlClose: number | null;
+  homeMlClose: number | null;
   book: string;            // "DraftKings"
   raw: Record<string, unknown>;
 };
@@ -63,11 +71,32 @@ type ScoreboardResponse = {
 type EventOddsProvider = {
   name?: string;
 };
+// A moneyLine node is either a bare number (top-level "current") or a
+// nested object with an `american` string ("+119" / "-150"), which is
+// how ESPN shapes the open/close splits.
+type MoneyLineNode = number | { american?: string; value?: number } | undefined;
+type TeamOdds = {
+  moneyLine?: number;
+  open?:  { moneyLine?: MoneyLineNode };
+  close?: { moneyLine?: MoneyLineNode };
+};
 type EventOddsItem = {
   provider?: EventOddsProvider;
-  awayTeamOdds?: { moneyLine?: number };
-  homeTeamOdds?: { moneyLine?: number };
+  awayTeamOdds?: TeamOdds;
+  homeTeamOdds?: TeamOdds;
 };
+
+/** Parse an ESPN moneyLine node to an American integer. Accepts a bare
+ *  number (top-level current line) or the nested `{ american: "+119" }`
+ *  shape used on open/close. Returns null for anything unparseable. */
+function parseMoneyLine(node: MoneyLineNode): number | null {
+  if (typeof node === "number") return Number.isFinite(node) ? node : null;
+  if (node && typeof node.american === "string") {
+    const n = parseInt(node.american, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
 type EventOddsResponse = {
   items?: EventOddsItem[];
 };
@@ -129,6 +158,10 @@ export async function fetchEspnOddsForDate(
         ...g,
         awayMl: typeof dk?.awayTeamOdds?.moneyLine === "number" ? dk.awayTeamOdds.moneyLine : null,
         homeMl: typeof dk?.homeTeamOdds?.moneyLine === "number" ? dk.homeTeamOdds.moneyLine : null,
+        awayMlOpen:  parseMoneyLine(dk?.awayTeamOdds?.open?.moneyLine),
+        homeMlOpen:  parseMoneyLine(dk?.homeTeamOdds?.open?.moneyLine),
+        awayMlClose: parseMoneyLine(dk?.awayTeamOdds?.close?.moneyLine),
+        homeMlClose: parseMoneyLine(dk?.homeTeamOdds?.close?.moneyLine),
         book: dk?.provider?.name ?? "DraftKings",
         raw: (dk ?? {}) as Record<string, unknown>,
       };
@@ -143,6 +176,10 @@ export async function fetchEspnOddsForDate(
       ...g,
       awayMl: null,
       homeMl: null,
+      awayMlOpen: null,
+      homeMlOpen: null,
+      awayMlClose: null,
+      homeMlClose: null,
       book: "DraftKings",
       raw: { error: (s.reason as Error).message },
     };
