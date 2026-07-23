@@ -182,18 +182,27 @@ export type WinPlay = {
 // ─── Daily card selection ────────────────────────────────────────────────
 //
 // The public card is ML-only (NRFI was dropped 2026-07-23 — its hit rate
-// didn't justify the slot). Size scales with the slate: CARD_GAME_FRACTION
-// of the day's games, floor 1 — a 15-game day shows 3, a 5-game day shows 1.
+// didn't justify the slot). Its BASE size scales with the slate:
+// CARD_GAME_FRACTION of the day's games, floor 1 — a 15-game day shows 3,
+// a 5-game day shows 1. But 20% is a FLOOR, not a cap: any additional
+// positive-EV pick whose win probability clears CARD_VERY_CONFIDENT_WINPCT
+// is kept too, so a light slate with two elite plays still shows both.
+// (Fitted 2026-07-23, scripts/fit-v71-card.ts: at 0.68 the override adds
+// only ~0.37 picks/day and those extras hit 86% — genuinely "very
+// confident," rare enough to keep the card ~20% on a typical day.)
+//
 // Picks are the model's favored side ranked by EV vs the market price
 // (model prob − break-even implied), favored side only, positive-EV only.
 // That's where the money is: over the 2026 season v7.1's favored-UNDERDOG
 // picks (market prices our side as a dog) returned +19.3% ROI vs favorites'
-// single digits (scripts/fit-v71-card.ts). Ranking by raw win% would bury
-// those under chalk, so we rank by edge — which needs the picked side's odds.
+// single digits. Ranking by raw win% would bury those under chalk, so we
+// rank by edge — which needs the picked side's odds.
 export const CARD_GAME_FRACTION = 0.20;
+export const CARD_VERY_CONFIDENT_WINPCT = 0.68;
 
-/** Number of ML picks to show for a slate of `numGames` games: 20% of the
- *  slate, rounded, floor 1. 15 → 3, 10 → 2, 5 → 1. */
+/** Base number of ML picks for a slate of `numGames` games: 20% of the
+ *  slate, rounded, floor 1. 15 → 3, 10 → 2, 5 → 1. selectDailyCard may
+ *  add very-confident picks on top of this. */
 export function cardSize(numGames: number): number {
   return Math.max(1, Math.round(CARD_GAME_FRACTION * numGames));
 }
@@ -233,13 +242,26 @@ export function cardCandidateFor(
   };
 }
 
-/** The day's card: the top `count` positive-EV ML plays ranked by edge. */
+/** The day's card: the top `count` positive-EV ML plays by edge (the 20%
+ *  floor), PLUS any other positive-EV pick whose win probability clears
+ *  CARD_VERY_CONFIDENT_WINPCT. Returned ordered by edge. */
 export function selectDailyCard(cands: CardCandidate[], count: number): CardPick[] {
   const picks = cands
     .filter((c): c is CardCandidate & { ml: NonNullable<CardCandidate["ml"]> } => c.ml !== null)
     .map((c) => ({ gamePk: c.gamePk, side: c.ml.side, winPct: c.ml.winPct, strong: c.ml.winPct >= ML_STRONG_THRESHOLD, dog: c.ml.dog, edge: c.ml.edge }));
   picks.sort((a, b) => b.edge - a.edge);
-  return picks.slice(0, Math.max(0, count));
+
+  const chosen = picks.slice(0, Math.max(0, count));
+  const chosenPks = new Set(chosen.map((p) => p.gamePk));
+  // 20% is a floor: keep very-confident picks even past the base count.
+  for (const p of picks) {
+    if (!chosenPks.has(p.gamePk) && p.winPct >= CARD_VERY_CONFIDENT_WINPCT) {
+      chosen.push(p);
+      chosenPks.add(p.gamePk);
+    }
+  }
+  chosen.sort((a, b) => b.edge - a.edge);
+  return chosen;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────

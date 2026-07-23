@@ -92,7 +92,7 @@ async function main() {
       if (price != null) { mlWO++; mlS += STAKE; mlPl += won ? STAKE * americanToProfitMultiplier(price) : -STAKE; }
     }
   }
-  console.log(`\nML CARD RULE (top-EV, 20% of slate) over ${days} days (${(cardPicks / days).toFixed(1)} picks/day):`);
+  console.log(`\nML CARD RULE (top-EV, 20% floor + winPct>=0.68 override) over ${days} days (${(cardPicks / days).toFixed(1)} picks/day):`);
   console.log(`  ${pct(mlH, mlN)} hit (${mlH}/${mlN})   ROI ${roi(mlPl, mlS)} on ${mlWO} priced ($${mlPl.toFixed(2)})`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
