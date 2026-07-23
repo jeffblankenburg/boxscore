@@ -478,6 +478,12 @@ export type SeasonHistoryGame = {
 export type SeasonHistoryDay = {
   date:  string;
   games: SeasonHistoryGame[];
+  /** $10/play P/L of the day's card against captured odds (ML from
+   *  DraftKings, NRFI from FanDuel). null when no pick that day had a
+   *  captured price. `profitPartial` flags days where some picks were
+   *  unpriced, so the total covers only part of the card. */
+  profit: number | null;
+  profitPartial: boolean;
 };
 
 /** Returns one row per graded day in the window, each with the
@@ -498,7 +504,7 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
   };
   type PredRowRaw = { date: string; game_pk: number; away_team_id: number; home_team_id: number };
 
-  const [resultsRows, predsRows, dkOddsRows] = await Promise.all([
+  const [resultsRows, predsRows, dkOddsRows, fdOddsRows] = await Promise.all([
     paginateSelect<ResRowRaw>((from, to) => sb.from("prediction_results")
       .select(
         "date, game_pk, away_win_pct, home_win_pct, nrfi_pct, status, " +
@@ -525,6 +531,12 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
       sb.from("daily_odds_first")
         .select("date, game_pk, away_ml_odds, home_ml_odds")
         .eq("sport", "mlb").eq("book", "DraftKings")
+        .gte("date", startIso).lte("date", endIso)
+        .range(from, to)),
+    paginateSelect<{ date: string; game_pk: number; nrfi_odds: number | null; yrfi_odds: number | null }>((from, to) =>
+      sb.from("daily_odds_first")
+        .select("date, game_pk, nrfi_odds, yrfi_odds")
+        .eq("sport", "mlb").eq("book", "FanDuel")
         .gte("date", startIso).lte("date", endIso)
         .range(from, to)),
   ]);
@@ -569,6 +581,9 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
 
   const dkOddsByKey = new Map<string, { away: number | null; home: number | null }>();
   for (const r of dkOddsRows) dkOddsByKey.set(`${r.date}|${r.game_pk}`, { away: r.away_ml_odds, home: r.home_ml_odds });
+  const fdOddsByKey = new Map<string, { nrfi: number | null; yrfi: number | null }>();
+  for (const r of fdOddsRows) fdOddsByKey.set(`${r.date}|${r.game_pk}`, { nrfi: r.nrfi_odds, yrfi: r.yrfi_odds });
+  const SEASON_STAKE = 10;
 
   // One row per game (rowspanned per day in the renderer). Each day shows
   // exactly the capped card — the same 2 ML + 2 NRFI + flex the page and
@@ -584,13 +599,30 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
 
     const mlByPk = new Map<number, { label: string; strong: boolean; hit: boolean | null; dog: boolean }>();
     const nrfiByPk = new Map<number, { label: string; strong: boolean; hit: boolean | null }>();
+    // $10/play P/L of the day's card. `dayPriced` counts picks with a
+    // captured price; `dayGraded` counts decided picks — a gap means the
+    // total is partial.
+    let dayProfit = 0, dayPriced = 0, dayGraded = 0;
     for (const p of card) {
       const o = outcomesByPk.get(p.gamePk);
       if (!o) continue;
       if (p.market === "ML") {
         mlByPk.set(p.gamePk, { label: p.side === "away" ? o.awayAbbr : o.homeAbbr, strong: p.strong, hit: o.winCorrect, dog: p.dog });
+        if (o.winCorrect === null) continue;
+        dayGraded++;
+        const odds = p.side === "away" ? dkOddsByKey.get(`${date}|${p.gamePk}`)?.away : dkOddsByKey.get(`${date}|${p.gamePk}`)?.home;
+        if (odds == null) continue;
+        dayPriced++;
+        dayProfit += o.winCorrect ? SEASON_STAKE * americanToProfitMultiplier(odds) : -SEASON_STAKE;
       } else {
         nrfiByPk.set(p.gamePk, { label: nrfiSideLabel(p.side as "NRFI" | "YRFI"), strong: p.strong, hit: o.nrfiCorrect });
+        if (o.nrfiCorrect === null) continue;
+        dayGraded++;
+        const fd = fdOddsByKey.get(`${date}|${p.gamePk}`);
+        const odds = p.side === "NRFI" ? fd?.nrfi : fd?.yrfi;
+        if (odds == null) continue;
+        dayPriced++;
+        dayProfit += o.nrfiCorrect ? SEASON_STAKE * americanToProfitMultiplier(odds) : -SEASON_STAKE;
       }
     }
 
@@ -611,7 +643,14 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
       });
     }
 
-    if (games.length > 0) days.push({ date, games });
+    if (games.length > 0) {
+      days.push({
+        date,
+        games,
+        profit: dayPriced > 0 ? dayProfit : null,
+        profitPartial: dayPriced < dayGraded,
+      });
+    }
   }
   return days;
 }

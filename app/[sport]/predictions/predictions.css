@@ -171,8 +171,6 @@
 }
 .pr-recap-table tbody tr:nth-child(even) { background: #fafafa; }
 .pr-pick-cell { font-weight: 700; }
-.pr-hit  { color: #1f5a1f; font-weight: 800; }
-.pr-miss { color: #a83232; font-weight: 600; }
 .pr-na   { color: var(--text-muted); font-style: italic; }
 .pr-recap-empty {
   color: var(--text-muted);
@@ -361,11 +359,20 @@
   background: #f2d0d0;
   color: #8a2a2a;
   border-color: #a83232;
+  /* Second, colorblind-safe cue beyond the red fill. */
+  text-decoration: line-through;
 }
 /* Yesterday's Results — neutral chrome. Only the play badge (hit/miss)
  * and the profit cell (positive/negative) carry color; alternating
  * rows are the only other visual distinction. */
 .pr-yesterday { background: #fff; }
+/* Day-total footer row — bold, separated from the per-game rows. */
+.pr-yesterday-total td {
+  border-top: 2px solid var(--border-light);
+  font-weight: 800;
+  background: #fafafa;
+}
+.pr-yesterday-total td:first-child { text-align: right; text-transform: uppercase; letter-spacing: 0.04em; font-size: 10px; }
 .pr-yesterday .pr-recap-table th { background: #f4f4f4; }
 .pr-yesterday .pr-recap-subhead { color: var(--text-muted); }
 
@@ -411,17 +418,26 @@
 .pr-season-table td { vertical-align: middle; }
 .pr-season-table th,
 .pr-season-table td { padding: 3px 4px; }
-.pr-season-date-head { width: 38px; }
+.pr-season-date-head { width: 56px; }
 .pr-season-box-head  { width: auto; }
-.pr-season-result-head { width: 78px; text-align: left !important; }
+.pr-season-result-head { width: 84px; text-align: left !important; }
 
 .pr-season-date {
-  width: 38px;
+  width: 56px;
   white-space: nowrap;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10px;
   text-align: center;
   border-right: 1px solid var(--border-light);
+}
+.pr-season-date-label { display: block; }
+/* Per-day card P/L under the date. Colour comes from pr-profit-pos/neg. */
+.pr-day-pl {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .pr-season-box {

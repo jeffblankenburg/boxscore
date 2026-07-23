@@ -280,6 +280,14 @@ function YesterdayResults({
 
   if (playedRows.length === 0) return null;
 
+  // Day total P/L across the card's priced picks.
+  let dayTotal = 0, priced = 0, anyPartial = false;
+  for (const { o, win, nrfi } of playedRows) {
+    const { profit, partial } = pickProfit(o, win, nrfi, odds);
+    if (profit !== null) { dayTotal += profit; priced++; }
+    if (partial) anyPartial = true;
+  }
+
   return (
     <section className="pr-recap pr-yesterday">
       <h2 className="pr-recap-head">Yesterday&apos;s Results</h2>
@@ -299,6 +307,17 @@ function YesterdayResults({
               <YesterdayRow key={o.gamePk} o={o} win={win} nrfi={nrfi} odds={odds} />
             ))}
           </tbody>
+          {priced > 0 && (
+            <tfoot>
+              <tr className="pr-yesterday-total">
+                <td colSpan={3}>Day total</td>
+                <td className="pr-yesterday-profit">
+                  <span className={dayTotal >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>{formatProfit(dayTotal)}</span>
+                  {anyPartial && <span className="pr-profit-partial" title="Some odds missing">*</span>}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </section>
@@ -393,11 +412,15 @@ function formatPctSigned(v: number | null): string {
   return `${sign}${(Math.abs(v) * 100).toFixed(1)}%`;
 }
 
+const SEASON_PICKS_DAYS = 14;
+
 function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
   if (days.length === 0) return null;
+  const shown = days.slice(0, SEASON_PICKS_DAYS);
   return (
     <section className="pr-recap">
       <h2 className="pr-recap-head">Season Picks</h2>
+      <div className="pr-recap-subhead">Last {shown.length} days</div>
       <div className="pr-scroll">
         <table className="pr-recap-table pr-season-table">
           <thead>
@@ -408,12 +431,17 @@ function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
             </tr>
           </thead>
           <tbody>
-            {days.flatMap((d) =>
+            {shown.flatMap((d) =>
               d.games.map((g, gi) => (
                 <tr key={`${d.date}|${g.gamePk}`}>
                   {gi === 0 && (
                     <td className="pr-season-date" rowSpan={d.games.length}>
-                      {shortDate(d.date)}
+                      <span className="pr-season-date-label">{shortDate(d.date)}</span>
+                      {d.profit !== null && (
+                        <span className={`pr-day-pl ${d.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}`}>
+                          {formatProfit(d.profit)}{d.profitPartial ? "*" : ""}
+                        </span>
+                      )}
                     </td>
                   )}
                   <td className="pr-season-box"><BoxScoreCell game={g} /></td>
@@ -519,29 +547,18 @@ function YesterdayRow({
       ? `${o.awayAbbr} ${o.awayScore} · ${o.homeAbbr} ${o.homeScore}`
       : <span className="pr-na">{o.status}</span>;
 
-  const STAKE = 10;
   const oddsCells: string[] = [];
-  const profits: number[] = [];
-  let missingOdds = false;
   if (win && o.winCorrect !== null) {
     const mlOdds = odds.mlByGamePk.get(o.gamePk);
     const price = win.side === "away" ? mlOdds?.away : mlOdds?.home;
-    if (price == null) { missingOdds = true; oddsCells.push("—"); }
-    else {
-      oddsCells.push(formatOdds(price));
-      profits.push(o.winCorrect ? STAKE * americanToProfitMultiplier(price) : -STAKE);
-    }
+    oddsCells.push(price == null ? "—" : formatOdds(price));
   }
   if (nrfi && o.nrfiCorrect !== null) {
     const nrfiOdds = odds.nrfiByGamePk.get(o.gamePk);
     const price = nrfi.side === "NRFI" ? nrfiOdds?.nrfi : nrfiOdds?.yrfi;
-    if (price == null) { missingOdds = true; oddsCells.push("—"); }
-    else {
-      oddsCells.push(formatOdds(price));
-      profits.push(o.nrfiCorrect ? STAKE * americanToProfitMultiplier(price) : -STAKE);
-    }
+    oddsCells.push(price == null ? "—" : formatOdds(price));
   }
-  const totalProfit = profits.length > 0 ? profits.reduce((a, b) => a + b, 0) : null;
+  const { profit: totalProfit, partial: missingOdds } = pickProfit(o, win, nrfi, odds);
 
   return (
     <tr>
@@ -576,6 +593,31 @@ function formatOdds(v: number): string {
   return v >= 0 ? `+${v}` : `${v}`;
 }
 
+/** $10/play P/L for one game's card picks against captured odds — used
+ *  per-row and summed for the day total. `partial` = a picked side had no
+ *  captured price (excluded from the sum). */
+const YESTERDAY_STAKE = 10;
+function pickProfit(
+  o: GamePredictionOutcome,
+  win: WinPlay | null,
+  nrfi: NrfiPlay | null,
+  odds: DayOdds,
+): { profit: number | null; partial: boolean } {
+  const profits: number[] = [];
+  let partial = false;
+  if (win && o.winCorrect !== null) {
+    const price = win.side === "away" ? odds.mlByGamePk.get(o.gamePk)?.away : odds.mlByGamePk.get(o.gamePk)?.home;
+    if (price == null) partial = true;
+    else profits.push(o.winCorrect ? YESTERDAY_STAKE * americanToProfitMultiplier(price) : -YESTERDAY_STAKE);
+  }
+  if (nrfi && o.nrfiCorrect !== null) {
+    const price = nrfi.side === "NRFI" ? odds.nrfiByGamePk.get(o.gamePk)?.nrfi : odds.nrfiByGamePk.get(o.gamePk)?.yrfi;
+    if (price == null) partial = true;
+    else profits.push(o.nrfiCorrect ? YESTERDAY_STAKE * americanToProfitMultiplier(price) : -YESTERDAY_STAKE);
+  }
+  return { profit: profits.length > 0 ? profits.reduce((a, b) => a + b, 0) : null, partial };
+}
+
 function PlayCell({
   badgeClass,
   strong,
@@ -587,15 +629,12 @@ function PlayCell({
   label: string;
   hit: boolean | null;
 }) {
+  // Outcome is coded two ways for colorblind safety: color (green/red)
+  // AND strikethrough on misses. No ✓/✗ — the styling carries it.
   const outcomeClass = hit === true ? " pr-play-hit" : hit === false ? " pr-play-miss" : "";
   return (
     <span className="pr-play-cell">
       <span className={`pr-play-badge ${badgeClass}${strong ? " pr-play-strong" : ""}${outcomeClass}`}>{label}</span>
-      {hit === null
-        ? <span className="pr-na"> —</span>
-        : hit
-          ? <span className="pr-hit"> ✓</span>
-          : <span className="pr-miss"> ✗</span>}
     </span>
   );
 }
