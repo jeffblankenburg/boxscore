@@ -23,6 +23,11 @@ export type EvalGame = {
   mlHomeOdds: number | null; nrfiOdds: number | null; yrfiOdds: number | null;
   v6HomeWin: number; v6Nrfi: number;              // shipped
   reV6HomeWin: number; reV6Nrfi: number;          // recomputed (faithfulness)
+  /** OUTCOME-side facts from the game's own day (post-hoc — never inputs
+   *  for this game's prediction, only for building tendencies of LATER
+   *  games): plate umpire + total 1st-inning runs. fit-umpire-nrfi.ts. */
+  plateUmpId: number | null;
+  firstInningRuns: number | null;
 };
 
 type ResultRow = {
@@ -40,6 +45,31 @@ async function pageAll<T>(build: (f: number, t: number) => PromiseLike<{ data: u
     const chunk = (data as T[]) ?? [];
     out.push(...chunk);
     if (chunk.length < 1000) break;
+  }
+  return out;
+}
+
+// Post-hoc facts from the game day's own payload: plate ump (boxscore
+// officials) + total 1st-inning runs (schedule linescore).
+type GameDayFacts = { plateUmpId: number | null; firstInningRuns: number | null };
+function parseGameDayFacts(payload: Record<string, unknown> | undefined): Map<number, GameDayFacts> {
+  const out = new Map<number, GameDayFacts>();
+  if (!payload) return out;
+  type Official = { official?: { id?: number }; officialType?: string };
+  const games = (payload.games as Record<string, { boxscore?: { officials?: Official[] } }>) ?? {};
+  type SchedGame = { gamePk?: number; linescore?: { innings?: Array<{ num?: number; away?: { runs?: number }; home?: { runs?: number } }> } };
+  const schedule = (payload.schedule as { dates?: Array<{ games?: SchedGame[] }> }) ?? {};
+  for (const d of schedule.dates ?? []) {
+    for (const g of d.games ?? []) {
+      if (typeof g.gamePk !== "number") continue;
+      const first = g.linescore?.innings?.find((i) => i.num === 1);
+      const a = first?.away?.runs, h = first?.home?.runs;
+      const hp = games[String(g.gamePk)]?.boxscore?.officials?.find((o) => o.officialType === "Home Plate");
+      out.set(g.gamePk, {
+        plateUmpId: typeof hp?.official?.id === "number" ? hp.official.id : null,
+        firstInningRuns: typeof a === "number" && typeof h === "number" ? a + h : null,
+      });
+    }
   }
   return out;
 }
@@ -157,6 +187,7 @@ export async function loadEvalGames(year: string): Promise<EvalGame[]> {
   for (const date of [...byDate.keys()].sort()) {
     const prevPayload = payloadByDate.get(prevDay(date));
     if (!prevPayload) continue;
+    const dayFacts = parseGameDayFacts(payloadByDate.get(date));
     const { slate, records, spStats } = parsePayload(prevPayload);
     const aggRows = rows.filter((r) => r.date <= prevDay(date)) as Parameters<typeof computeSeasonAggregatesFromRows>[0];
     const aggs = computeSeasonAggregatesFromRows(aggRows, prevDay(date));
@@ -178,6 +209,8 @@ export async function loadEvalGames(year: string): Promise<EvalGame[]> {
         mlHomeOdds: mlOdds.get(k) ?? null, nrfiOdds: nrfiOdds.get(k) ?? null, yrfiOdds: yrfiOdds.get(k) ?? null,
         v6HomeWin: res.home_win_pct, v6Nrfi: res.nrfi_pct,
         reV6HomeWin: v6g.home.winProbability, reV6Nrfi: v6g.nrfiProbability,
+        plateUmpId: dayFacts.get(res.game_pk)?.plateUmpId ?? null,
+        firstInningRuns: dayFacts.get(res.game_pk)?.firstInningRuns ?? null,
       });
     }
   }
