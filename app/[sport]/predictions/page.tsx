@@ -64,11 +64,14 @@ function prettyDate(iso: string): string {
 
 export default async function PredictionsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sport: string }>;
+  searchParams: Promise<{ spw?: string }>;
 }) {
   const { sport } = await params;
   if (sport !== "mlb") notFound();
+  const { spw } = await searchParams;
 
   const today = todayInET();
   const yesterday = prevDay(today);
@@ -86,7 +89,6 @@ export default async function PredictionsPage({
   let roi7:      PlayRoiSummary | null = null;
   let roi30:     PlayRoiSummary | null = null;
   let roiSeason: PlayRoiSummary | null = null;
-  let seasonHistory: SeasonHistoryDay[] = [];
   let seasonDays = 0;
 
   // Yesterday's and today's odds — small, dedicated fetches. Today's
@@ -108,7 +110,6 @@ export default async function PredictionsPage({
     roi30             = cached.roi30;
     roiSeason         = cached.roiSeason;
     seasonDays        = cached.seasonDays;
-    seasonHistory     = cached.seasonHistory;
   } else {
     // Cold path — same loaders the cache would have called. Wait on
     // all in parallel. Page is slow here (~20s on a fresh serverless
@@ -123,18 +124,30 @@ export default async function PredictionsPage({
          new Date(`${seasonStart}T00:00:00Z`).getTime()) / 86_400_000,
       ),
     );
-    [result, yesterdayOutcomes, rolling7, rolling30, rollingSeason, seasonHistory, roi7, roi30, roiSeason] = await Promise.all([
+    [result, yesterdayOutcomes, rolling7, rolling30, rollingSeason, roi7, roi30, roiSeason] = await Promise.all([
       loadPredictionsForDate(today),
       loadPredictionOutcomesForDate(yesterday),
       loadPredictionAccuracy(7,          yesterday),
       loadPredictionAccuracy(30,         yesterday),
       loadPredictionAccuracy(seasonDays, yesterday),
-      loadSeasonHistory(seasonStart, yesterday),
       loadPlayRoi(7,          yesterday),
       loadPlayRoi(30,         yesterday),
       loadPlayRoi(seasonDays, yesterday),
     ]);
   }
+
+  // Season Picks paginates by 7-day week, navigable via ?spw=<end ISO>.
+  // Default window ends yesterday (the latest graded day). This is a cheap
+  // read, loaded per request regardless of the blob so navigation works.
+  const SEASON_FLOOR = `${today.slice(0, 4)}-03-26`; // first graded day of the season
+  const winEndReq = spw && /^\d{4}-\d{2}-\d{2}$/.test(spw) ? spw : yesterday;
+  const winEnd = winEndReq > yesterday ? yesterday : winEndReq;
+  const winStart = shiftDays(winEnd, -(SEASON_PICKS_WEEK - 1));
+  const weekDays = await loadSeasonHistory(winStart, winEnd);
+  const hasNewer = winEnd < yesterday;
+  const newerEnd = hasNewer ? (shiftDays(winEnd, SEASON_PICKS_WEEK) > yesterday ? yesterday : shiftDays(winEnd, SEASON_PICKS_WEEK)) : null;
+  const hasOlder = winStart > SEASON_FLOOR;
+  const olderEnd = hasOlder ? shiftDays(winStart, -1) : null;
 
   // The card ranks by EV, which needs the day's lines. Those are captured
   // by the snapshot cron at 10:30 AM ET — before that, there are games but
@@ -165,7 +178,13 @@ export default async function PredictionsPage({
         seasonDays={seasonDays}
       />
 
-      <SeasonHistorySection days={seasonHistory} />
+      <SeasonHistorySection
+        days={weekDays}
+        rangeStart={winStart}
+        rangeEnd={winEnd}
+        olderHref={olderEnd ? `?spw=${olderEnd}` : null}
+        newerHref={newerEnd ? `?spw=${newerEnd}` : null}
+      />
     </div>
   );
 }
@@ -394,16 +413,43 @@ function formatDollarWhole(v: number): string {
   return `${sign}$${Math.round(Math.abs(v))}`;
 }
 
-const SEASON_PICKS_DAYS = 14;
+const SEASON_PICKS_WEEK = 7;
 
-function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
-  if (days.length === 0) return null;
-  const shown = days.slice(0, SEASON_PICKS_DAYS);
+/** Shift an ISO date by n days (UTC). */
+function shiftDays(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+function SeasonHistorySection({
+  days,
+  rangeStart,
+  rangeEnd,
+  olderHref,
+  newerHref,
+}: {
+  days: SeasonHistoryDay[];
+  rangeStart: string;
+  rangeEnd: string;
+  olderHref: string | null;
+  newerHref: string | null;
+}) {
   return (
     <section className="pr-recap">
       <h2 className="pr-recap-head">Season Picks</h2>
-      <div className="pr-recap-subhead">Last {shown.length} days</div>
-      {shown.map((d) => (
+      <nav className="pr-week-nav">
+        {olderHref
+          ? <a className="pr-week-link" href={olderHref}>‹ Older</a>
+          : <span className="pr-week-link pr-week-off">‹ Older</span>}
+        <span className="pr-week-range">{shortDate(rangeStart)} – {shortDate(rangeEnd)}</span>
+        {newerHref
+          ? <a className="pr-week-link" href={newerHref}>Newer ›</a>
+          : <span className="pr-week-link pr-week-off">Newer ›</span>}
+      </nav>
+      {days.length === 0 ? (
+        <p className="pr-recap-empty">No graded picks this week.</p>
+      ) : days.map((d) => (
         <div className="pr-day" key={d.date}>
           <div className="pr-day-head">
             <span className="pr-day-date">{weekdayMonthDay(d.date)}</span>
@@ -485,6 +531,12 @@ function longMonthDay(iso: string): string {
   if (!y || !m || !d) return iso;
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+}
+/** "Jul 23" — short month + day, for compact ranges. */
+function shortDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map((s) => Number(s));
+  if (!y || !m || !d) return iso;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 /** "Thursday, July 23" — weekday + month + day, no year. */
 function weekdayMonthDay(iso: string): string {

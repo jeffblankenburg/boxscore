@@ -175,6 +175,27 @@
 /* ─── Season Picks — day-grouped box-score blocks. The linescore gets
  * the full width (so 12 innings + 2-digit R/H/E fit at 400px) instead of
  * being crammed into a narrow table column. ──────────────────────── */
+/* Week navigation above Season Picks. */
+.pr-week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 14px;
+}
+.pr-week-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.pr-week-link:hover { text-decoration: underline; }
+.pr-week-off { color: var(--border-light); pointer-events: none; }
+.pr-week-range {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
 .pr-day { margin: 0 0 16px; }
 .pr-day-head {
   display: flex;
