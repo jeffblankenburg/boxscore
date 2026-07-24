@@ -108,62 +108,16 @@
 .pr-play-miss { color: #a83232; text-decoration: line-through; }
 .pr-play-cell { display: inline-flex; align-items: baseline; }
 
-/* ─── Win Percentages — three flat columns (7d / 30d / season), each a
- * small titled block, no box chrome. ──────────────────────────────── */
-.pr-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 4px 24px;
-}
-.pr-window-box { padding: 0; }
-.pr-window-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  font-weight: 700;
-  margin: 0 0 4px;
-  padding: 0 0 3px;
-  border-bottom: 1px solid var(--border-light);
-}
-.pr-window-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 3px 0;
-}
-.pr-window-tag {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  min-width: 34px;
-}
-.pr-window-pct {
+/* ─── Win Percentages — one row per window (7d / 30d / season), metric
+ * columns. Numeric cells right-aligned + monospace. ───────────────── */
+.pr-winpct-table th:not(:first-child) { text-align: right; }
+.pr-winpct-num {
+  text-align: right !important;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 800;
-  font-size: 17px;
-}
-.pr-window-sub {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-left: auto;
-}
-.pr-window-tag-sub {
-  color: var(--text-muted);
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 500;
-  font-size: 11px;
-}
-.pr-window-pl {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 700;
   font-size: 13px;
+  white-space: nowrap;
 }
-.pr-window-pl-pos { color: #1f5a1f; }
-.pr-window-pl-neg { color: #a83232; }
+.pr-winpct-hit { font-weight: 800; font-size: 15px; }
 
 /* ─── Yesterday's Results — Final | Play | Profit. ─────────────────── */
 .pr-yesterday-play { white-space: nowrap; }

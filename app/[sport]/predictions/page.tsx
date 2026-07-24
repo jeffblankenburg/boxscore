@@ -339,54 +339,46 @@ function StatBoxes({
   const hasAny = rolling30.mlPlays > 0 || rolling7.mlPlays > 0;
   if (!hasAny) return null;
 
-  const seasonLabel = seasonDays > 0 ? `Season (${seasonDays}d)` : "Season";
+  const rows: Array<{ label: string; s: PlayAccuracySummary; roi: PlayRoiSummary | null }> = [
+    { label: "Last 7", s: rolling7, roi: roi7 },
+    { label: "Last 30", s: rolling30, roi: roi30 },
+    ...(rollingSeason ? [{ label: "Season", s: rollingSeason, roi: roiSeason }] : []),
+  ];
 
   return (
     <section className="pr-recap">
       <h2 className="pr-recap-head">Win Percentages</h2>
-      <div className="pr-stat-grid">
-        <WindowStat label="Last 7 days" summary={rolling7} roi={roi7} />
-        <WindowStat label="Last 30 days" summary={rolling30} roi={roi30} />
-        {rollingSeason && <WindowStat label={seasonLabel} summary={rollingSeason} roi={roiSeason} />}
-      </div>
+      <table className="pr-recap-table pr-winpct-table">
+        <thead>
+          <tr>
+            <th>Window</th>
+            <th>Hit</th>
+            <th>Record</th>
+            <th>ROI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ label, s, roi }) => {
+            const priced = roi && roi.mlPlaysWithOdds > 0;
+            return (
+              <tr key={label}>
+                <td>{label}</td>
+                <td className="pr-winpct-num pr-winpct-hit">{pctOrDash(s.mlHitRate)}</td>
+                <td className="pr-winpct-num">{s.mlPlays > 0 ? `${s.mlPlayHits}/${s.mlPlays}` : "—"}</td>
+                <td className="pr-winpct-num">
+                  {priced
+                    ? <span className={roi!.mlProfit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>{formatPctSigned(roi!.mlRoi)}</span>
+                    : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </section>
   );
 }
 
-function WindowStat({
-  label,
-  summary,
-  roi,
-}: {
-  label: string;
-  summary: PlayAccuracySummary;
-  roi: PlayRoiSummary | null;
-}) {
-  return (
-    <div className="pr-window-box">
-      <div className="pr-window-label">{label}</div>
-      <div className="pr-window-row">
-        <span className="pr-window-tag">ML</span>
-        <span className="pr-window-pct">{pctOrDash(summary.mlHitRate)}</span>
-        <span className="pr-window-sub">{summary.mlPlays > 0 ? `${summary.mlPlayHits} of ${summary.mlPlays}` : "—"}</span>
-      </div>
-      {roi && roi.mlPlaysWithOdds > 0 && (
-        <div className="pr-window-row pr-window-row-roi">
-          <span className="pr-window-tag pr-window-tag-sub">${roi.stake}/play</span>
-          <span className={`pr-window-pl${roi.mlProfit >= 0 ? " pr-window-pl-pos" : " pr-window-pl-neg"}`}>
-            {formatDollarSigned(roi.mlProfit)}
-          </span>
-          <span className="pr-window-sub">{formatPctSigned(roi.mlRoi)} ROI</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function formatDollarSigned(v: number): string {
-  const sign = v >= 0 ? "+" : "−";
-  return `${sign}$${Math.abs(v).toFixed(2)}`;
-}
 function formatPctSigned(v: number | null): string {
   if (v == null) return "—";
   const sign = v >= 0 ? "+" : "−";
