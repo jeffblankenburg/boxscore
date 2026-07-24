@@ -305,7 +305,7 @@ function YesterdayResults({
           {priced > 0 && (
             <tfoot>
               <tr className="pr-yesterday-total">
-                <td colSpan={2}>Day total</td>
+                <td colSpan={2}>{longMonthDay(yesterday)} Total</td>
                 <td className="pr-yesterday-profit">
                   <span className={dayTotal >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>{formatProfit(dayTotal)}</span>
                   {anyPartial && <span className="pr-profit-partial" title="Some odds missing">*</span>}
@@ -485,6 +485,13 @@ function ResultCell({ game }: { game: SeasonHistoryGame }) {
       />
     </span>
   );
+}
+
+function longMonthDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map((s) => Number(s));
+  if (!y || !m || !d) return iso;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 }
 
 function shortDate(iso: string): string {
