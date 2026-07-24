@@ -354,21 +354,24 @@ function StatBoxes({
             <th>Window</th>
             <th>Hit</th>
             <th>Record</th>
+            <th>Profit</th>
             <th>ROI</th>
           </tr>
         </thead>
         <tbody>
           {rows.map(({ label, s, roi }) => {
             const priced = roi && roi.mlPlaysWithOdds > 0;
+            const pl = priced ? (roi!.mlProfit >= 0 ? "pr-profit-pos" : "pr-profit-neg") : "";
             return (
               <tr key={label}>
                 <td>{label}</td>
                 <td className="pr-winpct-num pr-winpct-hit">{pctOrDash(s.mlHitRate)}</td>
                 <td className="pr-winpct-num">{s.mlPlays > 0 ? `${s.mlPlayHits}/${s.mlPlays}` : "—"}</td>
                 <td className="pr-winpct-num">
-                  {priced
-                    ? <span className={roi!.mlProfit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>{formatPctSigned(roi!.mlRoi)}</span>
-                    : "—"}
+                  {priced ? <span className={pl}>{formatDollarWhole(roi!.mlProfit)}</span> : "—"}
+                </td>
+                <td className="pr-winpct-num">
+                  {priced ? <span className={pl}>{formatPctSigned(roi!.mlRoi)}</span> : "—"}
                 </td>
               </tr>
             );
@@ -383,6 +386,12 @@ function formatPctSigned(v: number | null): string {
   if (v == null) return "—";
   const sign = v >= 0 ? "+" : "−";
   return `${sign}${(Math.abs(v) * 100).toFixed(1)}%`;
+}
+/** Whole-dollar P/L, e.g. +$947 — compact enough for the 5-column Win%
+ *  table at 400px (the cents live in the day totals). */
+function formatDollarWhole(v: number): string {
+  const sign = v >= 0 ? "+" : "−";
+  return `${sign}$${Math.round(Math.abs(v))}`;
 }
 
 const SEASON_PICKS_DAYS = 14;

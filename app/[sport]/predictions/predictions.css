@@ -5,10 +5,17 @@
 
 .pr-page { padding: 0 0 32px; }
 
+/* Type scale — deliberately few sizes, each with a role:
+ *   24  page title
+ *   16  section headers
+ *   13  block headers (day date, matchup)
+ *   12  body (table cells, play labels, numbers, profit)
+ *   11  linescore only (width-constrained to fit 12 innings at 400px)
+ *   10  micro-labels (th, subheads, tags) */
 .pr-title {
   font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
   font-weight: 900;
-  font-size: 25px;
+  font-size: 24px;
   margin: 8px 0 2px;
   letter-spacing: -0.01em;
 }
@@ -18,7 +25,7 @@
   font-size: 12px;
 }
 
-/* Flat section — separated by whitespace + a titled hairline, no box. */
+/* Flat section — bold title with an underline rule (the section divider). */
 .pr-plays,
 .pr-recap {
   margin: 0 0 22px;
@@ -29,7 +36,7 @@
   font-weight: 800;
   font-size: 16px;
   letter-spacing: -0.005em;
-  margin: 0 0 6px;
+  margin: 0 0 7px;
   padding: 0 0 3px;
   border-bottom: 2px solid var(--border-strong);
 }
@@ -67,8 +74,10 @@
   letter-spacing: 0.03em;
   color: var(--text-secondary);
   text-align: left;
-  padding: 1px 6px 3px;
+  /* Symmetric padding so the label sits centered above its border. */
+  padding: 4px 6px;
   border-bottom: 1.5px solid var(--border-strong);
+  vertical-align: middle;
   white-space: nowrap;
 }
 .pr-plays-table td,
@@ -78,12 +87,17 @@
   text-align: left;
   vertical-align: middle;
 }
+/* Tables directly under a section header don't repeat a header rule — the
+ * section underline right above already divides. (Yesterday's keeps its
+ * rule; a date subhead sits between it and the section line.) */
+.pr-plays-table th,
+.pr-winpct-table th { border-bottom: none; }
 
 .pr-col-time {
-  width: 66px;
+  width: 70px;
   white-space: nowrap;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 .pr-team-link {
@@ -100,7 +114,7 @@
 .pr-play-plain,
 .pr-play-badge {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -117,7 +131,7 @@
   font-size: 12px;
   white-space: nowrap;
 }
-.pr-winpct-hit { font-weight: 800; font-size: 13px; }
+.pr-winpct-hit { font-weight: 800; }
 
 /* ─── Yesterday's Results — Final | Play | Profit. ─────────────────── */
 .pr-yesterday-play { white-space: nowrap; }
@@ -162,7 +176,7 @@
 .pr-day-date {
   font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
   font-weight: 800;
-  font-size: 14px;
+  font-size: 13px;
 }
 .pr-day-head .pr-profit-pos,
 .pr-day-head .pr-profit-neg {
@@ -170,8 +184,9 @@
   font-weight: 700;
   font-size: 12px;
 }
-.pr-game { margin: 0 0 9px; }
-.pr-game:last-child { margin-bottom: 0; }
+/* Contiguous game bands with subtle zebra striping to separate picks. */
+.pr-game { padding: 5px 6px; }
+.pr-game:nth-child(even) { background: rgba(0, 0, 0, 0.035); }
 .pr-game-line {
   display: flex;
   align-items: baseline;
