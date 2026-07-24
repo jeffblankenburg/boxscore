@@ -93,6 +93,10 @@
       "schedule": "30 9 * * *"
     },
     {
+      "path": "/api/cron/send-predictions-email",
+      "schedule": "15 15 * * *"
+    },
+    {
       "path": "/api/cron/fantasy-comparator?sport=mlb",
       "schedule": "45 9 * * *"
     }

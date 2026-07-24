@@ -229,6 +229,38 @@ export function dailyEmail(opts: {
 }
 
 /**
+ * Predictions digest email — the daily picks email (admins first, ~11:15 AM
+ * ET once the morning lines lock). Same chrome as dailyEmail, but the body is
+ * the predictions digest (today's card + 7-day results + season line), which
+ * is fully inline-styled, so no per-sport stylesheet is needed. The subject
+ * uses the SAME date as the body (picks are for today, not yesterday's edition).
+ */
+export function predictionsEmail(opts: {
+  digestDate: string;          // ISO "YYYY-MM-DD" — the day the picks are for
+  digestUrl: string;           // /mlb/predictions
+  unsubscribeUrl: string;
+  manageUrl: string;
+  gamesUrl: string;
+  tipJarUrl: string;
+  digestEmailHtml: string;     // renderPredictionsDigestBody(...)
+  openToken?: string | null;
+}): { subject: string; html: string; text: string } {
+  const subject = `MLB Picks - ${shortPrettyDate(opts.digestDate)}`;
+  const html = wrapWithDigest({
+    digestEmailHtml: opts.digestEmailHtml,
+    unsubscribeUrl: opts.unsubscribeUrl,
+    digestUrl: opts.digestUrl,
+    manageUrl: opts.manageUrl,
+    gamesUrl: opts.gamesUrl,
+    tipJarUrl: opts.tipJarUrl,
+    openToken: opts.openToken,
+    previewText: `${prettyDate(opts.digestDate)} · today's MLB picks from boxscore.`,
+  });
+  const text = `${subject}\n\nSee the picks: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
+  return { subject, html, text };
+}
+
+/**
  * Team-scoped daily email — same chrome as dailyEmail, but the subject and
  * preview text identify the team. Used for paid subscribers who've added a
  * specific team. Body comes from renderTeamEmailContent().
