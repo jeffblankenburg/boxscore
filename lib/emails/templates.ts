@@ -229,7 +229,7 @@ export function dailyEmail(opts: {
 }
 
 /**
- * Predictions digest email — the daily picks email (admins first, ~11:15 AM
+ * Predictions digest email — the daily picks email (admins first, ~11:30 AM
  * ET once the morning lines lock). Same chrome as dailyEmail, but the body is
  * the predictions digest (today's card + 7-day results + season line), which
  * is fully inline-styled, so no per-sport stylesheet is needed. The subject

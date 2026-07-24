@@ -14,7 +14,7 @@ export const maxDuration = 300;
 
 // Distinct sends key so predictions rows never collide with the league MLB
 // digest's (subscriber, sport, date) uniqueness. A subscriber can get both
-// the 5am league digest AND the 11:15am picks email on the same date.
+// the 5am league digest AND the 11:30am picks email on the same date.
 const SEND_KEY = "mlb-predictions";
 const BATCH_SIZE = 100;
 

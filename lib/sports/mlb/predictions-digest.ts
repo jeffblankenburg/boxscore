@@ -1,4 +1,4 @@
-// Predictions email digest — the daily picks email (admins first, ~11:15
+// Predictions email digest — the daily picks email (admins first, ~11:30
 // AM ET, after the morning lines lock). Mirrors the flat/newspaper style
 // of /mlb/predictions but as email-safe HTML (table layout + inline
 // styles). Content is deliberately concise: today's card, a 7-day results
