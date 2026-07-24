@@ -414,7 +414,10 @@ function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
             )}
           </div>
           {d.games.map((g) => (
-            <div className="pr-game" key={g.gamePk}>
+            <div
+              className={`pr-game${g.mlPick?.hit === true ? " pr-game-won" : g.mlPick?.hit === false ? " pr-game-lost" : ""}`}
+              key={g.gamePk}
+            >
               <div className="pr-game-line">
                 <span className="pr-game-match">{g.awayAbbr} @ {g.homeAbbr}</span>
                 {g.mlPick && (

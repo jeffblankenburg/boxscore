@@ -87,11 +87,12 @@
   text-align: left;
   vertical-align: middle;
 }
-/* Tables directly under a section header don't repeat a header rule — the
- * section underline right above already divides. (Yesterday's keeps its
- * rule; a date subhead sits between it and the section line.) */
+/* Tables directly under a section header (Today's Plays, Win%): the label
+ * row keeps its underline, and the labels sit vertically centered between
+ * the section underline above and that rule below — equal gap top (the
+ * section head's 7px margin) and bottom (7px padding). */
 .pr-plays-table th,
-.pr-winpct-table th { border-bottom: none; }
+.pr-winpct-table th { padding: 0 6px 7px; }
 
 .pr-col-time {
   width: 70px;
@@ -184,9 +185,10 @@
   font-weight: 700;
   font-size: 12px;
 }
-/* Contiguous game bands with subtle zebra striping to separate picks. */
+/* Game bands tinted faintly by outcome — green won, red lost. */
 .pr-game { padding: 5px 6px; }
-.pr-game:nth-child(even) { background: rgba(0, 0, 0, 0.035); }
+.pr-game-won  { background: rgba(31, 90, 31, 0.07); }
+.pr-game-lost { background: rgba(168, 50, 50, 0.07); }
 .pr-game-line {
   display: flex;
   align-items: baseline;
