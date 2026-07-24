@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { todayInET, timeInET, prevDay } from "@/lib/dates";
+import { todayInET, timeInET, prevDay, volumeNumber, issueNumber } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { loadPredictionsForDate } from "@/lib/sports/mlb/predictions-data";
 import {
@@ -158,11 +158,13 @@ export default async function PredictionsPage({
 
   return (
     <div className="pr-page">
-      <h1 className="pr-title">Daily Predictions</h1>
-      <p className="pr-subtitle">
-        {prettyDate(today)} &middot; {result.gameCount} game{result.gameCount === 1 ? "" : "s"}
-        {plays.length > 0 && <> &middot; <strong>{plays.length} play{plays.length === 1 ? "" : "s"}</strong></>}
-      </p>
+      {/* Newspaper dateline, same band as the /mlb digest — double top rule,
+          italic date, Vol./Issue. today is the games date, which matches the
+          edition date /mlb shows, so the issue number lines up. */}
+      <div className="dateline">
+        <div className="dateline-row"><span className="dateline-text">{prettyDate(today)}</span></div>
+        <div className="dateline-issue-no">Vol. {volumeNumber(today)}, Issue {issueNumber(today)}</div>
+      </div>
 
       <PlaysSection plays={plays} pending={picksPending} />
 

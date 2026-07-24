@@ -6,24 +6,12 @@
 .pr-page { padding: 0 0 32px; }
 
 /* Type scale — deliberately few sizes, each with a role:
- *   24  page title
  *   16  section headers
  *   13  block headers (day date, matchup)
  *   12  body (table cells, play labels, numbers, profit)
  *   11  linescore only (width-constrained to fit 12 innings at 400px)
- *   10  micro-labels (th, subheads, tags) */
-.pr-title {
-  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
-  font-weight: 900;
-  font-size: 24px;
-  margin: 8px 0 2px;
-  letter-spacing: -0.01em;
-}
-.pr-subtitle {
-  color: var(--text-muted);
-  margin: 0 0 20px;
-  font-size: 12px;
-}
+ *   10  micro-labels (th, subheads, tags)
+ * The page header is the shared .dateline band (globals.css), same as /mlb. */
 
 /* Flat section — bold title with an underline rule (the section divider). */
 .pr-recap {
