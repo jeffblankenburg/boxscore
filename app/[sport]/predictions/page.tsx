@@ -252,7 +252,7 @@ function PlaysSection({
                     <a className="pr-team-link" href={teamHref(game.home.abbr)}>{game.home.abbr}</a>
                   </td>
                   <td className="pr-plays-play">
-                    <span className="pr-play-plain">{win.abbr} ML{win.dog ? " 🐕" : ""}</span>
+                    <span className="pr-play-plain">{win.abbr}{win.dog ? " 🐕" : ""}</span>
                   </td>
                 </tr>
               ))}
@@ -396,7 +396,7 @@ function StatBoxes({
           })}
         </tbody>
       </table>
-      <p className="pr-caption">Profit and ROI assume a flat $10 wager per pick.</p>
+      <p className="pr-caption">Profit and ROI assume a flat $10 moneyline wager per pick.</p>
     </section>
   );
 }
@@ -464,18 +464,19 @@ function SeasonHistorySection({
               className={`pr-game${g.mlPick?.hit === true ? " pr-game-won" : g.mlPick?.hit === false ? " pr-game-lost" : ""}`}
               key={g.gamePk}
             >
-              <div className="pr-game-line">
-                <span className="pr-game-match">{g.awayAbbr} @ {g.homeAbbr}</span>
+              <a className="pr-box-link" href={`/mlb/${d.date}`}>
+                <BoxScoreLine game={g} />
                 {g.mlPick && (
-                  <PlayCell
-                    badgeClass="pr-play-ml"
-                    strong={g.mlPick.strong}
-                    label={`${g.mlPick.label} ML${g.mlPick.dog ? " 🐕" : ""}`}
-                    hit={g.mlPick.hit}
-                  />
+                  <div className="pr-pick">
+                    <span className={`pr-pick-team ${g.mlPick.hit === true ? "pr-play-hit" : g.mlPick.hit === false ? "pr-play-miss" : ""}`}>
+                      {g.mlPick.label}{g.mlPick.dog ? " 🐕" : ""}
+                    </span>
+                    {g.mlPick.profit != null && (
+                      <span className={`pr-pick-pl ${g.mlPick.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}`}>{formatProfit(g.mlPick.profit)}</span>
+                    )}
+                  </div>
                 )}
-              </div>
-              <BoxScoreLine game={g} />
+              </a>
             </div>
           ))}
         </div>
@@ -566,7 +567,7 @@ function YesterdayRow({
     <tr>
       <td>{finalScore}</td>
       <td className="pr-yesterday-play">
-        <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML${win.dog ? " 🐕" : ""}`} hit={o.winCorrect} />
+        <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr}${win.dog ? " 🐕" : ""}`} hit={o.winCorrect} />
       </td>
       <td className="pr-yesterday-profit">
         {totalProfit === null

@@ -9,6 +9,7 @@
 // dropped into the shared email shell (masthead + footer) by the cron.
 
 import { prevDay } from "@/lib/dates";
+import { EMAIL_LINK_BASE } from "@/lib/site";
 import { loadPredictionsForDate } from "./predictions-data";
 import { loadOddsForDate, loadPredictionOutcomesForDate, loadPredictionAccuracy, loadPlayRoi, loadSeasonHistory, type SeasonHistoryDay } from "./predictions-history";
 import { selectDailyCard, cardCandidateFor, cardSize } from "./predictions";
@@ -25,7 +26,7 @@ const SANS = "'Source Sans 3', Helvetica, Arial, sans-serif";
 const MONO = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
 export type DigestPick = { matchup: string; label: string; dog: boolean };
-export type DigestDayGame = { finalScore: string | null; label: string; hit: boolean | null; dog: boolean };
+export type DigestDayGame = { finalScore: string | null; label: string; hit: boolean | null; dog: boolean; profit: number | null };
 export type DigestDay = { date: string; profit: number | null; profitPartial: boolean; games: DigestDayGame[] };
 export type PredictionsDigestData = {
   date: string;
@@ -85,7 +86,7 @@ export async function loadPredictionsDigestData(date: string): Promise<Predictio
     .map((p) => {
       const g = gameByPk.get(p.gamePk);
       if (!g) return null;
-      return { matchup: `${g.away.abbr} @ ${g.home.abbr}`, label: `${p.side === "home" ? g.home.abbr : g.away.abbr} ML`, dog: p.dog };
+      return { matchup: `${g.away.abbr} @ ${g.home.abbr}`, label: `${p.side === "home" ? g.home.abbr : g.away.abbr}`, dog: p.dog };
     })
     .filter((x): x is DigestPick => x !== null);
 
@@ -95,9 +96,10 @@ export async function loadPredictionsDigestData(date: string): Promise<Predictio
     profitPartial: d.profitPartial,
     games: d.games.map((g) => ({
       finalScore: g.linescore ? `${g.awayAbbr} ${g.linescore.away.r ?? 0}, ${g.homeAbbr} ${g.linescore.home.r ?? 0}` : null,
-      label: g.mlPick ? `${g.mlPick.label} ML` : "—",
+      label: g.mlPick ? g.mlPick.label : "—",
       hit: g.mlPick ? g.mlPick.hit : null,
       dog: g.mlPick ? g.mlPick.dog : false,
+      profit: g.mlPick ? g.mlPick.profit : null,
     })),
   }));
 
@@ -140,24 +142,33 @@ function render7Day(d: PredictionsDigestData): string {
       ? `<span style="font-family:${MONO};font-weight:700;font-size:13px;color:${day.profit >= 0 ? GREEN : RED};">${money(day.profit)}${day.profitPartial ? "*" : ""}</span>`
       : "";
     const header = `
-      <tr><td colspan="2" style="padding:9px 0 3px;border-bottom:1.5px solid ${RULE};">
+      <tr><td colspan="3" style="padding:9px 0 3px;border-bottom:1.5px solid ${RULE};">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
           <td style="font-family:${SANS};font-weight:800;font-size:14px;color:${INK};">${weekdayMonthDay(day.date)}</td>
           <td style="text-align:right;">${total}</td>
         </tr></table>
       </td></tr>`;
+    // Each game links (unstyled) to that day's box-score page.
+    const boxUrl = `${EMAIL_LINK_BASE}/mlb/${day.date}`;
     const picks = day.games.map((g) => {
       const tint = g.hit === true ? GREEN_TINT : g.hit === false ? RED_TINT : "transparent";
       const strike = g.hit === false ? "text-decoration:line-through;" : "";
       const color = g.hit === true ? GREEN : g.hit === false ? RED : INK;
+      const score = g.finalScore
+        ? `<a href="${boxUrl}" style="color:inherit;text-decoration:none;">${g.finalScore}</a>`
+        : "—";
+      const pl = g.profit != null
+        ? `<span style="color:${g.profit >= 0 ? GREEN : RED};">${money(g.profit)}</span>`
+        : "";
       return `
         <tr style="background:${tint};">
-          <td style="font-family:${SANS};font-size:13px;color:${INK};padding:5px 6px;">${g.finalScore ?? "—"}</td>
+          <td style="font-family:${SANS};font-size:13px;color:${INK};padding:5px 6px;">${score}</td>
+          <td style="font-family:${MONO};font-size:12px;font-weight:700;text-align:center;padding:5px 6px;white-space:nowrap;">${pl}</td>
           <td style="font-family:${MONO};font-size:13px;font-weight:700;color:${color};${strike}text-align:right;padding:5px 6px;">${g.label}${g.dog ? " 🐕" : ""}</td>
         </tr>`;
     }).join("");
     return header + picks;
-  }).join(`<tr><td colspan="2" style="height:10px;line-height:10px;">&nbsp;</td></tr>`);
+  }).join(`<tr><td colspan="3" style="height:10px;line-height:10px;">&nbsp;</td></tr>`);
 
   return `${sectionHead("Last 7 Days")}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${dayBlocks}</table>`;
 }
@@ -169,7 +180,7 @@ function renderSeason(d: PredictionsDigestData): string {
     ? ` &nbsp;·&nbsp; <span style="color:${s.profit >= 0 ? GREEN : RED};font-weight:700;">${moneyWhole(s.profit)}</span> &nbsp;·&nbsp; <span style="color:${s.profit >= 0 ? GREEN : RED};font-weight:700;">${pctSigned(s.roi)} ROI</span>`
     : "";
   return `${sectionHead("Season")}<p style="font-family:${SANS};font-size:15px;color:${INK};margin:0;"><strong>${pct(s.hitRate)}</strong> (${s.hits} of ${s.plays})${profit}</p>
-    <p style="font-family:${SANS};font-size:11px;color:${MUTED};margin:6px 0 0;">Profit and ROI assume a flat $10 wager per pick.</p>`;
+    <p style="font-family:${SANS};font-size:11px;color:${MUTED};margin:6px 0 0;">Profit and ROI assume a flat $10 moneyline wager per pick.</p>`;
 }
 
 /** The digest body (no masthead/footer — the email shell wraps this). */

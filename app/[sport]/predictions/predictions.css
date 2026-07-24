@@ -217,20 +217,42 @@
   font-weight: 700;
   font-size: 12px;
 }
+/* A game row: linescore on the left, the pick (team over profit,
+ * vertically centered) on the right. The whole row is an unstyled link to
+ * that day's box scores — inherits colour, no underline; the coloured
+ * pick keeps its own colour. */
+.pr-box-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.pr-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+.pr-pick-team {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+.pr-pick-pl {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
 /* Game bands tinted faintly by outcome — green won, red lost — with a
  * 1px gap between them so adjacent tints don't run together. */
 .pr-game { padding: 5px 6px; margin-bottom: 1px; }
 .pr-game:last-child { margin-bottom: 0; }
 .pr-game-won  { background: rgba(31, 90, 31, 0.07); }
 .pr-game-lost { background: rgba(168, 50, 50, 0.07); }
-.pr-game-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 0 0 3px;
-}
-.pr-game-match { font-weight: 700; font-size: 13px; white-space: nowrap; }
 
 .pr-linescore {
   display: flex;
@@ -243,7 +265,7 @@
 }
 .pr-linescore-row {
   display: grid;
-  grid-template-columns: 30px 1fr auto;
+  grid-template-columns: 28px auto auto;
   gap: 10px;
   align-items: baseline;
 }
