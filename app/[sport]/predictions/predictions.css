@@ -87,12 +87,23 @@
   text-align: left;
   vertical-align: middle;
 }
-/* Tables directly under a section header (Today's Plays, Win%): the label
- * row keeps its underline, and the labels sit vertically centered between
- * the section underline above and that rule below — equal gap top (the
- * section head's 7px margin) and bottom (7px padding). */
-.pr-plays-table th,
-.pr-winpct-table th { padding: 0 6px 7px; }
+/* Today's Plays header sits under the section underline. */
+.pr-plays-table th { padding: 0 6px 7px; }
+
+/* Win% header is framed by two rules — its own top border (which IS the
+ * "Win Percentages" line: the section head drops its underline so this
+ * serves as it) and the base bottom border — with the labels centered
+ * between them via equal padding. */
+.pr-winpct-section .pr-recap-head { border-bottom: none; padding-bottom: 0; }
+.pr-winpct-table th {
+  border-top: 2px solid var(--border-strong);
+  padding: 7px 6px;
+}
+.pr-caption {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 6px 0 0;
+}
 
 .pr-col-time {
   width: 70px;

@@ -346,7 +346,7 @@ function StatBoxes({
   ];
 
   return (
-    <section className="pr-recap">
+    <section className="pr-recap pr-winpct-section">
       <h2 className="pr-recap-head">Win Percentages</h2>
       <table className="pr-recap-table pr-winpct-table">
         <thead>
@@ -378,6 +378,7 @@ function StatBoxes({
           })}
         </tbody>
       </table>
+      <p className="pr-caption">Profit and ROI assume a flat $10 wager per pick.</p>
     </section>
   );
 }
