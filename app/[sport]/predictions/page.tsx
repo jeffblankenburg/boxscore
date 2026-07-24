@@ -239,7 +239,7 @@ function PlaysSection({
               <tr>
                 <th className="pr-col-time">Time</th>
                 <th>Matchup</th>
-                <th>Play</th>
+                <th className="pr-plays-play">Play</th>
               </tr>
             </thead>
             <tbody>
@@ -251,7 +251,7 @@ function PlaysSection({
                     {" @ "}
                     <a className="pr-team-link" href={teamHref(game.home.abbr)}>{game.home.abbr}</a>
                   </td>
-                  <td>
+                  <td className="pr-plays-play">
                     <span className="pr-play-plain">{win.abbr}{win.dog ? " 🐕" : ""}</span>
                   </td>
                 </tr>

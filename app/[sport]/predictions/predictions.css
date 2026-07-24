@@ -98,7 +98,8 @@
 }
 
 .pr-col-time {
-  width: 70px;
+  /* Wide enough for "12:45 PM ET" in mono at 12px without clipping the ET. */
+  width: 84px;
   white-space: nowrap;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
@@ -112,6 +113,12 @@
 .pr-team-link:hover { text-decoration: underline; }
 .pr-pick-cell { font-weight: 700; }
 .pr-na { color: var(--text-muted); }
+
+/* Today's Plays — the pick sits at the right edge, matching the value
+ * column (Profit / ROI) in the other framed tables. Beats the specificity
+ * of the base `.pr-recap-table th`/`td` left-align. */
+.pr-recap-table th.pr-plays-play,
+.pr-recap-table td.pr-plays-play { text-align: right; }
 
 /* ─── Play labels — flat text, no pills. Colour + strikethrough carry
  * the hit/miss signal; 🐕 marks underdogs. ─────────────────────────── */
