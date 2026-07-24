@@ -394,96 +394,77 @@ function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
     <section className="pr-recap">
       <h2 className="pr-recap-head">Season Picks</h2>
       <div className="pr-recap-subhead">Last {shown.length} days</div>
-      <div className="pr-scroll">
-        <table className="pr-recap-table pr-season-table">
-          <thead>
-            <tr>
-              <th className="pr-season-date-head">Date</th>
-              <th className="pr-season-box-head">Box Score</th>
-              <th className="pr-season-result-head">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.flatMap((d) =>
-              d.games.map((g, gi) => (
-                <tr key={`${d.date}|${g.gamePk}`}>
-                  {gi === 0 && (
-                    <td className="pr-season-date" rowSpan={d.games.length}>
-                      <span className="pr-season-date-label">{shortDate(d.date)}</span>
-                      {d.profit !== null && (
-                        <span className={`pr-day-pl ${d.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}`}>
-                          {formatProfit(d.profit)}{d.profitPartial ? "*" : ""}
-                        </span>
-                      )}
-                    </td>
-                  )}
-                  <td className="pr-season-box"><BoxScoreCell game={g} /></td>
-                  <td className="pr-season-result"><ResultCell game={g} /></td>
-                </tr>
-              )),
+      {shown.map((d) => (
+        <div className="pr-day" key={d.date}>
+          <div className="pr-day-head">
+            <span className="pr-day-date">{longMonthDay(d.date)}</span>
+            {d.profit !== null && (
+              <span className={d.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>
+                {formatProfit(d.profit)}{d.profitPartial ? "*" : ""}
+              </span>
             )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+          {d.games.map((g) => (
+            <div className="pr-game" key={g.gamePk}>
+              <div className="pr-game-line">
+                <span className="pr-game-match">{g.awayAbbr} @ {g.homeAbbr}</span>
+                {g.mlPick && (
+                  <PlayCell
+                    badgeClass="pr-play-ml"
+                    strong={g.mlPick.strong}
+                    label={`${g.mlPick.label} ML${g.mlPick.dog ? " 🐕" : ""}`}
+                    hit={g.mlPick.hit}
+                  />
+                )}
+              </div>
+              <BoxScoreLine game={g} />
+            </div>
+          ))}
+        </div>
+      ))}
     </section>
   );
 }
 
-function BoxScoreCell({ game }: { game: SeasonHistoryGame }) {
+/** Full-width linescore beneath a game — team | innings | R H E. Handles
+ *  up to 12 innings and 2-digit values; each column padded to its widest
+ *  value so away/home align. */
+function BoxScoreLine({ game }: { game: SeasonHistoryGame }) {
   const ls = game.linescore;
-  if (!ls) {
-    return <span className="pr-na">{game.awayAbbr} @ {game.homeAbbr}</span>;
-  }
-  // Determine the widest single-inning cell width across both teams,
-  // then pad. Keeps columns aligned even when a 10+ inning happens.
-  const innings = ls.innings.slice(0, 9);
-  let width = 1;
+  if (!ls) return null;
+  const count = Math.min(12, Math.max(9, ls.innings.length));
+  const innings = ls.innings.slice(0, count);
+  let w = 1;
   for (const i of innings) {
-    if (i.a != null) width = Math.max(width, String(i.a).length);
-    if (i.h != null) width = Math.max(width, String(i.h).length);
+    if (i.a != null) w = Math.max(w, String(i.a).length);
+    if (i.h != null) w = Math.max(w, String(i.h).length);
   }
-  const fmtCell = (v: number | null): string => (v == null ? "-".padStart(width) : String(v).padStart(width));
-  const fmtInns = (side: "a" | "h"): string => {
+  const cell = (v: number | null): string => (v == null ? "·".padStart(w) : String(v).padStart(w));
+  const innRow = (side: "a" | "h"): string => {
     const cells: string[] = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < count; i++) {
       const inn = innings[i];
-      cells.push(fmtCell(inn ? (side === "a" ? inn.a : inn.h) : null));
+      cells.push(cell(inn ? (side === "a" ? inn.a : inn.h) : null));
     }
-    // Group by threes (1-3, 4-6, 7-9) with spaces between groups only
-    // when width > 1; otherwise a single space between the groups keeps
-    // the line tight.
-    const gap = width === 1 ? " " : "  ";
-    return `${cells.slice(0,3).join(width === 1 ? "" : " ")}${gap}${cells.slice(3,6).join(width === 1 ? "" : " ")}${gap}${cells.slice(6,9).join(width === 1 ? "" : " ")}`;
+    const groups: string[] = [];
+    for (let i = 0; i < cells.length; i += 3) groups.push(cells.slice(i, i + 3).join(" "));
+    return groups.join("  ");
   };
-  const fmtTot = (t: { r: number | null; h: number | null; e: number | null }): string =>
-    `${(t.r ?? 0).toString().padStart(2)} ${(t.h ?? 0).toString().padStart(2)} ${(t.e ?? 0).toString().padStart(1)}`;
+  const tot = (t: { r: number | null; h: number | null; e: number | null }): string =>
+    `${String(t.r ?? 0).padStart(2)} ${String(t.h ?? 0).padStart(2)} ${String(t.e ?? 0).padStart(2)}`;
   return (
-    <span className="pr-linescore">
-      <span className="pr-linescore-row">
+    <div className="pr-linescore">
+      <div className="pr-linescore-row">
         <span className="pr-linescore-team">{game.awayAbbr}</span>
-        <span className="pr-linescore-inn">{fmtInns("a")}</span>
-        <span className="pr-linescore-tot">{fmtTot(ls.away)}</span>
-      </span>
-      <span className="pr-linescore-row">
+        <span className="pr-linescore-inn">{innRow("a")}</span>
+        <span className="pr-linescore-tot">{tot(ls.away)}</span>
+      </div>
+      <div className="pr-linescore-row">
         <span className="pr-linescore-team">{game.homeAbbr}</span>
-        <span className="pr-linescore-inn">{fmtInns("h")}</span>
-        <span className="pr-linescore-tot">{fmtTot(ls.home)}</span>
-      </span>
-    </span>
-  );
-}
-
-function ResultCell({ game }: { game: SeasonHistoryGame }) {
-  if (!game.mlPick) return <span className="pr-na">—</span>;
-  return (
-    <span className="pr-result-stack">
-      <PlayCell
-        badgeClass="pr-play-ml"
-        strong={game.mlPick.strong}
-        label={`${game.mlPick.label} ML${game.mlPick.dog ? " 🐕" : ""}`}
-        hit={game.mlPick.hit}
-      />
-    </span>
+        <span className="pr-linescore-inn">{innRow("h")}</span>
+        <span className="pr-linescore-tot">{tot(ls.home)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -492,13 +473,6 @@ function longMonthDay(iso: string): string {
   if (!y || !m || !d) return iso;
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
-}
-
-function shortDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map((s) => Number(s));
-  if (!y || !m || !d) return iso;
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 function YesterdayRow({
