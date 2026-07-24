@@ -10,6 +10,12 @@
 -- Stripe webhooks (spec step 3) and the admin-comp tool both just write
 -- rows here.
 --
+-- Entitlements are per-SPORT: predictions expands past MLB (NFL, NBA, …),
+-- and each sport's season window/pricing differs (MLB Mar–Sept, NFL
+-- Sep–Feb), so paying for MLB must not unlock NFL. Every access check is
+-- scoped to (subscriber, sport). An all-sports bundle, if we ever sell one,
+-- is just multiple rows. Mirrors email_subscriptions.sport / sends.digest_sport.
+--
 -- Windows are ET calendar dates (inclusive) to match the daily edition
 -- boundary the rest of the product uses. Rolling weekly/monthly renewals
 -- append or extend windows; the season pass is one row; a comp sets its own
@@ -19,6 +25,7 @@
 create table predictions_entitlements (
   id                     uuid primary key default gen_random_uuid(),
   subscriber_id          uuid not null references public.subscribers(id) on delete cascade,
+  sport                  text not null default 'mlb',
   product                text not null,        -- 'week' | 'month' | 'season' | 'playoffs'
   access_start           date not null,        -- inclusive, ET calendar date
   access_end             date not null,        -- inclusive, last day of access
@@ -33,11 +40,11 @@ create table predictions_entitlements (
   constraint predictions_entitlements_window_ck check (access_end >= access_start)
 );
 
--- Access checks filter by subscriber + non-revoked; the send cron scans by
--- date window. Both are covered here.
+-- Access checks filter by (subscriber, sport) + non-revoked; the send cron
+-- scans by (sport, date window). Both are covered here.
 create index predictions_entitlements_sub_idx
-  on predictions_entitlements (subscriber_id, revoked_at);
+  on predictions_entitlements (subscriber_id, sport, revoked_at);
 create index predictions_entitlements_window_idx
-  on predictions_entitlements (access_start, access_end);
+  on predictions_entitlements (sport, access_start, access_end);
 
 notify pgrst, 'reload schema';

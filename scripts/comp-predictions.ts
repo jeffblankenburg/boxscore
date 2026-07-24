@@ -11,6 +11,7 @@
 //   npx tsx --env-file=.env.local scripts/comp-predictions.ts revoke <entitlement-id>
 //
 // Dates are ET calendar dates, ISO YYYY-MM-DD, inclusive on both ends.
+// Entitlements are per-sport; this tool operates on the launch sport (MLB).
 
 import { findByEmail } from "@/lib/subscribers";
 import {
@@ -20,6 +21,8 @@ import {
   hasPredictionsAccess,
 } from "@/lib/predictions-entitlements";
 import { todayInET, isValidIsoDate } from "@/lib/dates";
+
+const SPORT = "mlb"; // launch sport; add a flag when a 2nd predictions sport ships
 
 function fail(msg: string): never {
   console.error(`✗ ${msg}`);
@@ -34,10 +37,10 @@ async function main() {
     if (!email) fail("usage: list <email>");
     const sub = await findByEmail(email);
     if (!sub) fail(`no subscriber for ${email}`);
-    const rows = await listEntitlements(sub.id);
+    const rows = await listEntitlements(sub.id, SPORT);
     const today = todayInET();
-    const active = await hasPredictionsAccess(sub.id, today);
-    console.log(`${email} (${sub.id}) — access today (${today}): ${active ? "YES" : "no"}`);
+    const active = await hasPredictionsAccess(sub.id, SPORT, today);
+    console.log(`${email} (${sub.id}) — ${SPORT} access today (${today}): ${active ? "YES" : "no"}`);
     if (rows.length === 0) {
       console.log("  (no entitlements)");
       return;
@@ -46,7 +49,7 @@ async function main() {
       const state = r.revokedAt ? "REVOKED" : "active";
       const covered = !r.revokedAt && r.accessStart <= today && r.accessEnd >= today ? " ← covers today" : "";
       console.log(
-        `  ${r.id}  ${r.product.padEnd(8)} ${r.accessStart}→${r.accessEnd}  ${r.source.padEnd(6)} ${state}${r.note ? `  "${r.note}"` : ""}${covered}`,
+        `  ${r.id}  ${r.sport} ${r.product.padEnd(8)} ${r.accessStart}→${r.accessEnd}  ${r.source.padEnd(6)} ${state}${r.note ? `  "${r.note}"` : ""}${covered}`,
       );
     }
     return;
@@ -61,6 +64,7 @@ async function main() {
     if (!sub) fail(`no subscriber for ${email}`);
     const ent = await grantComp({
       subscriberId: sub.id,
+      sport: SPORT,
       accessStart: start,
       accessEnd: end,
       grantedBy: "admin-cli",

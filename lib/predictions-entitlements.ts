@@ -19,6 +19,7 @@ export type EntitlementSource = "stripe" | "comp";
 export type Entitlement = {
   id: string;
   subscriberId: string;
+  sport: string;
   product: PredictionsProduct;
   accessStart: string; // ISO YYYY-MM-DD, inclusive
   accessEnd: string;   // ISO YYYY-MM-DD, inclusive
@@ -32,11 +33,12 @@ export type Entitlement = {
 };
 
 const COLS =
-  "id, subscriber_id, product, access_start, access_end, source, stripe_subscription_id, stripe_checkout_id, granted_by, note, created_at, revoked_at";
+  "id, subscriber_id, sport, product, access_start, access_end, source, stripe_subscription_id, stripe_checkout_id, granted_by, note, created_at, revoked_at";
 
 type Row = {
   id: string;
   subscriber_id: string;
+  sport: string;
   product: PredictionsProduct;
   access_start: string;
   access_end: string;
@@ -53,6 +55,7 @@ function toEntitlement(r: Row): Entitlement {
   return {
     id: r.id,
     subscriberId: r.subscriber_id,
+    sport: r.sport,
     product: r.product,
     accessStart: r.access_start,
     accessEnd: r.access_end,
@@ -67,15 +70,16 @@ function toEntitlement(r: Row): Entitlement {
 }
 
 /**
- * True if the subscriber holds an active (non-revoked) entitlement whose
- * window covers `date` (ET ISO YYYY-MM-DD). This is the single access check
- * the premium page and the picks-email gate call.
+ * True if the subscriber holds an active (non-revoked) entitlement for
+ * `sport` whose window covers `date` (ET ISO YYYY-MM-DD). This is the single
+ * access check the premium page and the picks-email gate call.
  */
-export async function hasPredictionsAccess(subscriberId: string, date: string): Promise<boolean> {
+export async function hasPredictionsAccess(subscriberId: string, sport: string, date: string): Promise<boolean> {
   const { data, error } = await supabaseAdmin()
     .from("predictions_entitlements")
     .select("id")
     .eq("subscriber_id", subscriberId)
+    .eq("sport", sport)
     .is("revoked_at", null)
     .lte("access_start", date)
     .gte("access_end", date)
@@ -85,17 +89,18 @@ export async function hasPredictionsAccess(subscriberId: string, date: string): 
 }
 
 /**
- * The set of subscriber_ids with active access on `date`. Bulk form of
- * hasPredictionsAccess for the picks-email send cron, so it doesn't do one
- * round-trip per subscriber. Paginated past Supabase's 1000-row cap.
+ * The set of subscriber_ids with active access to `sport` on `date`. Bulk
+ * form of hasPredictionsAccess for the picks-email send cron, so it doesn't
+ * do one round-trip per subscriber. Paginated past Supabase's 1000-row cap.
  */
-export async function getEntitledSubscriberIds(date: string): Promise<Set<string>> {
+export async function getEntitledSubscriberIds(sport: string, date: string): Promise<Set<string>> {
   const out = new Set<string>();
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabaseAdmin()
       .from("predictions_entitlements")
       .select("subscriber_id")
+      .eq("sport", sport)
       .is("revoked_at", null)
       .lte("access_start", date)
       .gte("access_end", date)
@@ -108,26 +113,31 @@ export async function getEntitledSubscriberIds(date: string): Promise<Set<string
   return out;
 }
 
-/** All entitlements for a subscriber, newest first (includes revoked, for admin display). */
-export async function listEntitlements(subscriberId: string): Promise<Entitlement[]> {
-  const { data, error } = await supabaseAdmin()
+/**
+ * All entitlements for a subscriber, newest first (includes revoked, for
+ * admin display). Optionally scoped to one sport.
+ */
+export async function listEntitlements(subscriberId: string, sport?: string): Promise<Entitlement[]> {
+  let q = supabaseAdmin()
     .from("predictions_entitlements")
     .select(COLS)
-    .eq("subscriber_id", subscriberId)
-    .order("created_at", { ascending: false });
+    .eq("subscriber_id", subscriberId);
+  if (sport) q = q.eq("sport", sport);
+  const { data, error } = await q.order("created_at", { ascending: false });
   if (error) throw new Error(`listEntitlements: ${error.message}`);
   return ((data ?? []) as Row[]).map(toEntitlement);
 }
 
 /**
- * Grant a free access window (admin comp). Defaults the product to 'season'
- * since a comp is usually all-access; pass `product` to scope it. `grantedBy`
- * identifies who issued it (admin email or 'admin-cli').
+ * Grant a free access window (admin comp). Defaults `sport` to 'mlb' (v1) and
+ * `product` to 'season' since a comp is usually all-access; pass either to
+ * scope it. `grantedBy` identifies who issued it (admin email or 'admin-cli').
  */
 export async function grantComp(args: {
   subscriberId: string;
   accessStart: string;
   accessEnd: string;
+  sport?: string;
   product?: PredictionsProduct;
   grantedBy: string;
   note?: string | null;
@@ -136,6 +146,7 @@ export async function grantComp(args: {
     .from("predictions_entitlements")
     .insert({
       subscriber_id: args.subscriberId,
+      sport: args.sport ?? "mlb",
       product: args.product ?? "season",
       access_start: args.accessStart,
       access_end: args.accessEnd,
