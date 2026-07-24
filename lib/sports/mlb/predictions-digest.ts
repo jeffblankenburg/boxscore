@@ -1,8 +1,8 @@
 // Predictions email digest — the daily picks email (admins first, ~11:30
 // AM ET, after the morning lines lock). Mirrors the flat/newspaper style
 // of /mlb/predictions but as email-safe HTML (table layout + inline
-// styles). Content is deliberately concise: today's card, a 7-day results
-// table, and the season record.
+// styles). Content is deliberately concise: today's card, the season
+// record, and a 7-day results table.
 //
 // The render is pure (takes assembled data, returns an HTML body string).
 // loadPredictionsDigestData() does the I/O. The body is meant to be
@@ -185,5 +185,5 @@ function renderSeason(d: PredictionsDigestData): string {
 
 /** The digest body (no masthead/footer — the email shell wraps this). */
 export function renderPredictionsDigestBody(d: PredictionsDigestData): string {
-  return `<div style="font-family:${SANS};color:${INK};">${renderToday(d)}${render7Day(d)}${renderSeason(d)}</div>`;
+  return `<div style="font-family:${SANS};color:${INK};">${renderToday(d)}${renderSeason(d)}${render7Day(d)}</div>`;
 }
