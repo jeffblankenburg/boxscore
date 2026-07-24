@@ -173,14 +173,24 @@ function render7Day(d: PredictionsDigestData): string {
   return `${sectionHead("Last 7 Days")}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${dayBlocks}</table>`;
 }
 
-/** Season record line. */
+/** Season record — a compact framed table (Hit | Record | Profit | ROI), so
+ * the email mirrors the page's Win Percentages table. The section title
+ * carries no rule; the header row's top border IS the section divider. */
 function renderSeason(d: PredictionsDigestData): string {
   const s = d.season;
-  const profit = s.hasProfit
-    ? ` &nbsp;·&nbsp; <span style="color:${s.profit >= 0 ? GREEN : RED};font-weight:700;">${moneyWhole(s.profit)}</span> &nbsp;·&nbsp; <span style="color:${s.profit >= 0 ? GREEN : RED};font-weight:700;">${pctSigned(s.roi)} ROI</span>`
-    : "";
-  return `${sectionHead("Season")}<p style="font-family:${SANS};font-size:15px;color:${INK};margin:0;"><strong>${pct(s.hitRate)}</strong> (${s.hits} of ${s.plays})${profit}</p>
-    <p style="font-family:${SANS};font-size:11px;color:${MUTED};margin:6px 0 0;">Profit and ROI assume a flat $10 moneyline wager per pick.</p>`;
+  const plColor = s.profit >= 0 ? GREEN : RED;
+  const th = (label: string, align: string) =>
+    `<th style="font-family:${SANS};font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.03em;color:${MUTED};text-align:${align};padding:7px 6px;border-top:2px solid ${RULE};border-bottom:1.5px solid ${RULE};width:25%;">${label}</th>`;
+  const td = (inner: string, align: string) =>
+    `<td style="font-family:${MONO};font-size:13px;font-weight:700;color:${INK};text-align:${align};padding:6px 6px;">${inner}</td>`;
+  const profit = s.hasProfit ? `<span style="color:${plColor};">${moneyWhole(s.profit)}</span>` : "—";
+  const roi = s.hasProfit ? `<span style="color:${plColor};">${pctSigned(s.roi)}</span>` : "—";
+  const head = `<div style="font-family:${SANS};font-weight:800;font-size:17px;color:${INK};margin:22px 0 0;">Season</div>`;
+  return `${head}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <thead><tr>${th("Hit", "left")}${th("Record", "left")}${th("Profit", "right")}${th("ROI", "right")}</tr></thead>
+    <tbody><tr>${td(pct(s.hitRate), "left")}${td(`${s.hits}/${s.plays}`, "left")}${td(profit, "right")}${td(roi, "right")}</tr></tbody>
+  </table>
+  <p style="font-family:${SANS};font-size:11px;color:${MUTED};margin:6px 0 0;">Profit and ROI assume a flat $10 moneyline wager per pick.</p>`;
 }
 
 /** The digest body (no masthead/footer — the email shell wraps this). */
