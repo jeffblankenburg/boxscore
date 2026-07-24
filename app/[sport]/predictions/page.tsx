@@ -224,17 +224,17 @@ function PlaysSection({
   pending: boolean;
 }) {
   return (
-    <section className="pr-plays">
-      <h2 className="pr-plays-head">Today&apos;s Plays</h2>
+    <section className="pr-recap pr-framed">
+      <h2 className="pr-recap-head">Today&apos;s Plays</h2>
       {pending ? (
-        <p className="pr-plays-empty">
+        <p className="pr-recap-empty">
           Today&apos;s picks lock at <strong>{PICKS_LOCK_LABEL}</strong>, once the morning lines are set. Check back then.
         </p>
       ) : plays.length === 0 ? (
-        <p className="pr-plays-empty">No games on the slate today.</p>
+        <p className="pr-recap-empty">No games on the slate today.</p>
       ) : (
         <div className="pr-scroll">
-          <table className="pr-plays-table">
+          <table className="pr-recap-table pr-framed-table">
             <thead>
               <tr>
                 <th className="pr-col-time">Time</th>
@@ -251,7 +251,7 @@ function PlaysSection({
                     {" @ "}
                     <a className="pr-team-link" href={teamHref(game.home.abbr)}>{game.home.abbr}</a>
                   </td>
-                  <td className="pr-plays-play">
+                  <td>
                     <span className="pr-play-plain">{win.abbr}{win.dog ? " 🐕" : ""}</span>
                   </td>
                 </tr>

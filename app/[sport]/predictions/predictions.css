@@ -26,11 +26,9 @@
 }
 
 /* Flat section — bold title with an underline rule (the section divider). */
-.pr-plays,
 .pr-recap {
   margin: 0 0 22px;
 }
-.pr-plays-head,
 .pr-recap-head {
   font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
   font-weight: 800;
@@ -48,7 +46,6 @@
   color: var(--text-muted);
   margin: 0 0 7px;
 }
-.pr-plays-empty,
 .pr-recap-empty {
   color: var(--text-muted);
   font-size: 13px;
@@ -60,13 +57,11 @@
 
 /* ─── Tables — flat: no cell boxes, no fills, no striping. Header is a
  * bold underline; rows are separated by a single hairline. ─────────── */
-.pr-plays-table,
 .pr-recap-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }
-.pr-plays-table th,
 .pr-recap-table th {
   font-weight: 700;
   font-size: 10px;
@@ -80,15 +75,12 @@
   vertical-align: middle;
   white-space: nowrap;
 }
-.pr-plays-table td,
 .pr-recap-table td {
   padding: 4px 6px;
   border-bottom: 1px solid var(--border-light);
   text-align: left;
   vertical-align: middle;
 }
-/* Today's Plays header sits under the section underline. */
-.pr-plays-table th { padding: 0 6px 7px; }
 
 /* Framed table header: the section head drops its own underline and the
  * table header takes a top border, so the section rule IS the header's
