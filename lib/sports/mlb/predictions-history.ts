@@ -428,7 +428,7 @@ export type SeasonHistoryGame = {
   homeAbbr:  string;
   status:    string;
   linescore: SeasonHistoryLinescore | null;
-  mlPick:    { label: string; strong: boolean; hit: boolean | null; dog: boolean } | null;
+  mlPick:    { label: string; strong: boolean; hit: boolean | null; dog: boolean; profit: number | null } | null;
 };
 export type SeasonHistoryDay = {
   date:  string;
@@ -545,21 +545,25 @@ export async function loadSeasonHistory(startIso: string, endIso: string): Promi
       cardSize(outcomes.length),
     );
 
-    const mlByPk = new Map<number, { label: string; strong: boolean; hit: boolean | null; dog: boolean }>();
-    // $10/play P/L of the day's card. `dayPriced` counts picks with a
+    const mlByPk = new Map<number, { label: string; strong: boolean; hit: boolean | null; dog: boolean; profit: number | null }>();
+    // $10/play P/L of the day's card, tracked per pick (for the results
+    // rows) and summed for the day total. `dayPriced` counts picks with a
     // captured price; `dayGraded` counts decided picks — a gap means the
     // total is partial.
     let dayProfit = 0, dayPriced = 0, dayGraded = 0;
     for (const p of card) {
       const o = outcomesByPk.get(p.gamePk);
       if (!o) continue;
-      mlByPk.set(p.gamePk, { label: p.side === "away" ? o.awayAbbr : o.homeAbbr, strong: p.strong, hit: o.winCorrect, dog: p.dog });
+      const odds = p.side === "away" ? dkOddsByKey.get(`${date}|${p.gamePk}`)?.away : dkOddsByKey.get(`${date}|${p.gamePk}`)?.home;
+      const pickProfit = o.winCorrect === null || odds == null
+        ? null
+        : (o.winCorrect ? SEASON_STAKE * americanToProfitMultiplier(odds) : -SEASON_STAKE);
+      mlByPk.set(p.gamePk, { label: p.side === "away" ? o.awayAbbr : o.homeAbbr, strong: p.strong, hit: o.winCorrect, dog: p.dog, profit: pickProfit });
       if (o.winCorrect === null) continue;
       dayGraded++;
-      const odds = p.side === "away" ? dkOddsByKey.get(`${date}|${p.gamePk}`)?.away : dkOddsByKey.get(`${date}|${p.gamePk}`)?.home;
-      if (odds == null) continue;
+      if (pickProfit === null) continue;
       dayPriced++;
-      dayProfit += o.winCorrect ? SEASON_STAKE * americanToProfitMultiplier(odds) : -SEASON_STAKE;
+      dayProfit += pickProfit;
     }
 
     const games: SeasonHistoryGame[] = [];

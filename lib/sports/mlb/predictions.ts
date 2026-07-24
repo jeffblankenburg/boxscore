@@ -182,21 +182,20 @@ export type WinPlay = {
 // ─── Daily card selection ────────────────────────────────────────────────
 //
 // The public card is ML-only (NRFI was dropped 2026-07-23 — its hit rate
-// didn't justify the slot). Its BASE size scales with the slate:
-// CARD_GAME_FRACTION of the day's games, floor 1 — a 15-game day shows 3,
-// a 5-game day shows 1. But 20% is a FLOOR, not a cap: any additional
-// positive-EV pick whose win probability clears CARD_VERY_CONFIDENT_WINPCT
-// is kept too, so a light slate with two elite plays still shows both.
-// (Fitted 2026-07-23, scripts/fit-v71-card.ts: at 0.68 the override adds
-// only ~0.37 picks/day and those extras hit 86% — genuinely "very
-// confident," rare enough to keep the card ~20% on a typical day.)
+// didn't justify the slot). It's a PAID DAILY PRODUCT, so it always ships
+// a floor of picks: CARD_GAME_FRACTION of the day's games, rounded, floor
+// 1 — a 15-game day shows 3, a 5-game day shows 1. The floor is filled
+// with the best-available favorites by EV even when they aren't +EV (we'd
+// rather deliver a marginal play than nothing). On top of the floor, any
+// pick whose win probability clears CARD_VERY_CONFIDENT_WINPCT (0.68) is
+// also included — genuinely "very confident" and rare (~0.37/day).
 //
 // Picks are the model's favored side ranked by EV vs the market price
-// (model prob − break-even implied), favored side only, positive-EV only.
-// That's where the money is: over the 2026 season v7.1's favored-UNDERDOG
-// picks (market prices our side as a dog) returned +19.3% ROI vs favorites'
-// single digits. Ranking by raw win% would bury those under chalk, so we
-// rank by edge — which needs the picked side's odds.
+// (model prob − break-even implied). That's where the money is: over the
+// 2026 season v7.1's favored-UNDERDOG picks (market prices our side as a
+// dog) returned +19.3% ROI vs favorites' single digits. Ranking by raw
+// win% would bury those under chalk, so we rank by edge (falling back to
+// win% only before the day's lines are captured).
 export const CARD_GAME_FRACTION = 0.20;
 export const CARD_VERY_CONFIDENT_WINPCT = 0.68;
 
@@ -207,11 +206,12 @@ export function cardSize(numGames: number): number {
   return Math.max(1, Math.round(CARD_GAME_FRACTION * numGames));
 }
 
-/** One game's card-eligible ML pick. Null when we have no odds for the
- *  favored side or its EV is non-positive (no bet). */
+/** One game's card ML pick — always the model's favored side. `edge` is
+ *  the EV vs the market break-even; null only before odds are captured,
+ *  when the card falls back to ranking by win probability. */
 export type CardCandidate = {
   gamePk: number;
-  ml: { side: "away" | "home"; winPct: number; edge: number; dog: boolean } | null;
+  ml: { side: "away" | "home"; winPct: number; edge: number | null; dog: boolean };
 };
 
 export type CardPick = {
@@ -220,11 +220,13 @@ export type CardPick = {
   winPct: number;      // picked side's win probability
   strong: boolean;
   dog: boolean;        // picked side is a plus-money underdog
-  edge: number;        // EV vs market break-even — the rank metric
+  edge: number | null; // EV vs market break-even — the primary rank metric
 };
 
 /** Build a card candidate from a game's win probabilities + the favored
- *  side's DraftKings odds. Pure — the caller supplies the odds. */
+ *  side's DraftKings odds. Pure — the caller supplies the odds. Always
+ *  returns a candidate (favored side); the card guarantees a daily floor,
+ *  so even -EV favorites are rankable. */
 export function cardCandidateFor(
   gamePk: number,
   awayWinPct: number,
@@ -238,18 +240,28 @@ export function cardCandidateFor(
   const edge = implied === null ? null : winPct - implied;
   return {
     gamePk,
-    ml: edge !== null && edge > 0 ? { side: favSide, winPct, edge, dog: (sideOdds ?? 0) > 0 } : null,
+    ml: { side: favSide, winPct, edge, dog: sideOdds != null && sideOdds > 0 },
   };
 }
 
-/** The day's card: the top `count` positive-EV ML plays by edge (the 20%
- *  floor), PLUS any other positive-EV pick whose win probability clears
- *  CARD_VERY_CONFIDENT_WINPCT. Returned ordered by edge. */
+/** Rank metric: EV edge when odds are in, else win% (a fallback used only
+ *  before lines are captured). Shifting the no-odds branch below 0 keeps
+ *  priced picks ahead of unpriced ones on the rare mixed slate. */
+function cardRank(p: { edge: number | null; winPct: number }): number {
+  return p.edge != null ? p.edge : p.winPct - 1;
+}
+
+/** The day's card: ALWAYS the top `count` picks by edge (the 20% delivery
+ *  floor — a paid daily product ships something every day, so this fills
+ *  with the best-available favorites even when they aren't +EV), PLUS any
+ *  other pick whose win probability clears CARD_VERY_CONFIDENT_WINPCT.
+ *  Ordered by rank. */
 export function selectDailyCard(cands: CardCandidate[], count: number): CardPick[] {
-  const picks = cands
-    .filter((c): c is CardCandidate & { ml: NonNullable<CardCandidate["ml"]> } => c.ml !== null)
-    .map((c) => ({ gamePk: c.gamePk, side: c.ml.side, winPct: c.ml.winPct, strong: c.ml.winPct >= ML_STRONG_THRESHOLD, dog: c.ml.dog, edge: c.ml.edge }));
-  picks.sort((a, b) => b.edge - a.edge);
+  const picks: CardPick[] = cands.map((c) => ({
+    gamePk: c.gamePk, side: c.ml.side, winPct: c.ml.winPct,
+    strong: c.ml.winPct >= ML_STRONG_THRESHOLD, dog: c.ml.dog, edge: c.ml.edge,
+  }));
+  picks.sort((a, b) => cardRank(b) - cardRank(a));
 
   const chosen = picks.slice(0, Math.max(0, count));
   const chosenPks = new Set(chosen.map((p) => p.gamePk));
@@ -260,7 +272,7 @@ export function selectDailyCard(cands: CardCandidate[], count: number): CardPick
       chosenPks.add(p.gamePk);
     }
   }
-  chosen.sort((a, b) => b.edge - a.edge);
+  chosen.sort((a, b) => cardRank(b) - cardRank(a));
   return chosen;
 }
 

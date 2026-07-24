@@ -64,11 +64,14 @@ function prettyDate(iso: string): string {
 
 export default async function PredictionsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sport: string }>;
+  searchParams: Promise<{ spw?: string }>;
 }) {
   const { sport } = await params;
   if (sport !== "mlb") notFound();
+  const { spw } = await searchParams;
 
   const today = todayInET();
   const yesterday = prevDay(today);
@@ -86,7 +89,6 @@ export default async function PredictionsPage({
   let roi7:      PlayRoiSummary | null = null;
   let roi30:     PlayRoiSummary | null = null;
   let roiSeason: PlayRoiSummary | null = null;
-  let seasonHistory: SeasonHistoryDay[] = [];
   let seasonDays = 0;
 
   // Yesterday's and today's odds — small, dedicated fetches. Today's
@@ -108,7 +110,6 @@ export default async function PredictionsPage({
     roi30             = cached.roi30;
     roiSeason         = cached.roiSeason;
     seasonDays        = cached.seasonDays;
-    seasonHistory     = cached.seasonHistory;
   } else {
     // Cold path — same loaders the cache would have called. Wait on
     // all in parallel. Page is slow here (~20s on a fresh serverless
@@ -123,20 +124,37 @@ export default async function PredictionsPage({
          new Date(`${seasonStart}T00:00:00Z`).getTime()) / 86_400_000,
       ),
     );
-    [result, yesterdayOutcomes, rolling7, rolling30, rollingSeason, seasonHistory, roi7, roi30, roiSeason] = await Promise.all([
+    [result, yesterdayOutcomes, rolling7, rolling30, rollingSeason, roi7, roi30, roiSeason] = await Promise.all([
       loadPredictionsForDate(today),
       loadPredictionOutcomesForDate(yesterday),
       loadPredictionAccuracy(7,          yesterday),
       loadPredictionAccuracy(30,         yesterday),
       loadPredictionAccuracy(seasonDays, yesterday),
-      loadSeasonHistory(seasonStart, yesterday),
       loadPlayRoi(7,          yesterday),
       loadPlayRoi(30,         yesterday),
       loadPlayRoi(seasonDays, yesterday),
     ]);
   }
 
-  const plays = buildTodaysPlays(result.games, todayOdds);
+  // Season Picks paginates by 7-day week, navigable via ?spw=<end ISO>.
+  // Default window ends yesterday (the latest graded day). This is a cheap
+  // read, loaded per request regardless of the blob so navigation works.
+  const SEASON_FLOOR = `${today.slice(0, 4)}-03-26`; // first graded day of the season
+  const winEndReq = spw && /^\d{4}-\d{2}-\d{2}$/.test(spw) ? spw : yesterday;
+  const winEnd = winEndReq > yesterday ? yesterday : winEndReq;
+  const winStart = shiftDays(winEnd, -(SEASON_PICKS_WEEK - 1));
+  const weekDays = await loadSeasonHistory(winStart, winEnd);
+  const hasNewer = winEnd < yesterday;
+  const newerEnd = hasNewer ? (shiftDays(winEnd, SEASON_PICKS_WEEK) > yesterday ? yesterday : shiftDays(winEnd, SEASON_PICKS_WEEK)) : null;
+  const hasOlder = winStart > SEASON_FLOOR;
+  const olderEnd = hasOlder ? shiftDays(winStart, -1) : null;
+
+  // The card ranks by EV, which needs the day's lines. Those are captured
+  // by the snapshot cron at 10:30 AM ET — before that, there are games but
+  // no odds, so we show a "picks lock at" notice instead of provisional
+  // picks that would change once the lines post.
+  const picksPending = result.gameCount > 0 && todayOdds.mlByGamePk.size === 0;
+  const plays = picksPending ? [] : buildTodaysPlays(result.games, todayOdds);
 
   return (
     <div className="pr-page">
@@ -146,7 +164,7 @@ export default async function PredictionsPage({
         {plays.length > 0 && <> &middot; <strong>{plays.length} play{plays.length === 1 ? "" : "s"}</strong></>}
       </p>
 
-      <PlaysSection plays={plays} />
+      <PlaysSection plays={plays} pending={picksPending} />
 
       <YesterdayResults yesterday={yesterday} outcomes={yesterdayOutcomes} odds={yesterdayOdds} />
 
@@ -160,7 +178,13 @@ export default async function PredictionsPage({
         seasonDays={seasonDays}
       />
 
-      <SeasonHistorySection days={seasonHistory} />
+      <SeasonHistorySection
+        days={weekDays}
+        rangeStart={winStart}
+        rangeEnd={winEnd}
+        olderHref={olderEnd ? `?spw=${olderEnd}` : null}
+        newerHref={newerEnd ? `?spw=${newerEnd}` : null}
+      />
     </div>
   );
 }
@@ -190,15 +214,23 @@ function buildTodaysPlays(
   return rows.sort((a, b) => a.game.startTime.localeCompare(b.game.startTime));
 }
 
+const PICKS_LOCK_LABEL = "10:30 AM ET";
+
 function PlaysSection({
   plays,
+  pending,
 }: {
   plays: Array<{ game: GamePrediction; win: WinPlay }>;
+  pending: boolean;
 }) {
   return (
     <section className="pr-plays">
       <h2 className="pr-plays-head">Today&apos;s Plays</h2>
-      {plays.length === 0 ? (
+      {pending ? (
+        <p className="pr-plays-empty">
+          Today&apos;s picks lock at <strong>{PICKS_LOCK_LABEL}</strong>, once the morning lines are set. Check back then.
+        </p>
+      ) : plays.length === 0 ? (
         <p className="pr-plays-empty">No games on the slate today.</p>
       ) : (
         <div className="pr-scroll">
@@ -220,7 +252,7 @@ function PlaysSection({
                     <a className="pr-team-link" href={teamHref(game.home.abbr)}>{game.home.abbr}</a>
                   </td>
                   <td className="pr-plays-play">
-                    <span className="pr-play-plain">{win.abbr} ML{win.dog ? " 🐕" : ""}</span>
+                    <span className="pr-play-plain">{win.abbr}{win.dog ? " 🐕" : ""}</span>
                   </td>
                 </tr>
               ))}
@@ -272,11 +304,10 @@ function YesterdayResults({
   }
 
   return (
-    <section className="pr-recap pr-yesterday">
-      <h2 className="pr-recap-head">Yesterday&apos;s Results</h2>
-      <div className="pr-recap-subhead">{prettyDate(yesterday)}</div>
+    <section className="pr-recap pr-yesterday pr-framed">
+      <h2 className="pr-recap-head">Results for {weekdayMonthDay(yesterday)}</h2>
       <div className="pr-scroll">
-        <table className="pr-recap-table pr-yesterday-table">
+        <table className="pr-recap-table pr-yesterday-table pr-framed-table">
           <thead>
             <tr>
               <th>Final</th>
@@ -292,7 +323,7 @@ function YesterdayResults({
           {priced > 0 && (
             <tfoot>
               <tr className="pr-yesterday-total">
-                <td colSpan={2}>Day total</td>
+                <td colSpan={2}>{longMonthDay(yesterday)} Total</td>
                 <td className="pr-yesterday-profit">
                   <span className={dayTotal >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>{formatProfit(dayTotal)}</span>
                   {anyPartial && <span className="pr-profit-partial" title="Some odds missing">*</span>}
@@ -326,167 +357,194 @@ function StatBoxes({
   const hasAny = rolling30.mlPlays > 0 || rolling7.mlPlays > 0;
   if (!hasAny) return null;
 
-  const seasonLabel = seasonDays > 0 ? `Season (${seasonDays}d)` : "Season";
+  const rows: Array<{ label: string; s: PlayAccuracySummary; roi: PlayRoiSummary | null }> = [
+    { label: "Last 7", s: rolling7, roi: roi7 },
+    { label: "Last 30", s: rolling30, roi: roi30 },
+    ...(rollingSeason ? [{ label: "Season", s: rollingSeason, roi: roiSeason }] : []),
+  ];
 
   return (
-    <section className="pr-recap">
+    <section className="pr-recap pr-framed">
       <h2 className="pr-recap-head">Win Percentages</h2>
-      <div className="pr-stat-grid">
-        <WindowStat label="Last 7 days" summary={rolling7} roi={roi7} />
-        <WindowStat label="Last 30 days" summary={rolling30} roi={roi30} />
-        {rollingSeason && <WindowStat label={seasonLabel} summary={rollingSeason} roi={roiSeason} />}
-      </div>
+      <table className="pr-recap-table pr-winpct-table pr-framed-table">
+        <thead>
+          <tr>
+            <th>Window</th>
+            <th>Hit</th>
+            <th>Record</th>
+            <th>Profit</th>
+            <th>ROI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ label, s, roi }) => {
+            const priced = roi && roi.mlPlaysWithOdds > 0;
+            const pl = priced ? (roi!.mlProfit >= 0 ? "pr-profit-pos" : "pr-profit-neg") : "";
+            return (
+              <tr key={label}>
+                <td>{label}</td>
+                <td className="pr-winpct-num pr-winpct-hit">{pctOrDash(s.mlHitRate)}</td>
+                <td className="pr-winpct-num">{s.mlPlays > 0 ? `${s.mlPlayHits}/${s.mlPlays}` : "—"}</td>
+                <td className="pr-winpct-num">
+                  {priced ? <span className={pl}>{formatDollarWhole(roi!.mlProfit)}</span> : "—"}
+                </td>
+                <td className="pr-winpct-num">
+                  {priced ? <span className={pl}>{formatPctSigned(roi!.mlRoi)}</span> : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="pr-caption">Profit and ROI assume a flat $10 moneyline wager per pick.</p>
     </section>
   );
 }
 
-function WindowStat({
-  label,
-  summary,
-  roi,
-}: {
-  label: string;
-  summary: PlayAccuracySummary;
-  roi: PlayRoiSummary | null;
-}) {
-  return (
-    <div className="pr-window-box">
-      <div className="pr-window-label">{label}</div>
-      <div className="pr-window-row">
-        <span className="pr-window-tag">ML</span>
-        <span className="pr-window-pct">{pctOrDash(summary.mlHitRate)}</span>
-        <span className="pr-window-sub">{summary.mlPlays > 0 ? `${summary.mlPlayHits} of ${summary.mlPlays}` : "—"}</span>
-      </div>
-      {roi && roi.mlPlaysWithOdds > 0 && (
-        <div className="pr-window-row pr-window-row-roi">
-          <span className="pr-window-tag pr-window-tag-sub">${roi.stake}/play</span>
-          <span className={`pr-window-pl${roi.mlProfit >= 0 ? " pr-window-pl-pos" : " pr-window-pl-neg"}`}>
-            {formatDollarSigned(roi.mlProfit)}
-          </span>
-          <span className="pr-window-sub">{formatPctSigned(roi.mlRoi)} ROI</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function formatDollarSigned(v: number): string {
-  const sign = v >= 0 ? "+" : "−";
-  return `${sign}$${Math.abs(v).toFixed(2)}`;
-}
 function formatPctSigned(v: number | null): string {
   if (v == null) return "—";
   const sign = v >= 0 ? "+" : "−";
   return `${sign}${(Math.abs(v) * 100).toFixed(1)}%`;
 }
+/** Whole-dollar P/L, e.g. +$947 — compact enough for the 5-column Win%
+ *  table at 400px (the cents live in the day totals). */
+function formatDollarWhole(v: number): string {
+  const sign = v >= 0 ? "+" : "−";
+  return `${sign}$${Math.round(Math.abs(v))}`;
+}
 
-const SEASON_PICKS_DAYS = 14;
+const SEASON_PICKS_WEEK = 7;
 
-function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
-  if (days.length === 0) return null;
-  const shown = days.slice(0, SEASON_PICKS_DAYS);
+/** Shift an ISO date by n days (UTC). */
+function shiftDays(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+function SeasonHistorySection({
+  days,
+  rangeStart,
+  rangeEnd,
+  olderHref,
+  newerHref,
+}: {
+  days: SeasonHistoryDay[];
+  rangeStart: string;
+  rangeEnd: string;
+  olderHref: string | null;
+  newerHref: string | null;
+}) {
   return (
     <section className="pr-recap">
       <h2 className="pr-recap-head">Season Picks</h2>
-      <div className="pr-recap-subhead">Last {shown.length} days</div>
-      <div className="pr-scroll">
-        <table className="pr-recap-table pr-season-table">
-          <thead>
-            <tr>
-              <th className="pr-season-date-head">Date</th>
-              <th className="pr-season-box-head">Box Score</th>
-              <th className="pr-season-result-head">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.flatMap((d) =>
-              d.games.map((g, gi) => (
-                <tr key={`${d.date}|${g.gamePk}`}>
-                  {gi === 0 && (
-                    <td className="pr-season-date" rowSpan={d.games.length}>
-                      <span className="pr-season-date-label">{shortDate(d.date)}</span>
-                      {d.profit !== null && (
-                        <span className={`pr-day-pl ${d.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}`}>
-                          {formatProfit(d.profit)}{d.profitPartial ? "*" : ""}
-                        </span>
-                      )}
-                    </td>
-                  )}
-                  <td className="pr-season-box"><BoxScoreCell game={g} /></td>
-                  <td className="pr-season-result"><ResultCell game={g} /></td>
-                </tr>
-              )),
+      <nav className="pr-week-nav">
+        {olderHref
+          ? <a className="pr-week-link" href={olderHref}>‹ Older</a>
+          : <span className="pr-week-link pr-week-off">‹ Older</span>}
+        <span className="pr-week-range">{shortDate(rangeStart)} – {shortDate(rangeEnd)}</span>
+        {newerHref
+          ? <a className="pr-week-link" href={newerHref}>Newer ›</a>
+          : <span className="pr-week-link pr-week-off">Newer ›</span>}
+      </nav>
+      {days.length === 0 ? (
+        <p className="pr-recap-empty">No graded picks this week.</p>
+      ) : days.map((d) => (
+        <div className="pr-day" key={d.date}>
+          <div className="pr-day-head">
+            <span className="pr-day-date">{weekdayMonthDay(d.date)}</span>
+            {d.profit !== null && (
+              <span className={d.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>
+                {formatProfit(d.profit)}{d.profitPartial ? "*" : ""}
+              </span>
             )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+          {d.games.map((g) => (
+            <div
+              className={`pr-game${g.mlPick?.hit === true ? " pr-game-won" : g.mlPick?.hit === false ? " pr-game-lost" : ""}`}
+              key={g.gamePk}
+            >
+              <a className="pr-box-link" href={`/mlb/${d.date}`}>
+                <BoxScoreLine game={g} />
+                {g.mlPick && (
+                  <div className="pr-pick">
+                    <span className={`pr-pick-team ${g.mlPick.hit === true ? "pr-play-hit" : g.mlPick.hit === false ? "pr-play-miss" : ""}`}>
+                      {g.mlPick.label}{g.mlPick.dog ? " 🐕" : ""}
+                    </span>
+                    {g.mlPick.profit != null && (
+                      <span className={`pr-pick-pl ${g.mlPick.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}`}>{formatProfit(g.mlPick.profit)}</span>
+                    )}
+                  </div>
+                )}
+              </a>
+            </div>
+          ))}
+        </div>
+      ))}
     </section>
   );
 }
 
-function BoxScoreCell({ game }: { game: SeasonHistoryGame }) {
+/** Full-width linescore beneath a game — team | innings | R H E. Handles
+ *  up to 12 innings and 2-digit values; each column padded to its widest
+ *  value so away/home align. */
+function BoxScoreLine({ game }: { game: SeasonHistoryGame }) {
   const ls = game.linescore;
-  if (!ls) {
-    return <span className="pr-na">{game.awayAbbr} @ {game.homeAbbr}</span>;
-  }
-  // Determine the widest single-inning cell width across both teams,
-  // then pad. Keeps columns aligned even when a 10+ inning happens.
-  const innings = ls.innings.slice(0, 9);
-  let width = 1;
+  if (!ls) return null;
+  const count = Math.min(12, Math.max(9, ls.innings.length));
+  const innings = ls.innings.slice(0, count);
+  let w = 1;
   for (const i of innings) {
-    if (i.a != null) width = Math.max(width, String(i.a).length);
-    if (i.h != null) width = Math.max(width, String(i.h).length);
+    if (i.a != null) w = Math.max(w, String(i.a).length);
+    if (i.h != null) w = Math.max(w, String(i.h).length);
   }
-  const fmtCell = (v: number | null): string => (v == null ? "-".padStart(width) : String(v).padStart(width));
-  const fmtInns = (side: "a" | "h"): string => {
+  const cell = (v: number | null): string => (v == null ? "·".padStart(w) : String(v).padStart(w));
+  const innRow = (side: "a" | "h"): string => {
     const cells: string[] = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < count; i++) {
       const inn = innings[i];
-      cells.push(fmtCell(inn ? (side === "a" ? inn.a : inn.h) : null));
+      cells.push(cell(inn ? (side === "a" ? inn.a : inn.h) : null));
     }
-    // Group by threes (1-3, 4-6, 7-9) with spaces between groups only
-    // when width > 1; otherwise a single space between the groups keeps
-    // the line tight.
-    const gap = width === 1 ? " " : "  ";
-    return `${cells.slice(0,3).join(width === 1 ? "" : " ")}${gap}${cells.slice(3,6).join(width === 1 ? "" : " ")}${gap}${cells.slice(6,9).join(width === 1 ? "" : " ")}`;
+    const groups: string[] = [];
+    for (let i = 0; i < cells.length; i += 3) groups.push(cells.slice(i, i + 3).join(" "));
+    return groups.join("  ");
   };
-  const fmtTot = (t: { r: number | null; h: number | null; e: number | null }): string =>
-    `${(t.r ?? 0).toString().padStart(2)} ${(t.h ?? 0).toString().padStart(2)} ${(t.e ?? 0).toString().padStart(1)}`;
+  const tot = (t: { r: number | null; h: number | null; e: number | null }): string =>
+    `${String(t.r ?? 0).padStart(2)} ${String(t.h ?? 0).padStart(2)} ${String(t.e ?? 0).padStart(2)}`;
   return (
-    <span className="pr-linescore">
-      <span className="pr-linescore-row">
+    <div className="pr-linescore">
+      <div className="pr-linescore-row">
         <span className="pr-linescore-team">{game.awayAbbr}</span>
-        <span className="pr-linescore-inn">{fmtInns("a")}</span>
-        <span className="pr-linescore-tot">{fmtTot(ls.away)}</span>
-      </span>
-      <span className="pr-linescore-row">
+        <span className="pr-linescore-inn">{innRow("a")}</span>
+        <span className="pr-linescore-tot">{tot(ls.away)}</span>
+      </div>
+      <div className="pr-linescore-row">
         <span className="pr-linescore-team">{game.homeAbbr}</span>
-        <span className="pr-linescore-inn">{fmtInns("h")}</span>
-        <span className="pr-linescore-tot">{fmtTot(ls.home)}</span>
-      </span>
-    </span>
+        <span className="pr-linescore-inn">{innRow("h")}</span>
+        <span className="pr-linescore-tot">{tot(ls.home)}</span>
+      </div>
+    </div>
   );
 }
 
-function ResultCell({ game }: { game: SeasonHistoryGame }) {
-  if (!game.mlPick) return <span className="pr-na">—</span>;
-  return (
-    <span className="pr-result-stack">
-      <PlayCell
-        badgeClass="pr-play-ml"
-        strong={game.mlPick.strong}
-        label={`${game.mlPick.label} ML${game.mlPick.dog ? " 🐕" : ""}`}
-        hit={game.mlPick.hit}
-      />
-    </span>
-  );
-}
-
-function shortDate(iso: string): string {
+function longMonthDay(iso: string): string {
   const [y, m, d] = iso.split("-").map((s) => Number(s));
   if (!y || !m || !d) return iso;
   const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  return dt.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+}
+/** "Jul 23" — short month + day, for compact ranges. */
+function shortDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map((s) => Number(s));
+  if (!y || !m || !d) return iso;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+/** "Thursday, July 23" — weekday + month + day, no year. */
+function weekdayMonthDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map((s) => Number(s));
+  if (!y || !m || !d) return iso;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 }
 
 function YesterdayRow({
@@ -509,7 +567,7 @@ function YesterdayRow({
     <tr>
       <td>{finalScore}</td>
       <td className="pr-yesterday-play">
-        <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr} ML${win.dog ? " 🐕" : ""}`} hit={o.winCorrect} />
+        <PlayCell badgeClass="pr-play-ml" strong={win.strong} label={`${win.abbr}${win.dog ? " 🐕" : ""}`} hit={o.winCorrect} />
       </td>
       <td className="pr-yesterday-profit">
         {totalProfit === null
