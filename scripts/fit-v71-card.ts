@@ -16,8 +16,10 @@
 // Findings 2026-07-23 (see the printout):
 //   - High-confidence underdogs (model favors >=55%, priced as dog):
 //     ~55% hit, ~+19% ROI — our single best pick type.
-//   - The full EV-ranked card: ML ~62.7% hit / ~+25.4% ROI over 300
-//     priced picks (vs +7.3% for the favorites-only band it replaced).
+//   - The full card (20% floor + winPct>=0.68 override): ML ~65.9% hit /
+//     ~+25.8% ROI over ~367 priced picks (vs +7.3% for the favorites-only
+//     band it replaced). The floor guarantees a pick every day even when
+//     fewer than 20% of games are +EV — costs ~1.6pp ROI vs +EV-only.
 //
 // Run: npx tsx --env-file=.env.local scripts/fit-v71-card.ts
 

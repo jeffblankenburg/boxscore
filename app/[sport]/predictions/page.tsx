@@ -136,7 +136,12 @@ export default async function PredictionsPage({
     ]);
   }
 
-  const plays = buildTodaysPlays(result.games, todayOdds);
+  // The card ranks by EV, which needs the day's lines. Those are captured
+  // by the snapshot cron at 10:30 AM ET — before that, there are games but
+  // no odds, so we show a "picks lock at" notice instead of provisional
+  // picks that would change once the lines post.
+  const picksPending = result.gameCount > 0 && todayOdds.mlByGamePk.size === 0;
+  const plays = picksPending ? [] : buildTodaysPlays(result.games, todayOdds);
 
   return (
     <div className="pr-page">
@@ -146,7 +151,7 @@ export default async function PredictionsPage({
         {plays.length > 0 && <> &middot; <strong>{plays.length} play{plays.length === 1 ? "" : "s"}</strong></>}
       </p>
 
-      <PlaysSection plays={plays} />
+      <PlaysSection plays={plays} pending={picksPending} />
 
       <YesterdayResults yesterday={yesterday} outcomes={yesterdayOutcomes} odds={yesterdayOdds} />
 
@@ -190,15 +195,23 @@ function buildTodaysPlays(
   return rows.sort((a, b) => a.game.startTime.localeCompare(b.game.startTime));
 }
 
+const PICKS_LOCK_LABEL = "10:30 AM ET";
+
 function PlaysSection({
   plays,
+  pending,
 }: {
   plays: Array<{ game: GamePrediction; win: WinPlay }>;
+  pending: boolean;
 }) {
   return (
     <section className="pr-plays">
       <h2 className="pr-plays-head">Today&apos;s Plays</h2>
-      {plays.length === 0 ? (
+      {pending ? (
+        <p className="pr-plays-empty">
+          Today&apos;s picks lock at <strong>{PICKS_LOCK_LABEL}</strong>, once the morning lines are set. Check back then.
+        </p>
+      ) : plays.length === 0 ? (
         <p className="pr-plays-empty">No games on the slate today.</p>
       ) : (
         <div className="pr-scroll">
