@@ -285,11 +285,10 @@ function YesterdayResults({
   }
 
   return (
-    <section className="pr-recap pr-yesterday">
-      <h2 className="pr-recap-head">Yesterday&apos;s Results</h2>
-      <div className="pr-recap-subhead">{prettyDate(yesterday)}</div>
+    <section className="pr-recap pr-yesterday pr-framed">
+      <h2 className="pr-recap-head">Results for {weekdayMonthDay(yesterday)}</h2>
       <div className="pr-scroll">
-        <table className="pr-recap-table pr-yesterday-table">
+        <table className="pr-recap-table pr-yesterday-table pr-framed-table">
           <thead>
             <tr>
               <th>Final</th>
@@ -346,9 +345,9 @@ function StatBoxes({
   ];
 
   return (
-    <section className="pr-recap pr-winpct-section">
+    <section className="pr-recap pr-framed">
       <h2 className="pr-recap-head">Win Percentages</h2>
-      <table className="pr-recap-table pr-winpct-table">
+      <table className="pr-recap-table pr-winpct-table pr-framed-table">
         <thead>
           <tr>
             <th>Window</th>
@@ -407,7 +406,7 @@ function SeasonHistorySection({ days }: { days: SeasonHistoryDay[] }) {
       {shown.map((d) => (
         <div className="pr-day" key={d.date}>
           <div className="pr-day-head">
-            <span className="pr-day-date">{longMonthDay(d.date)}</span>
+            <span className="pr-day-date">{weekdayMonthDay(d.date)}</span>
             {d.profit !== null && (
               <span className={d.profit >= 0 ? "pr-profit-pos" : "pr-profit-neg"}>
                 {formatProfit(d.profit)}{d.profitPartial ? "*" : ""}
@@ -486,6 +485,13 @@ function longMonthDay(iso: string): string {
   if (!y || !m || !d) return iso;
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+}
+/** "Thursday, July 23" — weekday + month + day, no year. */
+function weekdayMonthDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map((s) => Number(s));
+  if (!y || !m || !d) return iso;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 }
 
 function YesterdayRow({

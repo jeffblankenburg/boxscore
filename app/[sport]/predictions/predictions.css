@@ -90,12 +90,12 @@
 /* Today's Plays header sits under the section underline. */
 .pr-plays-table th { padding: 0 6px 7px; }
 
-/* Win% header is framed by two rules — its own top border (which IS the
- * "Win Percentages" line: the section head drops its underline so this
- * serves as it) and the base bottom border — with the labels centered
- * between them via equal padding. */
-.pr-winpct-section .pr-recap-head { border-bottom: none; padding-bottom: 0; }
-.pr-winpct-table th {
+/* Framed table header: the section head drops its own underline and the
+ * table header takes a top border, so the section rule IS the header's
+ * top line and the labels sit centered between it and the bottom rule.
+ * Used where the table IS the section (Win%, Yesterday's Results). */
+.pr-framed .pr-recap-head { border-bottom: none; padding-bottom: 0; }
+.pr-framed-table th {
   border-top: 2px solid var(--border-strong);
   padding: 7px 6px;
 }
