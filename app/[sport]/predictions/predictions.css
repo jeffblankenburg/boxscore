@@ -1,51 +1,52 @@
 /* /mlb/predictions — flat, newspaper styling to match the /mlb digest:
  * no boxed cards, no background fills, hairline rules + whitespace and
- * typography for hierarchy. Hit/miss and profit are the only colour. */
+ * typography for hierarchy. Hit/miss and profit are the only colour.
+ * Sized dense for 400px first — content must fit at mobile width. */
 
 .pr-page { padding: 0 0 32px; }
 
 .pr-title {
   font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
   font-weight: 900;
-  font-size: 30px;
+  font-size: 25px;
   margin: 8px 0 2px;
   letter-spacing: -0.01em;
 }
 .pr-subtitle {
   color: var(--text-muted);
-  margin: 0 0 22px;
-  font-size: 14px;
+  margin: 0 0 20px;
+  font-size: 12px;
 }
 
 /* Flat section — separated by whitespace + a titled hairline, no box. */
 .pr-plays,
 .pr-recap {
-  margin: 0 0 24px;
+  margin: 0 0 22px;
 }
 .pr-plays-head,
 .pr-recap-head {
   font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
   font-weight: 800;
-  font-size: 19px;
+  font-size: 16px;
   letter-spacing: -0.005em;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   padding: 0 0 3px;
   border-bottom: 2px solid var(--border-strong);
 }
 .pr-recap-subhead {
   font-weight: 700;
-  font-size: 12px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
-  margin: 0 0 8px;
+  margin: 0 0 7px;
 }
 .pr-plays-empty,
 .pr-recap-empty {
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
   margin: 0;
-  padding: 4px 0;
+  padding: 3px 0;
 }
 
 .pr-scroll { overflow-x: auto; }
@@ -56,33 +57,33 @@
 .pr-recap-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 12px;
 }
 .pr-plays-table th,
 .pr-recap-table th {
   font-weight: 700;
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-secondary);
   text-align: left;
-  padding: 2px 8px 4px;
+  padding: 1px 6px 3px;
   border-bottom: 1.5px solid var(--border-strong);
   white-space: nowrap;
 }
 .pr-plays-table td,
 .pr-recap-table td {
-  padding: 5px 8px;
+  padding: 4px 6px;
   border-bottom: 1px solid var(--border-light);
   text-align: left;
   vertical-align: middle;
 }
 
 .pr-col-time {
-  width: 78px;
+  width: 66px;
   white-space: nowrap;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 .pr-team-link {
@@ -99,7 +100,7 @@
 .pr-play-plain,
 .pr-play-badge {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -108,23 +109,22 @@
 .pr-play-miss { color: #a83232; text-decoration: line-through; }
 .pr-play-cell { display: inline-flex; align-items: baseline; }
 
-/* ─── Win Percentages — one row per window (7d / 30d / season), metric
- * columns. Numeric cells right-aligned + monospace. ───────────────── */
+/* ─── Win Percentages — one row per window, metric columns. ───────── */
 .pr-winpct-table th:not(:first-child) { text-align: right; }
 .pr-winpct-num {
   text-align: right !important;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
 }
-.pr-winpct-hit { font-weight: 800; font-size: 15px; }
+.pr-winpct-hit { font-weight: 800; font-size: 13px; }
 
 /* ─── Yesterday's Results — Final | Play | Profit. ─────────────────── */
 .pr-yesterday-play { white-space: nowrap; }
 .pr-yesterday-profit {
   text-align: right !important;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -137,51 +137,57 @@
   border-top: 2px solid var(--border-strong);
   border-bottom: none;
   font-weight: 800;
-  padding-top: 6px;
+  padding-top: 5px;
 }
 .pr-yesterday-total td:first-child {
   text-align: right;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-size: 11px;
+  font-size: 10px;
 }
 
-/* ─── Season Picks — Date (+P/L) | Box Score | Result. ─────────────── */
-.pr-season-table { width: 100%; border-collapse: collapse; }
+/* ─── Season Picks — Date (+P/L) | Box Score | Result. The box score
+ * (linescore) is the content that matters, so the date is pinned narrow
+ * and the box score takes the room it needs. ─────────────────────── */
+.pr-season-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .pr-season-table td { vertical-align: middle; }
-.pr-season-date-head,
-.pr-season-result-head { white-space: nowrap; }
+.pr-season-table th { padding: 1px 4px 3px; }
+.pr-season-date-head { width: 42px; }
+.pr-season-result-head { width: 76px; }
+.pr-season-box-head { width: auto; }
+
 .pr-season-date {
   white-space: nowrap;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  padding-right: 12px;
+  font-size: 10px;
+  padding: 4px 6px 4px 0;
 }
 .pr-season-date-label { display: block; font-weight: 700; }
 .pr-day-pl {
   display: block;
-  margin-top: 2px;
-  font-size: 10px;
+  margin-top: 1px;
+  font-size: 9px;
   font-weight: 700;
   white-space: nowrap;
 }
-.pr-season-box { padding-right: 12px; }
+.pr-season-box { padding: 4px 6px 4px 0; }
 .pr-linescore {
   display: inline-flex;
   flex-direction: column;
   gap: 1px;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.3;
   white-space: pre;
   color: var(--text-secondary);
 }
 .pr-linescore-row {
   display: inline-grid;
-  grid-template-columns: 26px 1fr 48px;
-  gap: 6px;
+  grid-template-columns: 22px 1fr 40px;
+  gap: 5px;
   align-items: baseline;
 }
 .pr-linescore-team { font-weight: 700; color: var(--text-primary); }
 .pr-linescore-tot { font-weight: 700; text-align: right; color: var(--text-primary); }
+.pr-season-result { padding: 4px 0 4px 4px; }
 .pr-result-stack { display: inline-flex; flex-direction: column; gap: 2px; align-items: flex-start; }
