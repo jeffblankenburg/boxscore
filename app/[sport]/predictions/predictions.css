@@ -1,237 +1,161 @@
+/* /mlb/predictions — flat, newspaper styling to match the /mlb digest:
+ * no boxed cards, no background fills, hairline rules + whitespace and
+ * typography for hierarchy. Hit/miss and profit are the only colour. */
+
 .pr-page { padding: 0 0 32px; }
 
 .pr-title {
   font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
   font-weight: 900;
-  font-size: 32px;
-  margin: 8px 0 4px;
+  font-size: 30px;
+  margin: 8px 0 2px;
   letter-spacing: -0.01em;
 }
 .pr-subtitle {
   color: var(--text-muted);
-  margin: 0 0 14px;
+  margin: 0 0 22px;
   font-size: 14px;
 }
-.pr-note {
-  color: var(--text-muted);
+
+/* Flat section — separated by whitespace + a titled hairline, no box. */
+.pr-plays,
+.pr-recap {
+  margin: 0 0 24px;
+}
+.pr-plays-head,
+.pr-recap-head {
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: -0.005em;
+  margin: 0 0 8px;
+  padding: 0 0 3px;
+  border-bottom: 2px solid var(--border-strong);
+}
+.pr-recap-subhead {
+  font-weight: 700;
   font-size: 12px;
-  line-height: 1.5;
-  margin: 0 0 18px;
-  padding: 8px 12px;
-  background: #fafafa;
-  border-left: 3px solid var(--border-light);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 8px;
 }
-.pr-empty {
+.pr-plays-empty,
+.pr-recap-empty {
   color: var(--text-muted);
   font-size: 14px;
-  padding: 32px 0;
-  text-align: center;
+  margin: 0;
+  padding: 4px 0;
 }
 
 .pr-scroll { overflow-x: auto; }
 
-.pr-table {
+/* ─── Tables — flat: no cell boxes, no fills, no striping. Header is a
+ * bold underline; rows are separated by a single hairline. ─────────── */
+.pr-plays-table,
+.pr-recap-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
-  min-width: 760px;
+  font-size: 14px;
 }
-.pr-table th,
-.pr-table td {
-  border: 1px solid var(--border-light);
-  padding: 6px 8px;
-  text-align: center;
-  vertical-align: middle;
-}
-.pr-table th {
-  background: #f0ebde;
+.pr-plays-table th,
+.pr-recap-table th {
   font-weight: 700;
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  text-align: left;
+  padding: 2px 8px 4px;
+  border-bottom: 1.5px solid var(--border-strong);
   white-space: nowrap;
-  vertical-align: bottom;
 }
-.pr-table tbody tr:nth-child(even) { background: #fafafa; }
+.pr-plays-table td,
+.pr-recap-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-light);
+  text-align: left;
+  vertical-align: middle;
+}
 
 .pr-col-time {
-  width: 88px;
+  width: 78px;
   white-space: nowrap;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  text-align: right !important;
-}
-.pr-col-side {
-  text-align: left !important;
-  min-width: 180px;
-  line-height: 1.3;
-}
-.pr-col-conf {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  letter-spacing: -0.5px;
-}
-.pr-conf-bar {
+  font-size: 12px;
   color: var(--text-secondary);
 }
-
 .pr-team-link {
   color: inherit;
   text-decoration: none;
   font-weight: 700;
 }
 .pr-team-link:hover { text-decoration: underline; }
-.pr-record {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.pr-sp {
-  color: var(--text-secondary);
-  font-size: 11px;
-  margin-top: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pr-sp-era { color: var(--text-muted); }
-
-.pr-fav {
-  background: #fffbea;
-  font-weight: 800;
-}
-.pr-pick { font-weight: 700; }
-.pr-pick-even { color: var(--text-muted); font-style: italic; font-weight: 500; }
-
-/* "How we did" — yesterday's graded picks + rolling accuracy. */
-.pr-recap {
-  margin: 0 0 28px;
-  padding: 14px 16px;
-  border: 1px solid var(--border-light);
-  background: #fdfcf7;
-}
-.pr-recap-head {
-  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
-  font-weight: 800;
-  font-size: 16px;
-  margin: 0 0 10px;
-  letter-spacing: -0.005em;
-}
-.pr-recap-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px 28px;
-  margin: 0 0 14px;
-  font-size: 12px;
-  line-height: 1.4;
-}
-.pr-stat-block {
-  min-width: 120px;
-}
-.pr-stat-label {
-  color: var(--text-muted);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0 0 2px;
-}
-.pr-stat-value {
-  font-weight: 800;
-  font-size: 18px;
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.pr-stat-sub {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.pr-recap-subhead {
-  font-weight: 700;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  margin: 14px 0 6px;
-}
-.pr-recap-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.pr-recap-table th,
-.pr-recap-table td {
-  border: 1px solid var(--border-light);
-  padding: 5px 8px;
-  text-align: center;
-}
-.pr-recap-table th {
-  background: #f0ebde;
-  font-weight: 700;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.pr-recap-table tbody tr:nth-child(even) { background: #fafafa; }
 .pr-pick-cell { font-weight: 700; }
-.pr-na   { color: var(--text-muted); font-style: italic; }
-.pr-recap-empty {
-  color: var(--text-muted);
-  font-size: 13px;
-  padding: 12px 0;
-  text-align: center;
-}
+.pr-na { color: var(--text-muted); }
 
-/* Win-percentage stat boxes — three side-by-side panels (7d / 30d / season),
- * each showing ML% and NRFI% as separate rows. */
+/* ─── Play labels — flat text, no pills. Colour + strikethrough carry
+ * the hit/miss signal; 🐕 marks underdogs. ─────────────────────────── */
+.pr-play-plain,
+.pr-play-badge {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.pr-play-hit  { color: #1f5a1f; }
+.pr-play-miss { color: #a83232; text-decoration: line-through; }
+.pr-play-cell { display: inline-flex; align-items: baseline; }
+
+/* ─── Win Percentages — three flat columns (7d / 30d / season), each a
+ * small titled block, no box chrome. ──────────────────────────────── */
 .pr-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 4px 24px;
 }
-.pr-window-box {
-  border: 1px solid var(--border-light);
-  background: #fff;
-  padding: 10px 12px;
-}
+.pr-window-box { padding: 0; }
 .pr-window-label {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
   font-weight: 700;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
+  padding: 0 0 3px;
+  border-bottom: 1px solid var(--border-light);
 }
 .pr-window-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 2px 0;
+  padding: 3px 0;
 }
 .pr-window-tag {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-  min-width: 36px;
+  min-width: 34px;
 }
 .pr-window-pct {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 800;
-  font-size: 16px;
+  font-size: 17px;
 }
 .pr-window-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   margin-left: auto;
-}
-.pr-window-row-roi {
-  padding-left: 6px;
 }
 .pr-window-tag-sub {
   color: var(--text-muted);
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
-  font-size: 10px;
+  font-size: 11px;
 }
 .pr-window-pl {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -241,243 +165,69 @@
 .pr-window-pl-pos { color: #1f5a1f; }
 .pr-window-pl-neg { color: #a83232; }
 
-/* Section header above the "All games" table. */
-.pr-section-h {
-  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
-  font-weight: 800;
-  font-size: 18px;
-  margin: 24px 0 10px;
-  letter-spacing: -0.005em;
-}
-
-/* Today's Plays — three columns: Time | Matchup | Play. No colors. */
-.pr-plays {
-  margin: 0 0 20px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-light);
-  background: #fff;
-}
-.pr-plays-head {
-  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
-  font-weight: 800;
-  font-size: 15px;
-  margin: 0 0 8px;
-  letter-spacing: -0.005em;
-}
-.pr-plays-empty {
-  color: var(--text-muted);
-  font-size: 13px;
-  margin: 0;
-}
-.pr-plays-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.pr-plays-table th,
-.pr-plays-table td {
-  border: 1px solid var(--border-light);
-  padding: 4px 6px;
-  text-align: center;
-  vertical-align: middle;
-}
-.pr-plays-table th {
-  background: #f4f4f4;
-  font-weight: 700;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.pr-plays-table tbody tr:nth-child(even) { background: #fafafa; }
-/* Both plays on one line, centered — dual-market games render as
- * two adjacent boxes side-by-side. */
-.pr-plays-play {
-  text-align: center !important;
-  white-space: nowrap;
-}
-.pr-play-plain {
-  display: inline-block;
-  padding: 2px 6px;
-  margin: 0 2px;
-  border: 1px solid var(--border-light);
-  background: #fff;
-  border-radius: 3px;
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-/* Play badges (used in both Plays section and main table) */
-.pr-col-play {
-  width: 160px;
-  white-space: nowrap;
-}
-.pr-play-stack {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: stretch;
-}
-.pr-play-badge {
-  display: inline-block;
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-.pr-play-ml {
-  background: #d8e5c5;
-  color: #1f5a1f;
-  border: 1px solid #1f5a1f;
-}
-.pr-play-nrfi {
-  background: #f6e2c5;
-  color: #7a4e10;
-  border: 1px solid #7a4e10;
-}
-.pr-play-strong {
-  background: #1f5a1f;
-  color: #fff;
-}
-.pr-play-nrfi.pr-play-strong {
-  background: #7a4e10;
-  color: #fff;
-  border-color: #7a4e10;
-}
-/* Graded outcome — overrides the base ML/NRFI + strong fills so
- * the badge itself is the pass/fail signal, not just the ✓/✗ mark. */
-.pr-play-badge.pr-play-hit {
-  background: #d8e5c5;
-  color: #1f5a1f;
-  border-color: #1f5a1f;
-}
-.pr-play-badge.pr-play-miss {
-  background: #f2d0d0;
-  color: #8a2a2a;
-  border-color: #a83232;
-  /* Second, colorblind-safe cue beyond the red fill. */
-  text-decoration: line-through;
-}
-/* Yesterday's Results — neutral chrome. Only the play badge (hit/miss)
- * and the profit cell (positive/negative) carry color; alternating
- * rows are the only other visual distinction. */
-.pr-yesterday { background: #fff; }
-/* Day-total footer row — bold, separated from the per-game rows. */
-.pr-yesterday-total td {
-  border-top: 2px solid var(--border-light);
-  font-weight: 800;
-  background: #fafafa;
-}
-.pr-yesterday-total td:first-child { text-align: right; text-transform: uppercase; letter-spacing: 0.04em; font-size: 10px; }
-.pr-yesterday .pr-recap-table th { background: #f4f4f4; }
-.pr-yesterday .pr-recap-subhead { color: var(--text-muted); }
-
-/* Yesterday's Results — Final | Play | Profit. Play badge colored by
- * hit/miss; profit signed by green (positive) / red (negative). Per-game
- * odds are internal-only and never shown here. */
-.pr-yesterday-table th,
-.pr-yesterday-table td {
-  padding: 4px 6px;
-}
-.pr-yesterday-play {
-  text-align: center !important;
-  white-space: nowrap;
-}
-.pr-yesterday-play .pr-play-cell {
-  display: inline-flex;
-  margin: 0 2px;
-}
+/* ─── Yesterday's Results — Final | Play | Profit. ─────────────────── */
+.pr-yesterday-play { white-space: nowrap; }
 .pr-yesterday-profit {
   text-align: right !important;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
 }
+.pr-yesterday-table th:last-child { text-align: right; }
 .pr-profit-pos { color: #1f5a1f; }
 .pr-profit-neg { color: #a83232; }
-.pr-profit-partial {
-  color: var(--text-muted);
-  font-weight: 500;
-  margin-left: 2px;
+.pr-profit-partial { color: var(--text-muted); font-weight: 500; margin-left: 2px; }
+/* Day-total footer — a heavier top rule sets it off, no fill. */
+.pr-yesterday-total td {
+  border-top: 2px solid var(--border-strong);
+  border-bottom: none;
+  font-weight: 800;
+  padding-top: 6px;
+}
+.pr-yesterday-total td:first-child {
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
 }
 
-/* Season Picks — three columns: Date | Box Score | Result. Each row
- * is one game; the date cell rowspans across the day's games. Tuned
- * to fit inside the 400px page cap without horizontal scroll. */
-.pr-season-table { min-width: 0; table-layout: fixed; width: 100%; }
+/* ─── Season Picks — Date (+P/L) | Box Score | Result. ─────────────── */
+.pr-season-table { width: 100%; border-collapse: collapse; }
 .pr-season-table td { vertical-align: middle; }
-.pr-season-table th,
-.pr-season-table td { padding: 3px 4px; }
-.pr-season-date-head { width: 56px; }
-.pr-season-box-head  { width: auto; }
-.pr-season-result-head { width: 84px; text-align: left !important; }
-
+.pr-season-date-head,
+.pr-season-result-head { white-space: nowrap; }
 .pr-season-date {
-  width: 56px;
   white-space: nowrap;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  text-align: center;
-  border-right: 1px solid var(--border-light);
+  font-size: 11px;
+  padding-right: 12px;
 }
-.pr-season-date-label { display: block; }
-/* Per-day card P/L under the date. Colour comes from pr-profit-pos/neg. */
+.pr-season-date-label { display: block; font-weight: 700; }
 .pr-day-pl {
   display: block;
-  margin-top: 3px;
-  font-size: 9px;
+  margin-top: 2px;
+  font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
 }
-
-.pr-season-box {
-  padding: 3px 4px;
-  text-align: left !important;
-}
+.pr-season-box { padding-right: 12px; }
 .pr-linescore {
   display: inline-flex;
   flex-direction: column;
   gap: 1px;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  line-height: 1.25;
+  font-size: 11px;
+  line-height: 1.3;
   white-space: pre;
+  color: var(--text-secondary);
 }
 .pr-linescore-row {
   display: inline-grid;
-  grid-template-columns: 24px 1fr 48px;
-  gap: 4px;
+  grid-template-columns: 26px 1fr 48px;
+  gap: 6px;
   align-items: baseline;
 }
-.pr-linescore-team {
-  font-weight: 700;
-}
-.pr-linescore-inn {
-  color: var(--text-secondary);
-}
-.pr-linescore-tot {
-  font-weight: 700;
-  text-align: right;
-}
-
-.pr-season-result {
-  text-align: left !important;
-  padding: 4px 8px;
-}
-.pr-result-stack {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: flex-start;
-}
-.pr-play-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
+.pr-linescore-team { font-weight: 700; color: var(--text-primary); }
+.pr-linescore-tot { font-weight: 700; text-align: right; color: var(--text-primary); }
+.pr-result-stack { display: inline-flex; flex-direction: column; gap: 2px; align-items: flex-start; }
