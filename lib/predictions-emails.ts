@@ -17,7 +17,12 @@ import {
   predictionsRenewalEmail,
   predictionsPaymentFailedEmail,
   predictionsCancellationEmail,
+  predictionsAccessEndingEmail,
+  predictionsSeasonWindDownEmail,
+  predictionsCompEmail,
 } from "./emails/templates";
+
+const PREDICTIONS_URL = `${EMAIL_LINK_BASE}/mlb/predictions`;
 
 // Manage / update-card / cancel all live in /settings (invisible Stripe).
 const MANAGE_URL = `${EMAIL_LINK_BASE}/settings`;
@@ -92,6 +97,42 @@ export async function sendPredictionsCancellationEmail(args: {
     accessEndPretty: prettyDate(args.accessEnd),
     refundLabel: args.refundCents > 0 ? money(args.refundCents) : null,
     resubscribeUrl: `${EMAIL_LINK_BASE}/mlb/predictions/subscribe`,
+  });
+  await sendEmail({ to, subject, html, text });
+}
+
+/** Access-ending heads-up (~2-3 days before a non-renewing window lapses). */
+export async function sendPredictionsAccessEndingEmail(args: {
+  subscriberId: string;
+  accessEnd: string;
+}): Promise<void> {
+  const to = await subscriberEmail(args.subscriberId);
+  if (!to) return;
+  const { subject, html, text } = predictionsAccessEndingEmail({
+    accessEndPretty: prettyDate(args.accessEnd),
+    resubscribeUrl: PREDICTIONS_URL,
+  });
+  await sendEmail({ to, subject, html, text });
+}
+
+/** Season wind-down — access ends for the year at the season-end guard. */
+export async function sendPredictionsSeasonWindDownEmail(args: { subscriberId: string }): Promise<void> {
+  const to = await subscriberEmail(args.subscriberId);
+  if (!to) return;
+  const { subject, html, text } = predictionsSeasonWindDownEmail({ resubscribeUrl: PREDICTIONS_URL });
+  await sendEmail({ to, subject, html, text });
+}
+
+/** Comp granted — admin gave complimentary access. */
+export async function sendPredictionsCompEmail(args: {
+  subscriberId: string;
+  accessEnd: string;
+}): Promise<void> {
+  const to = await subscriberEmail(args.subscriberId);
+  if (!to) return;
+  const { subject, html, text } = predictionsCompEmail({
+    accessEndPretty: prettyDate(args.accessEnd),
+    predictionsUrl: PREDICTIONS_URL,
   });
   await sendEmail({ to, subject, html, text });
 }

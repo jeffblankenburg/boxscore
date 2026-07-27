@@ -244,6 +244,99 @@ export function predictionsRenewalEmail(opts: {
   return { subject, html, text };
 }
 
+/** Access-ending heads-up — ~2-3 days before a non-renewing window lapses (retention). */
+export function predictionsAccessEndingEmail(opts: {
+  accessEndPretty: string;
+  resubscribeUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "Your boxscore Predictions access ends soon";
+  const html = wrap(
+    `
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">Hey —</p>
+    <p style="font-size:16px; line-height:1.6;">
+      A quick heads-up: your <strong>boxscore Predictions</strong> access ends on
+      <strong>${opts.accessEndPretty}</strong>.
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      Want to keep the daily plays coming? Pick it back up here anytime:
+      <a href="${opts.resubscribeUrl}" style="color:${INK}; font-weight:700;">${opts.resubscribeUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br><span style="color:${MUTED};">boxscore</span>
+    </p>
+    `,
+    { previewText: `Your access ends ${opts.accessEndPretty}.` },
+  );
+  const text =
+    `Hey —\n\n` +
+    `A quick heads-up: your boxscore Predictions access ends on ${opts.accessEndPretty}.\n\n` +
+    `Want to keep the daily plays coming? Pick it back up anytime:\n${opts.resubscribeUrl}\n\n` +
+    `— Jeff\nboxscore\n`;
+  return { subject, html, text };
+}
+
+/** Season wind-down — access ends for the year at the season-end guard (retention). */
+export function predictionsSeasonWindDownEmail(opts: {
+  resubscribeUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "That's a wrap — boxscore Predictions";
+  const html = wrap(
+    `
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">Hey —</p>
+    <p style="font-size:16px; line-height:1.6;">
+      That's the season. Your <strong>boxscore Predictions</strong> access ends today — there's
+      no baseball to model until spring, so nothing renews over the winter.
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      Predictions are back when pitchers and catchers report. Thanks for riding along this season.
+      Pick it back up in March:
+      <a href="${opts.resubscribeUrl}" style="color:${INK}; font-weight:700;">${opts.resubscribeUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br><span style="color:${MUTED};">boxscore</span>
+    </p>
+    `,
+    { previewText: "Access ends for the season — back in March." },
+  );
+  const text =
+    `Hey —\n\n` +
+    `That's the season. Your boxscore Predictions access ends today — there's no baseball to model until spring, so nothing renews over the winter.\n\n` +
+    `Predictions are back when pitchers and catchers report. Thanks for riding along this season. Pick it back up in March:\n${opts.resubscribeUrl}\n\n` +
+    `— Jeff\nboxscore\n`;
+  return { subject, html, text };
+}
+
+/** Comp granted — admin gave complimentary access. */
+export function predictionsCompEmail(opts: {
+  accessEndPretty: string;
+  predictionsUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "You've got boxscore Predictions — on the house";
+  const html = wrap(
+    `
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">Hey —</p>
+    <p style="font-size:16px; line-height:1.6;">
+      You've been given complimentary access to <strong>boxscore Predictions</strong> through
+      <strong>${opts.accessEndPretty}</strong> — no charge, nothing to set up.
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      Here are the daily plays, the season track record, and the numbers behind each pick:
+      <a href="${opts.predictionsUrl}" style="color:${INK}; font-weight:700;">${opts.predictionsUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br><span style="color:${MUTED};">boxscore</span>
+    </p>
+    `,
+    { previewText: `Complimentary access through ${opts.accessEndPretty}.` },
+  );
+  const text =
+    `Hey —\n\n` +
+    `You've been given complimentary access to boxscore Predictions through ${opts.accessEndPretty} — no charge, nothing to set up.\n\n` +
+    `Here are the daily plays, the season track record, and the numbers behind each pick:\n${opts.predictionsUrl}\n\n` +
+    `— Jeff\nboxscore\n`;
+  return { subject, html, text };
+}
+
 /** Cancellation + refund — the painless exit (immediate cancel + prorated refund). */
 export function predictionsCancellationEmail(opts: {
   accessEndPretty: string;

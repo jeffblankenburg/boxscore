@@ -20,6 +20,7 @@ import {
   revokeEntitlement,
   hasPredictionsAccess,
 } from "@/lib/predictions-entitlements";
+import { sendPredictionsCompEmail } from "@/lib/predictions-emails";
 import { todayInET, isValidIsoDate } from "@/lib/dates";
 
 const SPORT = "mlb"; // launch sport; add a flag when a 2nd predictions sport ships
@@ -71,6 +72,13 @@ async function main() {
       note: noteParts.length ? noteParts.join(" ") : null,
     });
     console.log(`✓ comped ${email}: ${ent.accessStart}→${ent.accessEnd} (${ent.id})`);
+    // Tell the recipient they've got complimentary access (best-effort).
+    try {
+      await sendPredictionsCompEmail({ subscriberId: sub.id, accessEnd: ent.accessEnd });
+      console.log(`  ✉  comp email sent to ${email}`);
+    } catch (e) {
+      console.error(`  ✗ comp email failed: ${(e as Error).message}`);
+    }
     return;
   }
 
