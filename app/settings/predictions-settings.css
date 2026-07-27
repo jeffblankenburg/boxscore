@@ -77,22 +77,22 @@
 .settings-tabs { margin: 18px 0 8px; }
 .settings-tabbar {
   display: flex;
-  gap: 2px;
-  overflow-x: auto;
+  justify-content: space-between;
+  gap: 0;
   border-bottom: 2px solid #161410;
   margin-bottom: 16px;
-  -webkit-overflow-scrolling: touch;
 }
 .settings-tab {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   background: none;
   border: none;
   border-bottom: 3px solid transparent;
   margin-bottom: -2px;
-  padding: 8px 13px;
+  padding: 8px 5px;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-muted);
   cursor: pointer;
   white-space: nowrap;
