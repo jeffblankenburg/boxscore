@@ -30,42 +30,33 @@ export function SportPanel({
   teams: TeamRow[];
   teamSubs: Map<string, boolean>;
 }) {
-  if (!available) {
-    const groups = PREVIEW_TEAMS[sportId] ?? [];
-    return (
-      <div className="settings-panel">
-        <p className="subscribe-fine">
-          {`${sportLabel} isn't live yet — coming soon. You'll subscribe to the daily ${sportLabel} digest right here.`}
-        </p>
-        {groups.length > 0 && (
-          <>
-            <h3 className="settings-panel-h">Teams</h3>
-            <p className="subscribe-fine">
-              A preview of the teams — team emails open when {sportLabel} launches.
-            </p>
-            <PreviewTeams groups={groups} grouped={sportId === "ncaaf"} />
-          </>
-        )}
-        <PredictionsLine sportId={sportId} available={false} />
-      </div>
-    );
-  }
+  // Team display is independent of league availability: only MLB has real team
+  // digests (functional toggles); every other sport shows the ESPN preview list
+  // whether or not it's visible to this viewer (so admins see it too).
+  const previewGroups = PREVIEW_TEAMS[sportId] ?? [];
+  const hasRealTeams = teams.length > 0;
 
   return (
     <div className="settings-panel">
       <h3 className="settings-panel-h">Daily {sportLabel} digest</h3>
-      <ul className="settings-sport-list">
-        <li className="settings-sport-row">
-          <SettingsToggleCheckbox
-            active={leagueSubscribed}
-            action={setSportSubscription}
-            fields={{ sport: sportId }}
-            label={`Email me the ${sportLabel} league digest`}
-          />
-        </li>
-      </ul>
+      {available ? (
+        <ul className="settings-sport-list">
+          <li className="settings-sport-row">
+            <SettingsToggleCheckbox
+              active={leagueSubscribed}
+              action={setSportSubscription}
+              fields={{ sport: sportId }}
+              label={`Email me the ${sportLabel} league digest`}
+            />
+          </li>
+        </ul>
+      ) : (
+        <p className="subscribe-fine">
+          {`${sportLabel} isn't live yet — coming soon. You'll subscribe to the daily ${sportLabel} digest right here.`}
+        </p>
+      )}
 
-      {teams.length > 0 ? (
+      {hasRealTeams ? (
         <>
           <h3 className="settings-panel-h">Team emails</h3>
           <p className="subscribe-fine">
@@ -92,6 +83,14 @@ export function SportPanel({
               </li>
             ))}
           </ul>
+        </>
+      ) : previewGroups.length > 0 ? (
+        <>
+          <h3 className="settings-panel-h">Teams</h3>
+          <p className="subscribe-fine">
+            A preview of the teams — team emails open when {sportLabel} launches.
+          </p>
+          <PreviewTeams groups={previewGroups} grouped={sportId === "ncaaf"} />
         </>
       ) : (
         <p className="subscribe-fine">Team-specific emails are coming soon for {sportLabel}.</p>
