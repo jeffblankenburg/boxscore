@@ -218,7 +218,7 @@ async function captureScoreboardOnBrowser(
     );
     await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 2 });
     await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
-    await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
+    await ensureFontsLoaded(page);
     await new Promise((r) => setTimeout(r, 200));
 
     // Count rendered game tiles for use in social-post captions ("15 games")
@@ -245,9 +245,40 @@ async function captureScoreboardOnBrowser(
   }
 }
 
+// Force the Source Sans 3 webfont fully loaded before a screenshot. The app
+// serves the font via an @import in globals.css that does NOT reliably
+// register in document.fonts inside the headless render — so
+// `document.fonts.ready` can resolve with zero faces and the capture falls
+// back to a system font, which renders some glyphs at the wrong size (the
+// share-image footer URL was the tell). Inject the stylesheet if it's absent,
+// then explicitly load the weights we use and await readiness.
+async function ensureFontsLoaded(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const href =
+      "https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap";
+    if (![...document.styleSheets].some((s) => (s.href || "").includes("fonts.googleapis"))) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = href;
+      document.head.appendChild(link);
+      await new Promise((r) => {
+        link.onload = r;
+        link.onerror = r;
+      });
+    }
+    const specs = ["400", "italic 400", "600", "700", "800", "900"].map((w) => `${w} 16px 'Source Sans 3'`);
+    try {
+      await Promise.all(specs.map((s) => document.fonts.load(s)));
+    } catch {
+      /* best-effort */
+    }
+    await document.fonts.ready;
+  });
+}
+
 // Render a single DOM element on `url` (matched by `selector`) to a PNG.
 // Reuses the shared browser launch (system Chrome locally, @sparticuz/
-// chromium-min on Vercel). Used by the /boxscores image route to turn any
+// chromium-min on Vercel). Used by the /mlb/art image route to turn any
 // historical game's card into a downloadable share image on demand.
 export async function renderElementPng(args: {
   url: string;
@@ -261,7 +292,7 @@ export async function renderElementPng(args: {
         "globalThis.__name = globalThis.__name || (function(fn){ return fn; });",
       );
       await page.goto(args.url, { waitUntil: "networkidle0", timeout: 60_000 });
-      await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
+      await ensureFontsLoaded(page);
       await new Promise((r) => setTimeout(r, 200));
       const el = await page.$(args.selector);
       if (!el) throw new Error(`renderElementPng: no element for ${args.selector}`);
@@ -355,7 +386,7 @@ export async function renderShareImages(args: {
       "globalThis.__name = globalThis.__name || (function(fn){ return fn; });",
     );
     await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
-    await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
+    await ensureFontsLoaded(page);
     await new Promise((r) => setTimeout(r, 200));
 
     // Pull the actual device pixel ratio from the page — it's 2 in local
@@ -375,7 +406,7 @@ export async function renderShareImages(args: {
 
     // Now flatten the page for per-section captures.
     await injectShareChrome(page, editionDateStr, gamesDateStr, BRAND.tagline);
-    await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
+    await ensureFontsLoaded(page);
     await new Promise((r) => setTimeout(r, 200));
 
     const standings = await page.$$(".col-standings");
