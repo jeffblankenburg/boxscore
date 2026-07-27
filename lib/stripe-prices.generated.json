@@ -7,5 +7,12 @@
     "predictions_season_103": "price_1TxqW8ApeQXqdV5BXNKKsHWG",
     "predictions_season_77": "price_1TxqW9ApeQXqdV5BNzlfSfhx"
   },
-  "live": {}
+  "live": {
+    "predictions_week": "price_1Txvg3AM8wYZKtDDWdK1gofb",
+    "predictions_month": "price_1Txvg4AM8wYZKtDD3vnzq5X9",
+    "predictions_season_162": "price_1Txvg4AM8wYZKtDDzuzLCKB0",
+    "predictions_season_130": "price_1Txvg5AM8wYZKtDDmIbpxfq4",
+    "predictions_season_103": "price_1Txvg5AM8wYZKtDDLYOHAh3g",
+    "predictions_season_77": "price_1Txvg6AM8wYZKtDDluy1M10H"
+  }
 }
