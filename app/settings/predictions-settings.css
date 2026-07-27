@@ -1,0 +1,74 @@
+/* Predictions Subscription card on /settings (#111, Phase 4). */
+.ps-card {
+  border: 1px solid var(--border-light);
+  background: #fff;
+  padding: 14px 16px;
+  margin: 10px 0;
+}
+.ps-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ps-sport-name { font-size: 16px; font-weight: 800; }
+.ps-soon { opacity: 0.72; }
+.ps-soon-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.ps-body { margin-top: 8px; }
+.ps-note { font-size: 14px; line-height: 1.5; color: var(--text-secondary); margin: 6px 0; }
+.ps-muted { color: var(--text-muted); font-size: 13px; }
+.ps-banner {
+  font-size: 13px;
+  color: #8a1c1c;
+  background: #fbeaea;
+  border: 1px solid #e6c3c3;
+  padding: 8px 10px;
+  margin: 0 0 8px;
+}
+.ps-ok { font-size: 14px; color: #1f5a1f; font-weight: 600; margin: 8px 0; }
+.ps-error { font-size: 13px; color: #b3261e; margin: 8px 0; }
+
+/* Actions row: update card + cancel. */
+.ps-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.ps-confirm { border-top: 1px solid var(--border-light); padding-top: 10px; }
+.ps-confirm-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+
+.ps-btn {
+  display: inline-block;
+  padding: 9px 16px;
+  border: none;
+  background: #161410;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+.ps-btn:hover:not(:disabled) { background: #333; }
+.ps-btn:disabled { opacity: 0.6; cursor: default; }
+.ps-btn-link { text-align: center; }
+.ps-danger-btn { background: #8a1c1c; }
+.ps-danger-btn:hover:not(:disabled) { background: #6f1414; }
+
+.ps-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #161410;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ps-link-btn:disabled { opacity: 0.5; cursor: default; }
+.ps-danger { color: #8a1c1c; }
+
+.ps-card-form { margin-top: 6px; }
+.ps-card-form > * + * { margin-top: 10px; }

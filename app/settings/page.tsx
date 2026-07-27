@@ -23,6 +23,9 @@ import {
 } from "./actions";
 import { SettingsToggleCheckbox } from "./SettingsToggleCheckbox";
 import { DemographicsForm } from "@/app/welcome/DemographicsForm";
+import { PredictionsSection } from "./PredictionsSection";
+import "@/app/[sport]/predictions/subscribe/subscribe.css";
+import "./predictions-settings.css";
 
 // Sports that have a per-team digest pipeline wired. Team toggles only
 // surface for these on /settings. MLB-only at v1; flip on NBA/WNBA once
@@ -122,6 +125,8 @@ export default async function SettingsPage({
             Admin Dashboard →
           </a>
         )}
+
+        <PredictionsSection subscriberId={session.subscriber_id} />
 
         <h2 className="settings-section-h">Daily League Boxscores</h2>
         <ul className="settings-sport-list">

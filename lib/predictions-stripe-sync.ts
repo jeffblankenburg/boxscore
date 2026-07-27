@@ -26,7 +26,7 @@ import {
 import {
   upsertStripeSubscriptionWindow,
   grantStripeOneTime,
-  revokeBySubscription,
+  trimBySubscriptionToToday,
   listEntitlements,
   type PredictionsProduct,
 } from "./predictions-entitlements";
@@ -186,8 +186,8 @@ export async function notifyPaymentFailed(invoice: Stripe.Invoice): Promise<Sync
   return { status: "notified", subscriberId: identity.subscriberId, kind: "payment_failed" };
 }
 
-/** Handle customer.subscription.deleted — revoke access for the subscription. */
+/** Handle customer.subscription.deleted — end access today (keep today, per #109). */
 export async function revokeSubscription(subscription: Stripe.Subscription): Promise<SyncResult> {
-  await revokeBySubscription(subscription.id);
+  await trimBySubscriptionToToday(subscription.id, todayInET());
   return { status: "revoked", stripeSubscriptionId: subscription.id };
 }

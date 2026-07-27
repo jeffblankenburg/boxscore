@@ -20,6 +20,7 @@
 
 import pricesJson from "./stripe-prices.generated.json";
 import { stripeMode, type StripeMode } from "./stripe";
+import { daysBetweenISO } from "./dates";
 
 export type PricingSku = "week" | "month" | "season";
 
@@ -147,6 +148,25 @@ export function sellableSkus(dateIso: string): PricingSku[] {
 export function seasonStepForDate(dateIso: string): SeasonStep | null {
   if (!isSellable("season", dateIso)) return null;
   return SEASON_STEPS.find((s) => dateIso >= s.from && dateIso <= s.to) ?? null;
+}
+
+// Prorated cancellation refund (#109). Refund the unused days of the CURRENT
+// paid period and keep the used days; **today counts as used** (their picks
+// already worked today), so the refund covers tomorrow onward. Because the
+// refund never exceeds the tier's daily rate, fragmenting a sub can't be gamed
+// for profit. Returns whole cents. `todayISO`/`periodStartISO`/`periodEndISO`
+// are ET calendar dates; `pricePaidCents` is what they actually paid this period.
+export function proratedRefundCents(args: {
+  pricePaidCents: number;
+  periodStartISO: string;
+  periodEndISO: string;
+  todayISO: string;
+}): number {
+  const totalDays = daysBetweenISO(args.periodStartISO, args.periodEndISO) + 1; // inclusive
+  if (totalDays <= 0) return 0;
+  const usedDays = Math.min(totalDays, Math.max(1, daysBetweenISO(args.periodStartISO, args.todayISO) + 1));
+  const unusedDays = Math.max(0, totalDays - usedDays);
+  return Math.round((unusedDays / totalDays) * args.pricePaidCents);
 }
 
 // ── Stripe Price ID resolution ────────────────────────────────────────────

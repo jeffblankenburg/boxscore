@@ -244,6 +244,45 @@ export function predictionsRenewalEmail(opts: {
   return { subject, html, text };
 }
 
+/** Cancellation + refund — the painless exit (immediate cancel + prorated refund). */
+export function predictionsCancellationEmail(opts: {
+  accessEndPretty: string;
+  refundLabel: string | null; // e.g. "$7.14", or null when no refund was due
+  resubscribeUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "boxscore Predictions — canceled";
+  const refundHtml = opts.refundLabel
+    ? `<p style="font-size:16px; line-height:1.6;">We've refunded <strong>${opts.refundLabel}</strong> for the unused days back to your card — it should land in a few business days.</p>`
+    : `<p style="font-size:16px; line-height:1.6;">No refund was due — you'd used the full period.</p>`;
+  const refundText = opts.refundLabel
+    ? `We've refunded ${opts.refundLabel} for the unused days back to your card — it should land in a few business days.\n\n`
+    : `No refund was due — you'd used the full period.\n\n`;
+  const html = wrap(
+    `
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">Hey —</p>
+    <p style="font-size:16px; line-height:1.6;">
+      Your <strong>boxscore Predictions</strong> subscription is canceled. Your access runs through the end of today (<strong>${opts.accessEndPretty}</strong>).
+    </p>
+    ${refundHtml}
+    <p style="font-size:16px; line-height:1.6;">
+      Thanks for giving it a try. You can resubscribe anytime:
+      <a href="${opts.resubscribeUrl}" style="color:${INK}; font-weight:700;">${opts.resubscribeUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br><span style="color:${MUTED};">boxscore</span>
+    </p>
+    `,
+    { previewText: opts.refundLabel ? `Canceled — ${opts.refundLabel} refunded.` : "Your subscription is canceled." },
+  );
+  const text =
+    `Hey —\n\n` +
+    `Your boxscore Predictions subscription is canceled. Your access runs through the end of today (${opts.accessEndPretty}).\n\n` +
+    refundText +
+    `Thanks for giving it a try. You can resubscribe anytime:\n${opts.resubscribeUrl}\n\n` +
+    `— Jeff\nboxscore\n`;
+  return { subject, html, text };
+}
+
 /** Payment failed — a renewal charge was declined (Stripe Smart Retries run underneath). */
 export function predictionsPaymentFailedEmail(opts: {
   accessEndPretty: string;

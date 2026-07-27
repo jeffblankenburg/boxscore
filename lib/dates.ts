@@ -116,6 +116,14 @@ export function addDaysToISO(iso: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+// Whole days from ISO `a` to ISO `b` (b − a). Negative if b precedes a.
+// UTC-noon-free integer math; DST-safe since both are pure calendar dates.
+export function daysBetweenISO(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number) as [number, number, number];
+  const [by, bm, bd] = b.split("-").map(Number) as [number, number, number];
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000);
+}
+
 // The ET calendar date (YYYY-MM-DD) a Unix-seconds instant falls on. Stripe
 // timestamps are Unix seconds; entitlement windows are ET calendar dates, so
 // a charge at 2026-07-27T18:30Z maps to the 2026-07-27 ET edition.

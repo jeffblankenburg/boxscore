@@ -258,17 +258,23 @@ export async function grantStripeOneTime(args: {
 }
 
 /**
- * Soft-revoke the active entitlement for a Stripe subscription (cancel). No-op
- * if none is active. Phase 4 adds the prorated-refund trim; Phase 1 just
- * revokes on customer.subscription.deleted. Idempotent.
+ * Trim the active entitlement for a Stripe subscription so access ends TODAY
+ * (#109: today counts as used — they keep it; the refund, if any, covers
+ * tomorrow onward). Only ever SHORTENS the window (guarded by access_end >
+ * today), so a dunning-canceled sub whose paid period already lapsed isn't
+ * handed extra days. Called on cancel from both customer.subscription.deleted
+ * and the /settings cancel flow; both converge to the same end date, so it's
+ * idempotent. No-op if nothing active. (Full revoked_at is reserved for admin
+ * revoke — see revokeEntitlement.)
  */
-export async function revokeBySubscription(stripeSubscriptionId: string): Promise<void> {
+export async function trimBySubscriptionToToday(stripeSubscriptionId: string, todayISO: string): Promise<void> {
   const { error } = await supabaseAdmin()
     .from("predictions_entitlements")
-    .update({ revoked_at: new Date().toISOString() })
+    .update({ access_end: todayISO })
     .eq("stripe_subscription_id", stripeSubscriptionId)
-    .is("revoked_at", null);
-  if (error) throw new Error(`revokeBySubscription: ${error.message}`);
+    .is("revoked_at", null)
+    .gt("access_end", todayISO);
+  if (error) throw new Error(`trimBySubscriptionToToday: ${error.message}`);
 }
 
 /** Soft-revoke an entitlement (admin revoke, refund, or Stripe cancel). Idempotent. */

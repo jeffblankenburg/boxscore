@@ -16,6 +16,7 @@ import {
   predictionsPurchaseEmail,
   predictionsRenewalEmail,
   predictionsPaymentFailedEmail,
+  predictionsCancellationEmail,
 } from "./emails/templates";
 
 // Manage / update-card / cancel all live in /settings (invisible Stripe).
@@ -74,6 +75,23 @@ export async function sendPredictionsRenewalEmail(args: {
     priceLabel: m.priceLabel,
     accessEndPretty: prettyDate(args.accessEnd),
     manageUrl: MANAGE_URL,
+  });
+  await sendEmail({ to, subject, html, text });
+}
+
+/** Cancellation + refund receipt. `refundCents` of 0 renders the "no refund due" copy. */
+export async function sendPredictionsCancellationEmail(args: {
+  subscriberId: string;
+  product: PredictionsProduct;
+  accessEnd: string;
+  refundCents: number;
+}): Promise<void> {
+  const to = await subscriberEmail(args.subscriberId);
+  if (!to) return;
+  const { subject, html, text } = predictionsCancellationEmail({
+    accessEndPretty: prettyDate(args.accessEnd),
+    refundLabel: args.refundCents > 0 ? money(args.refundCents) : null,
+    resubscribeUrl: `${EMAIL_LINK_BASE}/mlb/predictions/subscribe`,
   });
   await sendEmail({ to, subject, html, text });
 }
