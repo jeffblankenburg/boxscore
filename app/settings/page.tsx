@@ -31,6 +31,7 @@ const SPORT_TABS: { id: string; label: string }[] = [
   { id: "mlb", label: "MLB" },
   { id: "nfl", label: "NFL" },
   { id: "nba", label: "NBA" },
+  { id: "wnba", label: "WNBA" },
   { id: "ncaaf", label: "NCAAF" },
   { id: "nhl", label: "NHL" },
 ];

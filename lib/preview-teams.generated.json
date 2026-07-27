@@ -1,0 +1,359 @@
+{
+  "nfl": [
+    {
+      "name": "American Football Conference",
+      "teams": [
+        "Baltimore Ravens",
+        "Buffalo Bills",
+        "Cincinnati Bengals",
+        "Cleveland Browns",
+        "Denver Broncos",
+        "Houston Texans",
+        "Indianapolis Colts",
+        "Jacksonville Jaguars",
+        "Kansas City Chiefs",
+        "Las Vegas Raiders",
+        "Los Angeles Chargers",
+        "Miami Dolphins",
+        "New England Patriots",
+        "New York Jets",
+        "Pittsburgh Steelers",
+        "Tennessee Titans"
+      ]
+    },
+    {
+      "name": "National Football Conference",
+      "teams": [
+        "Arizona Cardinals",
+        "Atlanta Falcons",
+        "Carolina Panthers",
+        "Chicago Bears",
+        "Dallas Cowboys",
+        "Detroit Lions",
+        "Green Bay Packers",
+        "Los Angeles Rams",
+        "Minnesota Vikings",
+        "New Orleans Saints",
+        "New York Giants",
+        "Philadelphia Eagles",
+        "San Francisco 49ers",
+        "Seattle Seahawks",
+        "Tampa Bay Buccaneers",
+        "Washington Commanders"
+      ]
+    }
+  ],
+  "nba": [
+    {
+      "name": "Eastern Conference",
+      "teams": [
+        "Atlanta Hawks",
+        "Boston Celtics",
+        "Brooklyn Nets",
+        "Charlotte Hornets",
+        "Chicago Bulls",
+        "Cleveland Cavaliers",
+        "Detroit Pistons",
+        "Indiana Pacers",
+        "Miami Heat",
+        "Milwaukee Bucks",
+        "New York Knicks",
+        "Orlando Magic",
+        "Philadelphia 76ers",
+        "Toronto Raptors",
+        "Washington Wizards"
+      ]
+    },
+    {
+      "name": "Western Conference",
+      "teams": [
+        "Dallas Mavericks",
+        "Denver Nuggets",
+        "Golden State Warriors",
+        "Houston Rockets",
+        "LA Clippers",
+        "Los Angeles Lakers",
+        "Memphis Grizzlies",
+        "Minnesota Timberwolves",
+        "New Orleans Pelicans",
+        "Oklahoma City Thunder",
+        "Phoenix Suns",
+        "Portland Trail Blazers",
+        "Sacramento Kings",
+        "San Antonio Spurs",
+        "Utah Jazz"
+      ]
+    }
+  ],
+  "wnba": [
+    {
+      "name": "Eastern Conference",
+      "teams": [
+        "Atlanta Dream",
+        "Chicago Sky",
+        "Connecticut Sun",
+        "Indiana Fever",
+        "New York Liberty",
+        "Toronto Tempo",
+        "Washington Mystics"
+      ]
+    },
+    {
+      "name": "Western Conference",
+      "teams": [
+        "Dallas Wings",
+        "Golden State Valkyries",
+        "Las Vegas Aces",
+        "Los Angeles Sparks",
+        "Minnesota Lynx",
+        "Phoenix Mercury",
+        "Portland Fire",
+        "Seattle Storm"
+      ]
+    }
+  ],
+  "ncaaf": [
+    {
+      "name": "American Conference",
+      "teams": [
+        "Army Black Knights",
+        "Charlotte 49ers",
+        "East Carolina Pirates",
+        "Florida Atlantic Owls",
+        "Memphis Tigers",
+        "Navy Midshipmen",
+        "North Texas Mean Green",
+        "Rice Owls",
+        "South Florida Bulls",
+        "Temple Owls",
+        "Tulane Green Wave",
+        "Tulsa Golden Hurricane",
+        "UAB Blazers",
+        "UTSA Roadrunners"
+      ]
+    },
+    {
+      "name": "Atlantic Coast Conference",
+      "teams": [
+        "Boston College Eagles",
+        "California Golden Bears",
+        "Clemson Tigers",
+        "Duke Blue Devils",
+        "Florida State Seminoles",
+        "Georgia Tech Yellow Jackets",
+        "Louisville Cardinals",
+        "Miami Hurricanes",
+        "NC State Wolfpack",
+        "North Carolina Tar Heels",
+        "Pittsburgh Panthers",
+        "SMU Mustangs",
+        "Stanford Cardinal",
+        "Syracuse Orange",
+        "Virginia Cavaliers",
+        "Virginia Tech Hokies",
+        "Wake Forest Demon Deacons"
+      ]
+    },
+    {
+      "name": "Big 12 Conference",
+      "teams": [
+        "Arizona State Sun Devils",
+        "Arizona Wildcats",
+        "Baylor Bears",
+        "BYU Cougars",
+        "Cincinnati Bearcats",
+        "Colorado Buffaloes",
+        "Houston Cougars",
+        "Iowa State Cyclones",
+        "Kansas Jayhawks",
+        "Kansas State Wildcats",
+        "Oklahoma State Cowboys",
+        "TCU Horned Frogs",
+        "Texas Tech Red Raiders",
+        "UCF Knights",
+        "Utah Utes",
+        "West Virginia Mountaineers"
+      ]
+    },
+    {
+      "name": "Big Ten Conference",
+      "teams": [
+        "Illinois Fighting Illini",
+        "Indiana Hoosiers",
+        "Iowa Hawkeyes",
+        "Maryland Terrapins",
+        "Michigan State Spartans",
+        "Michigan Wolverines",
+        "Minnesota Golden Gophers",
+        "Nebraska Cornhuskers",
+        "Northwestern Wildcats",
+        "Ohio State Buckeyes",
+        "Oregon Ducks",
+        "Penn State Nittany Lions",
+        "Purdue Boilermakers",
+        "Rutgers Scarlet Knights",
+        "UCLA Bruins",
+        "USC Trojans",
+        "Washington Huskies",
+        "Wisconsin Badgers"
+      ]
+    },
+    {
+      "name": "Conference USA",
+      "teams": [
+        "Delaware Blue Hens",
+        "Florida International Panthers",
+        "Jacksonville State Gamecocks",
+        "Kennesaw State Owls",
+        "Liberty Flames",
+        "Middle Tennessee Blue Raiders",
+        "Missouri State Bears",
+        "New Mexico State Aggies",
+        "Sam Houston Bearkats",
+        "Western Kentucky Hilltoppers"
+      ]
+    },
+    {
+      "name": "FBS Independents",
+      "teams": [
+        "Notre Dame Fighting Irish",
+        "UConn Huskies"
+      ]
+    },
+    {
+      "name": "Mid-American Conference",
+      "teams": [
+        "Akron Zips",
+        "Ball State Cardinals",
+        "Bowling Green Falcons",
+        "Buffalo Bulls",
+        "Central Michigan Chippewas",
+        "Eastern Michigan Eagles",
+        "Kent State Golden Flashes",
+        "Massachusetts Minutemen",
+        "Miami (OH) RedHawks",
+        "Ohio Bobcats",
+        "Sacramento State Hornets",
+        "Toledo Rockets",
+        "Western Michigan Broncos"
+      ]
+    },
+    {
+      "name": "Mountain West Conference",
+      "teams": [
+        "Air Force Falcons",
+        "Hawai'i Rainbow Warriors",
+        "Nevada Wolf Pack",
+        "New Mexico Lobos",
+        "North Dakota State Bison",
+        "Northern Illinois Huskies",
+        "San José State Spartans",
+        "UNLV Rebels",
+        "UTEP Miners",
+        "Wyoming Cowboys"
+      ]
+    },
+    {
+      "name": "Pac-12 Conference",
+      "teams": [
+        "Boise State Broncos",
+        "Colorado State Rams",
+        "Fresno State Bulldogs",
+        "Oregon State Beavers",
+        "San Diego State Aztecs",
+        "Texas State Bobcats",
+        "Utah State Aggies",
+        "Washington State Cougars"
+      ]
+    },
+    {
+      "name": "Southeastern Conference",
+      "teams": [
+        "Alabama Crimson Tide",
+        "Arkansas Razorbacks",
+        "Auburn Tigers",
+        "Florida Gators",
+        "Georgia Bulldogs",
+        "Kentucky Wildcats",
+        "LSU Tigers",
+        "Mississippi State Bulldogs",
+        "Missouri Tigers",
+        "Oklahoma Sooners",
+        "Ole Miss Rebels",
+        "South Carolina Gamecocks",
+        "Tennessee Volunteers",
+        "Texas A&M Aggies",
+        "Texas Longhorns",
+        "Vanderbilt Commodores"
+      ]
+    },
+    {
+      "name": "Sun Belt - East",
+      "teams": [
+        "App State Mountaineers",
+        "Coastal Carolina Chanticleers",
+        "Georgia Southern Eagles",
+        "Georgia State Panthers",
+        "James Madison Dukes",
+        "Marshall Thundering Herd",
+        "Old Dominion Monarchs"
+      ]
+    },
+    {
+      "name": "Sun Belt - West",
+      "teams": [
+        "Arkansas State Red Wolves",
+        "Louisiana Ragin' Cajuns",
+        "Louisiana Tech Bulldogs",
+        "South Alabama Jaguars",
+        "Southern Miss Golden Eagles",
+        "Troy Trojans",
+        "UL Monroe Warhawks"
+      ]
+    }
+  ],
+  "nhl": [
+    {
+      "name": "Eastern Conference",
+      "teams": [
+        "Boston Bruins",
+        "Buffalo Sabres",
+        "Carolina Hurricanes",
+        "Columbus Blue Jackets",
+        "Detroit Red Wings",
+        "Florida Panthers",
+        "Montreal Canadiens",
+        "New Jersey Devils",
+        "New York Islanders",
+        "New York Rangers",
+        "Ottawa Senators",
+        "Philadelphia Flyers",
+        "Pittsburgh Penguins",
+        "Tampa Bay Lightning",
+        "Toronto Maple Leafs",
+        "Washington Capitals"
+      ]
+    },
+    {
+      "name": "Western Conference",
+      "teams": [
+        "Anaheim Ducks",
+        "Calgary Flames",
+        "Chicago Blackhawks",
+        "Colorado Avalanche",
+        "Dallas Stars",
+        "Edmonton Oilers",
+        "Los Angeles Kings",
+        "Minnesota Wild",
+        "Nashville Predators",
+        "San Jose Sharks",
+        "Seattle Kraken",
+        "St. Louis Blues",
+        "Utah Mammoth",
+        "Vancouver Canucks",
+        "Vegas Golden Knights",
+        "Winnipeg Jets"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 import { SettingsToggleCheckbox } from "./SettingsToggleCheckbox";
 import { setSportSubscription, setTeamSubscription } from "./actions";
+import previewTeamsJson from "@/lib/preview-teams.generated.json";
+
+// Display-only team lists (grouped by conference) for preview sports, pulled
+// from ESPN — see scripts/gen-preview-teams.ts. Subscribing opens when the
+// sport launches; these are a preview only (Jeff's note).
+const PREVIEW_TEAMS = previewTeamsJson as Record<string, { name: string; teams: string[] }[]>;
 
 // One sport's tab on /settings: the league-digest toggle, per-team toggles
 // (only where team digests exist — MLB today), and a Predictions line item.
@@ -24,11 +30,30 @@ export function SportPanel({
   teamSubs: Map<string, boolean>;
 }) {
   if (!available) {
+    const groups = PREVIEW_TEAMS[sportId] ?? [];
     return (
       <div className="settings-panel">
         <p className="subscribe-fine">
-          {`${sportLabel} isn't live yet — coming soon. You'll subscribe to the daily ${sportLabel} digest and its teams right here.`}
+          {`${sportLabel} isn't live yet — coming soon. You'll subscribe to the daily ${sportLabel} digest right here.`}
         </p>
+        {groups.length > 0 && (
+          <>
+            <h3 className="settings-panel-h">Teams</h3>
+            <p className="subscribe-fine">
+              A preview of the teams — team emails open when {sportLabel} launches.
+            </p>
+            {groups.map((g) => (
+              <div key={g.name} className="settings-team-group">
+                <div className="settings-team-group-h">{g.name}</div>
+                <ul className="settings-team-preview">
+                  {g.teams.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </>
+        )}
         <PredictionsLine sportId={sportId} available={false} />
       </div>
     );
