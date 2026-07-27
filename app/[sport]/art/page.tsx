@@ -54,7 +54,10 @@ export default async function BoxArtPage({
           id="date"
           name="date"
           defaultValue={validDate ?? ""}
-          min="1950-01-01"
+          /* statsapi's modern-era box scores start in 1901 (incl. the Negro
+             Leagues); older dates return no games. Not limited to our 1950+
+             DB — anything outside it renders via the statsapi fallback. */
+          min="1901-01-01"
           max={todayInET()}
           style={{ fontSize: 15, padding: "6px 8px", border: "1px solid var(--border-strong)", borderRadius: 0, fontFamily: "inherit" }}
         />
