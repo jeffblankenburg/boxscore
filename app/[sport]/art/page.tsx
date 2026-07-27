@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listBoxGamesForDate } from "@/lib/historical/render-game";
-import { getArtBoxImageUrl } from "@/lib/share-storage";
 import { isValidIsoDate, prettyDate, todayInET } from "@/lib/dates";
 
 // Public box-score image maker: pick a date → list that day's games → pick a
@@ -32,12 +31,10 @@ export default async function BoxArtPage({
   const selectedPk = game && /^\d+$/.test(game) ? Number(game) : null;
   const selected = selectedPk ? games.find((g) => g.gamePk === selectedPk) ?? null : null;
 
-  // If the image is already in blob storage, point <img> straight at the
-  // bucket CDN; otherwise use the render route (generates → stores → redirects).
-  const storedUrl = selected ? await getArtBoxImageUrl(selected.gamePk) : null;
-  const imgSrc = selected
-    ? storedUrl ?? `/${sport}/art/image/${selected.gamePk}?date=${validDate}`
-    : "";
+  // Clean same-origin image URL. The route proxies from blob storage (or
+  // generates on first view); the bucket URL is never exposed. date lets the
+  // route render 2026 games' card header on a first-time miss.
+  const imgSrc = selected ? `/${sport}/art/${selected.gamePk}.png?date=${validDate}` : "";
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 14px 40px" }}>
