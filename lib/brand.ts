@@ -18,7 +18,7 @@ export const BRAND = {
   // Tip Jar opens in a new tab; the rest are in-app navigation.
   footerLinks: [
     { label: "About", href: "/about", external: false },
-    { label: "Box Score Art", href: "/mlb/art", external: false },
+    { label: "Art", href: "/mlb/art", external: false },
     { label: "Advertise", href: "/advertise", external: false },
     { label: "RSS", href: "/rss/mlb", external: false },
     { label: "Privacy", href: "/privacy", external: false },
