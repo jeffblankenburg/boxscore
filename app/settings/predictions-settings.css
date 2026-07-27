@@ -72,3 +72,45 @@
 
 .ps-card-form { margin-top: 6px; }
 .ps-card-form > * + * { margin-top: 10px; }
+
+/* Sport tabs on /settings (Jeff's note 3). */
+.settings-tabs { margin: 18px 0 8px; }
+.settings-tabbar {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  border-bottom: 2px solid #161410;
+  margin-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.settings-tab {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 8px 13px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.settings-tab:hover { color: #161410; }
+.settings-tab-on { color: #161410; border-bottom-color: #161410; }
+.settings-panel-h { font-size: 15px; font-weight: 800; margin: 18px 0 6px; }
+.settings-panel-h:first-child { margin-top: 0; }
+
+/* Predictions line item inside a sport tab. */
+.settings-pred-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border-light);
+  margin-top: 18px;
+  padding-top: 12px;
+}
+.settings-pred-label { font-size: 15px; font-weight: 800; }
+.settings-pred-link { font-size: 14px; font-weight: 700; color: #161410; }

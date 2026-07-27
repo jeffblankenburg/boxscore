@@ -9,10 +9,12 @@ import { PredictionsManage } from "./PredictionsManage";
 // predictions are league-wide per sport. MLB is live; NFL/NCAA/NBA are
 // coming-soon placeholders (their prediction models don't exist yet).
 
+// Matches the sport-tab order (MLB is the live card above these).
 const COMING_SOON: { sport: string; label: string }[] = [
   { sport: "nfl", label: "NFL" },
-  { sport: "ncaaf", label: "NCAA Football" },
   { sport: "nba", label: "NBA" },
+  { sport: "ncaaf", label: "NCAA Football" },
+  { sport: "nhl", label: "NHL" },
 ];
 
 function money(cents: number): string {

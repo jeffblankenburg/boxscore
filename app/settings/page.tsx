@@ -16,16 +16,24 @@ import {
   getTeamSubscriptions,
 } from "@/lib/email-subscriptions";
 import { teamsBySport, type Sport } from "@/lib/teams";
-import {
-  requestSignInLink,
-  setSportSubscription,
-  setTeamSubscription,
-} from "./actions";
-import { SettingsToggleCheckbox } from "./SettingsToggleCheckbox";
+import { requestSignInLink } from "./actions";
 import { DemographicsForm } from "@/app/welcome/DemographicsForm";
 import { PredictionsSection } from "./PredictionsSection";
+import { SettingsTabs } from "./SettingsTabs";
+import { SportPanel } from "./SportPanel";
 import "@/app/[sport]/predictions/subscribe/subscribe.css";
 import "./predictions-settings.css";
+
+// Sport tabs on /settings, in Jeff's order. NHL isn't a real sport yet (no
+// digest/teams) — it renders as a coming-soon panel. A sport tab is "live" for
+// this viewer only if getVisibleSports includes it (admins preview the rest).
+const SPORT_TABS: { id: string; label: string }[] = [
+  { id: "mlb", label: "MLB" },
+  { id: "nfl", label: "NFL" },
+  { id: "nba", label: "NBA" },
+  { id: "ncaaf", label: "NCAAF" },
+  { id: "nhl", label: "NHL" },
+];
 
 // Sports that have a per-team digest pipeline wired. Team toggles only
 // surface for these on /settings. MLB-only at v1; flip on NBA/WNBA once
@@ -70,17 +78,31 @@ export default async function SettingsPage({
       getTeamSubscriptions(session.subscriber_id),
     ]);
 
-    // Build per-sport team sections. Each section's teams are sorted by
-    // city alphabetically (per #31 spec).
-    const teamSections = sports
-      .filter((s) => SPORTS_WITH_TEAM_DIGESTS.has(s.id))
-      .map((sport) => ({
-        sport,
-        teams: teamsBySport(sport.id as Sport)
-          .slice()
-          .sort((a, b) => a.city.localeCompare(b.city)),
-        subs: teamSubscriptions.get(sport.id) ?? new Map<string, boolean>(),
-      }));
+    // One tab per sport (teams sorted by city, #31), plus a Predictions tab.
+    const visibleIds = new Set(sports.map((s) => s.id));
+    const sportTabs = SPORT_TABS.map((s) => {
+      const teams = SPORTS_WITH_TEAM_DIGESTS.has(s.id)
+        ? teamsBySport(s.id as Sport).slice().sort((a, b) => a.city.localeCompare(b.city))
+        : [];
+      return {
+        id: s.id,
+        label: s.label,
+        content: (
+          <SportPanel
+            sportId={s.id}
+            sportLabel={s.label}
+            available={visibleIds.has(s.id)}
+            leagueSubscribed={subscriptions.get(s.id) === true}
+            teams={teams}
+            teamSubs={teamSubscriptions.get(s.id) ?? new Map<string, boolean>()}
+          />
+        ),
+      };
+    });
+    const tabs = [
+      ...sportTabs,
+      { id: "predictions", label: "Predictions", content: <PredictionsSection subscriberId={session.subscriber_id} /> },
+    ];
 
     return (
       <section className="subscribe-card">
@@ -126,74 +148,15 @@ export default async function SettingsPage({
           </a>
         )}
 
-        <PredictionsSection subscriberId={session.subscriber_id} />
-
-        <h2 className="settings-section-h">Daily League Boxscores</h2>
-        <ul className="settings-sport-list">
-          {sports.map((sport) => {
-            const active = subscriptions.get(sport.id) === true;
-            const label = sport.visibility === "admin_only" ? (
-              <>
-                {sport.name}
-                <span className="settings-sport-badge"> (admin preview)</span>
-              </>
-            ) : sport.name;
-            return (
-              <li key={sport.id} className="settings-sport-row">
-                <SettingsToggleCheckbox
-                  active={active}
-                  action={setSportSubscription}
-                  fields={{ sport: sport.id }}
-                  label={label}
-                />
-              </li>
-            );
-          })}
-        </ul>
+        <SettingsTabs tabs={tabs} />
         {error === "forbidden" && (
-          <p className="subscribe-error">That sport isn't available yet.</p>
+          <p className="subscribe-error">That sport isn&apos;t available yet.</p>
         )}
         {error === "unknown_sport" && (
           <p className="subscribe-error">Unknown sport.</p>
         )}
-
-        {teamSections.length > 0 && (
-          <>
-            <h2 className="settings-section-h">Daily Team Boxscores</h2>
-            <p className="subscribe-fine">
-              Each team has its own daily email — yesterday&apos;s game (or a
-              standings + transactions roundup on off-days). Independent of
-              the league digest above; subscribe to any, all, or none.
-            </p>
-            {teamSections.map(({ sport, teams, subs }) => (
-              <ul key={sport.id} className="settings-sport-list">
-                {teams.map((team) => {
-                  const active = subs.get(team.slug) === true;
-                  return (
-                    <li key={team.slug} className="settings-sport-row">
-                      <SettingsToggleCheckbox
-                        active={active}
-                        action={setTeamSubscription}
-                        fields={{ sport: sport.id, team: team.slug }}
-                        label={team.name}
-                      />
-                      <a
-                        href={`/${sport.id}/${team.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="settings-preview-link"
-                      >
-                        Preview →
-                      </a>
-                    </li>
-                  );
-                })}
-              </ul>
-            ))}
-            {error === "unknown_team" && (
-              <p className="subscribe-error">Unknown team.</p>
-            )}
-          </>
+        {error === "unknown_team" && (
+          <p className="subscribe-error">Unknown team.</p>
         )}
 
         <h2 className="settings-section-h" id="about-you">About you</h2>
