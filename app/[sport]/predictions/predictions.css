@@ -289,3 +289,25 @@
   margin: 14px 0 0;
 }
 .pr-store-terms a { color: #666; }
+
+/* Free-trial activation for eligible existing subscribers (top of storefront). */
+.pr-trial {
+  border: 2px solid #161410;
+  background: #fffdf6;
+  padding: 14px 16px;
+  margin: 4px 0 18px;
+}
+.pr-trial-copy { font-size: 14px; line-height: 1.5; color: #161410; margin: 0 0 10px; }
+.pr-trial-btn {
+  width: 100%;
+  padding: 12px 18px;
+  border: none;
+  background: #161410;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pr-trial-btn:hover:not(:disabled) { background: #333; }
+.pr-trial-btn:disabled { opacity: 0.6; cursor: default; }
+.pr-trial-error { font-size: 13px; color: #b3261e; margin: 8px 0 0; }

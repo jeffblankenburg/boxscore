@@ -27,6 +27,7 @@ import { readPredictionsRenderBlob } from "@/lib/sports/mlb/predictions-cache";
 import { headers } from "next/headers";
 import { getSessionSubscriber } from "@/lib/subscriber-session";
 import { hasPredictionsAccess } from "@/lib/predictions-entitlements";
+import { canActivateTrial } from "@/lib/predictions-trial";
 import { checkoutOpen } from "@/lib/predictions-checkout";
 import { stripePublishableKey } from "@/lib/stripe";
 import { sellableSkus, RECURRING_SKUS } from "@/lib/predictions-pricing";
@@ -174,6 +175,8 @@ export default async function PredictionsPage({
   const paywallActive = checkoutOpen();
   const showStorefront = paywallActive && !entitled;
   const showTodaysPicks = !paywallActive || entitled;
+  // Eligible existing subscribers can self-activate a one-time free trial.
+  const trialEligible = showStorefront && subscriber ? await canActivateTrial(subscriber.id) : false;
 
   const skus = sellableSkus(today).filter((s): s is "week" | "month" => s === "week" || s === "month");
   const plans = skus.map((sku) => {
@@ -207,6 +210,7 @@ export default async function PredictionsPage({
           successUrl={successUrl}
           gameCount={result.gameCount}
           picksPending={picksPending}
+          trialEligible={trialEligible}
         />
       )}
 

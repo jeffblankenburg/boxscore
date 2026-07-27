@@ -1,4 +1,5 @@
 import { SubscribeClient, type PlanOption } from "./subscribe/SubscribeClient";
+import { TrialActivate } from "./TrialActivate";
 
 // The paywall storefront at the top of /mlb/predictions (#111 / Jeff's notes):
 // two pricing options + the full on-site checkout, right where the picks would
@@ -12,12 +13,14 @@ export function PredictionsStorefront({
   successUrl,
   gameCount,
   picksPending,
+  trialEligible,
 }: {
   publishableKey: string;
   plans: PlanOption[];
   successUrl: string;
   gameCount: number;
   picksPending: boolean;
+  trialEligible: boolean;
 }) {
   const lede = picksPending
     ? "Today's plays lock at 10:30 AM ET, once the morning lines are set."
@@ -29,6 +32,8 @@ export function PredictionsStorefront({
     <section className="pr-store pr-framed">
       <h2 className="pr-recap-head">Today&apos;s Plays</h2>
       <p className="pr-store-lede">{lede}</p>
+
+      {trialEligible && <TrialActivate />}
 
       <p className="pr-store-cancel">
         <strong>Cancel anytime.</strong> If you cancel, we refund the unused days automatically —
