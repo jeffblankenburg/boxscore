@@ -293,6 +293,17 @@ export async function renderElementPng(args: {
       );
       await page.goto(args.url, { waitUntil: "networkidle0", timeout: 60_000 });
       await ensureFontsLoaded(page);
+      // Strip anything that could overlap the element capture: app chrome and
+      // — when generated against a dev server — the Next.js dev-indicator
+      // badge (fixed bottom-left; bleeds into a tall card as a black
+      // half-circle). No-op in production, where neither is present.
+      await page.evaluate(() => {
+        const s = document.createElement("style");
+        s.textContent =
+          ".site-header,.site-footer,.paper-toggle{display:none!important}nextjs-portal{display:none!important}";
+        document.head.appendChild(s);
+        document.querySelectorAll("nextjs-portal").forEach((e) => e.remove());
+      });
       await new Promise((r) => setTimeout(r, 200));
       const el = await page.$(args.selector);
       if (!el) throw new Error(`renderElementPng: no element for ${args.selector}`);
