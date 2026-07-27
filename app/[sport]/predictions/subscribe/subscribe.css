@@ -1,0 +1,62 @@
+/* Predictions subscribe / checkout surface (GitHub #111, Phase 2).
+   Plain, centered, newspaper-adjacent — matches the transactional style, not
+   the digest shell. */
+.sub-page {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 40px 18px 72px;
+}
+.sub-title {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+}
+.sub-lede {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0 0 24px;
+}
+.sub-note { font-size: 14px; line-height: 1.5; color: var(--text-secondary); margin: 12px 0; }
+.sub-error { font-size: 14px; color: #b3261e; margin: 12px 0; }
+.sub-fineprint { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 14px 0 0; }
+.sub-back { margin-top: 28px; font-size: 14px; }
+.sub-back a, .sub-note a, .sub-active a { color: #161410; }
+
+/* Plan chooser — one button per sellable SKU. */
+.sub-plans { display: flex; flex-direction: column; gap: 12px; margin: 8px 0 4px; }
+.sub-plan {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  width: 100%;
+  text-align: left;
+  padding: 16px 18px;
+  border: 1px solid var(--border-light);
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.sub-plan:hover { border-color: #161410; }
+.sub-plan:disabled { opacity: 0.5; cursor: default; }
+.sub-plan-label { font-size: 17px; font-weight: 800; }
+.sub-plan-price { font-size: 17px; font-weight: 800; text-align: right; }
+.sub-plan-sub { grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); }
+
+/* Payment Element form. */
+.sub-checkout { margin: 8px 0; }
+.sub-submit {
+  width: 100%;
+  margin-top: 16px;
+  padding: 13px 18px;
+  border: none;
+  background: #161410;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.sub-submit:hover:not(:disabled) { background: #333; }
+.sub-submit:disabled { opacity: 0.6; cursor: default; }

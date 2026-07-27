@@ -27,6 +27,18 @@ export type PricingSku = "week" | "month" | "season";
 export const SEASON_END = "2026-09-27"; // last day of covered access; also the cancel_at renewal guard
 export const ALL_STAR_BREAK = "2026-07-14"; // season sales close here (#109)
 
+// Global renewal guard (#109): every subscription carries cancel_at = this
+// instant so nothing bills into October with no baseball. It's the moment
+// after the last covered ET day — 2026-09-28 00:00 ET (EDT, UTC−4). Unix
+// seconds, for the Stripe `cancel_at` field. Season-specific; bump each March.
+export const SEASON_END_CANCEL_AT = Math.floor(Date.parse("2026-09-28T04:00:00Z") / 1000);
+
+// Launch flag (#111 Phase 6). Phase 2 builds the full checkout, but the mode
+// resolver uses LIVE keys in production — so until launch we refuse live-mode
+// checkout to guarantee no real charge can happen before the paywall flip.
+// Test mode always works (local testing). Flip to true at Phase 6 launch.
+export const CHECKOUT_LIVE_ENABLED = false;
+
 // Sales-window cutoffs — last date each SKU may be SOLD so its full period
 // still fits inside the season (#109). No refund/proration owed on the tail.
 export const SALES_CUTOFF: Record<PricingSku, string> = {
