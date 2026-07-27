@@ -231,6 +231,40 @@ export async function uploadScoreboardShareImage(args: {
   return { path, publicUrl: data.publicUrl };
 }
 
+// Box-score "art" images (/mlb/art) — one per game_pk, generated on demand and
+// kept in the same public share-images bucket as every other share image, in a
+// boxscore-art/ subfolder so they don't mingle with the daily {date}_ files.
+const ART_PREFIX = "boxscore-art";
+
+// Public URL of an already-stored box-score art image, or null if not yet
+// generated. The page uses this to point <img> straight at the bucket CDN
+// when the image exists, hitting the render route only on a miss.
+export async function getArtBoxImageUrl(gamePk: number): Promise<string | null> {
+  const supa = supabaseAdmin();
+  const file = `${gamePk}.png`;
+  const { data, error } = await supa.storage.from(BUCKET).list(ART_PREFIX, { search: file, limit: 1 });
+  if (error) return null;
+  if (!data?.some((f) => f.name === file)) return null;
+  const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(`${ART_PREFIX}/${file}`);
+  return urlData.publicUrl;
+}
+
+// Store a freshly-rendered box-score art PNG and return its public URL.
+// upsert so a re-render replaces in place; long cacheControl since a completed
+// game's box score never changes.
+export async function uploadArtBoxImage(gamePk: number, png: Uint8Array): Promise<string> {
+  const supa = supabaseAdmin();
+  const path = `${ART_PREFIX}/${gamePk}.png`;
+  const { error } = await supa.storage.from(BUCKET).upload(path, png, {
+    contentType: "image/png",
+    upsert: true,
+    cacheControl: "31536000",
+  });
+  if (error) throw new Error(`uploadArtBoxImage ${path}: ${error.message}`);
+  const { data } = supa.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 // Look up an already-uploaded scoreboard image for an edition date. Returns
 // null when the file doesn't exist. Used by /mlb/[editionDate]'s
 // generateMetadata to set og:image when we've already rendered the image.
