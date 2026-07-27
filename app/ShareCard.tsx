@@ -4,16 +4,16 @@ import { BRAND } from "@/lib/brand";
 
 // One box score in the standard boxscore social-image chrome: cream card,
 // logo + wordmark + game-date header, the renderGame() box score, and a
-// tagline + marketing-URL footer. Fixed 600px width so the screenshot
-// generator (scripts/gen-redbaron77-images.ts) produces a consistent
-// 1200px-wide PNG at DPR 2. data-rb-card marks it for the screenshotter.
+// tagline + marketing-URL footer. Fixed 600px width so the screenshotters
+// (/mlb/art/image/[gamePk] and scripts/gen-redbaron77-images.ts) produce a
+// consistent 1200px-wide PNG at DPR 2. data-rb-card marks the element.
 
 const PAPER = "#f9f7f1";
 const INK = "#161410";
 const RULE = "#c4baa5";
 const MUTED = "#6a6354";
 
-export function RedBaronCard({ box }: { box: HistoricalBox }) {
+export function ShareCard({ box }: { box: HistoricalBox }) {
   return (
     <div
       data-rb-card=""

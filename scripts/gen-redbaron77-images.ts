@@ -41,9 +41,25 @@ async function main() {
     const page = await browser.newPage();
     // DPR 2 → ~1200px-wide PNGs from the 600px cards (social-crisp).
     await page.setViewport({ width: 680, height: 1400, deviceScaleFactor: 2 });
-    await page.goto(`${baseUrl}/redbaron77/raw`, { waitUntil: "domcontentloaded" });
-    // Let the web fonts settle so the wordmark/date render in Source Sans.
-    await new Promise((r) => setTimeout(r, 1200));
+    await page.goto(`${baseUrl}/redbaron77/raw`, { waitUntil: "networkidle0" });
+    // Force the Source Sans 3 webfont fully loaded — the globals.css @import
+    // doesn't reliably register in document.fonts in headless Chrome, so
+    // without this the capture falls back to a system font (wrong glyph
+    // sizes in the footer URL). Mirrors ensureFontsLoaded in render-images.ts.
+    await page.evaluate(async () => {
+      const href = "https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap";
+      if (![...document.styleSheets].some((s) => (s.href || "").includes("fonts.googleapis"))) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href;
+        document.head.appendChild(link);
+        await new Promise((r) => { link.onload = r; link.onerror = r; });
+      }
+      const specs = ["400", "italic 400", "700", "800", "900"].map((w) => `${w} 16px 'Source Sans 3'`);
+      try { await Promise.all(specs.map((s) => document.fonts.load(s))); } catch { /* best-effort */ }
+      await document.fonts.ready;
+    });
+    await new Promise((r) => setTimeout(r, 200));
 
     const cards = await page.$$("[data-rb-card]");
     if (cards.length !== REDBARON_GAMES.length) {
