@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getActiveSubscribers } from "@/lib/subscribers";
+import { getEntitledSubscriberIds } from "@/lib/predictions-entitlements";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
 import { predictionsEmail } from "@/lib/emails/templates";
@@ -53,11 +54,14 @@ export async function GET(req: Request) {
   try {
     runId = await startCronRun({ route: "send-predictions-email", sport: SEND_KEY, date, trigger });
 
-    // Admins-only while the picks product is pre-launch. Filtering here (not
-    // in a getActiveSubscribersForSport call) keeps delivery independent of
-    // MLB league opt-in: an admin gets the picks email whether or not they're
-    // on the newsletter.
-    const subscribers = (await getActiveSubscribers()).filter((s) => s.is_admin);
+    // Recipients: everyone holding an active predictions entitlement for `date`,
+    // plus admins (who preview/dogfood regardless of a subscription). Filtering
+    // here — not via getActiveSubscribersForSport — keeps delivery independent
+    // of the MLB league opt-in: an entitled subscriber gets the picks whether or
+    // not they're on the newsletter. Pre-launch this is effectively admins-only
+    // (no paid entitlements yet); at launch, paying subscribers are added.
+    const entitledIds = await getEntitledSubscriberIds("mlb", date);
+    const subscribers = (await getActiveSubscribers()).filter((s) => s.is_admin || entitledIds.has(s.id));
 
     // Render the digest once — the body is identical for every recipient (only
     // the per-subscriber open pixel + unsubscribe URL differ, injected by the

@@ -40,6 +40,11 @@ export function PredictionsStorefront({
       ) : (
         <p className="pr-store-lede">Subscriptions aren&apos;t open right now — check back soon.</p>
       )}
+
+      <p className="pr-store-terms">
+        Predictions are informational and for entertainment only — no guarantee of results.
+        By subscribing you agree to the <a href="/terms">Terms</a>.
+      </p>
     </section>
   );
 }

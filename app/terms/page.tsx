@@ -29,6 +29,16 @@ export default function TermsPage() {
         applied to past digests.
       </p>
 
+      <h2>Paid predictions</h2>
+      <p>
+        The predictions subscription is informational and for entertainment only.
+        It is analysis, not betting or investment advice — we don&apos;t accept wagers,
+        hold funds, or run any contest, pool, or sweepstakes. Model performance
+        figures reflect a past track record and are not a promise of future results;
+        there is no guarantee any pick will win. Billing, cancellation, and the
+        prorated-refund terms are described at checkout and in your Settings.
+      </p>
+
       <h2>Not affiliated with MLB</h2>
       <p>
         boxscore is an independent project. It is not affiliated with,

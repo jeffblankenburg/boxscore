@@ -280,3 +280,12 @@
   margin: 0 0 16px;
 }
 .pr-store-cancel strong { color: #143d14; }
+
+/* Informational disclaimer at checkout (FTC / Stripe guardrail). */
+.pr-store-terms {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #666;
+  margin: 14px 0 0;
+}
+.pr-store-terms a { color: #666; }
