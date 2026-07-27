@@ -142,7 +142,7 @@ function renderToday(d: PredictionsDigestData): string {
   const rows = d.today.map((p) => `
     <tr>
       <td style="font-family:${SANS};font-size:14px;font-weight:700;color:${INK};padding:5px 0;border-bottom:1px solid ${HAIR};">${p.matchup}</td>
-      <td style="font-family:${MONO};font-size:13px;font-weight:700;color:${GREEN};text-align:right;padding:5px 0;border-bottom:1px solid ${HAIR};">${p.label}${p.dog ? " 🐕" : ""}</td>
+      <td style="font-family:${MONO};font-size:13px;font-weight:700;color:${INK};text-align:right;padding:5px 0;border-bottom:1px solid ${HAIR};">${p.label}${p.dog ? " 🐕" : ""}</td>
     </tr>`).join("");
   return `${sectionHead("Today's Picks")}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table>`;
 }
