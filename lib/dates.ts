@@ -106,6 +106,29 @@ export function prevDay(iso: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
+// Add (or subtract) whole days to an ISO YYYY-MM-DD calendar date. UTC-noon
+// math so DST transitions never shift the result. Used to derive entitlement
+// windows (access_start + termDays - 1) for the predictions paywall.
+export function addDaysToISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+// The ET calendar date (YYYY-MM-DD) a Unix-seconds instant falls on. Stripe
+// timestamps are Unix seconds; entitlement windows are ET calendar dates, so
+// a charge at 2026-07-27T18:30Z maps to the 2026-07-27 ET edition.
+export function etDateFromUnixSeconds(unixSeconds: number): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const parts = fmt.formatToParts(new Date(unixSeconds * 1000));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 // Format an ISO-8601 timestamp (UTC) as a short ET clock time, e.g. "7:05 PM ET".
 // Returns "TBD" without the suffix when the input isn't a valid date.
 export function timeInET(iso: string): string {

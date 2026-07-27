@@ -160,6 +160,117 @@ export async function grantComp(args: {
   return toEntitlement(data);
 }
 
+/**
+ * Upsert the access window for a Stripe SUBSCRIPTION (weekly/monthly). Called
+ * by the webhook on checkout.session.completed and every invoice.paid. Keeps
+ * ONE non-revoked row per subscription (enforced by a partial unique index,
+ * migration 0079): the first event creates it, renewals widen it. Merges
+ * conservatively — access_start = min(existing, new), access_end = max — so a
+ * renewal can only extend coverage, never shrink it, and re-delivery is a
+ * no-op. Returns the resulting row.
+ */
+export async function upsertStripeSubscriptionWindow(args: {
+  subscriberId: string;
+  sport: string;
+  product: PredictionsProduct;
+  accessStart: string;
+  accessEnd: string;
+  stripeSubscriptionId: string;
+}): Promise<Entitlement> {
+  const db = supabaseAdmin();
+  const { data: existing, error: selErr } = await db
+    .from("predictions_entitlements")
+    .select(COLS)
+    .eq("stripe_subscription_id", args.stripeSubscriptionId)
+    .is("revoked_at", null)
+    .maybeSingle<Row>();
+  if (selErr) throw new Error(`upsertStripeSubscriptionWindow(select): ${selErr.message}`);
+
+  if (existing) {
+    const start = args.accessStart < existing.access_start ? args.accessStart : existing.access_start;
+    const end = args.accessEnd > existing.access_end ? args.accessEnd : existing.access_end;
+    // No-op if the window already covers this event (idempotent re-delivery).
+    if (start === existing.access_start && end === existing.access_end) return toEntitlement(existing);
+    const { data, error } = await db
+      .from("predictions_entitlements")
+      .update({ access_start: start, access_end: end })
+      .eq("id", existing.id)
+      .select(COLS)
+      .single<Row>();
+    if (error) throw new Error(`upsertStripeSubscriptionWindow(update): ${error.message}`);
+    return toEntitlement(data);
+  }
+
+  const { data, error } = await db
+    .from("predictions_entitlements")
+    .insert({
+      subscriber_id: args.subscriberId,
+      sport: args.sport,
+      product: args.product,
+      access_start: args.accessStart,
+      access_end: args.accessEnd,
+      source: "stripe",
+      stripe_subscription_id: args.stripeSubscriptionId,
+    })
+    .select(COLS)
+    .single<Row>();
+  if (error) throw new Error(`upsertStripeSubscriptionWindow(insert): ${error.message}`);
+  return toEntitlement(data);
+}
+
+/**
+ * Grant a one-time Stripe purchase (the season pass). Idempotent on
+ * stripe_checkout_id — a re-delivered checkout.session.completed returns the
+ * existing row instead of double-granting. Returns the row.
+ */
+export async function grantStripeOneTime(args: {
+  subscriberId: string;
+  sport: string;
+  product: PredictionsProduct;
+  accessStart: string;
+  accessEnd: string;
+  stripeCheckoutId: string;
+}): Promise<Entitlement> {
+  const db = supabaseAdmin();
+  const { data: existing, error: selErr } = await db
+    .from("predictions_entitlements")
+    .select(COLS)
+    .eq("stripe_checkout_id", args.stripeCheckoutId)
+    .maybeSingle<Row>();
+  if (selErr) throw new Error(`grantStripeOneTime(select): ${selErr.message}`);
+  if (existing) return toEntitlement(existing);
+
+  const { data, error } = await db
+    .from("predictions_entitlements")
+    .insert({
+      subscriber_id: args.subscriberId,
+      sport: args.sport,
+      product: args.product,
+      access_start: args.accessStart,
+      access_end: args.accessEnd,
+      source: "stripe",
+      stripe_checkout_id: args.stripeCheckoutId,
+    })
+    .select(COLS)
+    .single<Row>();
+  if (error) throw new Error(`grantStripeOneTime(insert): ${error.message}`);
+  return toEntitlement(data);
+}
+
+/**
+ * Soft-revoke the active entitlement for a Stripe subscription (cancel). No-op
+ * if none is active. Phase 4 adds the prorated-refund trim; Phase 1 just
+ * revokes on customer.subscription.deleted. Idempotent.
+ */
+export async function revokeBySubscription(stripeSubscriptionId: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("predictions_entitlements")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .is("revoked_at", null);
+  if (error) throw new Error(`revokeBySubscription: ${error.message}`);
+}
+
 /** Soft-revoke an entitlement (admin revoke, refund, or Stripe cancel). Idempotent. */
 export async function revokeEntitlement(id: string): Promise<void> {
   const { error } = await supabaseAdmin()
