@@ -36,11 +36,6 @@ const SPORT_TABS: { id: string; label: string }[] = [
   { id: "nhl", label: "NHL" },
 ];
 
-// Sports that have a per-team digest pipeline wired. Team toggles only
-// surface for these on /settings. MLB-only at v1; flip on NBA/WNBA once
-// their team renderers exist.
-const SPORTS_WITH_TEAM_DIGESTS = new Set<string>(["mlb"]);
-
 export const metadata = { title: "Settings — boxscore", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
@@ -82,9 +77,7 @@ export default async function SettingsPage({
     // One tab per sport (teams sorted by city, #31), plus a Predictions tab.
     const visibleIds = new Set(sports.map((s) => s.id));
     const sportTabs = SPORT_TABS.map((s) => {
-      const teams = SPORTS_WITH_TEAM_DIGESTS.has(s.id)
-        ? teamsBySport(s.id as Sport).slice().sort((a, b) => a.city.localeCompare(b.city))
-        : [];
+      const teams = teamsBySport(s.id as Sport);
       return {
         id: s.id,
         label: s.label,

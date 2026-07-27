@@ -17,12 +17,19 @@ export type Team = {
   nickname: string;    // "Guardians"
   abbreviation: string; // "CLE"
   mlbApiId?: number;   // present for MLB teams
+  conference?: string; // present for NCAAF (division/conference), used to group teams
   // ADMIN-ONLY: each team's recognizable primary color, used to tint
   // tabs/rows in admin tools so scanning by color works ("the orange
   // one"). Never surfaces on the public newspaper-style site/emails;
   // those stay strictly black and white.
   primary?: string;    // hex, e.g. "#0C2340"
 };
+
+// NCAAF (138 FBS, with conference) + NHL (32), generated from ESPN so both are
+// subscribable — see scripts/gen-teams-ncaaf-nhl.ts. Kept out of the hand-
+// maintained literal below and spread into TEAMS.
+import ncaafNhlGenerated from "./teams-ncaaf-nhl.generated.json";
+const NCAAF_NHL_TEAMS = ncaafNhlGenerated as unknown as Team[];
 
 export const TEAMS: readonly Team[] = [
   { sport: "mlb", slug: "ari", name: "Arizona Diamondbacks", city: "Arizona", nickname: "Diamondbacks", abbreviation: "ARI", mlbApiId: 109, primary: "#A71930" },
@@ -144,6 +151,7 @@ export const TEAMS: readonly Team[] = [
   { sport: "nfl", slug: "tb",  name: "Tampa Bay Buccaneers", city: "Tampa Bay", nickname: "Buccaneers", abbreviation: "TB", primary: "#D50A0A" },
   { sport: "nfl", slug: "ten", name: "Tennessee Titans", city: "Tennessee", nickname: "Titans", abbreviation: "TEN", primary: "#0C2340" },
   { sport: "nfl", slug: "wsh", name: "Washington Commanders", city: "Washington", nickname: "Commanders", abbreviation: "WSH", primary: "#5A1414" },
+  ...NCAAF_NHL_TEAMS,
 ];
 
 export function findTeam(sport: Sport, slug: string): Team | undefined {

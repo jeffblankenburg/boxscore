@@ -1,19 +1,14 @@
 import { SettingsToggleCheckbox } from "./SettingsToggleCheckbox";
-import { setSportSubscription, setTeamSubscription } from "./actions";
-import { PreviewTeams } from "./PreviewTeams";
-import previewTeamsJson from "@/lib/preview-teams.generated.json";
+import { setSportSubscription } from "./actions";
+import { TeamPicker } from "./TeamPicker";
 
-// Display-only team lists (grouped by conference) for preview sports, pulled
-// from ESPN — see scripts/gen-preview-teams.ts. Subscribing opens when the
-// sport launches; these are a preview only (Jeff's note).
-const PREVIEW_TEAMS = previewTeamsJson as Record<string, { name: string; teams: string[] }[]>;
+// One sport's tab on /settings: the league-digest toggle + the team list. All
+// sports now carry a real team registry (NCAAF/NHL added from ESPN), so teams
+// are subscribable wherever the sport is available to the viewer — MLB for
+// everyone, preview sports for admins. Non-admins see the preview lists
+// read-only until each sport launches. NCAAF groups by conference.
 
-// One sport's tab on /settings: the league-digest toggle, per-team toggles
-// (only where team digests exist — MLB today), and a Predictions line item.
-// Sports not yet live (admin-only for this user, or NHL which doesn't exist
-// yet) render a coming-soon panel.
-
-type TeamRow = { slug: string; name: string };
+type TeamRow = { slug: string; name: string; conference?: string };
 
 export function SportPanel({
   sportId,
@@ -30,11 +25,7 @@ export function SportPanel({
   teams: TeamRow[];
   teamSubs: Map<string, boolean>;
 }) {
-  // Team display is independent of league availability: only MLB has real team
-  // digests (functional toggles); every other sport shows the ESPN preview list
-  // whether or not it's visible to this viewer (so admins see it too).
-  const previewGroups = PREVIEW_TEAMS[sportId] ?? [];
-  const hasRealTeams = teams.length > 0;
+  const subs = Object.fromEntries(teamSubs); // plain object for the client component
 
   return (
     <div className="settings-panel">
@@ -56,41 +47,22 @@ export function SportPanel({
         </p>
       )}
 
-      {hasRealTeams ? (
+      {teams.length > 0 ? (
         <>
-          <h3 className="settings-panel-h">Team emails</h3>
+          <h3 className="settings-panel-h">{sportId === "mlb" ? "Team emails" : "Teams"}</h3>
           <p className="subscribe-fine">
-            Each team has its own daily email — yesterday&apos;s game (or a standings +
-            transactions roundup on off-days). Independent of the league digest above.
+            {available
+              ? "Each team has its own daily email. Subscribe to any, all, or none — independent of the league digest above."
+              : `A preview of the teams — you'll be able to subscribe when ${sportLabel} launches.`}
           </p>
-          <ul className="settings-sport-list">
-            {teams.map((team) => (
-              <li key={team.slug} className="settings-sport-row">
-                <SettingsToggleCheckbox
-                  active={teamSubs.get(team.slug) === true}
-                  action={setTeamSubscription}
-                  fields={{ sport: sportId, team: team.slug }}
-                  label={team.name}
-                />
-                <a
-                  href={`/${sportId}/${team.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="settings-preview-link"
-                >
-                  Preview →
-                </a>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : previewGroups.length > 0 ? (
-        <>
-          <h3 className="settings-panel-h">Teams</h3>
-          <p className="subscribe-fine">
-            A preview of the teams — team emails open when {sportLabel} launches.
-          </p>
-          <PreviewTeams groups={previewGroups} grouped={sportId === "ncaaf"} />
+          <TeamPicker
+            sportId={sportId}
+            teams={teams}
+            subs={subs}
+            grouped={sportId === "ncaaf"}
+            canSubscribe={available}
+            showPreview={sportId === "mlb"}
+          />
         </>
       ) : (
         <p className="subscribe-fine">Team-specific emails are coming soon for {sportLabel}.</p>

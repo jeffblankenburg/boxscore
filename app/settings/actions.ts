@@ -2,6 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
@@ -69,7 +70,8 @@ export async function setSportSubscription(formData: FormData) {
   }
 
   await setLeagueSubscription(session.subscriber_id, sport.id, next === "on");
-  redirect("/settings");
+  // revalidate (not redirect) so a toggle doesn't bounce off the active tab.
+  revalidatePath("/settings");
 }
 
 /**
@@ -119,5 +121,5 @@ export async function setTeamSubscription(formData: FormData) {
   }
 
   await upsertTeamSubscription(session.subscriber_id, sport.id, team.slug, next === "on");
-  redirect("/settings");
+  revalidatePath("/settings");
 }

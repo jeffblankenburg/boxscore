@@ -1,0 +1,1500 @@
+[
+  {
+    "sport": "ncaaf",
+    "slug": "army-black-knights",
+    "name": "Army Black Knights",
+    "city": "Army",
+    "nickname": "Black Knights",
+    "abbreviation": "ARMY",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "charlotte-49ers",
+    "name": "Charlotte 49ers",
+    "city": "Charlotte",
+    "nickname": "49ers",
+    "abbreviation": "CLT",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "east-carolina-pirates",
+    "name": "East Carolina Pirates",
+    "city": "East Carolina",
+    "nickname": "Pirates",
+    "abbreviation": "ECU",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "florida-atlantic-owls",
+    "name": "Florida Atlantic Owls",
+    "city": "Florida Atlantic",
+    "nickname": "Owls",
+    "abbreviation": "FAU",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "memphis-tigers",
+    "name": "Memphis Tigers",
+    "city": "Memphis",
+    "nickname": "Tigers",
+    "abbreviation": "MEM",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "navy-midshipmen",
+    "name": "Navy Midshipmen",
+    "city": "Navy",
+    "nickname": "Midshipmen",
+    "abbreviation": "NAVY",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "north-texas-mean-green",
+    "name": "North Texas Mean Green",
+    "city": "North Texas",
+    "nickname": "Mean Green",
+    "abbreviation": "UNT",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "rice-owls",
+    "name": "Rice Owls",
+    "city": "Rice",
+    "nickname": "Owls",
+    "abbreviation": "RICE",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "south-florida-bulls",
+    "name": "South Florida Bulls",
+    "city": "South Florida",
+    "nickname": "Bulls",
+    "abbreviation": "USF",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "temple-owls",
+    "name": "Temple Owls",
+    "city": "Temple",
+    "nickname": "Owls",
+    "abbreviation": "TEM",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "tulane-green-wave",
+    "name": "Tulane Green Wave",
+    "city": "Tulane",
+    "nickname": "Green Wave",
+    "abbreviation": "TULN",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "tulsa-golden-hurricane",
+    "name": "Tulsa Golden Hurricane",
+    "city": "Tulsa",
+    "nickname": "Golden Hurricane",
+    "abbreviation": "TLSA",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "uab-blazers",
+    "name": "UAB Blazers",
+    "city": "UAB",
+    "nickname": "Blazers",
+    "abbreviation": "UAB",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "utsa-roadrunners",
+    "name": "UTSA Roadrunners",
+    "city": "UTSA",
+    "nickname": "Roadrunners",
+    "abbreviation": "UTSA",
+    "conference": "American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "boston-college-eagles",
+    "name": "Boston College Eagles",
+    "city": "Boston College",
+    "nickname": "Eagles",
+    "abbreviation": "BC",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "california-golden-bears",
+    "name": "California Golden Bears",
+    "city": "California",
+    "nickname": "Golden Bears",
+    "abbreviation": "CAL",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "clemson-tigers",
+    "name": "Clemson Tigers",
+    "city": "Clemson",
+    "nickname": "Tigers",
+    "abbreviation": "CLEM",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "duke-blue-devils",
+    "name": "Duke Blue Devils",
+    "city": "Duke",
+    "nickname": "Blue Devils",
+    "abbreviation": "DUKE",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "florida-state-seminoles",
+    "name": "Florida State Seminoles",
+    "city": "Florida State",
+    "nickname": "Seminoles",
+    "abbreviation": "FSU",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "georgia-tech-yellow-jackets",
+    "name": "Georgia Tech Yellow Jackets",
+    "city": "Georgia Tech",
+    "nickname": "Yellow Jackets",
+    "abbreviation": "GT",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "louisville-cardinals",
+    "name": "Louisville Cardinals",
+    "city": "Louisville",
+    "nickname": "Cardinals",
+    "abbreviation": "LOU",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "miami-hurricanes",
+    "name": "Miami Hurricanes",
+    "city": "Miami",
+    "nickname": "Hurricanes",
+    "abbreviation": "MIA",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "nc-state-wolfpack",
+    "name": "NC State Wolfpack",
+    "city": "NC State",
+    "nickname": "Wolfpack",
+    "abbreviation": "NCSU",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "north-carolina-tar-heels",
+    "name": "North Carolina Tar Heels",
+    "city": "North Carolina",
+    "nickname": "Tar Heels",
+    "abbreviation": "UNC",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "pittsburgh-panthers",
+    "name": "Pittsburgh Panthers",
+    "city": "Pittsburgh",
+    "nickname": "Panthers",
+    "abbreviation": "PITT",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "smu-mustangs",
+    "name": "SMU Mustangs",
+    "city": "SMU",
+    "nickname": "Mustangs",
+    "abbreviation": "SMU",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "stanford-cardinal",
+    "name": "Stanford Cardinal",
+    "city": "Stanford",
+    "nickname": "Cardinal",
+    "abbreviation": "STAN",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "syracuse-orange",
+    "name": "Syracuse Orange",
+    "city": "Syracuse",
+    "nickname": "Orange",
+    "abbreviation": "SYR",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "virginia-cavaliers",
+    "name": "Virginia Cavaliers",
+    "city": "Virginia",
+    "nickname": "Cavaliers",
+    "abbreviation": "UVA",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "virginia-tech-hokies",
+    "name": "Virginia Tech Hokies",
+    "city": "Virginia Tech",
+    "nickname": "Hokies",
+    "abbreviation": "VT",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "wake-forest-demon-deacons",
+    "name": "Wake Forest Demon Deacons",
+    "city": "Wake Forest",
+    "nickname": "Demon Deacons",
+    "abbreviation": "WAKE",
+    "conference": "Atlantic Coast Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "arizona-state-sun-devils",
+    "name": "Arizona State Sun Devils",
+    "city": "Arizona State",
+    "nickname": "Sun Devils",
+    "abbreviation": "ASU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "arizona-wildcats",
+    "name": "Arizona Wildcats",
+    "city": "Arizona",
+    "nickname": "Wildcats",
+    "abbreviation": "ARIZ",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "baylor-bears",
+    "name": "Baylor Bears",
+    "city": "Baylor",
+    "nickname": "Bears",
+    "abbreviation": "BAY",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "byu-cougars",
+    "name": "BYU Cougars",
+    "city": "BYU",
+    "nickname": "Cougars",
+    "abbreviation": "BYU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "cincinnati-bearcats",
+    "name": "Cincinnati Bearcats",
+    "city": "Cincinnati",
+    "nickname": "Bearcats",
+    "abbreviation": "CIN",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "colorado-buffaloes",
+    "name": "Colorado Buffaloes",
+    "city": "Colorado",
+    "nickname": "Buffaloes",
+    "abbreviation": "COLO",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "houston-cougars",
+    "name": "Houston Cougars",
+    "city": "Houston",
+    "nickname": "Cougars",
+    "abbreviation": "HOU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "iowa-state-cyclones",
+    "name": "Iowa State Cyclones",
+    "city": "Iowa State",
+    "nickname": "Cyclones",
+    "abbreviation": "ISU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "kansas-jayhawks",
+    "name": "Kansas Jayhawks",
+    "city": "Kansas",
+    "nickname": "Jayhawks",
+    "abbreviation": "KU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "kansas-state-wildcats",
+    "name": "Kansas State Wildcats",
+    "city": "Kansas State",
+    "nickname": "Wildcats",
+    "abbreviation": "KSU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "oklahoma-state-cowboys",
+    "name": "Oklahoma State Cowboys",
+    "city": "Oklahoma State",
+    "nickname": "Cowboys",
+    "abbreviation": "OKST",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "tcu-horned-frogs",
+    "name": "TCU Horned Frogs",
+    "city": "TCU",
+    "nickname": "Horned Frogs",
+    "abbreviation": "TCU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "texas-tech-red-raiders",
+    "name": "Texas Tech Red Raiders",
+    "city": "Texas Tech",
+    "nickname": "Red Raiders",
+    "abbreviation": "TTU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "ucf-knights",
+    "name": "UCF Knights",
+    "city": "UCF",
+    "nickname": "Knights",
+    "abbreviation": "UCF",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "utah-utes",
+    "name": "Utah Utes",
+    "city": "Utah",
+    "nickname": "Utes",
+    "abbreviation": "UTAH",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "west-virginia-mountaineers",
+    "name": "West Virginia Mountaineers",
+    "city": "West Virginia",
+    "nickname": "Mountaineers",
+    "abbreviation": "WVU",
+    "conference": "Big 12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "illinois-fighting-illini",
+    "name": "Illinois Fighting Illini",
+    "city": "Illinois",
+    "nickname": "Fighting Illini",
+    "abbreviation": "ILL",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "indiana-hoosiers",
+    "name": "Indiana Hoosiers",
+    "city": "Indiana",
+    "nickname": "Hoosiers",
+    "abbreviation": "IU",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "iowa-hawkeyes",
+    "name": "Iowa Hawkeyes",
+    "city": "Iowa",
+    "nickname": "Hawkeyes",
+    "abbreviation": "IOWA",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "maryland-terrapins",
+    "name": "Maryland Terrapins",
+    "city": "Maryland",
+    "nickname": "Terrapins",
+    "abbreviation": "MD",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "michigan-state-spartans",
+    "name": "Michigan State Spartans",
+    "city": "Michigan State",
+    "nickname": "Spartans",
+    "abbreviation": "MSU",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "michigan-wolverines",
+    "name": "Michigan Wolverines",
+    "city": "Michigan",
+    "nickname": "Wolverines",
+    "abbreviation": "MICH",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "minnesota-golden-gophers",
+    "name": "Minnesota Golden Gophers",
+    "city": "Minnesota",
+    "nickname": "Golden Gophers",
+    "abbreviation": "MINN",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "nebraska-cornhuskers",
+    "name": "Nebraska Cornhuskers",
+    "city": "Nebraska",
+    "nickname": "Cornhuskers",
+    "abbreviation": "NEB",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "northwestern-wildcats",
+    "name": "Northwestern Wildcats",
+    "city": "Northwestern",
+    "nickname": "Wildcats",
+    "abbreviation": "NU",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "ohio-state-buckeyes",
+    "name": "Ohio State Buckeyes",
+    "city": "Ohio State",
+    "nickname": "Buckeyes",
+    "abbreviation": "OSU",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "oregon-ducks",
+    "name": "Oregon Ducks",
+    "city": "Oregon",
+    "nickname": "Ducks",
+    "abbreviation": "ORE",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "penn-state-nittany-lions",
+    "name": "Penn State Nittany Lions",
+    "city": "Penn State",
+    "nickname": "Nittany Lions",
+    "abbreviation": "PSU",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "purdue-boilermakers",
+    "name": "Purdue Boilermakers",
+    "city": "Purdue",
+    "nickname": "Boilermakers",
+    "abbreviation": "PUR",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "rutgers-scarlet-knights",
+    "name": "Rutgers Scarlet Knights",
+    "city": "Rutgers",
+    "nickname": "Scarlet Knights",
+    "abbreviation": "RUTG",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "ucla-bruins",
+    "name": "UCLA Bruins",
+    "city": "UCLA",
+    "nickname": "Bruins",
+    "abbreviation": "UCLA",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "usc-trojans",
+    "name": "USC Trojans",
+    "city": "USC",
+    "nickname": "Trojans",
+    "abbreviation": "USC",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "washington-huskies",
+    "name": "Washington Huskies",
+    "city": "Washington",
+    "nickname": "Huskies",
+    "abbreviation": "WASH",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "wisconsin-badgers",
+    "name": "Wisconsin Badgers",
+    "city": "Wisconsin",
+    "nickname": "Badgers",
+    "abbreviation": "WIS",
+    "conference": "Big Ten Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "delaware-blue-hens",
+    "name": "Delaware Blue Hens",
+    "city": "Delaware",
+    "nickname": "Blue Hens",
+    "abbreviation": "DEL",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "florida-international-panthers",
+    "name": "Florida International Panthers",
+    "city": "Florida International",
+    "nickname": "Panthers",
+    "abbreviation": "FIU",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "jacksonville-state-gamecocks",
+    "name": "Jacksonville State Gamecocks",
+    "city": "Jacksonville State",
+    "nickname": "Gamecocks",
+    "abbreviation": "JVST",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "kennesaw-state-owls",
+    "name": "Kennesaw State Owls",
+    "city": "Kennesaw State",
+    "nickname": "Owls",
+    "abbreviation": "KENN",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "liberty-flames",
+    "name": "Liberty Flames",
+    "city": "Liberty",
+    "nickname": "Flames",
+    "abbreviation": "LIB",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "middle-tennessee-blue-raiders",
+    "name": "Middle Tennessee Blue Raiders",
+    "city": "Middle Tennessee",
+    "nickname": "Blue Raiders",
+    "abbreviation": "MTSU",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "missouri-state-bears",
+    "name": "Missouri State Bears",
+    "city": "Missouri State",
+    "nickname": "Bears",
+    "abbreviation": "MOST",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "new-mexico-state-aggies",
+    "name": "New Mexico State Aggies",
+    "city": "New Mexico State",
+    "nickname": "Aggies",
+    "abbreviation": "NMSU",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "sam-houston-bearkats",
+    "name": "Sam Houston Bearkats",
+    "city": "Sam Houston",
+    "nickname": "Bearkats",
+    "abbreviation": "SHSU",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "western-kentucky-hilltoppers",
+    "name": "Western Kentucky Hilltoppers",
+    "city": "Western Kentucky",
+    "nickname": "Hilltoppers",
+    "abbreviation": "WKU",
+    "conference": "Conference USA"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "notre-dame-fighting-irish",
+    "name": "Notre Dame Fighting Irish",
+    "city": "Notre Dame",
+    "nickname": "Fighting Irish",
+    "abbreviation": "ND",
+    "conference": "FBS Independents"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "uconn-huskies",
+    "name": "UConn Huskies",
+    "city": "UConn",
+    "nickname": "Huskies",
+    "abbreviation": "CONN",
+    "conference": "FBS Independents"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "akron-zips",
+    "name": "Akron Zips",
+    "city": "Akron",
+    "nickname": "Zips",
+    "abbreviation": "AKR",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "ball-state-cardinals",
+    "name": "Ball State Cardinals",
+    "city": "Ball State",
+    "nickname": "Cardinals",
+    "abbreviation": "BALL",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "bowling-green-falcons",
+    "name": "Bowling Green Falcons",
+    "city": "Bowling Green",
+    "nickname": "Falcons",
+    "abbreviation": "BGSU",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "buffalo-bulls",
+    "name": "Buffalo Bulls",
+    "city": "Buffalo",
+    "nickname": "Bulls",
+    "abbreviation": "BUFF",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "central-michigan-chippewas",
+    "name": "Central Michigan Chippewas",
+    "city": "Central Michigan",
+    "nickname": "Chippewas",
+    "abbreviation": "CMU",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "eastern-michigan-eagles",
+    "name": "Eastern Michigan Eagles",
+    "city": "Eastern Michigan",
+    "nickname": "Eagles",
+    "abbreviation": "EMU",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "kent-state-golden-flashes",
+    "name": "Kent State Golden Flashes",
+    "city": "Kent State",
+    "nickname": "Golden Flashes",
+    "abbreviation": "KENT",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "massachusetts-minutemen",
+    "name": "Massachusetts Minutemen",
+    "city": "Massachusetts",
+    "nickname": "Minutemen",
+    "abbreviation": "MASS",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "miami-oh-redhawks",
+    "name": "Miami (OH) RedHawks",
+    "city": "Miami (OH)",
+    "nickname": "RedHawks",
+    "abbreviation": "M-OH",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "ohio-bobcats",
+    "name": "Ohio Bobcats",
+    "city": "Ohio",
+    "nickname": "Bobcats",
+    "abbreviation": "OHIO",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "sacramento-state-hornets",
+    "name": "Sacramento State Hornets",
+    "city": "Sacramento State",
+    "nickname": "Hornets",
+    "abbreviation": "SAC",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "toledo-rockets",
+    "name": "Toledo Rockets",
+    "city": "Toledo",
+    "nickname": "Rockets",
+    "abbreviation": "TOL",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "western-michigan-broncos",
+    "name": "Western Michigan Broncos",
+    "city": "Western Michigan",
+    "nickname": "Broncos",
+    "abbreviation": "WMU",
+    "conference": "Mid-American Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "air-force-falcons",
+    "name": "Air Force Falcons",
+    "city": "Air Force",
+    "nickname": "Falcons",
+    "abbreviation": "AFA",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "hawai-i-rainbow-warriors",
+    "name": "Hawai'i Rainbow Warriors",
+    "city": "Hawai'i",
+    "nickname": "Rainbow Warriors",
+    "abbreviation": "HAW",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "nevada-wolf-pack",
+    "name": "Nevada Wolf Pack",
+    "city": "Nevada",
+    "nickname": "Wolf Pack",
+    "abbreviation": "NEV",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "new-mexico-lobos",
+    "name": "New Mexico Lobos",
+    "city": "New Mexico",
+    "nickname": "Lobos",
+    "abbreviation": "UNM",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "north-dakota-state-bison",
+    "name": "North Dakota State Bison",
+    "city": "North Dakota State",
+    "nickname": "Bison",
+    "abbreviation": "NDSU",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "northern-illinois-huskies",
+    "name": "Northern Illinois Huskies",
+    "city": "Northern Illinois",
+    "nickname": "Huskies",
+    "abbreviation": "NIU",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "san-jos-state-spartans",
+    "name": "San José State Spartans",
+    "city": "San José State",
+    "nickname": "Spartans",
+    "abbreviation": "SJSU",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "unlv-rebels",
+    "name": "UNLV Rebels",
+    "city": "UNLV",
+    "nickname": "Rebels",
+    "abbreviation": "UNLV",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "utep-miners",
+    "name": "UTEP Miners",
+    "city": "UTEP",
+    "nickname": "Miners",
+    "abbreviation": "UTEP",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "wyoming-cowboys",
+    "name": "Wyoming Cowboys",
+    "city": "Wyoming",
+    "nickname": "Cowboys",
+    "abbreviation": "WYO",
+    "conference": "Mountain West Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "boise-state-broncos",
+    "name": "Boise State Broncos",
+    "city": "Boise State",
+    "nickname": "Broncos",
+    "abbreviation": "BOIS",
+    "conference": "Pac-12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "colorado-state-rams",
+    "name": "Colorado State Rams",
+    "city": "Colorado State",
+    "nickname": "Rams",
+    "abbreviation": "CSU",
+    "conference": "Pac-12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "fresno-state-bulldogs",
+    "name": "Fresno State Bulldogs",
+    "city": "Fresno State",
+    "nickname": "Bulldogs",
+    "abbreviation": "FRES",
+    "conference": "Pac-12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "oregon-state-beavers",
+    "name": "Oregon State Beavers",
+    "city": "Oregon State",
+    "nickname": "Beavers",
+    "abbreviation": "ORST",
+    "conference": "Pac-12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "san-diego-state-aztecs",
+    "name": "San Diego State Aztecs",
+    "city": "San Diego State",
+    "nickname": "Aztecs",
+    "abbreviation": "SDSU",
+    "conference": "Pac-12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "texas-state-bobcats",
+    "name": "Texas State Bobcats",
+    "city": "Texas State",
+    "nickname": "Bobcats",
+    "abbreviation": "TXST",
+    "conference": "Pac-12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "utah-state-aggies",
+    "name": "Utah State Aggies",
+    "city": "Utah State",
+    "nickname": "Aggies",
+    "abbreviation": "USU",
+    "conference": "Pac-12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "washington-state-cougars",
+    "name": "Washington State Cougars",
+    "city": "Washington State",
+    "nickname": "Cougars",
+    "abbreviation": "WSU",
+    "conference": "Pac-12 Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "alabama-crimson-tide",
+    "name": "Alabama Crimson Tide",
+    "city": "Alabama",
+    "nickname": "Crimson Tide",
+    "abbreviation": "ALA",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "arkansas-razorbacks",
+    "name": "Arkansas Razorbacks",
+    "city": "Arkansas",
+    "nickname": "Razorbacks",
+    "abbreviation": "ARK",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "auburn-tigers",
+    "name": "Auburn Tigers",
+    "city": "Auburn",
+    "nickname": "Tigers",
+    "abbreviation": "AUB",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "florida-gators",
+    "name": "Florida Gators",
+    "city": "Florida",
+    "nickname": "Gators",
+    "abbreviation": "FLA",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "georgia-bulldogs",
+    "name": "Georgia Bulldogs",
+    "city": "Georgia",
+    "nickname": "Bulldogs",
+    "abbreviation": "UGA",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "kentucky-wildcats",
+    "name": "Kentucky Wildcats",
+    "city": "Kentucky",
+    "nickname": "Wildcats",
+    "abbreviation": "UK",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "lsu-tigers",
+    "name": "LSU Tigers",
+    "city": "LSU",
+    "nickname": "Tigers",
+    "abbreviation": "LSU",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "mississippi-state-bulldogs",
+    "name": "Mississippi State Bulldogs",
+    "city": "Mississippi State",
+    "nickname": "Bulldogs",
+    "abbreviation": "MSST",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "missouri-tigers",
+    "name": "Missouri Tigers",
+    "city": "Missouri",
+    "nickname": "Tigers",
+    "abbreviation": "MIZ",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "oklahoma-sooners",
+    "name": "Oklahoma Sooners",
+    "city": "Oklahoma",
+    "nickname": "Sooners",
+    "abbreviation": "OU",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "ole-miss-rebels",
+    "name": "Ole Miss Rebels",
+    "city": "Ole Miss",
+    "nickname": "Rebels",
+    "abbreviation": "MISS",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "south-carolina-gamecocks",
+    "name": "South Carolina Gamecocks",
+    "city": "South Carolina",
+    "nickname": "Gamecocks",
+    "abbreviation": "SC",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "tennessee-volunteers",
+    "name": "Tennessee Volunteers",
+    "city": "Tennessee",
+    "nickname": "Volunteers",
+    "abbreviation": "TENN",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "texas-a-and-m-aggies",
+    "name": "Texas A&M Aggies",
+    "city": "Texas A&M",
+    "nickname": "Aggies",
+    "abbreviation": "TA&M",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "texas-longhorns",
+    "name": "Texas Longhorns",
+    "city": "Texas",
+    "nickname": "Longhorns",
+    "abbreviation": "TEX",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "vanderbilt-commodores",
+    "name": "Vanderbilt Commodores",
+    "city": "Vanderbilt",
+    "nickname": "Commodores",
+    "abbreviation": "VAN",
+    "conference": "Southeastern Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "app-state-mountaineers",
+    "name": "App State Mountaineers",
+    "city": "App State",
+    "nickname": "Mountaineers",
+    "abbreviation": "APP",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "arkansas-state-red-wolves",
+    "name": "Arkansas State Red Wolves",
+    "city": "Arkansas State",
+    "nickname": "Red Wolves",
+    "abbreviation": "ARST",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "coastal-carolina-chanticleers",
+    "name": "Coastal Carolina Chanticleers",
+    "city": "Coastal Carolina",
+    "nickname": "Chanticleers",
+    "abbreviation": "CCU",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "georgia-southern-eagles",
+    "name": "Georgia Southern Eagles",
+    "city": "Georgia Southern",
+    "nickname": "Eagles",
+    "abbreviation": "GASO",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "georgia-state-panthers",
+    "name": "Georgia State Panthers",
+    "city": "Georgia State",
+    "nickname": "Panthers",
+    "abbreviation": "GAST",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "james-madison-dukes",
+    "name": "James Madison Dukes",
+    "city": "James Madison",
+    "nickname": "Dukes",
+    "abbreviation": "JMU",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "louisiana-ragin-cajuns",
+    "name": "Louisiana Ragin' Cajuns",
+    "city": "Louisiana",
+    "nickname": "Ragin' Cajuns",
+    "abbreviation": "UL",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "louisiana-tech-bulldogs",
+    "name": "Louisiana Tech Bulldogs",
+    "city": "Louisiana Tech",
+    "nickname": "Bulldogs",
+    "abbreviation": "LT",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "marshall-thundering-herd",
+    "name": "Marshall Thundering Herd",
+    "city": "Marshall",
+    "nickname": "Thundering Herd",
+    "abbreviation": "MRSH",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "old-dominion-monarchs",
+    "name": "Old Dominion Monarchs",
+    "city": "Old Dominion",
+    "nickname": "Monarchs",
+    "abbreviation": "ODU",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "south-alabama-jaguars",
+    "name": "South Alabama Jaguars",
+    "city": "South Alabama",
+    "nickname": "Jaguars",
+    "abbreviation": "USA",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "southern-miss-golden-eagles",
+    "name": "Southern Miss Golden Eagles",
+    "city": "Southern Miss",
+    "nickname": "Golden Eagles",
+    "abbreviation": "USM",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "troy-trojans",
+    "name": "Troy Trojans",
+    "city": "Troy",
+    "nickname": "Trojans",
+    "abbreviation": "TROY",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "ncaaf",
+    "slug": "ul-monroe-warhawks",
+    "name": "UL Monroe Warhawks",
+    "city": "UL Monroe",
+    "nickname": "Warhawks",
+    "abbreviation": "ULM",
+    "conference": "Sun Belt Conference"
+  },
+  {
+    "sport": "nhl",
+    "slug": "anaheim-ducks",
+    "name": "Anaheim Ducks",
+    "city": "Anaheim",
+    "nickname": "Ducks",
+    "abbreviation": "ANA"
+  },
+  {
+    "sport": "nhl",
+    "slug": "boston-bruins",
+    "name": "Boston Bruins",
+    "city": "Boston",
+    "nickname": "Bruins",
+    "abbreviation": "BOS"
+  },
+  {
+    "sport": "nhl",
+    "slug": "buffalo-sabres",
+    "name": "Buffalo Sabres",
+    "city": "Buffalo",
+    "nickname": "Sabres",
+    "abbreviation": "BUF"
+  },
+  {
+    "sport": "nhl",
+    "slug": "calgary-flames",
+    "name": "Calgary Flames",
+    "city": "Calgary",
+    "nickname": "Flames",
+    "abbreviation": "CGY"
+  },
+  {
+    "sport": "nhl",
+    "slug": "carolina-hurricanes",
+    "name": "Carolina Hurricanes",
+    "city": "Carolina",
+    "nickname": "Hurricanes",
+    "abbreviation": "CAR"
+  },
+  {
+    "sport": "nhl",
+    "slug": "chicago-blackhawks",
+    "name": "Chicago Blackhawks",
+    "city": "Chicago",
+    "nickname": "Blackhawks",
+    "abbreviation": "CHI"
+  },
+  {
+    "sport": "nhl",
+    "slug": "colorado-avalanche",
+    "name": "Colorado Avalanche",
+    "city": "Colorado",
+    "nickname": "Avalanche",
+    "abbreviation": "COL"
+  },
+  {
+    "sport": "nhl",
+    "slug": "columbus-blue-jackets",
+    "name": "Columbus Blue Jackets",
+    "city": "Columbus",
+    "nickname": "Blue Jackets",
+    "abbreviation": "CBJ"
+  },
+  {
+    "sport": "nhl",
+    "slug": "dallas-stars",
+    "name": "Dallas Stars",
+    "city": "Dallas",
+    "nickname": "Stars",
+    "abbreviation": "DAL"
+  },
+  {
+    "sport": "nhl",
+    "slug": "detroit-red-wings",
+    "name": "Detroit Red Wings",
+    "city": "Detroit",
+    "nickname": "Red Wings",
+    "abbreviation": "DET"
+  },
+  {
+    "sport": "nhl",
+    "slug": "edmonton-oilers",
+    "name": "Edmonton Oilers",
+    "city": "Edmonton",
+    "nickname": "Oilers",
+    "abbreviation": "EDM"
+  },
+  {
+    "sport": "nhl",
+    "slug": "florida-panthers",
+    "name": "Florida Panthers",
+    "city": "Florida",
+    "nickname": "Panthers",
+    "abbreviation": "FLA"
+  },
+  {
+    "sport": "nhl",
+    "slug": "los-angeles-kings",
+    "name": "Los Angeles Kings",
+    "city": "Los Angeles",
+    "nickname": "Kings",
+    "abbreviation": "LA"
+  },
+  {
+    "sport": "nhl",
+    "slug": "minnesota-wild",
+    "name": "Minnesota Wild",
+    "city": "Minnesota",
+    "nickname": "Wild",
+    "abbreviation": "MIN"
+  },
+  {
+    "sport": "nhl",
+    "slug": "montreal-canadiens",
+    "name": "Montreal Canadiens",
+    "city": "Montreal",
+    "nickname": "Canadiens",
+    "abbreviation": "MTL"
+  },
+  {
+    "sport": "nhl",
+    "slug": "nashville-predators",
+    "name": "Nashville Predators",
+    "city": "Nashville",
+    "nickname": "Predators",
+    "abbreviation": "NSH"
+  },
+  {
+    "sport": "nhl",
+    "slug": "new-jersey-devils",
+    "name": "New Jersey Devils",
+    "city": "New Jersey",
+    "nickname": "Devils",
+    "abbreviation": "NJ"
+  },
+  {
+    "sport": "nhl",
+    "slug": "new-york-islanders",
+    "name": "New York Islanders",
+    "city": "New York",
+    "nickname": "Islanders",
+    "abbreviation": "NYI"
+  },
+  {
+    "sport": "nhl",
+    "slug": "new-york-rangers",
+    "name": "New York Rangers",
+    "city": "New York",
+    "nickname": "Rangers",
+    "abbreviation": "NYR"
+  },
+  {
+    "sport": "nhl",
+    "slug": "ottawa-senators",
+    "name": "Ottawa Senators",
+    "city": "Ottawa",
+    "nickname": "Senators",
+    "abbreviation": "OTT"
+  },
+  {
+    "sport": "nhl",
+    "slug": "philadelphia-flyers",
+    "name": "Philadelphia Flyers",
+    "city": "Philadelphia",
+    "nickname": "Flyers",
+    "abbreviation": "PHI"
+  },
+  {
+    "sport": "nhl",
+    "slug": "pittsburgh-penguins",
+    "name": "Pittsburgh Penguins",
+    "city": "Pittsburgh",
+    "nickname": "Penguins",
+    "abbreviation": "PIT"
+  },
+  {
+    "sport": "nhl",
+    "slug": "san-jose-sharks",
+    "name": "San Jose Sharks",
+    "city": "San Jose",
+    "nickname": "Sharks",
+    "abbreviation": "SJ"
+  },
+  {
+    "sport": "nhl",
+    "slug": "seattle-kraken",
+    "name": "Seattle Kraken",
+    "city": "Seattle",
+    "nickname": "Kraken",
+    "abbreviation": "SEA"
+  },
+  {
+    "sport": "nhl",
+    "slug": "st-louis-blues",
+    "name": "St. Louis Blues",
+    "city": "St. Louis",
+    "nickname": "Blues",
+    "abbreviation": "STL"
+  },
+  {
+    "sport": "nhl",
+    "slug": "tampa-bay-lightning",
+    "name": "Tampa Bay Lightning",
+    "city": "Tampa Bay",
+    "nickname": "Lightning",
+    "abbreviation": "TB"
+  },
+  {
+    "sport": "nhl",
+    "slug": "toronto-maple-leafs",
+    "name": "Toronto Maple Leafs",
+    "city": "Toronto",
+    "nickname": "Maple Leafs",
+    "abbreviation": "TOR"
+  },
+  {
+    "sport": "nhl",
+    "slug": "utah-mammoth",
+    "name": "Utah Mammoth",
+    "city": "Utah",
+    "nickname": "Mammoth",
+    "abbreviation": "UTAH"
+  },
+  {
+    "sport": "nhl",
+    "slug": "vancouver-canucks",
+    "name": "Vancouver Canucks",
+    "city": "Vancouver",
+    "nickname": "Canucks",
+    "abbreviation": "VAN"
+  },
+  {
+    "sport": "nhl",
+    "slug": "vegas-golden-knights",
+    "name": "Vegas Golden Knights",
+    "city": "Vegas",
+    "nickname": "Golden Knights",
+    "abbreviation": "VGK"
+  },
+  {
+    "sport": "nhl",
+    "slug": "washington-capitals",
+    "name": "Washington Capitals",
+    "city": "Washington",
+    "nickname": "Capitals",
+    "abbreviation": "WSH"
+  },
+  {
+    "sport": "nhl",
+    "slug": "winnipeg-jets",
+    "name": "Winnipeg Jets",
+    "city": "Winnipeg",
+    "nickname": "Jets",
+    "abbreviation": "WPG"
+  }
+]
