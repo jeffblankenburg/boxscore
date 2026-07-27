@@ -50,6 +50,10 @@
   cursor: pointer;
   text-decoration: none;
 }
+/* Higher specificity than the global `.subscribe-card a` (#333), which would
+   otherwise turn this black button's label dark-gray-on-black. */
+.ps-card .ps-btn,
+.ps-card .ps-btn:hover { color: #fff; }
 .ps-btn:hover:not(:disabled) { background: #333; }
 .ps-btn:disabled { opacity: 0.6; cursor: default; }
 .ps-btn-link { text-align: center; }
