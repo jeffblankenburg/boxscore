@@ -159,29 +159,29 @@ export default async function SettingsPage({
           <p className="subscribe-error">Unknown team.</p>
         )}
 
-        <h2 className="settings-section-h" id="about-you">About you</h2>
-        {demographicsMissing ? (
-          <p className="subscribe-fine">
-            Boxscore stays free because advertisers help support it —
-            and they want to understand who&rsquo;s reading. A few quick
-            optional answers give us an aggregate picture of the
-            audience. Every field is optional.
-          </p>
-        ) : (
-          <p className="subscribe-fine">
-            Thanks for sharing. Change any answer below, any time.
-          </p>
+        {/* Once demographics are filled in, hide the whole section — people
+            don't come back to update it (Jeff's note). */}
+        {demographicsMissing && (
+          <>
+            <h2 className="settings-section-h" id="about-you">About you</h2>
+            <p className="subscribe-fine">
+              Boxscore stays free because advertisers help support it —
+              and they want to understand who&rsquo;s reading. A few quick
+              optional answers give us an aggregate picture of the
+              audience. Every field is optional.
+            </p>
+            <DemographicsForm
+              showSkip={false}
+              initial={{
+                country:     sub?.country     ?? null,
+                region:      sub?.region      ?? null,
+                age_band:    sub?.age_band    ?? null,
+                income_band: sub?.income_band ?? null,
+                gender:      sub?.gender      ?? null,
+              }}
+            />
+          </>
         )}
-        <DemographicsForm
-          showSkip={false}
-          initial={{
-            country:     sub?.country     ?? null,
-            region:      sub?.region      ?? null,
-            age_band:    sub?.age_band    ?? null,
-            income_band: sub?.income_band ?? null,
-            gender:      sub?.gender      ?? null,
-          }}
-        />
       </section>
     );
   }
