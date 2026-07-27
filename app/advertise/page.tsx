@@ -218,9 +218,9 @@ export default async function AdvertisePage() {
       <Section eyebrow="The inventory" title="Four formats">
         <p className="advertise-meta">
           Ordered least to most visually invasive. Each shown below in the
-          same typesetting that subscribers see. Click any digest at{" "}
-          <a href={`/mlb/${today}`}>boxscore.email/mlb</a> to see them in
-          context.
+          same typesetting that subscribers see. See them all in context in a{" "}
+          <a href="/advertise/sample-edition">full sample edition</a>, or click
+          any digest at <a href={`/mlb/${today}`}>boxscore.email/mlb</a>.
         </p>
         <div className="advertise-formats">
           <FormatBlock
