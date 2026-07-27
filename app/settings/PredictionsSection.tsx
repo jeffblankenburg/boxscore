@@ -57,7 +57,7 @@ function MlbState({ state }: { state: PredictionsAccountState }) {
     return checkoutOpen() ? (
       <div className="ps-body">
         <p className="ps-note">Not subscribed.</p>
-        <Link href="/mlb/predictions/subscribe" className="ps-btn ps-btn-link">Subscribe →</Link>
+        <Link href="/mlb/predictions" className="ps-btn ps-btn-link">Subscribe →</Link>
       </div>
     ) : (
       <p className="ps-note">Not open yet — check back soon.</p>

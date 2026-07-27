@@ -259,3 +259,24 @@
 .pr-linescore-inn { white-space: pre; letter-spacing: 0.02em; }
 .pr-linescore-team { font-weight: 700; color: var(--text-primary); }
 .pr-linescore-tot { font-weight: 700; text-align: right; color: var(--text-primary); white-space: pre; }
+
+/* Paywall storefront at the top of the page (pricing + inline checkout). */
+.pr-store { margin-bottom: 22px; }
+.pr-store-lede {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+  margin: 8px 0 12px;
+}
+/* Cancel-anytime callout — emphasized on purpose (never scammy). */
+.pr-store-cancel {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #1f3d1f;
+  background: #eef5ee;
+  border: 1px solid #cfe0cf;
+  border-left: 3px solid #1f5a1f;
+  padding: 9px 12px;
+  margin: 0 0 16px;
+}
+.pr-store-cancel strong { color: #143d14; }

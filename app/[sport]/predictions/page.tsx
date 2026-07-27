@@ -24,14 +24,22 @@ import {
 } from "@/lib/sports/mlb/predictions-history";
 import { americanToProfitMultiplier } from "@/lib/sports/mlb/clv";
 import { readPredictionsRenderBlob } from "@/lib/sports/mlb/predictions-cache";
+import { headers } from "next/headers";
+import { getSessionSubscriber } from "@/lib/subscriber-session";
+import { hasPredictionsAccess } from "@/lib/predictions-entitlements";
+import { checkoutOpen } from "@/lib/predictions-checkout";
+import { stripePublishableKey } from "@/lib/stripe";
+import { sellableSkus, RECURRING_SKUS } from "@/lib/predictions-pricing";
+import { PredictionsStorefront } from "./PredictionsStorefront";
 import "./predictions.css";
+import "./subscribe/subscribe.css";
 
-// Data is once-a-day. Cache the rendered HTML aggressively — the two
-// crons that own this data (predictions-snapshot, predictions-comparator)
-// call revalidatePath("/mlb/predictions") after they rebuild the
-// blob, so the page invalidates the moment new data lands rather than
-// waiting for the timer. The 1-hour fallback covers anything missed.
-export const revalidate = 3600;
+// Per-subscriber paywall gating (session + entitlement) makes this dynamic.
+// The heavy once-a-day computation still comes from the cached render blob
+// (readPredictionsRenderBlob) — dynamic here only re-reads that blob + checks
+// access, so it stays cheap. Today's PICKS are the paid surface; everything
+// else (results, win %, season history) is public.
+export const dynamic = "force-dynamic";
 
 const META_TITLE = "Daily Predictions | boxscore";
 const META_DESC =
@@ -156,6 +164,32 @@ export default async function PredictionsPage({
   const picksPending = result.gameCount > 0 && todayOdds.mlByGamePk.size === 0;
   const plays = picksPending ? [] : buildTodaysPlays(result.games, todayOdds);
 
+  // Paywall gating. The storefront (pricing + inline checkout) shows only when
+  // checkout is open (the launch flag) AND the viewer isn't entitled — so
+  // pre-launch the page stays fully public exactly as before. Today's PICKS
+  // are the paid surface; everything below (results, win %, season history) is
+  // public to everyone.
+  const subscriber = await getSessionSubscriber();
+  const entitled = subscriber ? await hasPredictionsAccess(subscriber.id, "mlb", today) : false;
+  const paywallActive = checkoutOpen();
+  const showStorefront = paywallActive && !entitled;
+  const showTodaysPicks = !paywallActive || entitled;
+
+  const skus = sellableSkus(today).filter((s): s is "week" | "month" => s === "week" || s === "month");
+  const plans = skus.map((sku) => {
+    const cents = RECURRING_SKUS.find((r) => r.sku === sku)!.amountCents;
+    return {
+      sku,
+      label: sku === "week" ? "Weekly" : "Monthly",
+      priceLabel: `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`,
+      sub: sku === "week" ? "7 days · cancel anytime" : "31 days · cancel anytime",
+    };
+  });
+  const h = await headers();
+  const host = h.get("host") ?? "boxscore.email";
+  const proto = host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https";
+  const successUrl = `${proto}://${host}/mlb/predictions/subscribe/success`;
+
   return (
     <div className="pr-page">
       {/* Newspaper dateline, same band as the /mlb digest — double top rule,
@@ -166,7 +200,17 @@ export default async function PredictionsPage({
         <div className="dateline-issue-no">Vol. {volumeNumber(today)}, Issue {issueNumber(today)}</div>
       </div>
 
-      <PlaysSection plays={plays} pending={picksPending} />
+      {showStorefront && (
+        <PredictionsStorefront
+          publishableKey={stripePublishableKey()}
+          plans={plans}
+          successUrl={successUrl}
+          gameCount={result.gameCount}
+          picksPending={picksPending}
+        />
+      )}
+
+      {showTodaysPicks && <PlaysSection plays={plays} pending={picksPending} />}
 
       <YesterdayResults yesterday={yesterday} outcomes={yesterdayOutcomes} odds={yesterdayOdds} />
 
