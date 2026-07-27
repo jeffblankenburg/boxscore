@@ -13,7 +13,7 @@ const INK = "#161410";
 const RULE = "#c4baa5";
 const MUTED = "#6a6354";
 
-export function RedBaronCard({ box }: { box: HistoricalBox }) {
+export function ShareCard({ box }: { box: HistoricalBox }) {
   return (
     <div
       data-rb-card=""

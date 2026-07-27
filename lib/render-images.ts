@@ -245,6 +245,36 @@ async function captureScoreboardOnBrowser(
   }
 }
 
+// Render a single DOM element on `url` (matched by `selector`) to a PNG.
+// Reuses the shared browser launch (system Chrome locally, @sparticuz/
+// chromium-min on Vercel). Used by the /boxscores image route to turn any
+// historical game's card into a downloadable share image on demand.
+export async function renderElementPng(args: {
+  url: string;
+  selector: string;
+}): Promise<Uint8Array> {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    try {
+      await page.evaluateOnNewDocument(
+        "globalThis.__name = globalThis.__name || (function(fn){ return fn; });",
+      );
+      await page.goto(args.url, { waitUntil: "networkidle0", timeout: 60_000 });
+      await page.waitForFunction(() => document.fonts?.ready ?? Promise.resolve());
+      await new Promise((r) => setTimeout(r, 200));
+      const el = await page.$(args.selector);
+      if (!el) throw new Error(`renderElementPng: no element for ${args.selector}`);
+      const buffer = await el.screenshot({ type: "png" });
+      return new Uint8Array(buffer);
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
 // Render the 1200×630 scoreboard share-image — the OG-image for
 // /mlb/[editionDate] link previews and the lead image on the daily Twitter,
 // Bluesky, and Facebook posts. Single-shot version (boots + closes its own

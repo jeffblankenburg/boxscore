@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { loadHistoricalBoxHtml } from "@/lib/historical/render-game";
-import { RedBaronCard } from "../RedBaronCard";
+import { ShareCard } from "../../boxscores/ShareCard";
 import { REDBARON_GAMES } from "../games";
 
 // Screenshot source for scripts/gen-redbaron77-images.ts — renders each
@@ -22,7 +22,7 @@ export default async function RedBaronRaw() {
   return (
     <div style={{ background: "#fff", padding: 24, display: "flex", flexDirection: "column", gap: 40, alignItems: "flex-start" }}>
       {loaded.map((box) => (
-        <RedBaronCard key={box.gameDate + box.awayName} box={box} />
+        <ShareCard key={box.gameDate + box.awayName} box={box} />
       ))}
     </div>
   );
