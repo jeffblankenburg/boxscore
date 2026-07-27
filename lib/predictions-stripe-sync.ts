@@ -16,7 +16,7 @@
 
 import type Stripe from "stripe";
 import { getStripe } from "./stripe";
-import { addDaysToISO, etDateFromUnixSeconds } from "./dates";
+import { addDaysToISO, etDateFromUnixSeconds, todayInET } from "./dates";
 import {
   SEASON_END,
   TERM_DAYS,
@@ -27,12 +27,19 @@ import {
   upsertStripeSubscriptionWindow,
   grantStripeOneTime,
   revokeBySubscription,
+  listEntitlements,
   type PredictionsProduct,
 } from "./predictions-entitlements";
+import {
+  sendPredictionsPurchaseEmail,
+  sendPredictionsRenewalEmail,
+  sendPredictionsPaymentFailedEmail,
+} from "./predictions-emails";
 
 export type SyncResult =
   | { status: "granted" | "extended"; product: PredictionsProduct; subscriberId: string; accessStart: string; accessEnd: string }
   | { status: "revoked"; stripeSubscriptionId: string }
+  | { status: "notified"; subscriberId: string; kind: string }
   | { status: "skipped"; reason: string };
 
 function identityFrom(metadata: Stripe.Metadata | null | undefined): { subscriberId: string; sport: string } | null {
@@ -133,11 +140,50 @@ function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
   );
 }
 
-/** Handle invoice.paid — first invoice or renewal. Extends the subscription window. */
+/** Handle invoice.paid — first invoice or renewal. Extends the window + emails a receipt. */
 export async function syncFromInvoice(invoice: Stripe.Invoice): Promise<SyncResult> {
   const subId = subscriptionIdFromInvoice(invoice);
   if (!subId) return { status: "skipped", reason: `invoice ${invoice.id} has no subscription` };
-  return syncSubscription(subId, invoice.created);
+  const result = await syncSubscription(subId, invoice.created);
+
+  if (result.status === "granted" || result.status === "extended") {
+    // billing_reason distinguishes the first charge from a renewal (authoritative,
+    // unlike the granted/extended label). Email is best-effort — a failure must
+    // not 500 the webhook and trigger a Stripe retry (which would double-send).
+    const reason = (invoice as { billing_reason?: string | null }).billing_reason;
+    const isRenewal = reason === "subscription_cycle" || reason === "subscription_update";
+    try {
+      if (isRenewal) {
+        await sendPredictionsRenewalEmail({ subscriberId: result.subscriberId, product: result.product, accessEnd: result.accessEnd });
+      } else {
+        await sendPredictionsPurchaseEmail({ subscriberId: result.subscriberId, product: result.product, accessEnd: result.accessEnd });
+      }
+    } catch (e) {
+      console.error(`predictions receipt email failed (${invoice.id}): ${(e as Error).message}`);
+    }
+  }
+  return result;
+}
+
+/** Handle invoice.payment_failed — email the customer to update their card (access holds during Smart Retries). */
+export async function notifyPaymentFailed(invoice: Stripe.Invoice): Promise<SyncResult> {
+  const subId = subscriptionIdFromInvoice(invoice);
+  if (!subId) return { status: "skipped", reason: `invoice ${invoice.id} has no subscription` };
+  const sub = await getStripe().subscriptions.retrieve(subId);
+  const identity = identityFrom(sub.metadata);
+  if (!identity) return { status: "skipped", reason: `subscription ${subId} has no subscriber_id metadata` };
+
+  // Access continues through the current entitlement window while Stripe retries.
+  const rows = await listEntitlements(identity.subscriberId, identity.sport);
+  const active = rows.find((r) => !r.revokedAt && r.stripeSubscriptionId === subId);
+  const accessEnd = active?.accessEnd ?? todayInET();
+
+  try {
+    await sendPredictionsPaymentFailedEmail({ subscriberId: identity.subscriberId, accessEnd });
+  } catch (e) {
+    console.error(`payment-failed email failed (${invoice.id}): ${(e as Error).message}`);
+  }
+  return { status: "notified", subscriberId: identity.subscriberId, kind: "payment_failed" };
 }
 
 /** Handle customer.subscription.deleted — revoke access for the subscription. */

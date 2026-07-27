@@ -151,6 +151,133 @@ export function confirmationEmail(opts: { confirmUrl: string }): { subject: stri
   return { subject, html, text };
 }
 
+// ── Predictions subscription — transactional lifecycle emails (GitHub #111) ──
+//
+// Same plain-prose / single-link style as the confirmation email (dodges
+// Apple's CS01 classifier). These are CAN-SPAM *transactional* — they send
+// regardless of newsletter-unsubscribe status. Stripe's own receipt/dunning
+// emails stay OFF; these are the only billing emails a customer sees.
+
+/** Purchase confirmation — first successful payment (invoice billing_reason=subscription_create). */
+export function predictionsPurchaseEmail(opts: {
+  planLabel: string;   // "Weekly" | "Monthly" | "Season"
+  priceLabel: string;  // "$10"
+  accessEndPretty: string;
+  recurring: boolean;
+  manageUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "You're in — boxscore Predictions";
+  const renewLine = opts.recurring
+    ? `This is an auto-renewing ${opts.planLabel.toLowerCase()} subscription — it renews on its own until you cancel, and never bills past the end of the season.`
+    : `This is a one-time purchase — it won't renew.`;
+  const html = wrap(
+    `
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">Hey —</p>
+    <p style="font-size:16px; line-height:1.6;">
+      You're subscribed to <strong>boxscore Predictions</strong>. Here's your receipt:
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin:20px 0;">
+      <strong>${opts.planLabel}</strong> — ${opts.priceLabel}<br>
+      Access through <strong>${opts.accessEndPretty}</strong>
+    </p>
+    <p style="font-size:16px; line-height:1.6;">${renewLine}</p>
+    <p style="font-size:16px; line-height:1.6;">
+      You can cancel anytime for a prorated refund on the unused days:
+      <a href="${opts.manageUrl}" style="color:${INK}; font-weight:700;">${opts.manageUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      Predictions are informational and for entertainment — no guarantee of results.
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br><span style="color:${MUTED};">boxscore</span>
+    </p>
+    `,
+    { previewText: `Your ${opts.planLabel} subscription — access through ${opts.accessEndPretty}.` },
+  );
+  const text =
+    `Hey —\n\n` +
+    `You're subscribed to boxscore Predictions. Here's your receipt:\n\n` +
+    `${opts.planLabel} — ${opts.priceLabel}\n` +
+    `Access through ${opts.accessEndPretty}\n\n` +
+    `${renewLine}\n\n` +
+    `Cancel anytime for a prorated refund on the unused days:\n${opts.manageUrl}\n\n` +
+    `Predictions are informational and for entertainment — no guarantee of results.\n\n` +
+    `— Jeff\nboxscore\n`;
+  return { subject, html, text };
+}
+
+/** Renewal receipt — a recurring charge went through (billing_reason=subscription_cycle). */
+export function predictionsRenewalEmail(opts: {
+  planLabel: string;
+  priceLabel: string;
+  accessEndPretty: string;
+  manageUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "boxscore Predictions — renewed";
+  const html = wrap(
+    `
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">Hey —</p>
+    <p style="font-size:16px; line-height:1.6;">
+      Your <strong>boxscore Predictions</strong> subscription renewed.
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin:20px 0;">
+      <strong>${opts.planLabel}</strong> — ${opts.priceLabel}<br>
+      Access through <strong>${opts.accessEndPretty}</strong>
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      Cancel anytime for a prorated refund:
+      <a href="${opts.manageUrl}" style="color:${INK}; font-weight:700;">${opts.manageUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br><span style="color:${MUTED};">boxscore</span>
+    </p>
+    `,
+    { previewText: `Renewed — access through ${opts.accessEndPretty}.` },
+  );
+  const text =
+    `Hey —\n\n` +
+    `Your boxscore Predictions subscription renewed.\n\n` +
+    `${opts.planLabel} — ${opts.priceLabel}\n` +
+    `Access through ${opts.accessEndPretty}\n\n` +
+    `Cancel anytime for a prorated refund:\n${opts.manageUrl}\n\n` +
+    `— Jeff\nboxscore\n`;
+  return { subject, html, text };
+}
+
+/** Payment failed — a renewal charge was declined (Stripe Smart Retries run underneath). */
+export function predictionsPaymentFailedEmail(opts: {
+  accessEndPretty: string;
+  updateUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "boxscore Predictions — payment issue";
+  const html = wrap(
+    `
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">Hey —</p>
+    <p style="font-size:16px; line-height:1.6;">
+      We couldn't process your latest <strong>boxscore Predictions</strong> payment — your card was declined.
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin:20px 0;">
+      Update your payment method here:
+      <a href="${opts.updateUrl}" style="color:${INK}; font-weight:700;">${opts.updateUrl}</a>
+    </p>
+    <p style="font-size:16px; line-height:1.6;">
+      We'll keep retrying for a few days. Your access continues through <strong>${opts.accessEndPretty}</strong> in the meantime — update your card before then to avoid a gap.
+    </p>
+    <p style="font-size:16px; line-height:1.6; margin-top:24px;">
+      — Jeff<br><span style="color:${MUTED};">boxscore</span>
+    </p>
+    `,
+    { previewText: "Your card was declined — update it to keep your access." },
+  );
+  const text =
+    `Hey —\n\n` +
+    `We couldn't process your latest boxscore Predictions payment — your card was declined.\n\n` +
+    `Update your payment method here:\n${opts.updateUrl}\n\n` +
+    `We'll keep retrying for a few days. Your access continues through ${opts.accessEndPretty} in the meantime — update your card before then to avoid a gap.\n\n` +
+    `— Jeff\nboxscore\n`;
+  return { subject, html, text };
+}
+
 /**
  * Welcome email = brief greeting + the embedded digest body. The digest HTML
  * is the email-safe version produced by lib/render-email.ts (table-based,

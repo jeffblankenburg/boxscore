@@ -9,7 +9,8 @@
 // Events handled (all writes go to predictions_entitlements via
 // lib/predictions-stripe-sync):
 //   checkout.session.completed      → grant (subscription window or season pass)
-//   invoice.paid                    → grant/extend the subscription window (renewals)
+//   invoice.paid                    → grant/extend the window + email a receipt (renewals)
+//   invoice.payment_failed          → email the customer to update their card
 //   customer.subscription.deleted   → revoke access
 //
 // Idempotency: every event id is logged in webhook_events (source='stripe').
@@ -24,6 +25,7 @@ import { hasWebhookEvent, recordWebhookEvent } from "@/lib/webhooks";
 import {
   grantFromCheckoutSession,
   syncFromInvoice,
+  notifyPaymentFailed,
   revokeSubscription,
   type SyncResult,
 } from "@/lib/predictions-stripe-sync";
@@ -63,6 +65,9 @@ export async function POST(req: Request) {
         break;
       case "invoice.paid":
         result = await syncFromInvoice(event.data.object as Stripe.Invoice);
+        break;
+      case "invoice.payment_failed":
+        result = await notifyPaymentFailed(event.data.object as Stripe.Invoice);
         break;
       case "customer.subscription.deleted":
         result = await revokeSubscription(event.data.object as Stripe.Subscription);
