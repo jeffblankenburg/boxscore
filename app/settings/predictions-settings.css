@@ -98,18 +98,38 @@
   white-space: nowrap;
 }
 
-/* Display-only preview team lists (grouped by conference) in a sport tab. */
-.settings-team-group { margin: 10px 0; }
-.settings-team-group-h {
+/* Display-only preview team lists in a sport tab. Small sports = flat list;
+   NCAAF = search + collapsible conference accordions. */
+.settings-team-group { margin: 4px 0; }
+.settings-team-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  margin: 4px 0 10px;
+  border: 1px solid var(--border-light);
+  font: inherit;
+  font-size: 14px;
+}
+.settings-team-search:focus { outline: none; border-color: #161410; }
+.settings-acc-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+  padding: 8px 0;
+  font: inherit;
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border-light);
-  padding-bottom: 3px;
-  margin-bottom: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
 }
+.settings-acc-h:hover { color: #161410; }
+.settings-acc-caret { font-size: 16px; font-weight: 700; color: var(--text-muted); }
 .settings-team-preview {
   list-style: none;
   margin: 0;

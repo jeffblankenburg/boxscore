@@ -1,5 +1,6 @@
 import { SettingsToggleCheckbox } from "./SettingsToggleCheckbox";
 import { setSportSubscription, setTeamSubscription } from "./actions";
+import { PreviewTeams } from "./PreviewTeams";
 import previewTeamsJson from "@/lib/preview-teams.generated.json";
 
 // Display-only team lists (grouped by conference) for preview sports, pulled
@@ -42,16 +43,7 @@ export function SportPanel({
             <p className="subscribe-fine">
               A preview of the teams — team emails open when {sportLabel} launches.
             </p>
-            {groups.map((g) => (
-              <div key={g.name} className="settings-team-group">
-                <div className="settings-team-group-h">{g.name}</div>
-                <ul className="settings-team-preview">
-                  {g.teams.map((t) => (
-                    <li key={t}>{t}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            <PreviewTeams groups={groups} grouped={sportId === "ncaaf"} />
           </>
         )}
         <PredictionsLine sportId={sportId} available={false} />
