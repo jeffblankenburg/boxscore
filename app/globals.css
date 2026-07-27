@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap');
+/* Source Sans 3 is loaded via a <link> in app/layout.tsx <head>, not a CSS
+   @import here — Next's production CSS optimizer strips remote @import url()s,
+   which silently dropped the webfont site-wide. */
 
 :root {
   --bg-page: #f9f7f1;

@@ -45,6 +45,18 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   return (
     <html lang="en">
+      <head>
+        {/* Source Sans 3 must load via a real <link>, NOT a CSS @import — Next's
+            production CSS optimizer strips remote @import url()s, which left the
+            whole site falling back to system fonts (visible on /welcome and in
+            share-image captures; see lib/render-images.ts ensureFontsLoaded). */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap"
+        />
+      </head>
       <body>
         <AttributionCapture />
         {bare ? (
