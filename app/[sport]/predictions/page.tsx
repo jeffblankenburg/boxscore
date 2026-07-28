@@ -153,6 +153,11 @@ export default async function PredictionsPage({
   const winEnd = winEndReq > yesterday ? yesterday : winEndReq;
   const winStart = shiftDays(winEnd, -(SEASON_PICKS_WEEK - 1));
   const weekDays = await loadSeasonHistory(winStart, winEnd);
+
+  // 30-day profit calendar — an at-a-glance overview above the day-by-day
+  // Season Picks. Public track record, shown to everyone.
+  const calStart = shiftDays(yesterday, -(PROFIT_CAL_DAYS - 1));
+  const calendarDays = await loadSeasonHistory(calStart, yesterday);
   const hasNewer = winEnd < yesterday;
   const newerEnd = hasNewer ? (shiftDays(winEnd, SEASON_PICKS_WEEK) > yesterday ? yesterday : shiftDays(winEnd, SEASON_PICKS_WEEK)) : null;
   const hasOlder = winStart > SEASON_FLOOR;
@@ -230,6 +235,8 @@ export default async function PredictionsPage({
         roiSeason={roiSeason}
         seasonDays={seasonDays}
       />
+
+      <ProfitCalendar days={calendarDays} startIso={calStart} endIso={yesterday} />
 
       <SeasonHistorySection
         days={weekDays}
@@ -467,12 +474,62 @@ function formatDollarWhole(v: number): string {
 }
 
 const SEASON_PICKS_WEEK = 7;
+const PROFIT_CAL_DAYS = 30;
 
 /** Shift an ISO date by n days (UTC). */
 function shiftDays(iso: string, n: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m || !d) return iso;
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** Weekday index (0=Sun) of an ISO date, in UTC. */
+function weekdayOf(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+const CAL_DOW = ["S", "M", "T", "W", "T", "F", "S"];
+
+/** A month-style grid of the last PROFIT_CAL_DAYS days, each cell tinted by the
+ *  day's $10/play P/L — an at-a-glance overview above the day-by-day results. */
+function ProfitCalendar({ days, startIso, endIso }: { days: SeasonHistoryDay[]; startIso: string; endIso: string }) {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  // Pad the window out to whole Sun–Sat weeks so the grid is rectangular.
+  const gridStart = shiftDays(startIso, -weekdayOf(startIso));
+  const gridEnd = shiftDays(endIso, 6 - weekdayOf(endIso));
+  const cells: string[] = [];
+  for (let d = gridStart; d <= gridEnd; d = shiftDays(d, 1)) cells.push(d);
+  const weeks: string[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  return (
+    <section className="pr-recap">
+      <h2 className="pr-recap-head">Last 30 Days</h2>
+      <div className="pr-cal">
+        <div className="pr-cal-row pr-cal-dow-row">
+          {CAL_DOW.map((w, i) => <div key={i} className="pr-cal-dow">{w}</div>)}
+        </div>
+        {weeks.map((week) => (
+          <div className="pr-cal-row" key={week[0]}>
+            {week.map((date) => {
+              const inRange = date >= startIso && date <= endIso;
+              const day = inRange ? byDate.get(date) : undefined;
+              const hasProfit = !!day && day.profit !== null;
+              const cls = hasProfit ? (day!.profit! >= 0 ? "pr-cal-pos" : "pr-cal-neg") : inRange ? "pr-cal-in" : "pr-cal-out";
+              return (
+                <div className={`pr-cal-cell ${cls}`} key={date}>
+                  {inRange && <span className="pr-cal-dom">{Number(date.slice(8, 10))}</span>}
+                  {hasProfit && <span className="pr-cal-amt">{formatDollarWhole(day!.profit!)}</span>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <p className="pr-caption">Daily P/L, flat $10 per moneyline pick.</p>
+    </section>
+  );
 }
 
 function SeasonHistorySection({
