@@ -490,6 +490,13 @@ function weekdayOf(iso: string): number {
 }
 
 const CAL_DOW = ["S", "M", "T", "W", "T", "F", "S"];
+const CAL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Cell date label — the 1st of a month shows the month name (e.g. "Aug 1"). */
+function calDayLabel(iso: string): string {
+  const day = Number(iso.slice(8, 10));
+  return day === 1 ? `${CAL_MONTHS[Number(iso.slice(5, 7)) - 1]} 1` : String(day);
+}
 
 /** A month-style grid of the last PROFIT_CAL_DAYS days, each cell tinted by the
  *  day's $10/play P/L — an at-a-glance overview above the day-by-day results. */
@@ -519,7 +526,11 @@ function ProfitCalendar({ days, startIso, endIso }: { days: SeasonHistoryDay[]; 
               const cls = hasProfit ? (day!.profit! >= 0 ? "pr-cal-pos" : "pr-cal-neg") : inRange ? "pr-cal-in" : "pr-cal-out";
               return (
                 <div className={`pr-cal-cell ${cls}`} key={date}>
-                  {inRange && <span className="pr-cal-dom">{Number(date.slice(8, 10))}</span>}
+                  {inRange && (
+                    <span className={`pr-cal-dom${date.slice(8, 10) === "01" ? " pr-cal-first" : ""}`}>
+                      {calDayLabel(date)}
+                    </span>
+                  )}
                   {hasProfit && <span className="pr-cal-amt">{formatDollarWhole(day!.profit!)}</span>}
                 </div>
               );

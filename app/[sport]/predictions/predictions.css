@@ -318,18 +318,21 @@
 .pr-cal-dow-row { margin-bottom: 1px; }
 .pr-cal-dow { text-align: center; font-size: 10px; font-weight: 700; color: #999; }
 .pr-cal-cell {
-  aspect-ratio: 1 / 1;
+  /* Fixed, compact height — NOT aspect-ratio, which balloons the cells on
+     wide screens. Date pinned to the top, amount to the bottom. */
+  min-height: 50px;
   border: 1px solid #ececec;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 2px;
+  justify-content: flex-start;
+  padding: 3px 4px;
   overflow: hidden;
 }
 .pr-cal-out { border-color: transparent; }
 .pr-cal-in { background: #fafafa; }
 .pr-cal-dom { align-self: flex-start; font-size: 9px; line-height: 1; color: #bbb; }
+.pr-cal-first { color: #555; font-weight: 700; }
 .pr-cal-amt {
   margin-top: auto;
   font-family: ui-monospace, Menlo, monospace;
