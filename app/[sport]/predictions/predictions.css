@@ -329,7 +329,8 @@
   padding: 3px 4px;
   overflow: hidden;
 }
-.pr-cal-out { border-color: transparent; }
+.pr-cal-future { background: #fff; }
+.pr-cal-future .pr-cal-dom { color: #d8d8d8; } /* upcoming days — barely-there date */
 .pr-cal-in { background: #fafafa; }
 .pr-cal-dom { align-self: flex-start; font-size: 9px; line-height: 1; color: #bbb; }
 .pr-cal-first { color: #555; font-weight: 700; }

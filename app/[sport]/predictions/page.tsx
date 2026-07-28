@@ -154,10 +154,12 @@ export default async function PredictionsPage({
   const winStart = shiftDays(winEnd, -(SEASON_PICKS_WEEK - 1));
   const weekDays = await loadSeasonHistory(winStart, winEnd);
 
-  // 30-day profit calendar — an at-a-glance overview above the day-by-day
-  // Season Picks. Public track record, shown to everyone.
-  const calStart = shiftDays(yesterday, -(PROFIT_CAL_DAYS - 1));
-  const calendarDays = await loadSeasonHistory(calStart, yesterday);
+  // 5-week profit calendar (35 cells, exactly 5 rows) — an at-a-glance overview
+  // above the day-by-day Season Picks. Public track record, shown to everyone.
+  // Grid ends on the Saturday of the current week and spans 5 Sun–Sat weeks.
+  const calGridEnd = shiftDays(yesterday, 6 - weekdayOf(yesterday));
+  const calGridStart = shiftDays(calGridEnd, -34);
+  const calendarDays = await loadSeasonHistory(calGridStart, yesterday);
   const hasNewer = winEnd < yesterday;
   const newerEnd = hasNewer ? (shiftDays(winEnd, SEASON_PICKS_WEEK) > yesterday ? yesterday : shiftDays(winEnd, SEASON_PICKS_WEEK)) : null;
   const hasOlder = winStart > SEASON_FLOOR;
@@ -236,7 +238,7 @@ export default async function PredictionsPage({
         seasonDays={seasonDays}
       />
 
-      <ProfitCalendar days={calendarDays} startIso={calStart} endIso={yesterday} />
+      <ProfitCalendar days={calendarDays} gridStart={calGridStart} cutoff={yesterday} />
 
       <SeasonHistorySection
         days={weekDays}
@@ -474,7 +476,6 @@ function formatDollarWhole(v: number): string {
 }
 
 const SEASON_PICKS_WEEK = 7;
-const PROFIT_CAL_DAYS = 30;
 
 /** Shift an ISO date by n days (UTC). */
 function shiftDays(iso: string, n: number): string {
@@ -498,21 +499,19 @@ function calDayLabel(iso: string): string {
   return day === 1 ? `${CAL_MONTHS[Number(iso.slice(5, 7)) - 1]} 1` : String(day);
 }
 
-/** A month-style grid of the last PROFIT_CAL_DAYS days, each cell tinted by the
- *  day's $10/play P/L — an at-a-glance overview above the day-by-day results. */
-function ProfitCalendar({ days, startIso, endIso }: { days: SeasonHistoryDay[]; startIso: string; endIso: string }) {
+/** A 5-week (Sun–Sat) grid ending on the current week, each cell tinted by the
+ *  day's $10/play P/L — an at-a-glance overview above the day-by-day results.
+ *  `gridStart` is a Sunday; `cutoff` (yesterday) is the last day with data. */
+function ProfitCalendar({ days, gridStart, cutoff }: { days: SeasonHistoryDay[]; gridStart: string; cutoff: string }) {
   const byDate = new Map(days.map((d) => [d.date, d]));
-  // Pad the window out to whole Sun–Sat weeks so the grid is rectangular.
-  const gridStart = shiftDays(startIso, -weekdayOf(startIso));
-  const gridEnd = shiftDays(endIso, 6 - weekdayOf(endIso));
   const cells: string[] = [];
-  for (let d = gridStart; d <= gridEnd; d = shiftDays(d, 1)) cells.push(d);
+  for (let i = 0, d = gridStart; i < 35; i++, d = shiftDays(d, 1)) cells.push(d);
   const weeks: string[][] = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
   return (
     <section className="pr-recap">
-      <h2 className="pr-recap-head">Last 30 Days</h2>
+      <h2 className="pr-recap-head">Last 5 Weeks</h2>
       <div className="pr-cal">
         <div className="pr-cal-row pr-cal-dow-row">
           {CAL_DOW.map((w, i) => <div key={i} className="pr-cal-dow">{w}</div>)}
@@ -520,17 +519,15 @@ function ProfitCalendar({ days, startIso, endIso }: { days: SeasonHistoryDay[]; 
         {weeks.map((week) => (
           <div className="pr-cal-row" key={week[0]}>
             {week.map((date) => {
-              const inRange = date >= startIso && date <= endIso;
-              const day = inRange ? byDate.get(date) : undefined;
+              const day = byDate.get(date);
               const hasProfit = !!day && day.profit !== null;
-              const cls = hasProfit ? (day!.profit! >= 0 ? "pr-cal-pos" : "pr-cal-neg") : inRange ? "pr-cal-in" : "pr-cal-out";
+              const future = date > cutoff;
+              const cls = hasProfit ? (day!.profit! >= 0 ? "pr-cal-pos" : "pr-cal-neg") : future ? "pr-cal-future" : "pr-cal-in";
               return (
                 <div className={`pr-cal-cell ${cls}`} key={date}>
-                  {inRange && (
-                    <span className={`pr-cal-dom${date.slice(8, 10) === "01" ? " pr-cal-first" : ""}`}>
-                      {calDayLabel(date)}
-                    </span>
-                  )}
+                  <span className={`pr-cal-dom${date.slice(8, 10) === "01" ? " pr-cal-first" : ""}`}>
+                    {calDayLabel(date)}
+                  </span>
                   {hasProfit && <span className="pr-cal-amt">{formatDollarWhole(day!.profit!)}</span>}
                 </div>
               );
