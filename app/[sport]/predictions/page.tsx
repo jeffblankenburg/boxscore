@@ -172,9 +172,12 @@ export default async function PredictionsPage({
   // public to everyone.
   const subscriber = await getSessionSubscriber();
   const entitled = subscriber ? await hasPredictionsAccess(subscriber.id, "mlb", today) : false;
+  const isAdmin = subscriber?.isAdmin === true;
   const paywallActive = checkoutOpen();
-  const showStorefront = paywallActive && !entitled;
-  const showTodaysPicks = !paywallActive || entitled;
+  // Admins always see the picks (dogfood/preview), never the storefront —
+  // mirrors the picks-email cron, which always includes admins.
+  const showStorefront = paywallActive && !entitled && !isAdmin;
+  const showTodaysPicks = !paywallActive || entitled || isAdmin;
   // Eligible existing subscribers can self-activate a one-time free trial.
   const trialEligible = showStorefront && subscriber ? await canActivateTrial(subscriber.id) : false;
 

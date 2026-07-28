@@ -12,6 +12,7 @@ export type SessionSubscriber = {
   id: string;
   email: string;
   stripeCustomerId: string | null;
+  isAdmin: boolean;
 };
 
 export async function getSessionSubscriber(): Promise<SessionSubscriber | null> {
@@ -22,10 +23,10 @@ export async function getSessionSubscriber(): Promise<SessionSubscriber | null> 
 
   const { data, error } = await supabaseAdmin()
     .from("subscribers")
-    .select("id, email, stripe_customer_id")
+    .select("id, email, stripe_customer_id, is_admin")
     .eq("id", session.subscriber_id)
-    .maybeSingle<{ id: string; email: string; stripe_customer_id: string | null }>();
+    .maybeSingle<{ id: string; email: string; stripe_customer_id: string | null; is_admin: boolean | null }>();
   if (error) throw new Error(`getSessionSubscriber: ${error.message}`);
   if (!data) return null;
-  return { id: data.id, email: data.email, stripeCustomerId: data.stripe_customer_id };
+  return { id: data.id, email: data.email, stripeCustomerId: data.stripe_customer_id, isAdmin: data.is_admin === true };
 }
