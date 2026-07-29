@@ -367,7 +367,7 @@ function YesterdayResults({
 
   return (
     <section className="pr-recap pr-yesterday pr-framed">
-      <h2 className="pr-recap-head">Results for {weekdayMonthDay(yesterday)}</h2>
+      <h2 className="pr-recap-head">Picks for {weekdayMonthDay(yesterday)}</h2>
       <div className="pr-scroll">
         <table className="pr-recap-table pr-yesterday-table pr-framed-table">
           <thead>
