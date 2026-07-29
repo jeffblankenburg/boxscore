@@ -32,7 +32,9 @@ export type TeamEmailData = {
   team: Team;
   date: string;
   prettyDate: string;
-  yesterdayGame: GameDetail | null;
+  // ALL of the team's games on `date` — a doubleheader has two, and both belong
+  // in the digest (they're both in the league digest). Empty on off-days.
+  yesterdayGames: GameDetail[];
   roster: TeamRoster;
   upcoming: ScheduleGame[];
   liveAbbrev: Record<string, string>;
@@ -41,6 +43,15 @@ export type TeamEmailData = {
   transactions: Transaction[];
   probables: Map<number, ProbableStats>;
 };
+
+/** The team's games on `date` that were actually played (final, with box +
+ *  scoring). One on a normal day, two for a doubleheader, zero on an off-day.
+ *  Shared by the email + web renderers and the mode classifiers. */
+export function teamPlayedGames(data: TeamEmailData): GameDetail[] {
+  return data.yesterdayGames.filter(
+    (g) => !!(g.box && g.scoring && g.game.status.codedGameState === "F"),
+  );
+}
 
 function addDaysIso(iso: string, n: number): string {
   const d = new Date(iso + "T00:00:00Z");
@@ -65,11 +76,15 @@ export async function loadTeamEmailData(team: Team, date: string): Promise<TeamE
     getTeamScheduleRange(teamId, start, end),
   ]);
 
-  const yesterdayGame = daily.games.find(
-    (g) =>
-      g.game.teams.away.team.id === teamId ||
-      g.game.teams.home.team.id === teamId,
-  ) ?? null;
+  // filter, not find — both halves of a doubleheader are the team's games.
+  // Sorted by gameNumber so game 1 always renders before game 2.
+  const yesterdayGames = daily.games
+    .filter(
+      (g) =>
+        g.game.teams.away.team.id === teamId ||
+        g.game.teams.home.team.id === teamId,
+    )
+    .sort((a, b) => (a.game.gameNumber ?? 1) - (b.game.gameNumber ?? 1));
 
   const division = daily.standings.find((d) =>
     d.teamRecords.some((tr) => tr.team.id === teamId),
@@ -90,7 +105,7 @@ export async function loadTeamEmailData(team: Team, date: string): Promise<TeamE
     team,
     date,
     prettyDate: prettyDate(date),
-    yesterdayGame,
+    yesterdayGames,
     roster,
     upcoming,
     liveAbbrev: daily.teamAbbrev,
@@ -135,11 +150,12 @@ function teamSectionHeading(data: TeamEmailData): string {
 }
 
 function renderTeamYesterdayBox(data: TeamEmailData): string {
-  const g = data.yesterdayGame;
-  if (!g || !g.box || !g.scoring || g.game.status.codedGameState !== "F") {
+  const played = teamPlayedGames(data);
+  if (played.length === 0) {
     return `<p class="es-info">No game played on ${esc(data.prettyDate)}.</p>`;
   }
-  return renderGame(g as Required<GameDetail>, data.liveAbbrev);
+  // Both halves of a doubleheader, in schedule order.
+  return played.map((g) => renderGame(g as Required<GameDetail>, data.liveAbbrev)).join("");
 }
 
 // ─── standings ────────────────────────────────────────────────────────────
@@ -484,10 +500,7 @@ function renderTeamTransactions(data: TeamEmailData): string {
 type TeamDigestMode = "game" | "no-game" | "offseason";
 
 function classifyTeamMode(data: TeamEmailData): TeamDigestMode {
-  const g = data.yesterdayGame;
-  const hasGame = !!(
-    g && g.box && g.scoring && g.game.status.codedGameState === "F"
-  );
+  const hasGame = teamPlayedGames(data).length > 0;
   if (hasGame) return "game";
   if (data.upcoming.length > 0) return "no-game";
   return "offseason";

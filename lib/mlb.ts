@@ -14,6 +14,7 @@ async function getRaw(path: string): Promise<unknown> {
 export type ScheduleGame = {
   gamePk: number;
   gameDate: string;
+  gameNumber?: number; // 1 or 2 within a doubleheader; used to order the two games
   // MLB game type code: R=regular, S=spring, E=exhibition, A=All-Star,
   // F=Wild Card, D=Division Series, L=LCS, W=World Series, P=postseason.
   gameType?: string;

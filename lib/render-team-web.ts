@@ -15,7 +15,7 @@ import {
   renderGame, renderDateline, renderTransactions, renderDivisionTable,
 } from "./render";
 import { lastNameLinkWeb } from "./player-links";
-import type { TeamEmailData } from "./render-team-email";
+import { teamPlayedGames, type TeamEmailData } from "./render-team-email";
 
 const DIVISION_NAMES: Record<number, string> = {
   200: "AL West",
@@ -44,14 +44,14 @@ function renderStandings(data: TeamEmailData): string {
 }
 
 function renderYesterdayBox(data: TeamEmailData): string {
-  const g = data.yesterdayGame;
-  if (!g || !g.box || !g.scoring || g.game.status.codedGameState !== "F") {
+  const played = teamPlayedGames(data);
+  if (played.length === 0) {
     return `<div class="no-games-note">No game played on ${esc(data.prettyDate)}.</div>`;
   }
-  return renderGame(
-    g as Parameters<typeof renderGame>[0],
-    data.liveAbbrev,
-  );
+  // Both halves of a doubleheader, in schedule order.
+  return played
+    .map((g) => renderGame(g as Parameters<typeof renderGame>[0], data.liveAbbrev))
+    .join("");
 }
 
 function isPitcher(p: RosterPlayer): boolean {
@@ -293,8 +293,7 @@ function renderUpcoming(data: TeamEmailData): string {
 type TeamDigestMode = "game" | "no-game" | "offseason";
 
 function classifyMode(data: TeamEmailData): TeamDigestMode {
-  const g = data.yesterdayGame;
-  const hasGame = !!(g && g.box && g.scoring && g.game.status.codedGameState === "F");
+  const hasGame = teamPlayedGames(data).length > 0;
   if (hasGame) return "game";
   if (data.upcoming.length > 0) return "no-game";
   return "offseason";

@@ -7,7 +7,7 @@ import {
 } from "@/lib/ad-placements";
 import { upsertDigest } from "@/lib/digests";
 import { upsertTeamDigest } from "@/lib/team-digests";
-import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
+import { loadTeamEmailData, renderTeamEmailContent, teamPlayedGames } from "@/lib/render-team-email";
 import { renderTeamWebContent } from "@/lib/render-team-web";
 import { teamsBySport, findTeam } from "@/lib/teams";
 import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
@@ -119,11 +119,7 @@ export async function GET(req: Request) {
           const td = await loadTeamEmailData(team, date);
           const teamHtml = renderTeamWebContent(td);
           const teamEmailHtml = renderTeamEmailContent(td);
-          const hasGame = !!(
-            td.yesterdayGame &&
-            td.yesterdayGame.box &&
-            td.yesterdayGame.game.status.codedGameState === "F"
-          );
+          const hasGame = teamPlayedGames(td).length > 0;
           await upsertTeamDigest({
             sport, team_slug: team.slug, date,
             has_game: hasGame, mode: data.mode,
