@@ -14,6 +14,7 @@
 import type { FootballLeagueConfig } from "../leagues";
 import type { FootballRaw } from "../sources/espn";
 import { sortGamesCanonically, type CanonicalFootballDailyData } from "../canonical";
+import { dedupeTransactions } from "../../../dedupe-transactions";
 import type {
   FootballTeamRef,
   FootballPlayerRef,
@@ -96,13 +97,19 @@ function playerRef(athlete: unknown): FootballPlayerRef {
 function teamRef(team: unknown, extra?: { rank?: number | null; conference?: string | null }): FootballTeamRef {
   const t = rec(team);
   const abbr = str(t.abbreviation || t.shortDisplayName || t.name).toUpperCase();
+  // ESPN nests a team's conference under groups.shortName ("Big Ten") when
+  // groups.isConference; the rankings feed carries it there. Games pass it via
+  // `extra` from the scoreboard instead.
+  const groups = rec(t.groups);
+  const groupConf = groups.isConference === true ? (str(groups.shortName) || null) : null;
   return {
     id: abbr.toLowerCase(),
     name: str(t.displayName || t.name),
     abbr,
+    location: str(t.location) || null,
     espnId: str(t.id),
     rank: extra?.rank ?? null,
-    conference: extra?.conference ?? null,
+    conference: extra?.conference ?? groupConf,
   };
 }
 
@@ -434,6 +441,17 @@ function recordByType(stats: Rec[], type: string): string | null {
   return dv || null;
 }
 
+// Parse a "W-L" / "W-L-T" record string into components. ESPN's COLLEGE
+// standings omit plain losses/winPercent stats — the record only lives in the
+// `overall` string ("13-2") — so we recover W-L-T from there when the numeric
+// stats are absent (the NFL feed still provides them directly).
+function parseRecord(record: string | null): { wins: number; losses: number; ties: number } | null {
+  if (!record) return null;
+  const parts = record.split("-").map((p) => parseInt(p, 10));
+  if (parts.length < 2 || parts.some((p) => !Number.isFinite(p))) return null;
+  return { wins: parts[0]!, losses: parts[1]!, ties: parts[2] ?? 0 };
+}
+
 function adaptStandingsGroup(node: Rec, parentConference: string | null): FootballStandingsGroup[] {
   const groupName = str(node.name || node.abbreviation);
   const children = arr(node.children).map(rec);
@@ -445,12 +463,22 @@ function adaptStandingsGroup(node: Rec, parentConference: string | null): Footba
   if (!entries.length) return [];
   const rows: FootballStandingsRow[] = entries.map((e) => {
     const stats = arr(e.stats).map(rec);
+    // College omits plain losses/winPercent — recover W-L-T from the `overall`
+    // record ("13-2"). NFL has the plain stats, so those take precedence. Do NOT
+    // use `leagueWinPercent`: that's the in-conference win %, not overall —
+    // compute overall pct from W-L-T when the direct stat is absent.
+    const rec3 = parseRecord(recordByType(stats, "total"));
+    const wins = numOrNull(statByName(stats, "wins")) ?? rec3?.wins ?? 0;
+    const losses = numOrNull(statByName(stats, "losses")) ?? rec3?.losses ?? 0;
+    const ties = numOrNull(statByName(stats, "ties")) ?? rec3?.ties ?? 0;
+    const played = wins + losses + ties;
     return {
       team: teamRef(e.team),
-      wins: num(statByName(stats, "wins")),
-      losses: num(statByName(stats, "losses")),
-      ties: num(statByName(stats, "ties")),
-      pct: numOrNull(statByName(stats, "winPercent")),
+      wins,
+      losses,
+      ties,
+      pct: numOrNull(statByName(stats, "winPercent"))
+        ?? (played > 0 ? (wins + 0.5 * ties) / played : null),
       streak: recordByType(stats, "streak"),
       pointsFor: numOrNull(statByName(stats, "pointsFor")),
       pointsAgainst: numOrNull(statByName(stats, "pointsAgainst")),
@@ -460,6 +488,18 @@ function adaptStandingsGroup(node: Rec, parentConference: string | null): Footba
       conferenceRecord: recordByType(stats, "vsconf"),
     };
   });
+  // ESPN's entry order is unreliable — some divisions arrive win%-sorted, others
+  // put the leader last (a 14-3 team shown 4th). Sort ourselves: win% desc, then
+  // more wins (breaks ties when games-played differ early season), then net
+  // points. This is a display heuristic, not the NFL's full official tiebreaker
+  // chain (head-to-head / common games / etc., which the feed doesn't give us).
+  const netPoints = (r: FootballStandingsRow) => (r.pointsFor ?? 0) - (r.pointsAgainst ?? 0);
+  rows.sort((a, b) =>
+    (b.pct ?? -1) - (a.pct ?? -1) ||
+    b.wins - a.wins ||
+    netPoints(b) - netPoints(a) ||
+    (b.pointsFor ?? 0) - (a.pointsFor ?? 0),
+  );
   return [{ group: groupName, conference: parentConference, rows }];
 }
 
@@ -511,11 +551,13 @@ function adaptLeaders(raw: FootballRaw): FootballLeaderboard[] {
 }
 
 function adaptTransactions(raw: FootballRaw): FootballTransaction[] {
-  return arr(rec(raw.transactions).transactions).map(rec).map((t): FootballTransaction => ({
+  const mapped = arr(rec(raw.transactions).transactions).map(rec).map((t): FootballTransaction => ({
     date: str(t.date),
     description: str(t.description),
     teamAbbr: str(rec(t.team).abbreviation).toUpperCase() || null,
   }));
+  // Collapse a multi-player trade (one record per player, same text) to one row.
+  return dedupeTransactions(mapped);
 }
 
 // ─── Top-level adapter ────────────────────────────────────────────────────

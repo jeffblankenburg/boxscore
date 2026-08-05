@@ -341,6 +341,7 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
   border-bottom: 1px dotted var(--border-light);
 }
 .game-score-line .winner { font-weight: 700; }
+.game-line-status { color: var(--text-muted); }
 /* Today's Games gets a denser two-column grid (vs the three-column "Yesterday's
    Results" above it). Pitcher names + W-L + ERA push the line too wide for
    three columns at the digest's body width. */
@@ -1142,12 +1143,54 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-standings-table th, .bb-standings-table td,
 .bb-leader-table th, .bb-leader-table td { border-top: none; }
 
+/* Zebra striping (web only) — matches the MLB batting/pitching tables'
+   rgba(0,0,0,0.025) even-row wash. Multi-row tables only; the 2-row line score
+   is left un-striped so its home row doesn't read as a highlight. */
+.bb-player-table tbody tr:nth-child(even) td,
+.bb-standings-table tbody tr:nth-child(even) td,
+.bb-leader-table tbody tr:nth-child(even) td { background-color: rgba(0, 0, 0, 0.025); }
+
+/* Multi-column web layouts — mirror the MLB digest. All three classes are
+   web-only (absent from BASKETBALL_EMAIL_STYLES), so email stays single-column.
+   • Box scores flow into 3 balanced columns (like .boxscores-container).
+   • Standings sit the two conferences side by side (like .league-layout).
+   • Leaders flow their category tables into 2 columns (like .leaders-cols). */
+.bb-boxscores { column-count: 3; column-gap: 20px; margin-top: 8px; }
+.bb-boxscores .bb-game { break-inside: avoid; page-break-inside: avoid;
+                         margin: 0 0 18px; }
+.bb-standings-cols { display: grid; grid-template-columns: 1fr 1fr;
+                     gap: 4px 24px; align-items: start; }
+.bb-leaders-cols { column-count: 2; column-gap: 18px; margin-top: 8px; }
+.bb-leaders-cols .bb-ldr-cat { break-inside: avoid; page-break-inside: avoid; }
+@media (max-width: 900px) { .bb-boxscores { column-count: 2; } }
+@media (max-width: 600px) {
+  .bb-boxscores { column-count: 1; }
+  .bb-standings-cols { grid-template-columns: 1fr; }
+  .bb-leaders-cols { column-count: 1; }
+}
+
 .bb-section { margin: 18px 0 24px; }
 .bb-section-title {
   font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
-  margin: 22px 0 6px; padding-bottom: 4px;
+  /* No top margin: section separation is carried by .bb-section's own margins,
+     which collapse in normal flow. A title top margin only surfaces inside the
+     multi-column wrappers (grid/columns don't collapse margins), where it
+     stacked on top of the section margin and over-spaced Standings/Leaders. */
+  margin: 0 0 6px; padding-bottom: 4px;
   border-bottom: 2px solid #161410;
 }
+/* Grid items don't collapse margins, so the nested conference sections' own
+   18/24 margins doubled the space above and below Standings. Zero them; the
+   grid sits in normal flow and the dateline gap above / leaders section below
+   provide separation. */
+.bb-standings-cols > .bb-section { margin: 0; }
+
+/* Team digest: masthead team name + record, and the team's own standings row. */
+.bb-team-heading { font-size: 24px; font-weight: 800; letter-spacing: -0.01em;
+                   margin: 4px 0 10px; text-align: center; }
+.bb-team-record { font-weight: 400; color: #6a6354; }
+.bb-standings-table tr.bb-st-me td { background-color: rgba(0, 0, 0, 0.07); font-weight: 700; }
+
 .bb-dateline {
   border-top: 3px double #161410; border-bottom: 1px solid #161410;
   padding: 8px 0; margin: 0 0 14px; text-align: center;
@@ -1184,7 +1227,11 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-leader-table { width: 100%; border-collapse: collapse;
                    font-size: 12px; margin: 6px 0 14px; }
 .bb-ldr-caption {
-  margin: 10px 0 2px; padding: 0 0 2px;
+  /* No top margin: it's the leading edge of each column's first category, and
+     CSS columns truncate a top margin at a column break for column 2 but keep
+     it for column 1 — misaligning the two column tops. Separation between
+     stacked categories comes from .bb-leader-table's bottom margin instead. */
+  margin: 0 0 2px; padding: 0 0 2px;
   font-size: 13px; font-weight: 700;
   border-bottom: 1px solid #161410;
 }
@@ -1268,20 +1315,36 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-pl-pos    { font-size: 10px; color: #6a6354; margin-left: 3px;
                 text-transform: lowercase; letter-spacing: 0.04em;
                 white-space: nowrap; font-weight: 400; }
+.bb-pl-jersey { font-size: 10px; color: #6a6354; font-weight: 400; }
+.bb-pl-inj    { font-size: 10px; color: #6a6354; font-style: italic; }
+
+/* Player page (web only) — mirrors the football fb-pl- layout. */
+.bb-game-header { font-size: 14px; font-weight: 700; margin: 16px 0 4px;
+                  padding-bottom: 3px; border-bottom: 1px solid #161410; }
+.bb-player .bb-player-table { table-layout: auto; }
+.bb-player .bb-pl-name { width: auto; white-space: nowrap; }
+.bb-pl-opp { text-align: left !important; }
+.bb-pl-header { margin: 2px 0 12px; padding-bottom: 10px; border-bottom: 2px solid #161410; }
+.bb-pl-title { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+.bb-pl-team { font-size: 14px; font-weight: 600; margin-top: 3px; }
+.bb-pl-detail { font-size: 12px; color: #6b6459; margin-top: 2px; }
+.bb-pl-summary { display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 12px 0 16px; }
+.bb-pl-chip { display: flex; flex-direction: column; line-height: 1.15; }
+.bb-pl-chip-val { font-size: 19px; font-weight: 700; }
+.bb-pl-chip-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+                    color: #6b6459; margin-top: 1px; }
+.bb-pl-res { font-weight: 700; }
+.bb-pl-res-w { color: #1a7f37; }
+.bb-pl-res-l { color: #b42318; }
+.bb-pl-empty { font-size: 13px; color: #6b6459; }
 .bb-pl-stat   { min-width: 22px; }
 /* Totals row: weight + top border on every cell so the rule spans the
    full table. The single-cell .bb-pl-totals class only painted under the
    "Totals" label, which left a stub line under the player table. */
 .bb-player-table tfoot td { font-weight: 700; border-top: 1px solid #161410; }
 
-.bb-standings-grid { display: block; }
 .bb-standings-table { width: 100%; border-collapse: collapse;
                       font-size: 12px; margin: 6px 0 14px; }
-.bb-conf-caption {
-  margin: 10px 0 2px; padding: 0 0 2px;
-  font-size: 13px; font-weight: 700;
-  border-bottom: 1px solid #161410;
-}
 .bb-standings-table th, .bb-standings-table td {
   padding: 2px 4px; text-align: right; white-space: nowrap;
 }
@@ -1312,29 +1375,63 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   border-top: 3px double #161410; border-bottom: 1px solid #161410;
   padding: 8px 0; margin: 0 0 14px; text-align: center;
 }
+/* Conference digest masthead (e.g. "SEC"). */
+.fb-conf-heading { font-size: 24px; font-weight: 800; letter-spacing: -0.01em;
+                   margin: 4px 0 10px; text-align: center; }
+/* Conference digest: standings + weekly scores side by side on wide web (keeps
+   the standings from stretching across the whole page); stacked on narrow.
+   Scores drop to a single column inside the (narrower) right half. */
+.fb-conf-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; align-items: start; }
+.fb-conf-2col .fb-gs-grid { column-count: 1; }
+.fb-conf-2col .fb-next-list { column-count: 1; }
+@media (max-width: 900px) { .fb-conf-2col { grid-template-columns: 1fr; } }
+/* AP rank trailing a team in the standings ("(2)"). */
+.fb-sd-rank { color: #6a6354; font-size: 10px; }
+/* Zebra striping on the standings table. */
+.fb-standings-table tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
 .fb-dateline-text {
   font-style: italic; font-weight: 800; letter-spacing: -0.005em;
   font-size: 22px; font-size: clamp(16px, 4.2vw, 24px);
 }
 
-.fb-rank-grid { display: block; }
-.fb-rank-block { margin: 8px 0 14px; }
+/* Two polls (AP / Coaches) side by side on wide web — 2 → 1 by viewport. Email
+   stays single-column (its own fb-rank-grid rule in FOOTBALL_EMAIL_STYLES).
+   The grid row-gap owns the vertical space between stacked polls; the block /
+   caption / table margins are zeroed on the vertical axis because grid items
+   don't collapse margins (they'd otherwise compound into a huge gap on mobile). */
+.fb-rank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; align-items: start; }
+@media (max-width: 700px) { .fb-rank-grid { grid-template-columns: 1fr; } }
+.fb-rank-block { margin: 0; }
 .fb-rank-caption {
-  margin: 10px 0 2px; padding: 0 0 2px; font-size: 13px; font-weight: 700;
+  margin: 0 0 2px; padding: 0 0 2px; font-size: 13px; font-weight: 700;
   border-bottom: 1px solid #161410;
 }
-.fb-rank-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 12px; }
+.fb-rank-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 0; }
 .fb-rank-table th, .fb-rank-table td { padding: 1px 3px; white-space: nowrap; }
+.fb-rank-table tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
 .fb-rank-table th {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.04em; border-bottom: 1px solid #161410; text-align: left;
 }
+/* AP row: rank, team (school name, bold), record, conference, trend — each its
+   own column. */
 .fb-rk-rank { width: 24px; text-align: right !important; color: #6a6354; }
-.fb-rk-team { text-align: left; }
-.fb-rk-fpv { color: #6a6354; font-size: 10px; }
-.fb-rk-rec { width: 44px; text-align: right !important; color: #6a6354; }
-.fb-rk-trend { width: 44px; text-align: right !important; color: #6a6354; font-size: 11px; }
-.fb-rk-new { color: #6a6354; font-style: italic; }
+.fb-rk-team { text-align: left; font-weight: 700; }
+.fb-rk-rec  { text-align: left; color: #6a6354; }
+.fb-rk-conf { text-align: left; color: #6a6354; }
+/* Trend: solid triangles (▲/▼), monochrome — no green/red (digests are B&W).
+   Same font size as the rest of the table (no override). */
+.fb-rk-trend { width: 44px; text-align: right !important; }
+.fb-rk-flat { color: #6a6354; }
+.fb-rk-new  { color: #6a6354; font-style: italic; }
+
+/* Box scores flow into columns on wide web (web only — email stays single
+   column) — 3 → 2 → 1 by viewport, matching the NBA/MLB digests. */
+.fb-boxscores { column-count: 3; column-gap: 20px; margin-top: 8px; }
+.fb-boxscores .fb-game { break-inside: avoid; page-break-inside: avoid;
+                         margin: 0 0 18px; border-top: none; padding-top: 0; }
+@media (max-width: 1000px) { .fb-boxscores { column-count: 2; } }
+@media (max-width: 640px) { .fb-boxscores { column-count: 1; } }
 
 .fb-game { margin: 18px 0 8px; padding-top: 6px; border-top: 1px solid #c4baa5; }
 .fb-game-context { font-size: 11px; font-style: italic; color: #6a6354;
@@ -1458,16 +1555,29 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 }
 
 /* Game Scores (compact final-score list). */
-.fb-gs-grid { display: block; margin: 4px 0 0; }
-.fb-gs-line { font-size: 14px; padding: 2px 0; border-bottom: 1px dotted #e8e2d4; }
+/* Scores flow into 3 columns on wide web — 3 → 2 → 1 by viewport. column-count
+   (not grid) so the list fills the first column top-to-bottom, THEN the next,
+   rather than alternating rows across columns. Email keeps display:block
+   (single column) via FOOTBALL_EMAIL_STYLES. */
+.fb-gs-grid { column-count: 3; column-gap: 20px; margin: 4px 0 0; }
+@media (max-width: 900px) { .fb-gs-grid { column-count: 2; } }
+@media (max-width: 600px) { .fb-gs-grid { column-count: 1; } }
+.fb-gs-line { font-size: 14px; padding: 2px 0; border-bottom: 1px dotted #e8e2d4;
+              break-inside: avoid; }
 .fb-gs-line:last-child { border-bottom: none; }
 .fb-gs-win { font-weight: 700; }
 .fb-gs-note { color: #6a6354; font-style: italic; font-size: 12px; }
 
-/* Next Matchups. */
-.fb-next-list { list-style: none; padding: 0; margin: 4px 0 0; }
+/* Next Matchups — 2 columns on wide web (matchup + kickoff is wider than a
+   score line, so 2 not 3), single on narrow. column-count (not grid) so the
+   list fills the first column top-to-bottom, THEN the second, rather than
+   alternating rows across columns. Email stays single-column. */
+.fb-next-list { list-style: none; padding: 0; margin: 4px 0 0;
+                column-count: 2; column-gap: 24px; }
+@media (max-width: 700px) { .fb-next-list { column-count: 1; } }
 .fb-next-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-               padding: 3px 0; border-bottom: 1px dotted #e8e2d4; font-size: 14px; }
+               padding: 3px 0; border-bottom: 1px dotted #e8e2d4; font-size: 14px;
+               break-inside: avoid; }
 .fb-next-row:last-child { border-bottom: none; }
 .fb-next-matchup { font-weight: 700; }
 .fb-next-time { color: #6a6354; font-style: italic; white-space: nowrap; }
@@ -1494,7 +1604,9 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
               font-size: 12px; padding-top: 1px; }
 .fb-tx-desc { font-size: 13px; }
 
-@media only screen and (max-width: 1250px) {
+/* Two standings tables fit side by side at laptop width (1024) but not tablet
+   (768) — collapse to one column at/below 900px. */
+@media only screen and (max-width: 900px) {
   .fb-standings-2col { display: block; }
 }
 @media only screen and (max-width: 600px) {

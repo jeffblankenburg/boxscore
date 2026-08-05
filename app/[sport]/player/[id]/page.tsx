@@ -6,10 +6,18 @@ import { loadFootballPlayerData } from "@/lib/sports/football/player-data";
 import { renderFootballPlayerContent } from "@/lib/sports/football/render/player";
 import { decodeAthleteId, footballPlayerPath } from "@/lib/sports/football/player-links";
 import type { FootballLeague } from "@/lib/sports/football/types";
+import { loadBasketballPlayerData } from "@/lib/basketball-player";
+import { renderBasketballPlayerContent } from "@/lib/render-basketball-player";
+import {
+  decodeAthleteId as decodeBballAthleteId,
+  basketballPlayerPath,
+  type BasketballLeague,
+} from "@/lib/basketball-links";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const FOOTBALL_LEAGUES = new Set(["nfl", "ncaaf"]);
+const BASKETBALL_LEAGUES = new Set(["nba", "wnba"]);
 
 // Player profile at /{sport}/player/{id}. The `id` URL segment accepts
 // either:
@@ -55,6 +63,21 @@ export async function generateMetadata({
     const data = await loadFootballPlayerData(sport as FootballLeague, athleteId);
     if (!data) return {};
     const canonical = `${EMAIL_LINK_BASE}${footballPlayerPath(sport as FootballLeague, {
+      id: data.bio.id,
+      slug: data.bio.slug,
+    })}`;
+    return {
+      title: `${data.bio.fullName} — ${data.season} Game Log and Stats | boxscore`,
+      description: `${data.bio.fullName} game log, season stats, and recent games.`,
+      alternates: { canonical },
+    };
+  }
+  if (BASKETBALL_LEAGUES.has(sport)) {
+    const athleteId = decodeBballAthleteId(id);
+    if (!athleteId) return {};
+    const data = await loadBasketballPlayerData(sport as BasketballLeague, athleteId);
+    if (!data) return {};
+    const canonical = `${EMAIL_LINK_BASE}${basketballPlayerPath(sport as BasketballLeague, {
       id: data.bio.id,
       slug: data.bio.slug,
     })}`;
@@ -118,6 +141,38 @@ export default async function PlayerPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
         />
         <div dangerouslySetInnerHTML={{ __html: renderFootballPlayerContent(data) }} />
+      </>
+    );
+  }
+
+  if (BASKETBALL_LEAGUES.has(sport)) {
+    const league = sport as BasketballLeague;
+    const athleteId = decodeBballAthleteId(id);
+    if (!athleteId) notFound();
+    const data = await loadBasketballPlayerData(league, athleteId);
+    if (!data) notFound();
+    const canonicalUrl = `${EMAIL_LINK_BASE}${basketballPlayerPath(league, {
+      id: data.bio.id,
+      slug: data.bio.slug,
+    })}`;
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "@id": canonicalUrl,
+      name: data.bio.fullName,
+      url: canonicalUrl,
+      jobTitle: "Basketball Player",
+      ...(data.bio.teamName && {
+        affiliation: { "@type": "SportsTeam", name: data.bio.teamName },
+      }),
+    };
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        />
+        <div dangerouslySetInnerHTML={{ __html: renderBasketballPlayerContent(data) }} />
       </>
     );
   }

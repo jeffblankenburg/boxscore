@@ -43,6 +43,10 @@ export type FootballTeamRef = {
   id: string;        // canonical slug — matches lib/teams.ts Team.slug
   name: string;      // "Dallas Cowboys" / "Georgia Bulldogs"
   abbr: string;      // "DAL" / "UGA"
+  // ESPN "location": the school ("Ohio State", "North Texas") for college, the
+  // city ("Dallas") for the NFL. Used to show NCAAF as school names rather than
+  // mascots ("Buckeyes") — the poll feed only carries the mascot in `name`.
+  location: string | null;
   espnId: string;    // vendor id, kept for provenance / future slug backfill
 
   // NCAAF only. null/absent for NFL and for unranked college teams.

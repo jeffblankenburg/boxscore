@@ -8,6 +8,7 @@ import { DateInputWithToday } from "./DateInputWithToday";
 import { loadDailyData } from "@/lib/daily";
 import { isValidIsoDate, nextDay, prevDay, shortPrettyDate, yesterdayInET } from "@/lib/dates";
 import { MLB_PREVIEW_FIXTURES, MLB_PREVIEW_MODES } from "@/lib/mlb-preview-fixtures";
+import { NCAAF_CONFERENCES, findConferenceBySlug } from "@/lib/sports/football/conferences";
 import {
   BASKETBALL_PREVIEW_MODES,
   basketballFixtureDate,
@@ -25,7 +26,7 @@ const VALID_SPORTS = new Set(["mlb", "nba", "wnba", "nfl", "ncaaf"]);
 
 // Preset preview widths. "full" means no constraint (fills the available column).
 const WIDTH_PRESETS: Array<{ key: string; label: string; px: number | null }> = [
-  { key: "mobile", label: "Mobile", px: 375 },
+  { key: "mobile", label: "Mobile", px: 400 },
   { key: "email", label: "Email", px: 600 },
   { key: "tablet", label: "Tablet", px: 768 },
   { key: "laptop", label: "Laptop", px: 1024 },
@@ -95,13 +96,16 @@ export default async function PreviewPage({
   searchParams,
 }: {
   params: Promise<{ sport: string }>;
-  searchParams: Promise<{ date?: string; surface?: string; width?: string }>;
+  searchParams: Promise<{ date?: string; surface?: string; width?: string; conf?: string }>;
 }) {
   await requireAdmin();
   const { sport } = await params;
   if (!VALID_SPORTS.has(sport)) notFound();
 
-  const { date: dateParam, surface: surfaceParam, width: widthParam } = await searchParams;
+  const { date: dateParam, surface: surfaceParam, width: widthParam, conf: confParam } = await searchParams;
+  // NCAAF only: a valid conference slug renders that conference's digest in
+  // place of the Top-25 league digest.
+  const conf = sport === "ncaaf" && confParam && findConferenceBySlug(confParam) ? confParam : "";
   const { modes, fixtures } = modeOptionsFor(sport);
   // `date` is the EDITION date (what subscribers see at the top of the
   // email — the day a newspaper would be dated). Backend lookups use
@@ -129,18 +133,28 @@ export default async function PreviewPage({
     mlbActualMode = data.mode;
   }
 
+  // Football's real send uses a week + recap-day subject; mirror it here so the
+  // preview's Subject line matches what subscribers get.
+  let footballSubject: string | null = null;
+  if (sport === "nfl" || sport === "ncaaf") {
+    const { loadFootballData } = await import("@/lib/sports/football/data");
+    const { footballEmailSubject } = await import("@/lib/sports/football/render/digest");
+    footballSubject = footballEmailSubject(await loadFootballData(sport, gamesDate));
+  }
+
   // The /frame route still expects games_date as its `date` param, so we
   // translate here. Same URL is reused for the "Pop out" link. The `_cb`
   // cache-buster (per page render — this page is force-dynamic) guarantees the
   // browser refetches the iframe instead of serving a stale cached render,
   // which repeatedly showed old digest content after code changes.
-  const frameSrc = `/admin/preview/${sport}/frame?date=${gamesDate}&surface=${surface}&_cb=${Date.now()}`;
+  const frameSrc = `/admin/preview/${sport}/frame?date=${gamesDate}&surface=${surface}${conf ? `&conf=${conf}` : ""}&_cb=${Date.now()}`;
 
-  const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string }) => {
+  const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string; conf?: string }) => {
     const d = overrides.date ?? date;
     const s = overrides.surface ?? surface;
     const w = overrides.width ?? width;
-    return `/admin/preview/${sport}?date=${d}&surface=${s}&width=${w}`;
+    const c = overrides.conf ?? conf;
+    return `/admin/preview/${sport}?date=${d}&surface=${s}&width=${w}${c ? `&conf=${c}` : ""}`;
   };
 
   const containerStyle: React.CSSProperties = widthPx
@@ -149,8 +163,8 @@ export default async function PreviewPage({
 
   const previewId = `${date}/${surface}/${width}`;
   // What the actual league send will use as the subject for this edition.
-  // Mirrors the format in lib/emails/templates.ts:dailyEmail.
-  const emailSubject = `${sport.toUpperCase()} - ${shortPrettyDate(date)}`;
+  // Mirrors lib/emails/templates.ts:dailyEmail (football gets the week/day form).
+  const emailSubject = footballSubject ?? `${sport.toUpperCase()} - ${shortPrettyDate(date)}`;
 
   return (
     <main className="admin admin-preview">
@@ -186,10 +200,24 @@ export default async function PreviewPage({
                 className={width === p.key ? "active" : ""}
                 href={link({ width: p.key })}
               >
-                {p.label}
+                {p.px ? `${p.label} (${p.px})` : p.label}
               </a>
             ))}
           </div>
+          {sport === "ncaaf" && (
+            <div className="preview-toggle">
+              <a className={!conf ? "active" : ""} href={link({ conf: "" })}>Top 25</a>
+              {NCAAF_CONFERENCES.map((c) => (
+                <a
+                  key={c.slug}
+                  className={conf === c.slug ? "active" : ""}
+                  href={link({ conf: c.slug })}
+                >
+                  {c.short}
+                </a>
+              ))}
+            </div>
+          )}
           <form method="get" className="preview-date-form">
             <label className="preview-date-label">
               <span>Variant</span>

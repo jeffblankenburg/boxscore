@@ -28,7 +28,7 @@ const VALID_SPORTS = new Set(["mlb", "nba", "wnba", "nfl", "ncaaf"]);
 const WEB_ONLY_SPORTS = new Set(["nfl", "ncaaf"]);
 
 const WIDTH_PRESETS: Array<{ key: string; label: string; px: number | null }> = [
-  { key: "mobile", label: "Mobile", px: 375 },
+  { key: "mobile", label: "Mobile", px: 400 },
   { key: "email", label: "Email", px: 600 },
   { key: "tablet", label: "Tablet", px: 768 },
   { key: "laptop", label: "Laptop", px: 1024 },
@@ -80,13 +80,18 @@ export default async function TeamPreviewPage({
   const widthPx = WIDTH_PRESETS.find((p) => p.key === width)?.px ?? null;
 
   // Football renders live at its 2-segment latest URL (Branch B), which shows
-  // the team's most recent game and ignores a date. MLB/NBA point the web
-  // iframe at the dated public page and email at the frame route.
+  // the team's most recent game and ignores a date. Email always uses the frame
+  // route. For web: MLB points at its dated public page (public sport, cached
+  // digest), but NBA/WNBA render live through the frame — their public page is
+  // 404 while the sport is admin_only and before the generate cron has run.
+  const isBasketball = sport === "nba" || sport === "wnba";
   const frameSrc = webOnly
     ? `/${sport}/${team.slug}`
-    : surface === "web"
-      ? `/${sport}/${team.slug}/${date}`
-      : `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}`;
+    : surface === "email"
+      ? `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}`
+      : isBasketball
+        ? `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}&surface=web`
+        : `/${sport}/${team.slug}/${date}`;
 
   const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string }) => {
     const d = overrides.date ?? date;
@@ -138,7 +143,7 @@ export default async function TeamPreviewPage({
                   className={width === p.key ? "active" : ""}
                   href={link({ width: p.key })}
                 >
-                  {p.label}
+                  {p.px ? `${p.label} (${p.px})` : p.label}
                 </a>
               ))}
             </div>

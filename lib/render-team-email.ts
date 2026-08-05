@@ -25,6 +25,7 @@ import {
   esc, pad, fmtAvg, fmtEra, lastName,
 } from "./render-email";
 import { lastNameLinkEmail } from "./player-links";
+import { dedupeTransactions } from "./dedupe-transactions";
 
 type ProbableStats = { wins: number; losses: number; era: string | null };
 
@@ -94,8 +95,11 @@ export async function loadTeamEmailData(team: Team, date: string): Promise<TeamE
     ? { wins: teamRec.wins, losses: teamRec.losses, gamesBack: teamRec.gamesBack }
     : null;
 
-  const transactions = daily.transactions.filter(
-    (t) => t.fromTeamId === teamId || t.toTeamId === teamId,
+  // A multi-player trade lists the team once per player (same description) —
+  // and a trade between two teams the team is on both sides of doubles again;
+  // dedupe by description so the deal shows once.
+  const transactions = dedupeTransactions(
+    daily.transactions.filter((t) => t.fromTeamId === teamId || t.toTeamId === teamId),
   );
 
   // Wave 2: fan-out for upcoming-game probable-pitcher stats.

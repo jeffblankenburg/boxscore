@@ -26,7 +26,10 @@ import { loadFootballData } from "@/lib/sports/football/data";
 import {
   renderFootballContent,
   renderFootballEmailContent,
+  renderFootballConferenceContent,
+  renderFootballConferenceEmailContent,
 } from "@/lib/sports/football/render/digest";
+import { findConferenceBySlug } from "@/lib/sports/football/conferences";
 import { FOOTBALL_PREVIEW_FIXTURES } from "@/lib/sports/football/preview-fixtures";
 
 export const runtime = "nodejs";
@@ -135,26 +138,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
     const fb = await loadFootballData(sport, targetDate);
     digestDate = fb.date;
     digestPrettyDate = prettyDate(fb.date);
-    webBody = renderFootballContent(fb);
-    emailBody = renderFootballEmailContent(fb);
+    // NCAAF: a `conf` slug renders that conference's digest instead of the
+    // Top-25 league digest. Unknown/absent slug → the league digest.
+    const conf =
+      sport === "ncaaf" ? findConferenceBySlug(url.searchParams.get("conf") ?? "") : undefined;
+    if (conf) {
+      webBody = renderFootballConferenceContent(fb, conf);
+      emailBody = renderFootballConferenceEmailContent(fb, conf);
+    } else {
+      webBody = renderFootballContent(fb);
+      emailBody = renderFootballEmailContent(fb);
+    }
   } else {
     const data = sport === "nba"
       ? await loadNbaData(targetDate)
       : await loadWnbaData(targetDate);
-    // Playoff bracket: build from real ESPN data (standings + every
-    // playoff series in the digest's date plus the upcoming window). Returns
-    // null when ESPN hasn't set the bracket yet (no playoffSeed on standings,
-    // missing conferences) — in which case we leave playoffBracket unset and
-    // no bracket section renders.
-    if (sport === "nba") {
-      const { buildNbaBracket } = await import("@/lib/nba-bracket-adapter");
-      const events = [...data.games.map((g) => g.event), ...data.upcomingEvents];
-      const bracket = buildNbaBracket(events, data.standings);
-      if (bracket) {
-        data.isPlayoffs = true;
-        data.playoffBracket = bracket;
-      }
-    }
     digestDate = data.date;
     digestPrettyDate = data.prettyDate;
     webBody = renderBasketballContent(data);

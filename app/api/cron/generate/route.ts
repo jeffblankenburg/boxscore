@@ -9,6 +9,12 @@ import { upsertDigest } from "@/lib/digests";
 import { upsertTeamDigest } from "@/lib/team-digests";
 import { loadTeamEmailData, renderTeamEmailContent, teamPlayedGames } from "@/lib/render-team-email";
 import { renderTeamWebContent } from "@/lib/render-team-web";
+import { loadBasketballTeamData } from "@/lib/basketball-team";
+import { teamSlugForEspn } from "@/lib/basketball-links";
+import {
+  renderBasketballTeamContent,
+  renderBasketballTeamEmailContent,
+} from "@/lib/render-basketball-team";
 import { teamsBySport, findTeam } from "@/lib/teams";
 import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
 import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
@@ -258,6 +264,41 @@ export async function GET(req: Request) {
     await upsertDigest({
       sport, date, html, email_html, game_count: bb.games.length,
     });
+
+    // Per-team digests — basketball/football/hockey cadence: write a digest ONLY
+    // for teams that played today, so a subscriber gets an email only the
+    // morning after their team plays. (MLB differs: it writes all 30 teams
+    // daily above, since teams play nearly every day.) Teams with no row are
+    // cleanly skipped by the send cron. Collect today's played teams from the
+    // finals, mapping each ESPN side to its boxscore slug.
+    const bbPlayedSlugs = skipTeams
+      ? []
+      : [...new Set(
+          bb.games
+            .filter((g) => g.event.status === "final")
+            .flatMap((g) => [g.event.away.team, g.event.home.team])
+            .map((t) => teamSlugForEspn(sport, { displayName: t.displayName, nickname: t.name }))
+            .filter((s): s is string => s != null),
+        )];
+    let bbTeamOk = 0;
+    const bbTeamFails: string[] = [];
+    for (const slug of bbPlayedSlugs) {
+      try {
+        const td = await loadBasketballTeamData(sport, slug, date);
+        await upsertTeamDigest({
+          sport, team_slug: slug, date,
+          has_game: true, mode: td.mode,
+          html: renderBasketballTeamContent(td),
+          email_html: renderBasketballTeamEmailContent(td),
+        });
+        bbTeamOk++;
+      } catch (err) {
+        const msg = (err as Error).message;
+        console.error(`[generate] team ${slug} failed: ${msg}`);
+        bbTeamFails.push(`${slug}: ${msg}`);
+      }
+    }
+
     const finals = bb.games.filter((g) => g.event.status === "final").length;
     const result = {
       sport, date,
@@ -267,6 +308,8 @@ export async function GET(req: Request) {
       season: bb.season,
       html_bytes: html.length,
       email_bytes: email_html.length,
+      team_ok: bbTeamOk,
+      team_fails: bbTeamFails,
     };
     revalidatePath("/sitemap.xml");
     await finishCronRun(runId, { status: "ok", result });

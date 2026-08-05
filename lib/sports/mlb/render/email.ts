@@ -44,6 +44,7 @@ import { EMAIL_LINK_BASE } from "@/lib/site";
 import {
   esc, pad, fmtAvg, fmtOps, fmtEra, dateline, sectionH,
 } from "@/lib/render-email";
+import { sortTransactionsByTeam } from "../transactions";
 
 // ─── Display tables (name-keyed) ─────────────────────────────────────────
 // Mirrors the canonical web renderer's maps so this file stands on its
@@ -767,7 +768,7 @@ function renderTodaysGames(
 
 function renderTransactions(txs: MlbTransaction[]): string {
   if (txs.length === 0) return "";
-  const items = txs.map((t) => `<p class="es-tx">
+  const items = sortTransactionsByTeam(txs).map((t) => `<p class="es-tx">
     <span class="es-tx-type">${esc(t.typeLabel)}</span> ${esc(t.description)}
   </p>`).join("");
   return `${sectionH("Transactions")}<div class="es-tx-block">${items}</div>`;

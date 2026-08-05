@@ -135,6 +135,16 @@ export async function GET(req: Request) {
     const { getAnnouncement } = await import("@/lib/announcements");
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
 
+    // Football gets a week + recap-day subject ("NFL Week 5, Thursday Digest").
+    // Computed once per run from the canonical data (cached daily_raw); other
+    // sports keep the generic "{SPORT} - {date}" subject.
+    let subjectOverride: string | undefined;
+    if (sport === "nfl" || sport === "ncaaf") {
+      const { loadFootballData } = await import("@/lib/sports/football/data");
+      const { footballEmailSubject } = await import("@/lib/sports/football/render/digest");
+      subjectOverride = footballEmailSubject(await loadFootballData(sport, date)) ?? undefined;
+    }
+
     const groups = chunk(toSend, BATCH_SIZE);
     for (const [batchIndex, group] of groups.entries()) {
       const batchStart = performance.now();
@@ -161,6 +171,7 @@ export async function GET(req: Request) {
           announcementBanner,
           digestEmailHtml: digest.email_html!,
           openToken: openTokens[i]!,
+          subjectOverride,
         });
         return {
           to: sub.email,

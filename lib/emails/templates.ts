@@ -464,13 +464,16 @@ export function dailyEmail(opts: {
   announcementBanner?: string; // optional product/feature note prepended
                                 // above the digest body
   openToken?: string | null;   // injected as a 1x1 pixel at the top of <body>
+  subjectOverride?: string;    // sport-specific subject (e.g. football's
+                                // "NFL Week 5, Thursday Digest"); falls back to
+                                // the generic "{SPORT} - {date}" when absent
 }): { subject: string; html: string; text: string } {
   const sportTag = opts.sport.toUpperCase();
   // Subject + preview text use the EDITION date (the day the email arrives)
   // so the inbox header matches the masthead inside the body. digestDate
   // is games_date; nextDay() shifts to edition date.
   const editionDateIso = nextDay(opts.digestDate);
-  const subject = `${sportTag} - ${shortPrettyDate(editionDateIso)}`;
+  const subject = opts.subjectOverride ?? `${sportTag} - ${shortPrettyDate(editionDateIso)}`;
   const html = wrapWithDigest({
     styles: stylesForSport(opts.sport),
     digestEmailHtml: opts.digestEmailHtml,

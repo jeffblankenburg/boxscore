@@ -14,6 +14,7 @@ import type { DailyRaw } from "@/lib/daily-raw";
 import { canonicalTeamRefForRef } from "@/lib/teams";
 import { sortGamesCanonically, type CanonicalDailyData } from "../canonical";
 import { playerRef } from "../player-ref";
+import { dedupeTransactions } from "../../../dedupe-transactions";
 import type {
   MlbBoxBatting,
   MlbBoxPitching,
@@ -651,7 +652,7 @@ function transactionsFromRaw(
 ): MlbTransaction[] {
   const env = txnRaw as StatsapiTransactionsEnvelope | null;
   const txns = env?.transactions ?? [];
-  return txns
+  const mapped = txns
     .filter((t) => typeof t.description === "string" && t.description.length > 0)
     // MLB files All-Star selection as a "trade" to the AL/NL All-Star teams
     // (159/160). These aren't real roster moves — drop any txn touching them.
@@ -669,6 +670,9 @@ function transactionsFromRaw(
         toTeam:      t.toTeam?.id   ? teamRefById(idx, t.toTeam.id)   : null,
       };
     });
+  // statsapi files a multi-player trade as one record per player, all with the
+  // same description — collapse to one row so the deal shows once.
+  return dedupeTransactions(mapped);
 }
 
 // scoringPlays come pre-parsed in daily_raw (lib/daily-raw.ts:StoredScoringPlay)

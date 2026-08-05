@@ -103,18 +103,6 @@ export type BasketballData = {
   // description text from ESPN (e.g. "New Orleans hired Jamahl Mosley as
   // head coach"). Empty array means none returned.
   transactions: BasketballTransaction[];
-  // Optional playoff bracket. Only set during admin preview (via fixture)
-  // for now — real data wiring lands in a follow-up. When set, the bracket
-  // section renders above the results.
-  playoffBracket?: PlayoffBracketData;
-};
-
-// Conferences stack vertically; finals (if set) sits between them with the
-// two conference champions labeled. Sport-agnostic shape — MLB/NHL/NFL will
-// populate the same structure from their respective adapters.
-export type PlayoffBracketData = {
-  conferences: import("./render-bracket").Bracket[];
-  finals?: { westChamp: string | null; eastChamp: string | null };
 };
 
 // ---- Cache helpers (same table as MLB, different payload shape) -----------
@@ -179,13 +167,17 @@ async function fetchBasketballRaw(
     fetchScoreboardRaw(sport, date),
     fetchScoreboardRangeRaw(sport, upcomingStart, upcomingEnd),
     fetchStandingsRaw(sport, season),
-    fetchAthleteStatsRaw(sport, season, 2, 100).catch((e: unknown) => {
+    // limit=600 covers every player who's logged minutes (NBA ~500, WNBA ~180)
+    // so the same payload feeds both the top-5 league leaders AND full per-team
+    // rosters for the team digests — no separate roster fetch. Top-100 (the old
+    // limit) only held the league's leading scorers, ~3 per team.
+    fetchAthleteStatsRaw(sport, season, 2, 600).catch((e: unknown) => {
       console.error(
         `[basketball] leaders fetch failed for ${sport}/${date}: ${(e as Error).message}`,
       );
       return null;
     }),
-    fetchTransactionsRaw(sport).catch((e: unknown) => {
+    fetchTransactionsRaw(sport, date).catch((e: unknown) => {
       console.error(
         `[basketball] transactions fetch failed for ${sport}/${date}: ${(e as Error).message}`,
       );
@@ -268,10 +260,29 @@ function isOldShape(raw: BasketballRaw): boolean {
 }
 
 /**
- * Read-through: stored raw → BasketballData. If raw is missing, in the old
- * shape, or refetch=true was passed, hit ESPN and write through. League-
- * specific entry points (loadNbaData, loadWnbaData) call this with their
- * own season-for-date logic.
+ * Read-through for the raw payload. If raw is missing, in the old shape, or
+ * refetch=true was passed, hit ESPN and write through. Shared by the daily
+ * loader and the team-digest loader — the latter needs raw.athleteStats to
+ * build a team's roster, which the parsed BasketballData doesn't carry.
+ */
+export async function loadBasketballRawFor(
+  sport: BasketballLeagueSlug,
+  date: string,
+  season: number,
+  opts?: { refetch?: boolean },
+): Promise<BasketballRaw> {
+  let raw = opts?.refetch ? null : await getBasketballRaw(sport, date);
+  if (raw && isOldShape(raw)) raw = null;
+  if (!raw) {
+    raw = await fetchBasketballRaw(sport, date, season);
+    await upsertBasketballRaw(sport, date, raw);
+  }
+  return raw;
+}
+
+/**
+ * Read-through: stored raw → BasketballData. League-specific entry points
+ * (loadNbaData, loadWnbaData) call this with their own season-for-date logic.
  */
 export async function loadBasketballDataFor(
   sport: BasketballLeagueSlug,
@@ -279,11 +290,10 @@ export async function loadBasketballDataFor(
   season: number,
   opts?: { refetch?: boolean },
 ): Promise<BasketballData> {
-  let raw = opts?.refetch ? null : await getBasketballRaw(sport, date);
-  if (raw && isOldShape(raw)) raw = null;
-  if (!raw) {
-    raw = await fetchBasketballRaw(sport, date, season);
-    await upsertBasketballRaw(sport, date, raw);
-  }
+  const raw = await loadBasketballRawFor(sport, date, season, opts);
   return rawToBasketballData(raw, sport, date);
 }
+
+// Exposed so the team-digest loader can turn one raw read into both the daily
+// BasketballData (games/standings/upcoming/transactions) and the team roster.
+export { rawToBasketballData };

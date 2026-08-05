@@ -1,11 +1,21 @@
-// Renders the team email HTML for /admin/preview/[sport]/[team]'s iframe
-// when surface=email. Web surface points the iframe at the public team
-// page (/{sport}/{slug}/{date}) directly, so this route only covers email.
+// Renders a team digest for /admin/preview/[sport]/[team]'s iframe. surface=web
+// renders the web body in the newspaper shell; surface=email wraps the email
+// body in teamDailyEmail. Both render LIVE (not from the team_digests cache),
+// so the preview works for admin_only sports whose public page 404s and before
+// the generate cron has run.
 
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { findTeam, type Sport } from "@/lib/teams";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
+import { renderTeamWebContent } from "@/lib/render-team-web";
+import { loadBasketballTeamData } from "@/lib/basketball-team";
+import {
+  renderBasketballTeamContent,
+  renderBasketballTeamEmailContent,
+} from "@/lib/render-basketball-team";
 import { teamDailyEmail } from "@/lib/emails/templates";
 import { getAnnouncement } from "@/lib/announcements";
 import { siteOrigin } from "@/lib/site";
@@ -29,10 +39,34 @@ export async function GET(
   const url = new URL(req.url);
   const dateParam = url.searchParams.get("date");
   const date = dateParam && isValidIsoDate(dateParam) ? dateParam : yesterdayInET();
+  const surface = url.searchParams.get("surface") === "web" ? "web" : "email";
+  const isBasketball = sport === "nba" || sport === "wnba";
+
+  if (surface === "web") {
+    const webBody = isBasketball
+      ? renderBasketballTeamContent(await loadBasketballTeamData(sport, slug, date))
+      : renderTeamWebContent(await loadTeamEmailData(team, date));
+    const globalsCss = await readFile(join(process.cwd(), "app", "globals.css"), "utf-8");
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap">
+<style>${globalsCss}</style>
+</head>
+<body><div class="newspaper">${webBody}</div></body>
+</html>`;
+    return new NextResponse(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+    });
+  }
 
   const origin = await siteOrigin();
-  const data = await loadTeamEmailData(team, date);
-  const body = renderTeamEmailContent(data);
+  const body = isBasketball
+    ? renderBasketballTeamEmailContent(await loadBasketballTeamData(sport, slug, date))
+    : renderTeamEmailContent(await loadTeamEmailData(team, date));
   const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
 
   const { html } = teamDailyEmail({

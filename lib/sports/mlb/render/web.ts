@@ -37,6 +37,7 @@ import { findTeam } from "@/lib/teams";
 import { nextDay, prettyDate, issueNumber, volumeNumber } from "@/lib/dates";
 import { lastName } from "@/lib/names";
 import { lastNameLinkWeb, fullNameLinkWeb } from "@/lib/player-links";
+import { sortTransactionsByTeam } from "../transactions";
 
 // ─── Display tables (name-keyed) ─────────────────────────────────────────
 // Kept local rather than imported from lib/render.ts so this file stands
@@ -522,7 +523,7 @@ export function renderDateline(
 
 function renderTransactions(txs: MlbTransaction[], hl?: HighlightMap): string {
   if (txs.length === 0) return "";
-  const items = txs
+  const items = sortTransactionsByTeam(txs)
     .map((t) => {
       const attrs = t.player ? diffAttrs(hl, `txn:player:${t.player.id}`) : "";
       return `<li${attrs}><span class="tx-type">${esc(t.typeLabel)}</span> ${esc(t.description)}</li>`;

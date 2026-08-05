@@ -168,9 +168,11 @@ const pick = (v: unknown, keys: string[]): Any => {
   return out;
 };
 
-// Team reference fields the adapter's teamRef() reads.
+// Team reference fields the adapter's teamRef() reads. `location` is the school
+// ("Ohio State") / city ("Dallas") — needed so college scores + box-score
+// titles can show the school name instead of the long "Ohio State Buckeyes".
 const slimTeam = (t: unknown): Any =>
-  pick(t, ["id", "abbreviation", "displayName", "name", "shortDisplayName"]);
+  pick(t, ["id", "abbreviation", "displayName", "name", "shortDisplayName", "location"]);
 
 function slimSummary(summary: unknown): Any {
   const s = obj(summary);

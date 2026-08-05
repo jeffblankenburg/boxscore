@@ -18,7 +18,6 @@ import type {
   BasketballBoxscore,
   BasketballBoxTeam,
   BasketballPlayerLine,
-  BasketballStandings,
   BasketballConferenceStandings,
   BasketballStandingsEntry,
   BasketballLeaders,
@@ -27,7 +26,31 @@ import type {
 } from "./basketball";
 import { lastName } from "./render-email";
 import { nextDay, prettyDate, timeInET } from "./dates";
-import { renderBracket } from "./render-bracket";
+import {
+  teamLinkByNickname,
+  playerLink,
+  slugifyName,
+  escText,
+  type BasketballLeague,
+} from "./basketball-links";
+
+// Link a team by its ESPN nickname ("Cavaliers") to its team page; a player by
+// ESPN athlete id to their player page. `web` picks relative vs absolute href +
+// the unstyled team-link/player-link (web) or es-*-link (email) class. Both
+// return escape-safe HTML, so call sites pass raw names (no pre-escaping).
+export function teamNameLink(name: string, web: boolean, league: BasketballLeague): string {
+  return teamLinkByNickname(league, name, name, web);
+}
+export function playerNameLink(
+  id: string,
+  fullName: string,
+  visible: string,
+  web: boolean,
+  league: BasketballLeague,
+): string {
+  if (!id) return escText(visible);
+  return playerLink(league, { id, slug: slugifyName(fullName) }, visible, web);
+}
 
 // 7-column box score per Jeff's call. The full ESPN set has 14; these are
 // the high-signal ones for a glance. Tweak this array to change the line.
@@ -51,18 +74,19 @@ const STANDINGS_COLUMNS: ReadonlyArray<{ key: string; label: string }> = [
 ];
 
 export function renderBasketballContent(data: BasketballData): string {
-  return renderBody(data);
+  return renderBody(data, true);
 }
 
 export function renderBasketballEmailContent(data: BasketballData): string {
   // Email dateline = the day this email goes out (i.e. digest date + 1).
   // Mirrors a newspaper: today's edition shows yesterday's results.
-  return renderBody({ ...data, prettyDate: prettyDate(nextDay(data.date)) });
+  return renderBody({ ...data, prettyDate: prettyDate(nextDay(data.date)) }, false);
 }
 
 // ---- Body -----------------------------------------------------------------
 
-function renderBody(data: BasketballData): string {
+function renderBody(data: BasketballData, web: boolean): string {
+  const league = data.sport;
   // Playoffs and regular-season modes use different section orders. Playoffs
   // leads with the result (the big news is the game just played), then the
   // current series state, then what's coming up. Regular season mirrors
@@ -71,24 +95,24 @@ function renderBody(data: BasketballData): string {
   if (data.isPlayoffs) {
     const sections = [
       renderDateline(data),
-      renderPlayoffBracket(data),
-      renderResults(data, "Yesterday\u2019s games"),
-      renderPlayoffSeries(data),
+      renderResults(data, "Yesterday\u2019s games", web, league),
+      renderPlayoffSeries(data, web, league),
       // Today's games surfaces a Game N of an ongoing series scheduled for
       // tonight — should always be visible above the broader upcoming
-      // list. Upcoming then covers the rest of the bracket window.
-      renderTodaysGames(data),
-      renderUpcomingGames(data),
+      // list. Upcoming then covers the rest of the postseason window.
+      renderTodaysGames(data, web, league),
+      renderUpcomingGames(data, web, league),
     ];
     return sections.filter((s) => s.length > 0).join("\n");
   }
 
   const sections = [
     renderDateline(data),
-    ...data.standings.conferences.map((c) => renderConferenceSection(c)),
-    renderLeaders(data.leaders),
-    renderTodaysGames(data),
-    renderResults(data, "Box scores"),
+    renderStandingsColumns(data.standings, web, league),
+    renderLeaders(data.leaders, data.sport, web, league),
+    renderYesterdayResults(data, web, league),
+    renderTodaysGames(data, web, league),
+    renderResults(data, "Box scores", web, league),
     renderTransactions(data.transactions, data.date),
   ];
   return sections.filter((s) => s.length > 0).join("\n");
@@ -100,44 +124,41 @@ function renderDateline(data: BasketballData): string {
   return `<div class="bb-dateline"><div class="bb-dateline-text">${escapeHtml(data.prettyDate)}</div></div>`;
 }
 
-// Text-only playoff bracket. Each conference renders as a <pre> block of
-// monospaced box-drawing characters. Stacks vertically (West first, then
-// East) with an optional Finals row showing the two conference champions.
-// Returns "" when no bracket data is attached (regular season, or playoffs
-// before the bracket adapter is wired to real data).
-function renderPlayoffBracket(data: BasketballData): string {
-  const bracket = data.playoffBracket;
-  if (!bracket || bracket.conferences.length === 0) return "";
+// ---- Yesterday's results (compact score-line list) ------------------------
 
-  const blocks = bracket.conferences.map((c) => `
-<div class="bb-bracket-block">
-  <h3 class="bb-bracket-title">${escapeHtml(c.title)}</h3>
-  <pre class="bb-bracket">${escapeHtml(renderBracket(c))}</pre>
-</div>`.trim()).join("\n");
-
-  const finals = bracket.finals
-    ? `<div class="bb-bracket-finals">
-  <h3 class="bb-bracket-title">NBA Finals</h3>
-  <p class="bb-bracket-finals-line">
-    (W) ${escapeHtml(bracket.finals.westChamp ?? "___")}
-    &nbsp;vs&nbsp;
-    ${escapeHtml(bracket.finals.eastChamp ?? "___")} (E)
-  </p>
-</div>`
-    : "";
-
-  return `
-<section class="bb-section">
-  <h2 class="bb-section-title">Playoff bracket</h2>
-  ${blocks}
-  ${finals}
-</section>
-`.trim();
+// Mirrors the MLB digest's "Yesterday's Results" section — a compact grid of
+// one-line scores (winner bolded) that sits between league leaders and
+// today's games, above the full box scores. Reuses the sport-neutral
+// games-section / games-grid / game-score-line classes so the web styling is
+// identical to MLB with no new CSS; the email surface gets matching rules in
+// BASKETBALL_EMAIL_STYLES.
+function renderYesterdayResults(data: BasketballData, web: boolean, league: BasketballLeague): string {
+  const games = data.games.filter(
+    (g) => g.event.status === "final" || g.event.status === "in_progress",
+  );
+  if (games.length === 0) return "";
+  const lines = games.map((g) => {
+    const { away, home, status, statusDetail } = g.event;
+    const aScore = away.score ?? 0;
+    const hScore = home.score ?? 0;
+    const aClass = aScore > hScore ? "winner" : "";
+    const hClass = hScore > aScore ? "winner" : "";
+    const tag = status === "final"
+      ? ""
+      : ` <span class="game-line-status">(${escapeHtml(statusDetail || status)})</span>`;
+    return `<div class="game-score-line">
+      <span class="${aClass}">${teamNameLink(away.team.name, web, league)} ${aScore}</span>, <span class="${hClass}">${teamNameLink(home.team.name, web, league)} ${hScore}</span>${tag}
+    </div>`;
+  }).join("");
+  return `<div class="games-section">
+  <div class="games-section-title">Yesterday’s Results</div>
+  <div class="games-grid">${lines}</div>
+</div>`;
 }
 
-// ---- Yesterday's results --------------------------------------------------
+// ---- Yesterday's box scores -----------------------------------------------
 
-function renderResults(data: BasketballData, title: string): string {
+function renderResults(data: BasketballData, title: string, web: boolean, league: BasketballLeague): string {
   const finalsAndLive = data.games.filter(
     (g) => g.event.status === "final" || g.event.status === "in_progress",
   );
@@ -150,31 +171,49 @@ function renderResults(data: BasketballData, title: string): string {
 </section>
 `.trim();
   }
-  const blocks = finalsAndLive.map((g) => renderGameBlock(g.event, g.box));
+  const blocks = finalsAndLive.map((g) => renderGameBlock(g.event, g.box, web, league));
+  // Box scores flow into CSS columns on wide web (same technique as the MLB
+  // digest's .boxscores-container) — 3 → 2 → 1 by viewport. The .bb-boxscores
+  // class is web-only; it's absent from BASKETBALL_EMAIL_STYLES, so email
+  // falls back to a single stacked column (CSS columns aren't email-safe).
   return `
 <section class="bb-section">
   <h2 class="bb-section-title">${escapeHtml(title)}</h2>
-  ${blocks.join("\n")}
+  <div class="bb-boxscores">${blocks.join("\n")}</div>
 </section>
 `.trim();
 }
 
-function renderGameBlock(
+export function renderGameBlock(
   event: BasketballScoreboardEvent,
   box: BasketballBoxscore | undefined,
+  web: boolean,
+  league: BasketballLeague,
 ): string {
   const lineScore = renderLineScore(event);
-  const boxTables = box ? renderBoxScore(box) : "";
+  const boxTables = box ? renderBoxScore(box, web, league) : "";
   // Playoff series context: round + current state above the matchup. Only
-  // present on postseason events; regular-season game blocks skip it.
-  const context = event.roundName || event.series
-    ? `<div class="bb-game-context">${escapeHtml([event.roundName, event.series?.summary].filter(Boolean).join(" · "))}</div>`
+  // present on postseason events; regular-season game blocks skip it. Round
+  // leads ("NBA Finals"), series state trails in parens ("NBA Finals (NY
+  // leads series 3-1)") — a bare summary with no round read as a mystery
+  // "wins series 4-1" line before the round label was wired up.
+  const round = event.roundName;
+  const summary = event.series?.summary;
+  const contextText = round
+    ? summary ? `${round} (${summary})` : round
+    : summary ?? "";
+  const context = contextText
+    ? `<div class="bb-game-context">${escapeHtml(contextText)}</div>`
     : "";
+  // Nicknames rather than ESPN's abbreviated shortName ("SA @ NY") — reads as
+  // "Spurs @ Knicks", matching the Yesterday's Results list above. Each side
+  // links to its team page.
+  const matchup = `${teamNameLink(event.away.team.name, web, league)} @ ${teamNameLink(event.home.team.name, web, league)}`;
   return `
 <article class="bb-game">
   ${context}
   <header class="bb-game-header">
-    <span class="bb-game-matchup">${escapeHtml(event.shortName)}</span>
+    <span class="bb-game-matchup">${matchup}</span>
     <span class="bb-game-status">${escapeHtml(event.statusDetail || event.status)}</span>
   </header>
   ${lineScore}
@@ -225,27 +264,27 @@ function renderLineScore(event: BasketballScoreboardEvent): string {
 `.trim();
 }
 
-function renderBoxScore(box: BasketballBoxscore): string {
+function renderBoxScore(box: BasketballBoxscore, web: boolean, league: BasketballLeague): string {
   return `<div class="bb-box">
-  ${box.teams.map((t) => renderBoxTeam(t)).join("\n")}
+  ${box.teams.map((t) => renderBoxTeam(t, web, league)).join("\n")}
 </div>`;
 }
 
-function renderBoxTeam(team: BasketballBoxTeam): string {
+function renderBoxTeam(team: BasketballBoxTeam, web: boolean, league: BasketballLeague): string {
   // Players who played, sorted by minutes desc. ESPN's MIN comes as a
   // string ("25"); Number() handles the parse, NaN → 0 so DNPs sink.
   const played = team.players
     .filter((p) => !p.didNotPlay && Object.keys(p.stats).length > 0)
     .sort((a, b) => parseMinutes(b) - parseMinutes(a));
 
-  const rows = played.map((p) => renderPlayerRow(p)).join("");
+  const rows = played.map((p) => renderPlayerRow(p, web, league)).join("");
   const totals = renderTotalsRow(team);
 
-  // Team name renders as an h3 sibling above the table (matches MLB's
-  // sub-h pattern) rather than a <caption> inside — captions don't reliably
-  // span table width across email clients.
+  // Team name (nickname link) renders as an h3 sibling above the table
+  // (matches MLB's sub-h pattern) rather than a <caption> inside — captions
+  // don't reliably span table width across email clients.
   return `
-<h3 class="bb-team-caption">${escapeHtml(team.team.displayName)}</h3>
+<h3 class="bb-team-caption">${teamNameLink(team.team.name, web, league)}</h3>
 <table class="bb-player-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
   <thead>
     <tr>
@@ -259,25 +298,25 @@ function renderBoxTeam(team: BasketballBoxTeam): string {
 `.trim();
 }
 
-function renderPlayerRow(p: BasketballPlayerLine): string {
+function renderPlayerRow(p: BasketballPlayerLine, web: boolean, league: BasketballLeague): string {
   const cells = PLAYER_STAT_COLUMNS.map((c) =>
     `<td class="bb-pl-stat">${escapeHtml(p.stats[c.key] ?? "")}</td>`,
   ).join("");
   // Basketball has more cell width than baseball's box, so we show first
   // initial + last name ("L. Doncic") rather than baseball's last-name-only
-  // convention. Position stays lowercase as a small suffix.
-  const name = initialLast(p.displayName);
+  // convention, linked to the player page. Position stays lowercase suffix.
+  const name = playerNameLink(p.athleteId, p.displayName, initialLast(p.displayName), web, league);
   const pos = p.position ? p.position.toLowerCase() : "";
   const nameCell = pos
-    ? `${escapeHtml(name)} <span class="bb-pl-pos">${escapeHtml(pos)}</span>`
-    : escapeHtml(name);
+    ? `${name} <span class="bb-pl-pos">${escapeHtml(pos)}</span>`
+    : name;
   return `<tr><td class="bb-pl-name">${nameCell}</td>${cells}</tr>`;
 }
 
 // "Devin Vassell" → "D. Vassell". Falls back to the full string for one-word
 // names. Hyphenated/multi-word last names ("Gilgeous-Alexander",
 // "Antetokounmpo") survive intact because lastName() handles them.
-function initialLast(full: string): string {
+export function initialLast(full: string): string {
   const parts = full.trim().split(/\s+/);
   if (parts.length < 2) return full;
   const first = parts[0] ?? "";
@@ -302,25 +341,7 @@ function parseMinutes(p: BasketballPlayerLine): number {
 
 // ---- Standings ------------------------------------------------------------
 
-function renderStandings(standings: BasketballStandings, isPlayoffs: boolean): string {
-  if (standings.conferences.length === 0) {
-    const title = isPlayoffs ? "Playoff seeding" : "Standings";
-    return `<section class="bb-section"><h2 class="bb-section-title">${title}</h2><p class="bb-empty">Standings unavailable.</p></section>`;
-  }
-  const tables = standings.conferences.map((c) => renderConference(c, isPlayoffs)).join("\n");
-  // Playoff mode: show the eight teams in each conference's playoff field
-  // ordered by seed. Full bracket-with-series-state is a follow-up; this is
-  // the closest thing to a bracket we can render from standings alone.
-  const title = isPlayoffs ? "Playoff seeding" : "Standings";
-  return `
-<section class="bb-section">
-  <h2 class="bb-section-title">${title}</h2>
-  <div class="bb-standings-grid">${tables}</div>
-</section>
-`.trim();
-}
-
-function renderConference(conf: BasketballConferenceStandings, isPlayoffs: boolean): string {
+function renderConference(conf: BasketballConferenceStandings, web: boolean, league: BasketballLeague): string {
   // Sort by playoffSeed when present (postseason / late-season), falling
   // back to win percentage. ESPN sometimes returns seed=0 for non-playoff
   // teams; treat as "no seed" and sort by winPercent.
@@ -333,18 +354,10 @@ function renderConference(conf: BasketballConferenceStandings, isPlayoffs: boole
     return pctB - pctA;
   });
 
-  // Playoff mode: only the eight playoff seeds. ESPN reports playoffSeed
-  // 1-10 in some windows (8 + 2 play-in); we cap at 8 for the bracket view.
-  const shown = isPlayoffs
-    ? sorted.filter((e) => {
-        const s = e.stats.playoffSeed?.value;
-        return typeof s === "number" && s >= 1 && s <= 8;
-      })
-    : sorted;
-
-  const rows = shown.map((e, i) => renderStandingsRow(e, i + 1)).join("");
+  // No inner caption — the section's h2 ("Eastern Conference Standings")
+  // already labels the table; a repeated <h3> here was a double header.
+  const rows = sorted.map((e, i) => renderStandingsRow(e, i + 1, web, league)).join("");
   return `
-<h3 class="bb-conf-caption">${escapeHtml(conf.name)}</h3>
 <table class="bb-standings-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
   <thead>
     <tr>
@@ -358,25 +371,24 @@ function renderConference(conf: BasketballConferenceStandings, isPlayoffs: boole
 `.trim();
 }
 
-function renderStandingsRow(entry: BasketballStandingsEntry, rank: number): string {
+function renderStandingsRow(entry: BasketballStandingsEntry, rank: number, web: boolean, league: BasketballLeague): string {
   const team = entry.team;
   const cells = STANDINGS_COLUMNS.map((c) => {
     const stat = entry.stats[c.key];
     const display = stat?.displayValue ?? "";
     return `<td class="bb-st-stat">${escapeHtml(display)}</td>`;
   }).join("");
-  // team.name = "Cavaliers" (no city). Matches baseball's convention of
-  // showing just the nickname in standings tables.
-  return `<tr><td class="bb-st-rank">${rank}</td><td class="bb-st-team">${escapeHtml(team.name)}</td>${cells}</tr>`;
+  // team.name = "Cavaliers" (no city), linked to the team page. Matches
+  // baseball's convention of showing just the nickname in standings tables.
+  return `<tr><td class="bb-st-rank">${rank}</td><td class="bb-st-team">${teamNameLink(team.name, web, league)}</td>${cells}</tr>`;
 }
 
-// ---- Playoff bracket ------------------------------------------------------
+// ---- Playoff series (Glance) ----------------------------------------------
 //
-// Collects active series from today's games + tomorrow's events (a 2-day
-// window catches the typical 1-day gap between Conference Finals games),
-// dedupes by sorted competitor pair, and groups by round name. The "state"
-// of each series comes straight from ESPN's `series.summary` text
-// ("SA leads series 1-0") so we don't have to recompute.
+// Newspaper-style "Playoff Glance": collects active series from today's games
+// plus the upcoming window, dedupes by sorted competitor pair, and groups by
+// round name. The "state" of each series comes straight from ESPN's
+// `series.summary` text ("SA leads series 1-0") so we don't have to recompute.
 
 type SeriesEntry = {
   round: string;
@@ -405,7 +417,7 @@ function collectSeries(data: BasketballData): SeriesEntry[] {
   return Array.from(map.values());
 }
 
-function renderPlayoffSeries(data: BasketballData): string {
+function renderPlayoffSeries(data: BasketballData, web: boolean, league: BasketballLeague): string {
   const series = collectSeries(data);
   if (series.length === 0) {
     return `
@@ -426,7 +438,7 @@ function renderPlayoffSeries(data: BasketballData): string {
   const rounds = Array.from(byRound.entries()).map(([round, list]) => {
     const rows = list.map((s) =>
       `<div class="bb-bracket-series">
-        <div class="bb-bracket-matchup">${escapeHtml(s.awayName)} <span class="bb-bracket-vs">vs</span> ${escapeHtml(s.homeName)}</div>
+        <div class="bb-bracket-matchup">${teamNameLink(s.awayName, web, league)} <span class="bb-bracket-vs">vs</span> ${teamNameLink(s.homeName, web, league)}</div>
         ${s.summary ? `<div class="bb-bracket-summary">${escapeHtml(s.summary)}</div>` : `<div class="bb-bracket-summary">Series tied 0&ndash;0</div>`}
       </div>`,
     ).join("");
@@ -471,7 +483,7 @@ function etCalendarDate(iso: string): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-function renderUpcomingGames(data: BasketballData): string {
+function renderUpcomingGames(data: BasketballData, web: boolean, league: BasketballLeague): string {
   // Skip today's games — they live in the dedicated "Today's games"
   // section in both regular and playoff modes. Without this exclusion
   // playoffs would double-list tonight's Game N (once here, once above).
@@ -502,8 +514,9 @@ function renderUpcomingGames(data: BasketballData): string {
     const rows = events.map((e) => {
       const tipoff = timeInET(e.date);
       const round = e.roundName ? ` · ${e.roundName}` : "";
+      const matchup = `${teamNameLink(e.away.team.name, web, league)} @ ${teamNameLink(e.home.team.name, web, league)}`;
       return `<li class="bb-upcoming-row">
-        <span class="bb-upcoming-matchup">${escapeHtml(e.shortName)}</span>
+        <span class="bb-upcoming-matchup">${matchup}</span>
         <span class="bb-upcoming-time">${escapeHtml(tipoff)}${escapeHtml(round)}</span>
       </li>`;
     }).join("");
@@ -523,14 +536,24 @@ function renderUpcomingGames(data: BasketballData): string {
 
 // ---- Conference standings (regular season) ------------------------------
 
-// Each conference renders as its own top-level section ("Eastern Conference"
-// / "Western Conference") rather than packed into a single "Standings" box —
-// matches baseball's per-league sectioning.
-function renderConferenceSection(conf: BasketballConferenceStandings): string {
-  const table = renderConference(conf, false);
+// The two conference sections sit side by side on wide web (bb-standings-cols
+// is a 2-col grid, mirroring MLB's AL/NL league-layout); email and narrow
+// viewports stack them. Empty conferences → "" so the wrapper never emits a
+// bare grid.
+function renderStandingsColumns(standings: BasketballData["standings"], web: boolean, league: BasketballLeague): string {
+  if (standings.conferences.length === 0) return "";
+  const cols = standings.conferences.map((c) => renderConferenceSection(c, web, league)).join("\n");
+  return `<div class="bb-standings-cols">${cols}</div>`;
+}
+
+// Each conference renders as its own section ("Eastern Conference Standings" /
+// "Western Conference Standings") rather than packed into a single "Standings"
+// box — matches baseball's per-league sectioning.
+function renderConferenceSection(conf: BasketballConferenceStandings, web: boolean, league: BasketballLeague): string {
+  const table = renderConference(conf, web, league);
   return `
 <section class="bb-section">
-  <h2 class="bb-section-title">${escapeHtml(conf.name)}</h2>
+  <h2 class="bb-section-title">${escapeHtml(conf.name)} Standings</h2>
   ${table}
 </section>
 `.trim();
@@ -538,32 +561,38 @@ function renderConferenceSection(conf: BasketballConferenceStandings): string {
 
 // ---- League leaders -------------------------------------------------------
 
-function renderLeaders(leaders: BasketballLeaders): string {
+function renderLeaders(leaders: BasketballLeaders, sport: BasketballData["sport"], web: boolean, league: BasketballLeague): string {
   const nonEmpty = leaders.categories.filter((c) => c.entries.length > 0);
   if (nonEmpty.length === 0) return "";
-  const tables = nonEmpty.map((c) => renderLeaderCategory(c)).join("\n");
+  const tables = nonEmpty.map((c) => renderLeaderCategory(c, web, league)).join("\n");
+  // "NBA League Leaders" / "WNBA League Leaders" — this renderer is shared
+  // by both leagues, so the label comes from the slug, not a constant.
   return `
 <section class="bb-section">
-  <h2 class="bb-section-title">League leaders</h2>
-  ${tables}
+  <h2 class="bb-section-title">${sport.toUpperCase()} League Leaders</h2>
+  <div class="bb-leaders-cols">${tables}</div>
 </section>
 `.trim();
 }
 
-function renderLeaderCategory(cat: LeaderCategory): string {
+function renderLeaderCategory(cat: LeaderCategory, web: boolean, league: BasketballLeague): string {
   const rows = cat.entries.map((e) =>
     `<tr>
       <td class="bb-ldr-rank">${e.rank}</td>
-      <td class="bb-ldr-name">${escapeHtml(initialLast(e.athleteName))}</td>
+      <td class="bb-ldr-name">${playerNameLink(e.athleteId, e.athleteName, initialLast(e.athleteName), web, league)}</td>
       <td class="bb-ldr-team">${escapeHtml(e.teamAbbr)}</td>
-      <td class="bb-ldr-value">${e.value.toFixed(1)}</td>
+      <td class="bb-ldr-value">${escapeHtml(e.displayValue)}</td>
     </tr>`,
   ).join("");
+  // Wrapped so caption + table stay together as one unit when the parent
+  // flows into columns (bb-leaders-cols sets break-inside: avoid on this).
   return `
-<h3 class="bb-ldr-caption">${escapeHtml(cat.label)} <span class="bb-ldr-abbrev">${escapeHtml(cat.abbrev)}</span></h3>
+<div class="bb-ldr-cat">
+<h3 class="bb-ldr-caption">${escapeHtml(cat.label)}${cat.abbrev ? ` <span class="bb-ldr-abbrev">${escapeHtml(cat.abbrev)}</span>` : ""}</h3>
 <table class="bb-leader-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
   <tbody>${rows}</tbody>
 </table>
+</div>
 `.trim();
 }
 
@@ -577,7 +606,7 @@ function digestDatePlusOne(digestDate: string): string {
   return `${r.getUTCFullYear()}-${String(r.getUTCMonth() + 1).padStart(2, "0")}-${String(r.getUTCDate()).padStart(2, "0")}`;
 }
 
-function renderTodaysGames(data: BasketballData): string {
+function renderTodaysGames(data: BasketballData, web: boolean, league: BasketballLeague): string {
   const todayEt = digestDatePlusOne(data.date);
   // Don't filter by status — historical regens see these events as
   // 'final' now, but the section is "what was scheduled today" and the
@@ -589,8 +618,9 @@ function renderTodaysGames(data: BasketballData): string {
 
   const rows = games.map((e) => {
     const tipoff = timeInET(e.date);
+    const matchup = `${teamNameLink(e.away.team.name, web, league)} @ ${teamNameLink(e.home.team.name, web, league)}`;
     return `<li class="bb-upcoming-row">
-      <span class="bb-upcoming-matchup">${escapeHtml(e.shortName)}</span>
+      <span class="bb-upcoming-matchup">${matchup}</span>
       <span class="bb-upcoming-time">${escapeHtml(tipoff)}</span>
     </li>`;
   }).join("");
@@ -616,7 +646,11 @@ function renderTransactions(
     (t) => t.date && etCalendarDate(t.date) === digestDate,
   );
   if (sameDay.length === 0) return "";
-  const sorted = sameDay.sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = sameDay.sort(
+    (a, b) =>
+      (a.teamAbbr ?? "").localeCompare(b.teamAbbr ?? "") ||
+      a.description.localeCompare(b.description),
+  );
   const rows = sorted.map((t) => {
     const team = t.teamAbbr ? `<span class="bb-tx-team">${escapeHtml(t.teamAbbr)}</span>` : "";
     return `<li class="bb-tx-row">
@@ -634,7 +668,7 @@ function renderTransactions(
 
 // ---- utility --------------------------------------------------------------
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c] ?? c));
@@ -655,6 +689,12 @@ export const BASKETBALL_EMAIL_STYLES = `
   margin: 22px 0 6px; padding-bottom: 4px;
   border-bottom: 2px solid #161410;
 }
+.es-team-link, .bb-team-link { color: inherit !important; text-decoration: none !important; }
+.es-player-link, .bb-player-link { color: inherit !important; text-decoration: none !important; }
+.bb-team-heading { font-size: 24px; font-weight: 800; letter-spacing: -0.01em;
+                   margin: 4px 0 10px; text-align: center; }
+.bb-team-record { font-weight: 400; color: #6a6354; }
+.bb-standings-table tr.bb-st-me td { background-color: rgba(0, 0, 0, 0.07); font-weight: 700; }
 .bb-dateline {
   border-top: 3px double #161410; border-bottom: 1px solid #161410;
   padding: 8px 0; margin: 0 0 14px; text-align: center;
@@ -667,24 +707,16 @@ export const BASKETBALL_EMAIL_STYLES = `
 .bb-empty { font-size: 13px; color: #6a6354; font-style: italic;
             margin: 6px 0; text-align: center; }
 
-.bb-bracket-block { margin: 8px 0 14px; }
-.bb-bracket-title { font-size: 13px; font-weight: 700; text-transform: uppercase;
-                    letter-spacing: 0.08em; color: #6a6354; margin: 6px 0 4px;
-                    padding-bottom: 2px; border-bottom: 1px solid #c4baa5; }
-/* Mono block for the bracket itself. Same font family as the MLB linescore
-   so the rendering matches the rest of the boxscore aesthetic. Narrow
-   viewports get horizontal scroll inside the <pre> rather than wrap, since
-   wrapping would destroy the bracket geometry. */
-.bb-bracket {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 12px; line-height: 1.3;
-  margin: 0; padding: 4px 0; color: #161410;
-  white-space: pre;
-  overflow-x: auto;
-}
-.bb-bracket-finals { margin: 10px 0 4px; text-align: center; }
-.bb-bracket-finals-line { font-size: 14px; font-weight: 700;
-                          letter-spacing: 0.02em; margin: 4px 0; }
+/* Compact "Yesterday's Results" — mirrors the web games-section, but stacks
+   single-column for email reliability (CSS grid is spotty across clients). */
+.games-section { padding: 10px 0; border-top: 2px solid #161410; }
+.games-section-title { font-size: 16px; font-weight: 700; margin-bottom: 8px;
+                       border-bottom: 1px solid #161410; padding-bottom: 4px; }
+.games-grid { display: block; }
+.game-score-line { font-size: 14px; line-height: 1.5; padding: 2px 0;
+                   border-bottom: 1px dotted #e8e2d4; }
+.game-score-line .winner { font-weight: 700; }
+.game-line-status { color: #6a6354; }
 
 .bb-game { margin: 18px 0 6px; padding-top: 6px; border-top: 1px solid #c4baa5; }
 .bb-game-context { font-size: 11px; font-style: italic; color: #6a6354;
@@ -792,17 +824,13 @@ export const BASKETBALL_EMAIL_STYLES = `
 .bb-pl-pos       { font-size: 10px; color: #6a6354; margin-left: 3px;
                    text-transform: lowercase; letter-spacing: 0.04em;
                    white-space: nowrap; font-weight: 400; }
+.bb-pl-jersey    { font-size: 10px; color: #6a6354; font-weight: 400; }
+.bb-pl-inj       { font-size: 10px; color: #6a6354; font-style: italic; }
 .bb-pl-stat      { min-width: 22px; }
 .bb-player-table tfoot td { font-weight: 700; border-top: 1px solid #161410; }
 
-.bb-standings-grid { display: block; }
 .bb-standings-table { width: 100%; border-collapse: collapse;
                       font-size: 12px; margin: 6px 0 14px; }
-.bb-conf-caption {
-  margin: 10px 0 2px; padding: 0 0 2px;
-  font-size: 13px; font-weight: 700;
-  border-bottom: 1px solid #161410;
-}
 .bb-standings-table th, .bb-standings-table td {
   padding: 2px 4px; text-align: right; white-space: nowrap;
 }
