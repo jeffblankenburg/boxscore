@@ -3,15 +3,19 @@ import AttributionFields from "./AttributionFields";
 import { getVisibleSports } from "@/lib/sports";
 import { teamsBySport, type Sport } from "@/lib/teams";
 import { NCAAF_CONFERENCES } from "@/lib/sports/football/conferences";
+import { digestFrequency } from "@/lib/digest-frequency";
 
-// Sports with a per-team digest pipeline (generate loop + send-team-email).
-// NBA/WNBA/NCAAF join once their team renderers ship. Filtered by visibility
-// below, so a sport's teams only appear once it's also public. When the
-// surviving list has more than one entry the section becomes a tabbed picker;
-// one entry renders the team list inline.
+// Sports with a per-team digest pipeline (generate loop + send-team-email) and
+// a team page for the "Preview →" link. Filtered by visibility below, so a
+// sport's teams only appear once it's also public. When the surviving list has
+// more than one entry the section becomes a tabbed picker; one entry renders
+// the team list inline.
 const TEAM_TAB_SPORTS: Array<{ id: Sport; label: string }> = [
   { id: "mlb", label: "MLB" },
   { id: "nfl", label: "NFL" },
+  { id: "ncaaf", label: "NCAAF" },
+  { id: "nba", label: "NBA" },
+  { id: "wnba", label: "WNBA" },
 ];
 
 export const metadata = {
@@ -76,7 +80,7 @@ export default async function SubscribePage({
           you&rsquo;re in. Unsubscribe in one click, any time.
         </p>
 
-        <h2 className="settings-section-h">Daily League Boxscores</h2>
+        <h2 className="settings-section-h">League Boxscores</h2>
         <ul className="settings-sport-list">
           {sports.map((sport) => (
             <li key={sport.id} className="settings-sport-row">
@@ -89,6 +93,7 @@ export default async function SubscribePage({
                 />
                 <span>{sport.id === "ncaaf" ? `${sport.name} (Top 25)` : sport.name}</span>
               </label>
+              <span className="subscribe-freq">{digestFrequency(sport.id)}</span>
             </li>
           ))}
         </ul>

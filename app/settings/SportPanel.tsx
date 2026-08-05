@@ -1,6 +1,7 @@
 import { SettingsToggleCheckbox } from "./SettingsToggleCheckbox";
 import { setSportSubscription, setConferenceSubscription } from "./actions";
 import { TeamPicker } from "./TeamPicker";
+import { digestFrequency } from "@/lib/digest-frequency";
 
 // One sport's tab on /settings: the league-digest toggle + the team list. All
 // sports now carry a real team registry (NCAAF/NHL added from ESPN), so teams
@@ -11,6 +12,12 @@ import { TeamPicker } from "./TeamPicker";
 
 type TeamRow = { slug: string; name: string; conference?: string };
 type ConferenceRow = { slug: string; name: string };
+
+// Sports whose /{sport}/{slug} team page renders (football live, others from
+// the stored team digest). NHL has a registry but no team page yet. Preview
+// links only make sense here — and only when the page is loadable by the
+// viewer, so we AND this with `available` below.
+const TEAM_PAGE_SPORTS = new Set(["mlb", "nfl", "ncaaf", "nba", "wnba"]);
 
 export function SportPanel({
   sportId,
@@ -39,8 +46,9 @@ export function SportPanel({
   return (
     <div className="settings-panel">
       <h3 className="settings-panel-h">
-        Daily {sportLabel} {sportId === "ncaaf" ? "Top 25 " : ""}digest
+        {sportLabel} {sportId === "ncaaf" ? "Top 25 " : ""}digest
       </h3>
+      <p className="settings-freq">{digestFrequency(sportId)}</p>
       {available ? (
         <ul className="settings-sport-list">
           <li className="settings-sport-row">
@@ -54,7 +62,7 @@ export function SportPanel({
         </ul>
       ) : (
         <p className="subscribe-fine">
-          {`${sportLabel} isn't live yet — coming soon. You'll subscribe to the daily ${sportLabel} ${leagueName} digest right here.`}
+          {`${sportLabel} isn't live yet — coming soon. You'll subscribe to the ${sportLabel} ${leagueName} digest right here.`}
         </p>
       )}
 
@@ -105,7 +113,7 @@ export function SportPanel({
             subs={subs}
             grouped={sportId === "ncaaf"}
             canSubscribe={available}
-            showPreview={sportId === "mlb"}
+            showPreview={available && TEAM_PAGE_SPORTS.has(sportId)}
           />
         </>
       ) : (

@@ -9,6 +9,8 @@ import { getScoreboardShareImageUrl } from "@/lib/share-storage";
 import { isAdminSession } from "@/lib/admin-auth";
 import { loadFootballTeamData, teamEditionDate as footballTeamEditionDate } from "@/lib/sports/football/team-data";
 import { renderFootballTeamContent } from "@/lib/sports/football/render/team";
+import { loadBasketballTeamData } from "@/lib/basketball-team";
+import { renderBasketballTeamContent } from "@/lib/render-basketball-team";
 import type { FootballLeague } from "@/lib/sports/football/types";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { PaperMasthead } from "@/app/PaperMasthead";
@@ -164,6 +166,21 @@ export default async function DayPage({
           today={fbToday}
           teamSlug={team.slug}
         />
+      </div>
+    );
+  }
+
+  // Basketball also renders live (like football) so team pages resolve in the
+  // offseason / pre-launch, when no team_digest has been generated yet. The
+  // loader returns a graceful offseason/no-game shell rather than erroring.
+  if (sport === "nba" || sport === "wnba") {
+    const bbData = await loadBasketballTeamData(sport, team.slug, yesterdayInET());
+    const bbToday = nextDay(yesterdayInET());
+    const bbEdition = nextDay(bbData.date);
+    return (
+      <div>
+        <div dangerouslySetInnerHTML={{ __html: renderBasketballTeamContent(bbData) }} />
+        <DateHeaderCalendar sport={sport} currentDate={bbEdition} today={bbToday} teamSlug={team.slug} />
       </div>
     );
   }

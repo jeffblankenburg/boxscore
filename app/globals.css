@@ -745,6 +745,9 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 }
 .settings-preview-link:hover { color: var(--text-primary);
                                 text-decoration: underline; }
+/* Send-cadence note on the right of a /subscribe league row. */
+.subscribe-freq { flex: 0 0 auto; font-size: 12px; font-style: italic;
+                  color: var(--text-muted); white-space: nowrap; }
 .subscribe-input-block { width: 100%; box-sizing: border-box; margin: 4px 0; }
 .subscribe-button-block { width: 100%; margin-top: 16px; }
 
