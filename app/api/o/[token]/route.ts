@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
 // Self-hosted open-tracking pixel. Gmail clips messages over ~102 KB,
@@ -66,43 +66,38 @@ export async function GET(
   // of the digest. Track-or-not is internal; pixel is public.
   if (!UUID_RE.test(token)) return pixelResponse();
 
-  try {
-    const db = supabaseAdmin();
-    // Resolve token → resend_id. We log against resend_id so the existing
-    // open-rate aggregation (which keys on resend_id) sees both Resend's
-    // events and ours under one identifier.
-    const { data: send } = await db
-      .from("sends")
-      .select("resend_id")
-      .eq("open_token", token)
-      .maybeSingle<{ resend_id: string | null }>();
-    const resendId = send?.resend_id ?? null;
-    if (!resendId) {
-      // Token doesn't resolve, or the send row exists without a resend_id
-      // (cron failure mid-flight). Pixel still fires; we just can't bind
-      // the open to a known send. Skip the insert.
-      return pixelResponse();
+  // Capture request-scoped values now — the request may be frozen once the
+  // pixel response is sent and the logging runs in after().
+  const ua = request.headers.get("user-agent");
+  const ip = truncatedClientIp(request.headers);
+
+  // Log the open in the background (Vercel waitUntil) so the pixel returns
+  // instantly. A morning send makes providers prefetch thousands of pixels in
+  // minutes; blocking each on a DB round-trip would back up the function and
+  // amplify the Supabase load spike. Same after()-based pattern as /r/e.
+  after(async () => {
+    try {
+      const db = supabaseAdmin();
+      // Resolve token → resend_id so the open-rate aggregation (keyed on
+      // resend_id) sees our pixel opens alongside Resend's events.
+      const { data: send } = await db
+        .from("sends")
+        .select("resend_id")
+        .eq("open_token", token)
+        .maybeSingle<{ resend_id: string | null }>();
+      const resendId = send?.resend_id ?? null;
+      if (!resendId) return; // unknown token or send row without resend_id
+      await db.from("email_events").insert({
+        resend_id: resendId,
+        event_type: "boxscore.opened",
+        user_agent: ua,
+        ip,
+        payload: { source: "self-hosted-pixel", token },
+      });
+    } catch (e) {
+      console.error(`pixel fetch logging failed: ${(e as Error).message}`);
     }
-
-    // User-agent + truncated IP for forensic debugging if a recipient
-    // claims they opened/didn't open. Same /24 IPv4 + /48 IPv6 truncation
-    // pattern email_events documents.
-    const ua = request.headers.get("user-agent");
-    const ip = truncatedClientIp(request.headers);
-
-    await db.from("email_events").insert({
-      resend_id: resendId,
-      event_type: "boxscore.opened",
-      user_agent: ua,
-      ip,
-      payload: { source: "self-hosted-pixel", token },
-    });
-  } catch (e) {
-    // Don't fail the pixel fetch on a logging error — the user already
-    // opened; we just lose this one data point. Surfacing the error to
-    // an image client would do nothing useful.
-    console.error(`pixel fetch logging failed: ${(e as Error).message}`);
-  }
+  });
 
   return pixelResponse();
 }

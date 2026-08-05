@@ -2,6 +2,7 @@ import { subscribe } from "./actions";
 import AttributionFields from "./AttributionFields";
 import { getVisibleSports } from "@/lib/sports";
 import { teamsBySport, type Sport } from "@/lib/teams";
+import { NCAAF_CONFERENCES } from "@/lib/sports/football/conferences";
 
 // Sports with a per-team digest pipeline (generate loop + send-team-email).
 // NBA/WNBA/NCAAF join once their team renderers ship. Filtered by visibility
@@ -86,11 +87,40 @@ export default async function SubscribePage({
                   value={sport.id}
                   defaultChecked={sport.id === "mlb"}
                 />
-                <span>{sport.name}</span>
+                <span>{sport.id === "ncaaf" ? `${sport.name} (Top 25)` : sport.name}</span>
               </label>
             </li>
           ))}
         </ul>
+
+        {visibleIds.has("ncaaf") && (
+          <>
+            <h2 className="settings-section-h">NCAAF Conferences</h2>
+            <p className="subscribe-fine">
+              Each conference has its own daily digest — scores, standings, and
+              box scores for that conference. Independent of the Top 25 above and
+              the team emails below; subscribe to any, all, or none.
+            </p>
+            <ul className="settings-sport-list">
+              {NCAAF_CONFERENCES.map((c) => (
+                <li key={c.slug} className="settings-sport-row">
+                  <label className="settings-pick-label">
+                    <input type="checkbox" name="conferences" value={`ncaaf:${c.slug}`} />
+                    <span>{c.short}</span>
+                  </label>
+                  <a
+                    href={`/ncaaf/conference/${c.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="settings-preview-link"
+                  >
+                    Preview →
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
 
         <h2 className="settings-section-h">Daily Team Boxscores</h2>
         <p className="subscribe-fine">

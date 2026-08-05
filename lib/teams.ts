@@ -158,6 +158,14 @@ export function findTeam(sport: Sport, slug: string): Team | undefined {
   return TEAMS.find((t) => t.sport === sport && t.slug === slug);
 }
 
+// Reverse lookup by team abbreviation ("OSU", "UGA"). Football digests key
+// their team refs off ESPN's abbreviation, so this resolves a ref back to the
+// canonical slug for linking to /{sport}/{slug}. Case-insensitive.
+export function findTeamByAbbr(sport: Sport, abbr: string): Team | undefined {
+  const up = abbr.toUpperCase();
+  return TEAMS.find((t) => t.sport === sport && t.abbreviation.toUpperCase() === up);
+}
+
 // Reverse lookup by MLB API ID. Used by the league standings web renderer
 // so each team row can link to /mlb/{slug} without the caller having to
 // build its own ID→slug map.

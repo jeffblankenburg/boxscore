@@ -4,6 +4,7 @@ import { getActiveTeamIds } from "@/lib/email-subscriptions";
 import { getActiveSubscribers, getTeamOptInSubscriberIds, type Subscriber } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
+import { paceBatch } from "@/lib/send-pacing";
 import { teamDailyEmail } from "@/lib/emails/templates";
 import { getTeamDigest } from "@/lib/team-digests";
 import { getAnnouncement } from "@/lib/announcements";
@@ -68,10 +69,11 @@ export async function GET(req: Request) {
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
-  // MLB and NFL have team-digest renderers + generate loops. NBA/WNBA/NCAAF
-  // don't yet — fail loudly so we don't silently no-op when a cron is wired
-  // but the renderer isn't.
-  if (sport !== "mlb" && sport !== "nfl") {
+  // Sports whose generate loop writes per-team digests (html + email_html) to
+  // team_digests. The send below is otherwise sport-agnostic — it just reads
+  // the pre-rendered email_html. Anything else fails loudly rather than no-op.
+  const TEAM_EMAIL_SPORTS = new Set(["mlb", "nfl", "nba", "wnba", "ncaaf"]);
+  if (!TEAM_EMAIL_SPORTS.has(sport)) {
     return NextResponse.json(
       { error: `no team-digest renderer for sport=${sport}` },
       { status: 501 },
@@ -271,6 +273,7 @@ export async function GET(req: Request) {
               sent++;
             }
           }
+          await paceBatch(); // flatten the delivery burst
         }
 
         totalSent += sent;

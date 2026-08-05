@@ -10,6 +10,7 @@ import { EMAIL_LINK_BASE } from "@/lib/site";
 import { requestMagicLink } from "@/lib/subscriber-auth";
 import { isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
+import { findConferenceBySlug } from "@/lib/sports/football/conferences";
 import { checkSubscribeRate, recordSubscribeAttempt } from "@/lib/subscribe-rate-limit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -73,6 +74,7 @@ export async function subscribe(formData: FormData): Promise<void> {
 
   const rawLeagues = formData.getAll("leagues").filter((v): v is string => typeof v === "string");
   const rawTeams = formData.getAll("teams").filter((v): v is string => typeof v === "string");
+  const rawConfs = formData.getAll("conferences").filter((v): v is string => typeof v === "string");
 
   // Filter to known-visible sports. Anything else is silently dropped so a
   // crafted POST with "?leagues=admin_only_sport" can't sneak through.
@@ -93,10 +95,20 @@ export async function subscribe(formData: FormData): Promise<void> {
     teams.push({ sport, slug });
   }
 
+  // Parse "sport:slug" conference pairs (NCAAF) against the static registry.
+  const conferences: Array<{ sport: string; slug: string }> = [];
+  for (const pair of rawConfs) {
+    const [sport, slug] = pair.split(":", 2);
+    if (!sport || !slug) continue;
+    if (!(await isSportVisible(sport, { includeAdminOnly: false }))) continue;
+    if (sport !== "ncaaf" || !findConferenceBySlug(slug)) continue;
+    conferences.push({ sport, slug });
+  }
+
   // Empty pickers aren't a valid subscribe — would create a dead account
   // that receives nothing. Surface as an error instead of silently signing
   // them up to no digests.
-  if (leagues.length === 0 && teams.length === 0) {
+  if (leagues.length === 0 && teams.length === 0 && conferences.length === 0) {
     redirect("/subscribe?error=no_picks");
   }
 
@@ -146,7 +158,7 @@ export async function subscribe(formData: FormData): Promise<void> {
   // returning unsub re-picking only MLB should have Guardians removed).
   // Attribution is only written for genuinely-new rows (see startSubscription).
   const subscriber = await startSubscription(email, attribution);
-  await applyInitialSubscriptions(subscriber.id, { leagues, teams });
+  await applyInitialSubscriptions(subscriber.id, { leagues, teams, conferences });
 
   const confirmUrl = `${EMAIL_LINK_BASE}/c/${subscriber.confirm_token}`;
   const { subject, html, text } = confirmationEmail({ confirmUrl });

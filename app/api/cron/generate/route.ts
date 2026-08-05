@@ -210,11 +210,12 @@ export async function GET(req: Request) {
 
       // Per-team recap digests. Weekly cadence (Jeff, 2026-07-20): a team's
       // subscribers only get an email the morning after THEIR game, so we
-      // write a team_digest only for teams with a final today — not all 32.
-      // NCAAF stays league-only (130+ teams, no team pages / registry).
+      // write a team_digest only for teams with a final today. NCAAF is
+      // included now that it has team pages + a full FBS registry — the cron
+      // path skips the heavy roster fetch (web-only), so each write is cheap.
       let team_digests_written = 0;
       const team_fails: string[] = [];
-      if (sport === "nfl" && !skipTeams) {
+      if ((sport === "nfl" || sport === "ncaaf") && !skipTeams) {
         const gameByTeam = new Map<string, string>(); // canonical slug → game id
         for (const g of fb.games) {
           if (g.status !== "final") continue;

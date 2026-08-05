@@ -141,6 +141,7 @@ export async function applyInitialSubscriptions(
   picks: {
     leagues: string[];
     teams: Array<{ sport: string; slug: string }>;
+    conferences?: Array<{ sport: string; slug: string }>;
   },
 ): Promise<void> {
   const { data: rows, error } = await supabaseAdmin()
@@ -149,8 +150,10 @@ export async function applyInitialSubscriptions(
     .eq("subscriber_id", subscriberId);
   if (error) throw new Error(`applyInitialSubscriptions read: ${error.message}`);
 
+  const conferences = picks.conferences ?? [];
   const pickedLeagues = new Set(picks.leagues);
   const pickedTeams = new Set(picks.teams.map((t) => `${t.sport}|${t.slug}`));
+  const pickedConfs = new Set(conferences.map((c) => `${c.sport}|${c.slug}`));
 
   // Activate everything the subscriber picked. Idempotent (insert-then-
   // update fallback inside the helpers handles existing rows).
@@ -159,6 +162,9 @@ export async function applyInitialSubscriptions(
   }
   for (const t of picks.teams) {
     await setTeamSubscription(subscriberId, t.sport, t.slug, true);
+  }
+  for (const c of conferences) {
+    await setConferenceSubscription(subscriberId, c.sport, c.slug, true);
   }
 
   // Deactivate any prior opt-ins NOT in the new picks. Skips rows already
@@ -176,6 +182,11 @@ export async function applyInitialSubscriptions(
       const key = `${row.sport}|${row.team_id}`;
       if (!pickedTeams.has(key)) {
         await setTeamSubscription(subscriberId, row.sport, row.team_id, false);
+      }
+    } else if (row.scope === "conference" && row.team_id) {
+      const key = `${row.sport}|${row.team_id}`;
+      if (!pickedConfs.has(key)) {
+        await setConferenceSubscription(subscriberId, row.sport, row.team_id, false);
       }
     }
   }
@@ -222,6 +233,26 @@ export async function getActiveTeamIds(sport: string): Promise<string[]> {
     .eq("scope", "team")
     .eq("active", true);
   if (error) throw new Error(`getActiveTeamIds: ${error.message}`);
+  const out = new Set<string>();
+  for (const row of (data ?? []) as Array<{ team_id: string | null }>) {
+    if (row.team_id) out.add(row.team_id);
+  }
+  return Array.from(out).sort();
+}
+
+/**
+ * Every conference (slug in team_id) with at least one active subscription for
+ * the sport. The conference-send cron iterates this to decide which conference
+ * digests to render + fan out. Mirrors getActiveTeamIds with scope='conference'.
+ */
+export async function getActiveConferenceIds(sport: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("email_subscriptions")
+    .select("team_id")
+    .eq("sport", sport)
+    .eq("scope", "conference")
+    .eq("active", true);
+  if (error) throw new Error(`getActiveConferenceIds: ${error.message}`);
   const out = new Set<string>();
   for (const row of (data ?? []) as Array<{ team_id: string | null }>) {
     if (row.team_id) out.add(row.team_id);
@@ -286,4 +317,63 @@ export async function setTeamSubscription(
     .eq("team_id", teamId)
     .eq("scope", "team");
   if (updateErr) throw new Error(`setTeamSubscription update: ${updateErr.message}`);
+}
+
+/**
+ * Returns a nested map of sport → conference-slug → active for this
+ * subscriber's conference rows (NCAAF). Conferences never subscribed to are
+ * absent (treat as active=false in UI). Mirrors getTeamSubscriptions; the
+ * conference slug lives in team_id.
+ */
+export async function getConferenceSubscriptions(
+  subscriberId: string,
+): Promise<Map<string, Map<string, boolean>>> {
+  const { data, error } = await supabaseAdmin()
+    .from("email_subscriptions")
+    .select("sport, team_id, active")
+    .eq("subscriber_id", subscriberId)
+    .eq("scope", "conference");
+  if (error) throw new Error(`getConferenceSubscriptions: ${error.message}`);
+  const out = new Map<string, Map<string, boolean>>();
+  for (const row of (data ?? []) as Array<{ sport: string; team_id: string | null; active: boolean }>) {
+    if (!row.team_id) continue;
+    if (!out.has(row.sport)) out.set(row.sport, new Map());
+    out.get(row.sport)!.set(row.team_id, row.active);
+  }
+  return out;
+}
+
+/**
+ * Upsert the conference row for (subscriber, sport, conferenceSlug). Same
+ * insert-then-update dance as setTeamSubscription — the uniqueness comes from a
+ * partial index (scope='conference') .upsert() can't target by column list.
+ */
+export async function setConferenceSubscription(
+  subscriberId: string,
+  sport: string,
+  conferenceSlug: string,
+  active: boolean,
+): Promise<void> {
+  const { error: insertErr } = await supabaseAdmin()
+    .from("email_subscriptions")
+    .insert({
+      subscriber_id: subscriberId,
+      sport,
+      scope: "conference",
+      team_id: conferenceSlug,
+      active,
+    });
+  if (!insertErr) return;
+  const code = (insertErr as { code?: string }).code;
+  const isDup = code === "23505" || /duplicate key/i.test(insertErr.message);
+  if (!isDup) throw new Error(`setConferenceSubscription insert: ${insertErr.message}`);
+
+  const { error: updateErr } = await supabaseAdmin()
+    .from("email_subscriptions")
+    .update({ active, updated_at: new Date().toISOString() })
+    .eq("subscriber_id", subscriberId)
+    .eq("sport", sport)
+    .eq("team_id", conferenceSlug)
+    .eq("scope", "conference");
+  if (updateErr) throw new Error(`setConferenceSubscription update: ${updateErr.message}`);
 }

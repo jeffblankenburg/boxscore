@@ -14,8 +14,10 @@ import { getVisibleSports } from "@/lib/sports";
 import {
   getLeagueSubscriptions,
   getTeamSubscriptions,
+  getConferenceSubscriptions,
 } from "@/lib/email-subscriptions";
 import { teamsBySport, type Sport } from "@/lib/teams";
+import { NCAAF_CONFERENCES } from "@/lib/sports/football/conferences";
 import { requestSignInLink } from "./actions";
 import { DemographicsForm } from "@/app/welcome/DemographicsForm";
 import { PredictionsSection } from "./PredictionsSection";
@@ -68,16 +70,22 @@ export default async function SettingsPage({
     const isAdmin = sub?.is_admin === true;
     const demographicsMissing = !sub?.demographics_completed_at;
 
-    const [sports, subscriptions, teamSubscriptions] = await Promise.all([
+    const [sports, subscriptions, teamSubscriptions, conferenceSubscriptions] = await Promise.all([
       getVisibleSports({ includeAdminOnly: isAdmin }),
       getLeagueSubscriptions(session.subscriber_id),
       getTeamSubscriptions(session.subscriber_id),
+      getConferenceSubscriptions(session.subscriber_id),
     ]);
 
     // One tab per sport (teams sorted by city, #31), plus a Predictions tab.
     const visibleIds = new Set(sports.map((s) => s.id));
     const sportTabs = SPORT_TABS.map((s) => {
       const teams = teamsBySport(s.id as Sport);
+      // NCAAF splits into three tiers: Top 25 (league), Conference, Team.
+      const conferences =
+        s.id === "ncaaf"
+          ? NCAAF_CONFERENCES.map((c) => ({ slug: c.slug, name: c.short }))
+          : [];
       return {
         id: s.id,
         label: s.label,
@@ -89,6 +97,8 @@ export default async function SettingsPage({
             leagueSubscribed={subscriptions.get(s.id) === true}
             teams={teams}
             teamSubs={teamSubscriptions.get(s.id) ?? new Map<string, boolean>()}
+            conferences={conferences}
+            confSubs={conferenceSubscriptions.get(s.id) ?? new Map<string, boolean>()}
           />
         ),
       };

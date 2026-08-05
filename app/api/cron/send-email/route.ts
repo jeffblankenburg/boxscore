@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDigest } from "@/lib/digests";
 import { getSportRow } from "@/lib/sports";
+import { paceBatch } from "@/lib/send-pacing";
 import { featuresFor } from "@/lib/sport-features";
 import { getActiveSubscribersForSport } from "@/lib/subscribers";
 import { getSentSubscriberIds, recordSend } from "@/lib/sends";
@@ -246,6 +247,9 @@ export async function GET(req: Request) {
         `[send-email] sport=${sport} date=${date} batch=${batchIndex + 1}/${groups.length}` +
         ` size=${group.length} elapsed_ms=${Math.round(performance.now() - batchStart)} status=ok`,
       );
+      // Pace delivery so providers don't prefetch every email at once (spikes
+      // Supabase tracking-writes + Vercel edge requests). Skip after the last.
+      if (batchIndex < groups.length - 1) await paceBatch();
     }
 
     const result = {

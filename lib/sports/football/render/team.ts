@@ -19,8 +19,16 @@ import {
   linkAnchor,
 } from "./digest";
 import { footballPlayerPath, lastNameOf } from "../player-links";
+import { findTeamByAbbr } from "../../../teams";
 import type { FootballTeamPageData } from "../team-canonical";
-import type { FootballGame, FootballStandingsRow } from "../types";
+import type { FootballGame, FootballStandingsRow, FootballLeague } from "../types";
+
+// Link an opponent (by abbreviation) to its team page when resolvable; FCS
+// opponents not in the FBS registry stay unlinked. `inner` must be escaped.
+function teamPageLink(league: FootballLeague, abbr: string, inner: string, web: boolean): string {
+  const slug = findTeamByAbbr(league, abbr)?.slug;
+  return slug ? linkAnchor(`/${league}/${slug}`, inner, web, "team-link", "es-team-link") : inner;
+}
 
 // "Sun, Jan 4, 1:00 PM ET" — weekday + date + kickoff, in ET.
 function kickoffLabel(iso: string): string {
@@ -42,7 +50,7 @@ function kickoffLabel(iso: string): string {
   }
 }
 
-function recordLine(r: FootballStandingsRow): string {
+function recordLine(r: { wins: number; losses: number; ties: number; streak: string | null }): string {
   const base = r.ties > 0 ? `${r.wins}-${r.losses}-${r.ties}` : `${r.wins}-${r.losses}`;
   return r.streak ? `${base}, ${r.streak}` : base;
 }
@@ -55,7 +63,10 @@ function ordinal(n: number): string {
 
 function renderHeading(data: FootballTeamPageData): string {
   const sub: string[] = [];
-  if (data.record) sub.push(recordLine(data.record));
+  // Prefer the point-in-time record (from the schedule through the as-of date)
+  // over the standings row, which ESPN only serves as current.
+  const rec = data.asOfRecord ?? data.record;
+  if (rec) sub.push(recordLine(rec));
   if (data.divisionRank != null && data.divisionGroup) {
     sub.push(`${ordinal(data.divisionRank)} in ${escapeHtml(data.divisionGroup.group)}`);
   }
@@ -66,20 +77,63 @@ function renderHeading(data: FootballTeamPageData): string {
 </header>`.trim();
 }
 
+// Record-split columns that should disappear when the whole group has no data
+// for them — e.g. college conferences without divisions show Div = "0-0" for
+// every team, so the column is pure noise.
+// Columns worth hiding when a whole group has no data for them: the record
+// splits (Div is "0-0" for every team in a division-less college conference)
+// and Ties (essentially always 0 in modern football).
+const DROPPABLE_LABELS = new Set(["Home", "Road", "Div", "Conf", "T"]);
+function isBlankRecord(v: string | number): boolean {
+  const s = String(v).trim();
+  return s === "" || s === "0" || /^0-0(-0)?$/.test(s);
+}
+function visibleStandingsCols(
+  cols: typeof NFL_STANDINGS_COLS,
+  rows: FootballStandingsRow[],
+): typeof NFL_STANDINGS_COLS {
+  return cols.filter((c) =>
+    DROPPABLE_LABELS.has(c.label) ? rows.some((r) => !isBlankRecord(c.get(r))) : true,
+  );
+}
+
 function renderStandingsSection(data: FootballTeamPageData, web: boolean): string {
   if (!data.divisionGroup) return "";
+  // One combined header ("American Conference Standings") — the group's own
+  // caption is suppressed so we don't stack a generic "… Standings" title over
+  // a redundant conference caption. Drop split columns that are empty/zero for
+  // the whole conference (e.g. Div in a division-less college conference).
+  const cols = visibleStandingsCols(NFL_STANDINGS_COLS, data.divisionGroup.rows);
   return `
 <section class="fb-section">
-  <div class="fb-section-title">Division Standings</div>
-  ${renderStandingsGroup(data.divisionGroup, NFL_STANDINGS_COLS, data.league === "nfl", data.league, web)}
+  <div class="fb-section-title">${escapeHtml(data.divisionGroup.group)} Standings</div>
+  ${renderStandingsGroup(data.divisionGroup, cols, data.league === "nfl", data.league, web, undefined, true, true)}
 </section>`.trim();
+}
+
+// "Saturday, November 1, 2025" — date only (the box header already carries the
+// kickoff/Final status), in ET so a late game lands on the night it was played.
+function gameDateLabel(iso: string): string {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(iso));
+  } catch {
+    return "";
+  }
 }
 
 function renderLastGameSection(data: FootballTeamPageData, web: boolean): string {
   if (!data.lastGame) return "";
+  const date = gameDateLabel(data.lastGame.startTime);
   return `
 <section class="fb-section">
-  <div class="fb-section-title">Most Recent Game</div>
+  <div class="fb-section-title">${date ? escapeHtml(date) : "Most Recent Game"}</div>
   ${renderGameBlock(data.bundle, data.lastGame, data.lastBox, web)}
 </section>`.trim();
 }
@@ -105,6 +159,131 @@ function renderUpcomingSection(data: FootballTeamPageData): string {
 <section class="fb-section">
   <div class="fb-section-title">Upcoming Matchups</div>
   <div class="fb-next-list">${rows}</div>
+</section>`.trim();
+}
+
+// "3:30 PM ET" for an upcoming game's result column; "TBD" when the kickoff
+// time isn't set yet (ESPN parks unscheduled games at midnight).
+function kickoffTime(iso: string): string {
+  if (!iso) return "TBD";
+  try {
+    const d = new Date(iso);
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const parts = fmt.formatToParts(d);
+    const hour = parts.find((p) => p.type === "hour")?.value;
+    const minute = parts.find((p) => p.type === "minute")?.value;
+    const period = parts.find((p) => p.type === "dayPeriod")?.value;
+    // ESPN parks unscheduled games at midnight ET — show TBD, not "12:00 AM".
+    if (hour === "12" && minute === "00" && /AM/i.test(period ?? "")) return "TBD";
+    return fmt.format(d) + " ET";
+  } catch {
+    return "TBD";
+  }
+}
+
+// "Sep 6" — compact date for a schedule row, in ET.
+function shortDate(iso: string): string {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(iso));
+  } catch {
+    return "";
+  }
+}
+
+// Full-season schedule with results for completed games. Web-only (the loader
+// fetches it live; the email digest omits it).
+function renderScheduleSection(data: FootballTeamPageData, web: boolean): string {
+  if (!data.schedule || data.schedule.length === 0) return "";
+  const rows = data.schedule
+    .map((g) => {
+      const oppName =
+        data.league === "nfl"
+          ? g.opponent
+            ? mascot(g.opponent.name)
+            : "TBD"
+          : g.opponent?.location ?? g.opponent?.name ?? "TBD";
+      const oppRef = g.opponent
+        ? // Link the opponent to its team page when we can resolve the slug.
+          teamPageLink(data.league, g.opponent.abbr, escapeHtml(oppName), web)
+        : escapeHtml(oppName);
+      const site = g.isHome ? "vs" : "at";
+      let result = "";
+      if (g.completed && g.teamScore != null && g.oppScore != null) {
+        const wl = g.won === null ? "T" : g.won ? "W" : "L";
+        result = `<span class="fb-sch-wl fb-sch-${wl.toLowerCase()}">${wl}</span> ${g.teamScore}&ndash;${g.oppScore}`;
+      } else {
+        // Not played (as of this page's date): show the kickoff time, not
+        // ESPN's real "Final" status. Reads as an upcoming game.
+        result = `<span class="fb-sch-upcoming">${escapeHtml(kickoffTime(g.isoDate))}</span>`;
+      }
+      return `<tr>
+        <td class="fb-sch-date">${escapeHtml(shortDate(g.isoDate))}</td>
+        <td class="fb-sch-opp">${escapeHtml(site)} ${oppRef}</td>
+        <td class="fb-sch-res">${result}</td>
+      </tr>`;
+    })
+    .join("");
+  return `
+<section class="fb-section">
+  <div class="fb-section-title">Schedule</div>
+  <table class="fb-sched-table" role="presentation" cellpadding="0" cellspacing="0" border="0">
+    <thead><tr>
+      <th class="fb-sch-date">Date</th>
+      <th class="fb-sch-opp">Opponent</th><th class="fb-sch-res">Result</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</section>`.trim();
+}
+
+// Full roster stat tables (Passing/Rushing/Receiving/Defense/Kicking), season
+// totals through the page's as-of date. Web-only (live loader aggregates the
+// box scores). Player names link to their player pages.
+function renderRosterSection(data: FootballTeamPageData, web: boolean): string {
+  if (!data.roster || data.roster.length === 0) return "";
+  const blocks = data.roster
+    .map((t) => {
+      const head = t.columns
+        .map((c, i) => `<th class="${i === 0 ? "fb-rost-name" : "fb-rost-stat"}">${escapeHtml(c)}</th>`)
+        .join("");
+      const rows = t.rows
+        .map((r) => {
+          const nm = r.player.id
+            ? linkAnchor(
+                footballPlayerPath(data.league, { id: r.player.id, slug: r.player.slug }),
+                escapeHtml(r.player.fullName),
+                web,
+                "player-link",
+                "es-player-link",
+              )
+            : escapeHtml(r.player.fullName);
+          const vals = r.values.map((v) => `<td class="fb-rost-stat">${escapeHtml(String(v))}</td>`).join("");
+          return `<tr><td class="fb-rost-name">${nm}</td>${vals}</tr>`;
+        })
+        .join("");
+      return `<div class="fb-rost-block">
+  <h3 class="fb-rost-cap">${escapeHtml(t.label)}</h3>
+  <table class="fb-rost-table" role="presentation" cellpadding="0" cellspacing="0" border="0">
+    <thead><tr>${head}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</div>`;
+    })
+    .join("");
+  return `
+<section class="fb-section">
+  <div class="fb-section-title">Roster Statistics</div>
+  <div class="fb-rost-grid">${blocks}</div>
 </section>`.trim();
 }
 
@@ -135,8 +314,10 @@ function renderTeam(data: FootballTeamPageData, web: boolean): string {
   ${renderHeading(data)}
   ${renderStandingsSection(data, web)}
   ${renderLastGameSection(data, web)}
+  ${renderRosterSection(data, web)}
+  ${renderScheduleSection(data, web)}
   ${renderUpcomingSection(data)}
-  ${renderLeadersSection(data, web)}
+  ${data.roster && data.roster.length > 0 ? "" : renderLeadersSection(data, web)}
 </div>`.trim();
 }
 

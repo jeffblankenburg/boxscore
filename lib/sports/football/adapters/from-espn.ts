@@ -359,7 +359,7 @@ function adaptDrives(summary: Rec): FootballDrive[] {
   }));
 }
 
-function adaptBoxScore(cfg: FootballLeagueConfig, gameId: string, summary: unknown): FootballBoxScore | null {
+export function adaptBoxScore(cfg: FootballLeagueConfig, gameId: string, summary: unknown): FootballBoxScore | null {
   const s = rec(summary);
   const box = rec(s.boxscore);
   const players = arr(box.players).map(rec);
@@ -433,12 +433,17 @@ function statByName(stats: Rec[], name: string): unknown {
 }
 
 // Record-type stats (home/road/vs-div/vs-conf) carry their value in
-// `displayValue` ("6-3"), not `value`, and are keyed by `type`. Returns
-// null when absent so the renderer can blank the cell.
-function recordByType(stats: Rec[], type: string): string | null {
-  const s = stats.find((x) => str(x.type) === type);
-  const dv = s ? str(rec(s).displayValue) : "";
-  return dv || null;
+// `displayValue` ("6-3"), not `value`, and are keyed by `type`. The NFL and
+// college feeds name these types DIFFERENTLY (NFL: home/road/vsdiv; college:
+// homerecord/awayrecord/vsdivision), so callers pass every alias and we take
+// the first that resolves. Returns null when absent so the cell blanks.
+function recordByType(stats: Rec[], ...types: string[]): string | null {
+  for (const type of types) {
+    const s = stats.find((x) => str(x.type) === type);
+    const dv = s ? str(rec(s).displayValue) : "";
+    if (dv) return dv;
+  }
+  return null;
 }
 
 // Parse a "W-L" / "W-L-T" record string into components. ESPN's COLLEGE
@@ -482,9 +487,9 @@ function adaptStandingsGroup(node: Rec, parentConference: string | null): Footba
       streak: recordByType(stats, "streak"),
       pointsFor: numOrNull(statByName(stats, "pointsFor")),
       pointsAgainst: numOrNull(statByName(stats, "pointsAgainst")),
-      home: recordByType(stats, "home"),
-      road: recordByType(stats, "road"),
-      divisionRecord: recordByType(stats, "vsdiv"),
+      home: recordByType(stats, "home", "homerecord"),
+      road: recordByType(stats, "road", "awayrecord"),
+      divisionRecord: recordByType(stats, "vsdiv", "vsdivision"),
       conferenceRecord: recordByType(stats, "vsconf"),
     };
   });

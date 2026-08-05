@@ -79,14 +79,14 @@ export default async function TeamPreviewPage({
   const width = asWidth(widthParam, surface);
   const widthPx = WIDTH_PRESETS.find((p) => p.key === width)?.px ?? null;
 
-  // Football renders live at its 2-segment latest URL (Branch B), which shows
-  // the team's most recent game and ignores a date. Email always uses the frame
-  // route. For web: MLB points at its dated public page (public sport, cached
-  // digest), but NBA/WNBA render live through the frame — their public page is
-  // 404 while the sport is admin_only and before the generate cron has run.
+  // Football renders live at its dated URL (point-in-time as of that date's
+  // games). Email always uses the frame route. For web: MLB points at its dated
+  // public page (public sport, cached digest), but NBA/WNBA render live through
+  // the frame — their public page is 404 while the sport is admin_only and
+  // before the generate cron has run.
   const isBasketball = sport === "nba" || sport === "wnba";
   const frameSrc = webOnly
-    ? `/${sport}/${team.slug}`
+    ? `/${sport}/${team.slug}/${date}`
     : surface === "email"
       ? `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}`
       : isBasketball

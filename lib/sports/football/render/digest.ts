@@ -32,10 +32,10 @@ import type {
   FootballLeague,
 } from "../types";
 import { prettyDate, nextDay } from "../../../dates";
-import { findTeam } from "../../../teams";
+import { findTeam, findTeamByAbbr } from "../../../teams";
 import { EMAIL_LINK_BASE } from "../../../site";
 import { footballPlayerPath } from "../player-links";
-import { scopeToConference, type NcaafConference } from "../conferences";
+import { scopeToConference, findConferenceByAnyName, type NcaafConference } from "../conferences";
 
 // Anchor for a player/team page. Web uses a relative href + the site's
 // hover-underline class; email uses an ABSOLUTE url (relative links don't
@@ -95,14 +95,14 @@ export function renderFootballConferenceEmailContent(
 
 // A conference's upcoming matchups: the earliest upcoming week among its games
 // in the look-ahead window. Reuses the shared matchup section rendering.
-function renderConferenceMatchups(data: CanonicalFootballDailyData): string {
+function renderConferenceMatchups(data: CanonicalFootballDailyData, web: boolean): string {
   const first = [...data.nextGames].sort((a, b) => a.startTime.localeCompare(b.startTime))[0];
   if (!first) return "";
   const games = data.nextGames.filter(
     (g) => g.week === first.week && g.seasonType === first.seasonType,
   );
   if (games.length === 0) return "";
-  return matchupSection(data, matchupSectionTitle(first, "Upcoming"), games);
+  return matchupSection(data, matchupSectionTitle(first, "Upcoming"), games, web);
 }
 
 function renderConferenceBody(
@@ -118,8 +118,8 @@ function renderConferenceBody(
   // the standings at half-width rather than stretched across the page.
   const standings = renderStandings(scoped, web);
   const leaders = ""; // TODO(#118): conference leaders once NCAAF leader data exists
-  const scores = renderGameScores(scoped);
-  const matchups = renderConferenceMatchups(scoped);
+  const scores = renderGameScores(scoped, web);
+  const matchups = renderConferenceMatchups(scoped, web);
   const row = (a: string, b: string) =>
     a || b ? `<div class="fb-conf-2col">${a}${b}</div>` : "";
   const sections = [
@@ -140,12 +140,12 @@ function renderBody(data: CanonicalFootballDailyData, dateline: string, web: boo
   // Scores, Next Matchups, Box Scores, Transactions. (Rankings lead for NCAAF.)
   const sections = [
     renderDateline(dateline),
-    renderRankings(data.rankings),
+    renderRankings(data.rankings, web),
     renderStandings(data, web),
     renderLeaders(data, web),
-    renderGameScores(data),
-    renderThisWeekMatchups(data),
-    renderNextWeekMatchups(data),
+    renderGameScores(data, web),
+    renderThisWeekMatchups(data, web),
+    renderNextWeekMatchups(data, web),
     renderBoxScores(data, web, data.league === "ncaaf"),
     renderTransactions(data),
   ];
@@ -158,7 +158,7 @@ function renderDateline(dateline: string): string {
 
 // ---- Rankings (NCAAF) -----------------------------------------------------
 
-function renderRankings(rankings: FootballRanking[]): string {
+function renderRankings(rankings: FootballRanking[], web: boolean): string {
   if (rankings.length === 0) return "";
   // Show at most two polls to keep the header tight: the AP poll always, and
   // the CFP rankings when they exist (mid-season on) — otherwise the Coaches
@@ -189,7 +189,7 @@ function renderRankings(rankings: FootballRanking[]): string {
         <td class="fb-rk-rank">${e.rank}</td>
         <td class="fb-rk-team">${school}</td>
         <td class="fb-rk-rec">${escapeHtml(e.record ?? "")}</td>
-        <td class="fb-rk-conf">${escapeHtml(e.team.conference ?? "")}</td>
+        <td class="fb-rk-conf">${conferenceLink("ncaaf", e.team.conference ?? null, web)}</td>
         <td class="fb-rk-trend">${trend}</td>
       </tr>`;
     }).join("");
@@ -224,8 +224,9 @@ function playedGames(data: CanonicalFootballDailyData): FootballGame[] {
 // Compact team name: NFL → mascot ("Cowboys"); college → school name ("Troy"),
 // not the long full name ("Troy Trojans"). `location` is the school; game refs
 // get it enriched from the standings (the scoreboard feed omits it).
-function teamShort(data: CanonicalFootballDailyData, t: FootballTeamRef): string {
-  return escapeHtml(data.league === "nfl" ? mascot(t.name) : (t.location ?? t.name));
+function teamShort(data: CanonicalFootballDailyData, t: FootballTeamRef, web: boolean): string {
+  const name = data.league === "nfl" ? mascot(t.name) : (t.location ?? t.name);
+  return rankBadge(t.rank) + teamLink(data.league, t, escapeHtml(name), web);
 }
 
 // The week these games belong to, for section titles ("Week 14 Scores").
@@ -253,7 +254,7 @@ export function footballEmailSubject(data: CanonicalFootballDailyData): string |
   return `${data.league.toUpperCase()} Week ${week}, ${day} Digest`;
 }
 
-function renderGameScores(data: CanonicalFootballDailyData): string {
+function renderGameScores(data: CanonicalFootballDailyData, web: boolean): string {
   const games = playedGames(data);
   if (games.length === 0) return "";
   const lines = games
@@ -265,7 +266,7 @@ function renderGameScores(data: CanonicalFootballDailyData): string {
       const note = /^final$/i.test(g.statusDetail)
         ? ""
         : ` <span class="fb-gs-note">(${escapeHtml(g.statusDetail)})</span>`;
-      return `<div class="fb-gs-line"><span class="${aCls}">${teamShort(data, g.awayTeam)} ${a}</span>, <span class="${hCls}">${teamShort(data, g.homeTeam)} ${h}</span>${note}</div>`;
+      return `<div class="fb-gs-line"><span class="${aCls}">${teamShort(data, g.awayTeam, web)} ${a}</span>, <span class="${hCls}">${teamShort(data, g.homeTeam, web)} ${h}</span>${note}</div>`;
     })
     .join("");
   return `
@@ -329,11 +330,11 @@ function followingWeekGames(data: CanonicalFootballDailyData): FootballGame[] {
   );
 }
 
-function matchupSection(data: CanonicalFootballDailyData, title: string, games: FootballGame[]): string {
+function matchupSection(data: CanonicalFootballDailyData, title: string, games: FootballGame[], web: boolean): string {
   const rows = games
     .map(
       (g) => `<li class="fb-next-row">
-        <span class="fb-next-matchup">${teamShort(data, g.awayTeam)} at ${teamShort(data, g.homeTeam)}</span>
+        <span class="fb-next-matchup">${teamShort(data, g.awayTeam, web)} at ${teamShort(data, g.homeTeam, web)}</span>
         <span class="fb-next-time">${escapeHtml(kickoffET(g.startTime))}</span>
       </li>`,
     )
@@ -350,7 +351,7 @@ function matchupSection(data: CanonicalFootballDailyData, title: string, games: 
 // Monday edition still has Monday Night to preview). When the next-week block
 // also renders below it (Sun/Mon editions), this is labeled "Remaining Week n"
 // so it reads as the leftover games rather than a second "Upcoming".
-function renderThisWeekMatchups(data: CanonicalFootballDailyData): string {
+function renderThisWeekMatchups(data: CanonicalFootballDailyData, web: boolean): string {
   const recap = playedGames(data)[0];
   if (!recap) return "";
   const games = data.nextGames.filter(
@@ -358,15 +359,15 @@ function renderThisWeekMatchups(data: CanonicalFootballDailyData): string {
   );
   if (games.length === 0) return "";
   const verb = followingWeekGames(data).length > 0 ? "Remaining" : "Upcoming";
-  return matchupSection(data, matchupSectionTitle(games[0]!, verb), games);
+  return matchupSection(data, matchupSectionTitle(games[0]!, verb), games, web);
 }
 
 // NEXT week's games — only on the Sunday/Monday recap editions once the week is
 // essentially done (see followingWeekGames).
-function renderNextWeekMatchups(data: CanonicalFootballDailyData): string {
+function renderNextWeekMatchups(data: CanonicalFootballDailyData, web: boolean): string {
   const games = followingWeekGames(data);
   if (games.length === 0) return "";
-  return matchupSection(data, matchupSectionTitle(games[0]!, "Upcoming"), games);
+  return matchupSection(data, matchupSectionTitle(games[0]!, "Upcoming"), games, web);
 }
 
 // ---- Leaders --------------------------------------------------------------
@@ -443,11 +444,63 @@ function renderLeaders(data: CanonicalFootballDailyData, web: boolean): string {
 
 // ---- Box Scores (full detail) ---------------------------------------------
 
-// Team ids currently in the AP Top 25 (both game and ranking refs key `id` off
-// the lowercased abbreviation, so they match).
-function apTop25Ids(data: CanonicalFootballDailyData): Set<string> {
-  const ap = data.rankings.find((r) => /AP Top 25/i.test(r.poll));
-  return new Set((ap?.entries ?? []).map((e) => e.team.id));
+// The poll that defines the "Top 25" scope. AP is the canonical choice, but in
+// the preseason/offseason ESPN often publishes only the Coaches poll, so fall
+// back to whatever top-25 poll is present. Keeping the box-score filter and the
+// Rankings header driven by the SAME poll means they never disagree (an empty
+// AP set used to blank out every Top-25 box score whenever AP was missing).
+function primaryPoll(data: CanonicalFootballDailyData): FootballRanking | null {
+  const rk = data.rankings;
+  return (
+    rk.find((r) => /AP Top 25/i.test(r.poll)) ??
+    rk.find((r) => /CFP|College Football Playoff/i.test(r.poll)) ??
+    rk.find((r) => /Coaches/i.test(r.poll)) ??
+    rk[0] ??
+    null
+  );
+}
+
+// Team ids in the primary poll (both game and ranking refs key `id` off the
+// lowercased abbreviation, so they match).
+function rankedTeamIds(data: CanonicalFootballDailyData): Set<string> {
+  return new Set((primaryPoll(data)?.entries ?? []).map((e) => e.team.id));
+}
+
+// Poll rank by team id — for surfaces whose refs don't carry the scoreboard's
+// curatedRank (standings). Memoized per data bundle. Keyed by `id` (lowercased
+// abbreviation), which standings refs share.
+const rankMapCache = new WeakMap<CanonicalFootballDailyData, Map<string, number>>();
+function pollRankMap(data: CanonicalFootballDailyData): Map<string, number> {
+  let m = rankMapCache.get(data);
+  if (!m) {
+    m = new Map();
+    for (const e of primaryPoll(data)?.entries ?? []) m.set(e.team.id, e.rank);
+    rankMapCache.set(data, m);
+  }
+  return m;
+}
+
+// "#2 " badge when the team is ranked, else "". Monochrome/muted (fb-rank-badge).
+function rankBadge(rank: number | null | undefined): string {
+  return rank ? `<span class="fb-rank-badge">#${rank}</span> ` : "";
+}
+
+// Wrap a team's display text in a link to its team page when the abbreviation
+// resolves to a known team; FCS opponents (not in the FBS registry) stay
+// unlinked. `inner` must already be escaped.
+function teamLink(league: FootballLeague, ref: FootballTeamRef, inner: string, web: boolean): string {
+  const slug = findTeamByAbbr(league, ref.abbr)?.slug;
+  return slug ? linkAnchor(`/${league}/${slug}`, inner, web, "team-link", "es-team-link") : inner;
+}
+
+// Link a conference name (any feed form — "Big Ten" / "Big Ten Conference" /
+// "Sun Belt West") to its conference digest. NCAAF only; unrecognized names
+// (NFL divisions, FCS) stay unlinked. Returns the escaped name either way.
+function conferenceLink(league: FootballLeague, name: string | null, web: boolean): string {
+  const inner = escapeHtml(name ?? "");
+  if (league !== "ncaaf" || !name) return inner;
+  const conf = findConferenceByAnyName(name);
+  return conf ? linkAnchor(`/${league}/conference/${conf.slug}`, inner, web, "team-link", "es-team-link") : inner;
 }
 
 function renderBoxScores(data: CanonicalFootballDailyData, web: boolean, onlyTop25: boolean): string {
@@ -458,7 +511,7 @@ function renderBoxScores(data: CanonicalFootballDailyData, web: boolean, onlyTop
   // (already-scoped) slate. NFL always shows every game.
   const top25 = onlyTop25;
   if (top25) {
-    const ranked = apTop25Ids(data);
+    const ranked = rankedTeamIds(data);
     games = games.filter((g) => ranked.has(g.awayTeam.id) || ranked.has(g.homeTeam.id));
   }
   if (games.length === 0) return "";
@@ -515,15 +568,13 @@ function orderGamesForRecap(games: FootballGame[], league: string): FootballGame
     .map((x) => x.g);
 }
 
-// Full name + rank badge — box-score TEAM headers ("#2 Troy Trojans").
-function teamLabel(t: FootballTeamRef): string {
-  const rank = t.rank ? `<span class="fb-rank-badge">#${t.rank}</span> ` : "";
-  return `${rank}${escapeHtml(t.name)}`;
+// Full name + rank badge, linked — box-score TEAM headers ("#2 Troy Trojans").
+function teamLabel(league: FootballLeague, t: FootballTeamRef, web: boolean): string {
+  return rankBadge(t.rank) + teamLink(league, t, escapeHtml(t.name), web);
 }
-// School name + rank — box-score TITLES ("#2 Troy at Clemson"); no mascot.
-function teamTitle(t: FootballTeamRef): string {
-  const rank = t.rank ? `<span class="fb-rank-badge">#${t.rank}</span> ` : "";
-  return `${rank}${escapeHtml(t.location ?? t.name)}`;
+// School name + rank, linked — box-score TITLES ("#2 Troy @ Clemson"); no mascot.
+function teamTitle(league: FootballLeague, t: FootballTeamRef, web: boolean): string {
+  return rankBadge(t.rank) + teamLink(league, t, escapeHtml(t.location ?? t.name), web);
 }
 
 // An upset: the loser was ranked and either the winner was unranked or the
@@ -553,7 +604,7 @@ export function renderGameBlock(data: CanonicalFootballDailyData, g: FootballGam
   // since rankings are the story there.
   // NFL: mascots. College: school name + rank in the TITLE (no mascot); the
   // per-team headers below keep the full "school + mascot" via teamLabel.
-  const head = (t: FootballTeamRef) => (data.league === "nfl" ? teamShort(data, t) : teamTitle(t));
+  const head = (t: FootballTeamRef) => (data.league === "nfl" ? teamShort(data, t, web) : teamTitle(data.league, t, web));
 
   return `
 <article class="fb-game">
@@ -716,7 +767,7 @@ function renderTeamBox(t: FootballTeamBox, league: FootballLeague, web: boolean)
 
   return `
 <div class="fb-team-box">
-  <h3 class="fb-team-caption">${teamLabel(t.team)}</h3>
+  <h3 class="fb-team-caption">${teamLabel(league, t.team, web)}</h3>
   ${passing}${rushing}${receiving}${defense}${kicking}
 </div>`.trim();
 }
@@ -791,6 +842,9 @@ function renderStandings(data: CanonicalFootballDailyData, web: boolean): string
   // NFL standings use the bare mascot ("Cowboys") — no city — to keep the
   // 12-column table narrow enough to fit two-up at tablet and whole on mobile.
   const useMascot = data.league === "nfl";
+  // Poll ranks for the "#N" badge — standings refs carry no curatedRank, so the
+  // primary poll supplies them (empty for the NFL, which has no rankings).
+  const rankMap = pollRankMap(data);
 
   const conferences = [...new Set(data.standings.map((g) => g.conference).filter(Boolean))];
   if (conferences.length === 2) {
@@ -799,7 +853,7 @@ function renderStandings(data: CanonicalFootballDailyData, web: boolean): string
     // one fixed-layout table so columns line up top-to-bottom. Two conferences
     // sit in the 2-col grid (collapses to one column on narrow widths).
     const tables = conferences
-      .map((conf) => renderConferenceTable(conf!, data.standings.filter((g) => g.conference === conf), cols, useMascot, data.league, web))
+      .map((conf) => renderConferenceTable(conf!, data.standings.filter((g) => g.conference === conf), cols, useMascot, data.league, web, rankMap))
       .join("\n");
     return `
 <section class="fb-section">
@@ -807,7 +861,7 @@ function renderStandings(data: CanonicalFootballDailyData, web: boolean): string
 </section>`.trim();
   }
 
-  const tables = data.standings.map((grp) => renderStandingsGroup(grp, cols, useMascot, data.league, web)).join("\n");
+  const tables = data.standings.map((grp) => renderStandingsGroup(grp, cols, useMascot, data.league, web, rankMap)).join("\n");
   return `
 <section class="fb-section">
   <h2 class="fb-section-title">Standings</h2>
@@ -845,19 +899,20 @@ function teamNameCell(
   useMascot: boolean,
   league: FootballLeague | undefined,
   web: boolean,
+  rankMap?: Map<string, number>,
 ): string {
   // NFL: bare mascot ("Cowboys"). College: the school name ("North Texas"),
   // not the full "North Texas Mean Green" — prefer ESPN's location.
   const name = escapeHtml(useMascot ? mascot(ref.name) : (ref.location ?? ref.name));
-  // AP rank trails the name in college standings ("Miami (2)"). Enriched onto
-  // the ref by scopeToConference; null for NFL and unranked teams.
-  const rank = ref.rank ? ` <span class="fb-sd-rank">(${ref.rank})</span>` : "";
-  const team = league ? findTeam(league, ref.id) : undefined;
-  const linked = team ? linkAnchor(`/${league}/${team.slug}`, name, web, "team-link", "es-team-link") : name;
-  return `${linked}${rank}`;
+  // Leading "#2" badge for ranked teams — same treatment as scores/box titles.
+  // scopeToConference enriches ref.rank on the conference digest; the league
+  // digest supplies the poll rank map instead (standings refs lack curatedRank).
+  const rank = ref.rank ?? rankMap?.get(ref.id) ?? null;
+  const linked = league ? teamLink(league, ref, name, web) : name;
+  return `${rankBadge(rank)}${linked}`;
 }
 
-function renderConferenceTable(confName: string, divisions: FootballStandingsGroup[], cols: StandingsCol[], useMascot: boolean, league?: FootballLeague, web = true): string {
+function renderConferenceTable(confName: string, divisions: FootballStandingsGroup[], cols: StandingsCol[], useMascot: boolean, league?: FootballLeague, web = true, rankMap?: Map<string, number>): string {
   const colgroup = `<colgroup><col class="fb-sd-teamcol" />${cols.map((c) => `<col${c.w ? ` style="width:${c.w}"` : ""} />`).join("")}</colgroup>`;
   const headRow = `<tr class="fb-sd-headrow"><th class="fb-sd-team">Team</th>${cols.map((c) => `<th class="fb-sd-stat">${escapeHtml(c.label)}</th>`).join("")}</tr>`;
   const body = divisions
@@ -868,7 +923,7 @@ function renderConferenceTable(confName: string, divisions: FootballStandingsGro
           const cells = cols
             .map((c) => `<td class="fb-sd-stat">${escapeHtml(String(c.get(r)))}</td>`)
             .join("");
-          return `<tr><td class="fb-sd-team">${teamNameCell(r.team, useMascot, league, web)}</td>${cells}</tr>`;
+          return `<tr><td class="fb-sd-team">${teamNameCell(r.team, useMascot, league, web, rankMap)}</td>${cells}</tr>`;
         })
         .join("");
       return divRow + headRow + teamRows;
@@ -884,28 +939,33 @@ function renderConferenceTable(confName: string, divisions: FootballStandingsGro
 </div>`.trim();
 }
 
-export function renderStandingsGroup(grp: FootballStandingsGroup, cols: StandingsCol[], useMascot: boolean, league?: FootballLeague, web = true): string {
+export function renderStandingsGroup(grp: FootballStandingsGroup, cols: StandingsCol[], useMascot: boolean, league?: FootballLeague, web = true, rankMap?: Map<string, number>, hideCaption = false, autoLayout = false): string {
   const head = cols.map((c) => `<th class="fb-sd-stat">${escapeHtml(c.label)}</th>`).join("");
   const rows = grp.rows
     .map((r) => {
       const cells = cols
         .map((c) => `<td class="fb-sd-stat">${escapeHtml(String(c.get(r)))}</td>`)
         .join("");
-      return `<tr><td class="fb-sd-team">${teamNameCell(r.team, useMascot, league, web)}</td>${cells}</tr>`;
+      return `<tr><td class="fb-sd-team">${teamNameCell(r.team, useMascot, league, web, rankMap)}</td>${cells}</tr>`;
     })
     .join("");
-  // NFL (mascot) uses the same colgroup as the daily conference tables — a
-  // narrow 16% team column + each stat column's width hint — so the full
-  // 11-column set fits mobile without clipping headers to "Hor"/"Roa"/"Con".
-  // NCAAF has few columns and full team names, so it gets a generous 40% team
-  // column and even stat columns.
-  const colgroup = useMascot
-    ? `<colgroup><col class="fb-sd-teamcol" />${cols.map((c) => `<col${c.w ? ` style="width:${c.w}"` : ""} />`).join("")}</colgroup>`
-    : `<colgroup><col style="width:40%" />${cols.map(() => "<col />").join("")}</colgroup>`;
+  // Compact layout (the college team page): a modest 24% team column + even
+  // stat columns, so a wide set (W L Pct Strk PF PA Home Road Conf) spreads
+  // across the row and fits 400px without the wasted 40% team column that left
+  // the stats cramped. NFL (mascot) uses fixed per-column widths with a narrow
+  // team column; the lean college league-digest set keeps the roomy 40% column.
+  const colgroup = autoLayout
+    ? `<colgroup><col style="width:24%" />${cols.map(() => "<col />").join("")}</colgroup>`
+    : useMascot
+      ? `<colgroup><col class="fb-sd-teamcol" />${cols.map((c) => `<col${c.w ? ` style="width:${c.w}"` : ""} />`).join("")}</colgroup>`
+      : `<colgroup><col style="width:40%" />${cols.map(() => "<col />").join("")}</colgroup>`;
+  const caption = hideCaption
+    ? ""
+    : `<h3 class="fb-conf-caption">${league ? conferenceLink(league, grp.group, web) : escapeHtml(grp.group)}</h3>`;
   return `
 <div class="fb-standings-block">
-  <h3 class="fb-conf-caption">${escapeHtml(grp.group)}</h3>
-  <table class="fb-standings-table" role="presentation" cellpadding="0" cellspacing="0" border="0">
+  ${caption}
+  <table class="fb-standings-table${autoLayout ? " fb-sd-compact" : ""}" role="presentation" cellpadding="0" cellspacing="0" border="0">
     ${colgroup}
     <thead><tr><th class="fb-sd-team">Team</th>${head}</tr></thead>
     <tbody>${rows}</tbody>

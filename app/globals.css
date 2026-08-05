@@ -1526,14 +1526,52 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
                  font-size: 10px; letter-spacing: 0.04em; color: #6b6459; padding-top: 2px; }
 .fb-tm-ldr-vals { flex: 1 1 auto; min-width: 0; }
 
+/* Team-page roster stat tables — season totals per unit, 2-up on wide web. */
+.fb-rost-grid { column-count: 2; column-gap: 26px; margin-top: 4px; }
+@media (max-width: 720px) { .fb-rost-grid { column-count: 1; } }
+.fb-rost-block { break-inside: avoid; page-break-inside: avoid; margin-bottom: 14px; }
+.fb-rost-cap { font-size: 13px; font-weight: 700; margin: 0 0 2px; padding-bottom: 2px;
+  border-bottom: 1px solid #161410; }
+.fb-rost-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
+.fb-rost-table th, .fb-rost-table td { padding: 2px 4px; border-bottom: 1px solid rgba(0,0,0,0.07);
+  white-space: nowrap; }
+.fb-rost-table th { font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em; color: #6b6459; }
+.fb-rost-table tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
+.fb-rost-name { text-align: left; }
+.fb-rost-stat { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Team-page schedule table — full season, results for played games. */
+.fb-sched-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 0; }
+.fb-sched-table th, .fb-sched-table td { padding: 3px 6px; text-align: left;
+  border-bottom: 1px solid rgba(0,0,0,0.08); white-space: nowrap; }
+.fb-sched-table th { font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: #6b6459; border-bottom: 1px solid #161410; }
+.fb-sched-table tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
+.fb-sch-date { width: 18%; color: #6b6459; }
+.fb-sch-opp { width: 52%; white-space: normal; }
+.fb-sch-res { width: 30%; text-align: right !important; font-variant-numeric: tabular-nums; }
+.fb-sch-wl { display: inline-block; width: 1.1em; font-weight: 800; }
+.fb-sch-w { } /* monochrome — weight carries W/L, no color (digests are B&W) */
+.fb-sch-l { color: #6b6459; }
+.fb-sch-upcoming { color: #6b6459; font-style: italic; }
+
 /* Standings — mirrors the MLB standings look (base table rules above): 14px
    fixed-layout table, centered conference title, division sub-headers, repeated
    column-header row per division. Fixed layout + overflow:hidden fits the table
    to any width (clipping over-long cells) like MLB, rather than scrolling. */
-.fb-standings-grid { display: block; }
+/* NCAAF: many conference tables flow into newspaper columns (fill column 1,
+   then column 2), same technique as .fb-boxscores. Each conference block stays
+   intact via break-inside. Collapses to one column on narrow web + email. */
+.fb-standings-grid { column-count: 2; column-gap: 28px; }
+.fb-standings-grid .fb-standings-block { break-inside: avoid; page-break-inside: avoid; }
+@media (max-width: 720px) { .fb-standings-grid { column-count: 1; } }
 .fb-standings-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 28px; align-items: start; }
 .fb-standings-col { min-width: 0; }
-.fb-standings-block { margin: 8px 0 14px; min-width: 0; }
+.fb-standings-block { margin: 0 0 14px; min-width: 0; }
+/* The first conference table sits directly under the "Standings" title — drop
+   the caption's leading margin so there's no dead band before it. */
+.fb-standings-grid .fb-standings-block:first-child .fb-conf-caption { margin-top: 0; }
 .fb-conf-title {
   text-align: center; font-size: 22px; font-weight: 700;
   margin: 10px 0; padding-bottom: 4px; border-bottom: 2px solid #161410;
@@ -1550,6 +1588,11 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .fb-standings-table th { font-weight: 700; border-bottom: 1px solid #161410; }
 .fb-sd-team { text-align: left !important; }
 .fb-sd-teamcol { width: 16%; }
+/* Team-page standings: even stat columns (24% team col) so a wide set spreads
+   across the row rather than crowding the right edge. */
+.fb-standings-table.fb-sd-compact th,
+.fb-standings-table.fb-sd-compact td { padding: 0 3px; }
+.fb-standings-table.fb-sd-compact .fb-sd-team { padding-left: 0; }
 .fb-standings-table .fb-sd-divhead-cell {
   text-align: left; font-weight: 700; padding: 8px 2px 2px; border-bottom: 1px solid #161410;
 }

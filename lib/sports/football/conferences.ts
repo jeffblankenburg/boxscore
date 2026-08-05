@@ -38,6 +38,18 @@ export function findConferenceByEspnName(name: string | null): NcaafConference |
   return NCAAF_CONFERENCES.find((c) => c.espnName === name);
 }
 
+// Resolve a conference by any of the name forms that appear in the feeds: the
+// standings' full espnName ("Big Ten Conference"), the rankings' short name
+// ("Big Ten"), or a divisional group ("Sun Belt West" → Sun Belt). Used to link
+// conference names in the digest to the conference page.
+export function findConferenceByAnyName(name: string | null): NcaafConference | undefined {
+  if (!name) return undefined;
+  return (
+    NCAAF_CONFERENCES.find((c) => c.espnName === name || c.short === name) ??
+    NCAAF_CONFERENCES.find((c) => name.startsWith(c.short))
+  );
+}
+
 // A conference's team ids, from the standings (game/leader/txn refs carry no
 // conference, so the standings are the source of truth). `conference ?? group`
 // folds Sun Belt East/West back into "Sun Belt Conference". id = lowercased

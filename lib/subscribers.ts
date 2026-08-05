@@ -274,6 +274,28 @@ export async function getTeamOptInSubscriberIds(
   sport: string,
   teamId: string,
 ): Promise<Set<string>> {
+  return optInSubscriberIds(sport, "team", teamId);
+}
+
+/**
+ * Active subscriber ids opted in to a specific conference's digest (NCAAF).
+ * Mirrors getTeamOptInSubscriberIds with scope='conference'; the conference
+ * slug lives in team_id.
+ */
+export async function getConferenceOptInSubscriberIds(
+  sport: string,
+  conferenceSlug: string,
+): Promise<Set<string>> {
+  return optInSubscriberIds(sport, "conference", conferenceSlug);
+}
+
+// Shared paginated opt-in lookup for team/conference scopes (the target slug
+// lives in team_id for both).
+async function optInSubscriberIds(
+  sport: string,
+  scope: "team" | "conference",
+  targetId: string,
+): Promise<Set<string>> {
   const out = new Set<string>();
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
@@ -281,11 +303,11 @@ export async function getTeamOptInSubscriberIds(
       .from("email_subscriptions")
       .select("subscriber_id")
       .eq("sport", sport)
-      .eq("scope", "team")
-      .eq("team_id", teamId)
+      .eq("scope", scope)
+      .eq("team_id", targetId)
       .eq("active", true)
       .range(from, from + pageSize - 1);
-    if (error) throw new Error(`getTeamOptInSubscriberIds: ${error.message}`);
+    if (error) throw new Error(`optInSubscriberIds(${scope}): ${error.message}`);
     const page = (data ?? []) as Array<{ subscriber_id: string }>;
     for (const row of page) out.add(row.subscriber_id);
     if (page.length < pageSize) break;

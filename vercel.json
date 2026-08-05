@@ -61,6 +61,22 @@
       "schedule": "30 8 * * *"
     },
     {
+      "path": "/api/cron/send-team-email?sport=ncaaf",
+      "schedule": "40 8 * * *"
+    },
+    {
+      "path": "/api/cron/send-conference-email?sport=ncaaf",
+      "schedule": "50 8 * * *"
+    },
+    {
+      "path": "/api/cron/send-team-email?sport=nba",
+      "schedule": "35 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-team-email?sport=wnba",
+      "schedule": "47 9 * * *"
+    },
+    {
       "path": "/api/cron/send-team-email?sport=mlb",
       "schedule": "45 9 * * *"
     },
