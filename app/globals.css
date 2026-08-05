@@ -745,50 +745,8 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 }
 .settings-preview-link:hover { color: var(--text-primary);
                                 text-decoration: underline; }
-/* Send-cadence note on the right of a /subscribe league row. */
-.subscribe-freq { flex: 0 0 auto; font-size: 12px; font-style: italic;
-                  color: var(--text-muted); white-space: nowrap; }
 .subscribe-input-block { width: 100%; box-sizing: border-box; margin: 4px 0; }
 .subscribe-button-block { width: 100%; margin-top: 16px; }
-
-/* CSS-only tab strip for the Team Newsletters section on /subscribe. Three
-   radio inputs (visually hidden) live as siblings of the strip + panels; the
-   :checked + ~ combinator decides which strip label is "active" and which
-   panel is visible. No JavaScript needed; submitting the form ignores the
-   radio because the action only reads `leagues` and `teams`. */
-.team-tabs { margin-top: 4px; }
-.team-tab-input { position: absolute; opacity: 0; pointer-events: none; }
-.team-tab-strip {
-  display: flex; gap: 0;
-  border-bottom: 1px solid var(--border-strong);
-}
-.team-tab-label {
-  padding: 5px 14px;
-  font-size: 13px; font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--border-strong);
-  background: #fff;
-  color: var(--text-secondary);
-  margin-right: -1px;
-  margin-bottom: -1px;
-}
-.team-tab-label:hover { background: rgba(0,0,0,0.04); }
-.team-tab-panel { display: none; padding-top: 4px; }
-#tab-mlb:checked ~ .team-tab-strip label[for="tab-mlb"],
-#tab-nba:checked ~ .team-tab-strip label[for="tab-nba"],
-#tab-wnba:checked ~ .team-tab-strip label[for="tab-wnba"],
-#tab-nfl:checked ~ .team-tab-strip label[for="tab-nfl"],
-#tab-ncaaf:checked ~ .team-tab-strip label[for="tab-ncaaf"] {
-  background: var(--text-primary); color: #fff;
-  border-color: var(--text-primary);
-}
-#tab-mlb:checked ~ .team-tab-panel[data-sport="mlb"],
-#tab-nba:checked ~ .team-tab-panel[data-sport="nba"],
-#tab-wnba:checked ~ .team-tab-panel[data-sport="wnba"],
-#tab-nfl:checked ~ .team-tab-panel[data-sport="nfl"],
-#tab-ncaaf:checked ~ .team-tab-panel[data-sport="ncaaf"] {
-  display: block;
-}
 .settings-toggle-on { background: #000; color: #fff; border: 1px solid #000; }
 .settings-toggle-on:hover { background: #333; }
 .settings-toggle-off { background: #fff; color: var(--text-primary);

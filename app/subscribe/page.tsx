@@ -1,22 +1,15 @@
 import { subscribe } from "./actions";
 import AttributionFields from "./AttributionFields";
+import { SubscribeSportPanel } from "./SubscribeSportPanel";
+import { SettingsTabs } from "@/app/settings/SettingsTabs";
 import { getVisibleSports } from "@/lib/sports";
 import { teamsBySport, type Sport } from "@/lib/teams";
 import { NCAAF_CONFERENCES } from "@/lib/sports/football/conferences";
-import { digestFrequency } from "@/lib/digest-frequency";
+import "@/app/settings/predictions-settings.css";
 
-// Sports with a per-team digest pipeline (generate loop + send-team-email) and
-// a team page for the "Preview →" link. Filtered by visibility below, so a
-// sport's teams only appear once it's also public. When the surviving list has
-// more than one entry the section becomes a tabbed picker; one entry renders
-// the team list inline.
-const TEAM_TAB_SPORTS: Array<{ id: Sport; label: string }> = [
-  { id: "mlb", label: "MLB" },
-  { id: "nfl", label: "NFL" },
-  { id: "ncaaf", label: "NCAAF" },
-  { id: "nba", label: "NBA" },
-  { id: "wnba", label: "WNBA" },
-];
+// Sports that have a per-team digest pipeline + a team page for the "Preview →"
+// link, so their tab shows a team picker.
+const TEAM_PAGE_SPORTS = new Set<Sport>(["mlb", "nfl", "ncaaf", "nba", "wnba"]);
 
 export const metadata = {
   title: "Subscribe — boxscore",
@@ -34,12 +27,30 @@ export default async function SubscribePage({
   // is ready. Flip to includeAdminOnly: true when previewing upcoming
   // sports on the public picker again.
   const sports = await getVisibleSports({ includeAdminOnly: false });
-  // Team pickers only for sports that are BOTH public and have a team pipeline.
-  const visibleIds = new Set(sports.map((s) => s.id));
-  const teamTabs = TEAM_TAB_SPORTS.filter((t) => visibleIds.has(t.id)).map(({ id, label }) => ({
-    id,
-    label,
-    teams: teamsBySport(id).slice().sort((a, b) => a.city.localeCompare(b.city)),
+
+  // One tab per public sport, same layout as /settings: league toggle, then
+  // conferences (NCAAF) and teams. Plain form checkboxes submit with the form —
+  // SettingsTabs keeps hidden panels mounted so every pick is included.
+  const sportTabs = sports.map((s) => ({
+    id: s.id,
+    label: s.name,
+    content: (
+      <SubscribeSportPanel
+        sportId={s.id}
+        sportLabel={s.name}
+        teams={
+          TEAM_PAGE_SPORTS.has(s.id as Sport)
+            ? teamsBySport(s.id as Sport)
+                .slice()
+                .sort((a, b) => a.city.localeCompare(b.city))
+                .map((t) => ({ slug: t.slug, name: t.name }))
+            : []
+        }
+        conferences={
+          s.id === "ncaaf" ? NCAAF_CONFERENCES.map((c) => ({ slug: c.slug, name: c.short })) : []
+        }
+      />
+    ),
   }));
 
   return (
@@ -72,6 +83,10 @@ export default async function SubscribePage({
           aria-label="Email address"
         />
 
+        {/* One tab per sport — same layout as /settings. Hidden panels stay
+            mounted (SettingsTabs), so checkboxes in inactive tabs still submit. */}
+        <SettingsTabs tabs={sportTabs} />
+
         <button type="submit" className="subscribe-button subscribe-button-block">
           Subscribe →
         </button>
@@ -79,147 +94,6 @@ export default async function SubscribePage({
           We&rsquo;ll send one confirmation email. After you click the link,
           you&rsquo;re in. Unsubscribe in one click, any time.
         </p>
-
-        <h2 className="settings-section-h">League Boxscores</h2>
-        <ul className="settings-sport-list">
-          {sports.map((sport) => (
-            <li key={sport.id} className="settings-sport-row">
-              <label className="settings-pick-label">
-                <input
-                  type="checkbox"
-                  name="leagues"
-                  value={sport.id}
-                  defaultChecked={sport.id === "mlb"}
-                />
-                <span>{sport.id === "ncaaf" ? `${sport.name} (Top 25)` : sport.name}</span>
-              </label>
-              <span className="subscribe-freq">{digestFrequency(sport.id)}</span>
-            </li>
-          ))}
-        </ul>
-
-        {visibleIds.has("ncaaf") && (
-          <>
-            <h2 className="settings-section-h">NCAAF Conferences</h2>
-            <p className="subscribe-fine">
-              Each conference has its own daily digest — scores, standings, and
-              box scores for that conference. Independent of the Top 25 above and
-              the team emails below; subscribe to any, all, or none.
-            </p>
-            <ul className="settings-sport-list">
-              {NCAAF_CONFERENCES.map((c) => (
-                <li key={c.slug} className="settings-sport-row">
-                  <label className="settings-pick-label">
-                    <input type="checkbox" name="conferences" value={`ncaaf:${c.slug}`} />
-                    <span>{c.short}</span>
-                  </label>
-                  <a
-                    href={`/ncaaf/conference/${c.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="settings-preview-link"
-                  >
-                    Preview →
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-
-        <h2 className="settings-section-h">Daily Team Boxscores</h2>
-        <p className="subscribe-fine">
-          Each team has its own daily email — yesterday&rsquo;s game (or a
-          standings + transactions roundup on off-days). Independent of the
-          league digest above; subscribe to any, all, or none.
-        </p>
-        {teamTabs.length === 1 ? (
-          // Single-sport simplification: skip the tab chrome when MLB is the
-          // only sport with a team picker. Restores the flat list look while
-          // keeping the value="sport:slug" wire format so the action still
-          // routes picks correctly.
-          <ul className="settings-sport-list">
-            {teamTabs[0]!.teams.map((team) => (
-              <li key={team.slug} className="settings-sport-row">
-                <label className="settings-pick-label">
-                  <input
-                    type="checkbox"
-                    name="teams"
-                    value={`${teamTabs[0]!.id}:${team.slug}`}
-                  />
-                  <span>{team.name}</span>
-                </label>
-                <a
-                  href={`/${teamTabs[0]!.id}/${team.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="settings-preview-link"
-                >
-                  Preview →
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="team-tabs">
-            {/* Radio inputs drive the tabs via CSS — no JS needed. Inputs are
-                named the same so only one is "active" at a time. Their value
-                isn't read server-side; the action only consumes "leagues" and
-                "teams" fields. */}
-            {teamTabs.map((tab, i) => (
-              <input
-                key={`input-${tab.id}`}
-                type="radio"
-                name="team-tab"
-                id={`tab-${tab.id}`}
-                className="team-tab-input"
-                defaultChecked={i === 0}
-              />
-            ))}
-            <div className="team-tab-strip">
-              {teamTabs.map((tab) => (
-                <label
-                  key={`label-${tab.id}`}
-                  htmlFor={`tab-${tab.id}`}
-                  className="team-tab-label"
-                >
-                  {tab.label}
-                </label>
-              ))}
-            </div>
-            {teamTabs.map((tab) => (
-              <div
-                key={`panel-${tab.id}`}
-                className="team-tab-panel"
-                data-sport={tab.id}
-              >
-                <ul className="settings-sport-list">
-                  {tab.teams.map((team) => (
-                    <li key={team.slug} className="settings-sport-row">
-                      <label className="settings-pick-label">
-                        <input
-                          type="checkbox"
-                          name="teams"
-                          value={`${tab.id}:${team.slug}`}
-                        />
-                        <span>{team.name}</span>
-                      </label>
-                      <a
-                        href={`/${tab.id}/${team.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="settings-preview-link"
-                      >
-                        Preview →
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-
       </form>
 
       {error === "invalid_email" && (
