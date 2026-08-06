@@ -1,5 +1,6 @@
 import { getStoredManifest } from "@/lib/share-storage";
 import { imagePostContent } from "@/lib/social-content";
+import { resolvedOfficialMap } from "@/lib/team-hashtags";
 import { CopyButtons } from "./CopyButtons";
 import { requireAdmin } from "../require-admin";
 
@@ -22,8 +23,10 @@ export default async function AdminTwitterCompose() {
   }
 
   const dates = { edition: manifest.prettyDate, games: manifest.gamesPrettyDate };
+  // Compose page is the MLB manifest; apply the same editable official hashtags.
+  const officialMap = await resolvedOfficialMap("mlb");
   const posts = manifest.entries.map(({ entry, url }) => {
-    const { text } = imagePostContent(entry, dates);
+    const { text } = imagePostContent(entry, dates, undefined, "mlb", officialMap);
     return { entry, url, text };
   });
 

@@ -57,6 +57,11 @@ export function blueskyText(ctx: DailyPostContext): string {
 
 const hashtag = (team: string): string => "#" + team.replace(/\s+/g, "");
 const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+// The NCAAF caption key for a school name — exported so the admin editor can
+// key an added school the same way the caption resolver looks it up.
+export function normalizeHashtagKey(s: string): string {
+  return norm(s);
+}
 // Derived team tag for the newer sports: strip everything X doesn't allow in a
 // hashtag (spaces, &, ., ', -) so "Texas A&M" → "TexasAM", "Trail Blazers" →
 // "TrailBlazers". MLB keeps its own `hashtag()` to preserve exact output.
@@ -219,10 +224,6 @@ const NCAAF_OFFICIAL_RAW: Record<string, string> = {
   // South Florida, Colorado State, Ball State, Middle Tennessee, Delaware,
   // Missouri State, UConn, Appalachian State.
 };
-const NCAAF_OFFICIAL = new Map(
-  Object.entries(NCAAF_OFFICIAL_RAW).map(([school, tag]) => [norm(school), tag]),
-);
-
 // Canonical team index per pro sport: normalized abbreviation OR nickname →
 // team. Lets us resolve whichever form the box title carries (basketball emits
 // the abbreviation "LV"; football emits the mascot "Panthers"). Built lazily.
@@ -240,26 +241,85 @@ function teamIndex(sport: string): Map<string, { nickname: string; abbreviation:
   return idx;
 }
 
+// The official-hashtag map for a sport, keyed by that sport's caption-lookup
+// key (mlb: nickname, pro: abbreviation, ncaaf: normalized school). This is the
+// admin-editable layer — the DB-merged version comes in via imagePostContent's
+// `officialMap` argument; absent that, these coded defaults are used.
+export function defaultOfficialMap(sport: string): Record<string, string | null> {
+  switch (sport) {
+    case "mlb": return { ...OFFICIAL_HASHTAG };
+    case "nfl": return { ...NFL_OFFICIAL };
+    case "nba": return { ...NBA_OFFICIAL };
+    case "wnba": return { ...WNBA_OFFICIAL };
+    case "ncaaf":
+      return Object.fromEntries(
+        Object.entries(NCAAF_OFFICIAL_RAW).map(([school, tag]) => [norm(school), tag]),
+      );
+    default: return {};
+  }
+}
+
+// One row per team for the admin hashtag editor: the stable override key, a
+// display label, the always-on derived tags (not editable — they're facts), and
+// the coded default official tag. NCAAF only lists the researched teams; the
+// admin adds the rest. Sorted for a stable table.
+export type HashtagRosterRow = {
+  key: string;
+  label: string;
+  derived: string[];
+  defaultOfficial: string | null;
+};
+
+export function hashtagRoster(sport: string): HashtagRosterRow[] {
+  if (sport === "mlb") {
+    return TEAMS.filter((t) => t.sport === "mlb").map((t) => ({
+      key: t.nickname,
+      label: t.name,
+      derived: [hashtag(t.nickname), ...(TRICODE[t.nickname] ? [`#${TRICODE[t.nickname]}`] : [])],
+      defaultOfficial: OFFICIAL_HASHTAG[t.nickname] ?? null,
+    }));
+  }
+  if (sport === "nba" || sport === "wnba" || sport === "nfl") {
+    const off = PRO_OFFICIAL[sport] ?? {};
+    return TEAMS.filter((t) => t.sport === sport).map((t) => ({
+      key: t.abbreviation,
+      label: t.name,
+      derived: [`#${cleanTag(t.nickname)}`, `#${t.abbreviation}`],
+      defaultOfficial: off[t.abbreviation] ?? null,
+    }));
+  }
+  if (sport === "ncaaf") {
+    return Object.entries(NCAAF_OFFICIAL_RAW)
+      .map(([school, tag]) => ({
+        key: norm(school),
+        label: school,
+        derived: [`#${cleanTag(school)}`],
+        defaultOfficial: tag,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+  return [];
+}
+
 // MLB box titles carry nicknames ("Yankees"); look up tricode + official
-// directly. Preserves the original MLB tag logic exactly.
-function mlbTags(teams: string[]): string {
+// directly. Preserves the original MLB tag logic (official is now injectable).
+function mlbTags(teams: string[], official: Record<string, string | null>): string {
   const nameTags = teams.map(hashtag);
   const tricodeTags = teams
     .map((t) => TRICODE[t])
     .filter((c): c is string => Boolean(c))
     .map((c) => `#${c}`);
   const officialTags = teams
-    .map((t) => OFFICIAL_HASHTAG[t])
+    .map((t) => official[t])
     .filter((c): c is string => Boolean(c))
     .map((c) => `#${c}`);
   return Array.from(new Set([...nameTags, ...tricodeTags, ...officialTags])).join(" ");
 }
 
 // NBA/WNBA/NFL: resolve the token to a canonical team, then emit nickname +
-// abbreviation + (if confirmed) official rally hashtag.
-function proTags(sport: string, teams: string[]): string {
+// abbreviation + (if present) official rally hashtag.
+function proTags(sport: string, teams: string[], official: Record<string, string | null>): string {
   const idx = teamIndex(sport);
-  const official = PRO_OFFICIAL[sport] ?? {};
   const out = new Set<string>();
   for (const token of teams) {
     const team = idx.get(norm(token));
@@ -276,24 +336,24 @@ function proTags(sport: string, teams: string[]): string {
   return Array.from(out).join(" ");
 }
 
-// NCAAF: token is the school name. Derive #SchoolName + (if confirmed) the
+// NCAAF: token is the school name. Derive #SchoolName + (if present) the
 // official rally hashtag.
-function ncaafTags(teams: string[]): string {
+function ncaafTags(teams: string[], official: Record<string, string | null>): string {
   const out = new Set<string>();
   for (const token of teams) {
     const derived = cleanTag(token);
     if (derived) out.add(`#${derived}`);
-    const off = NCAAF_OFFICIAL.get(norm(token));
+    const off = official[norm(token)];
     if (off) out.add(`#${off}`);
   }
   return Array.from(out).join(" ");
 }
 
-function boxscoreTags(sport: string, teams: [string, string]): string {
+function boxscoreTags(sport: string, teams: [string, string], official: Record<string, string | null>): string {
   const valid = teams.filter((t) => t.length > 0);
-  if (sport === "mlb") return mlbTags(valid);
-  if (sport === "ncaaf") return ncaafTags(valid);
-  return proTags(sport, valid);
+  if (sport === "mlb") return mlbTags(valid, official);
+  if (sport === "ncaaf") return ncaafTags(valid, official);
+  return proTags(sport, valid, official);
 }
 
 // Caption date convention: content-anchored images (scoreboard, box scores,
@@ -310,11 +370,16 @@ export function imagePostContent(
   dates: CaptionDates,
   digestUrl?: string,
   sport = "mlb",
+  // Admin-editable official-hashtag overrides (defaults + DB), keyed by the
+  // sport's caption key. Load once per run via lib/team-hashtags. Absent → the
+  // coded defaults.
+  officialMap?: Record<string, string | null>,
 ): { text: string; alt: string } {
   // Twitter charges $0.20/post when a URL is present (vs $0.015 without), so
   // the Twitter paths pass digestUrl=undefined. Bluesky still includes it.
   const tail = digestUrl ? ` ${digestUrl}` : "";
   const m = meta(sport);
+  const official = officialMap ?? defaultOfficialMap(sport);
   if (entry.type === "full") {
     const games = entry.gameCount;
     const gamesLabel = games === 1 ? "1 game" : `${games} games`;
@@ -351,7 +416,7 @@ export function imagePostContent(
       alt: `${name} Leaders as of ${dates.edition}.`,
     };
   }
-  const tags = boxscoreTags(sport, entry.teams);
+  const tags = boxscoreTags(sport, entry.teams, official);
   return {
     text: `${entry.title} · ${dates.games}\n\n${tags} #${m.tag}${tail}`.trim(),
     alt: `Box score: ${entry.title} on ${dates.games}.`,

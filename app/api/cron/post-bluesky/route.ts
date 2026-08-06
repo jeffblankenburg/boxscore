@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
 import { imagePostContent } from "@/lib/social-content";
+import { resolvedOfficialMap } from "@/lib/team-hashtags";
 import { startCronRun, finishCronRun, summarizeItemErrors } from "@/lib/cron-runs";
 
 export const runtime = "nodejs";
@@ -101,6 +102,9 @@ export async function GET(req: Request) {
     console.error(`share-storage upload failed: ${(err as Error).message}`);
   }
 
+  // Admin-editable per-team official hashtags (defaults + DB overrides).
+  const officialMap = await resolvedOfficialMap(sport);
+
   let posted = 0, skipped = 0, failed = 0;
   const results: Array<{ subId: string; url?: string; error?: string }> = [];
 
@@ -119,7 +123,7 @@ export async function GET(req: Request) {
       continue;
     }
 
-    const { text, alt } = imagePostContent(entry, captionDates, digestUrl, sport);
+    const { text, alt } = imagePostContent(entry, captionDates, digestUrl, sport, officialMap);
     const dims = width > 0 && height > 0 ? { width, height } : undefined;
 
     try {

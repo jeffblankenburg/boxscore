@@ -1152,3 +1152,45 @@
   border: 0;
   display: block;
 }
+
+/* /admin/hashtags — per-league social hashtag editor (GH #119) */
+.admin-hashtag-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 28px;
+  font-size: 14px;
+}
+.admin-hashtag-table th,
+.admin-hashtag-table td {
+  text-align: left;
+  padding: 6px 12px 6px 0;
+  border-bottom: 1px solid #e8e2d4;
+  vertical-align: middle;
+}
+.admin-hashtag-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6a6354;
+}
+.admin-hashtag-table .ht-team { font-weight: 600; white-space: nowrap; }
+.admin-hashtag-table .ht-flag {
+  font-weight: 400;
+  font-size: 11px;
+  color: #8a7f66;
+  font-style: italic;
+}
+.admin-hashtag-table .ht-derived {
+  color: #6a6354;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.admin-hashtag-table .ht-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-hashtag-table .ht-hash { color: #8a7f66; }
+.admin-hashtag-table .ht-input { width: 180px; }
+.admin-hashtag-table .ht-reset { white-space: nowrap; }
+.ht-add-h { margin-top: 8px; }

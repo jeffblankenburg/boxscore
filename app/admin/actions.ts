@@ -13,6 +13,8 @@ import { BRAND } from "@/lib/brand";
 import { supabaseAdmin } from "@/lib/supabase";
 import { findTeam, type Sport } from "@/lib/teams";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
+import { saveTeamHashtag, resetTeamHashtag } from "@/lib/team-hashtags";
+import { normalizeHashtagKey } from "@/lib/social-content";
 import { requireAdmin } from "./require-admin";
 
 export async function sendAdminPreview(
@@ -665,4 +667,46 @@ export async function searchSends(query: string): Promise<SearchResults> {
   });
 
   return { subscribers, sends: sendsOut };
+}
+
+// ── /admin/hashtags — per-league social hashtag overrides (GH #119) ──────────
+
+const HASHTAG_SPORTS = new Set(["mlb", "nba", "wnba", "nfl", "ncaaf"]);
+
+export async function saveTeamHashtagAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const sport = String(formData.get("sport") ?? "");
+  const label = String(formData.get("label") ?? "").trim();
+  // Existing roster rows submit their stable key; the "add team" row leaves it
+  // blank, so we derive it from the label the same way the caption resolver does.
+  let teamKey = String(formData.get("teamKey") ?? "").trim();
+  if (!teamKey) teamKey = normalizeHashtagKey(label);
+  const official = String(formData.get("official") ?? "");
+
+  if (!HASHTAG_SPORTS.has(sport) || !teamKey || !label) {
+    redirect(`/admin/hashtags?sport=${sport}&error=${encodeURIComponent("Missing team name")}`);
+  }
+  try {
+    await saveTeamHashtag({ sport, teamKey, label, official });
+  } catch (err) {
+    redirect(`/admin/hashtags?sport=${sport}&error=${encodeURIComponent((err as Error).message)}`);
+  }
+  revalidatePath("/admin/hashtags");
+  redirect(`/admin/hashtags?sport=${sport}&ok=${encodeURIComponent(`Saved ${label}`)}`);
+}
+
+export async function resetTeamHashtagAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const sport = String(formData.get("sport") ?? "");
+  const teamKey = String(formData.get("teamKey") ?? "");
+  if (!HASHTAG_SPORTS.has(sport) || !teamKey) {
+    redirect(`/admin/hashtags?sport=${sport}&error=${encodeURIComponent("Missing team")}`);
+  }
+  try {
+    await resetTeamHashtag(sport, teamKey);
+  } catch (err) {
+    redirect(`/admin/hashtags?sport=${sport}&error=${encodeURIComponent((err as Error).message)}`);
+  }
+  revalidatePath("/admin/hashtags");
+  redirect(`/admin/hashtags?sport=${sport}&ok=${encodeURIComponent("Reverted to default")}`);
 }

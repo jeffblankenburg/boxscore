@@ -79,6 +79,7 @@ export const PLATFORM_AREAS: PlatformArea[] = [
     match: [
       "/admin/content", "/admin/preview/canonical", "/admin/historical",
       "/admin/twitter", "/admin/discord", "/admin/images", "/admin/share-preview",
+      "/admin/hashtags",
     ],
     links: [
       { href: "/admin/content/digests", label: "Digests" },
@@ -91,6 +92,7 @@ export const PLATFORM_AREAS: PlatformArea[] = [
       { href: "/admin/discord", label: "Discord" },
       { href: "/admin/images", label: "Images" },
       { href: "/admin/share-preview", label: "Share preview" },
+      { href: "/admin/hashtags", label: "Hashtags" },
     ],
   },
   {
