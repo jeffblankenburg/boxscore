@@ -4,6 +4,7 @@ import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates"
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
 import { deleteTweet, postTweetWithImage } from "@/lib/twitter";
 import { siteOrigin } from "@/lib/site";
+import { socialSendsAllowed } from "@/lib/sports";
 import { supabaseAdmin } from "@/lib/supabase";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
@@ -37,6 +38,14 @@ export async function GET(req: Request) {
   const runId = await startCronRun({ route: "post-twitter", sport, date, trigger });
 
   try {
+    // Cron-triggered posts only run for a publicly-launched sport with sends
+    // enabled; manual admin triggers bypass so pre-launch sports can be tested.
+    if (trigger !== "manual" && !(await socialSendsAllowed(sport))) {
+      const result = { sport, date, skipped: "sport not public or sends disabled" };
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
     if (reset) {
       const { data: prior, error: priorErr } = await supabaseAdmin()
         .from("social_posts")
@@ -66,9 +75,12 @@ export async function GET(req: Request) {
       games: prettyDate(date),
     };
 
+    // NCAAF ships scoreboards only (Top 25 + per-conference); posting one image
+    // per FBS game would be dozens of tweets.
+    const scoreboardsOnly = sport === "ncaaf";
     let images: Awaited<ReturnType<typeof renderShareImages>>;
     try {
-      images = await renderShareImages({ date, baseUrl: origin });
+      images = await renderShareImages({ date, baseUrl: origin, sport, scoreboardsOnly });
     } catch (err) {
       throw new Error(`render failed: ${(err as Error).message}`);
     }
@@ -77,7 +89,7 @@ export async function GET(req: Request) {
     // serve the latest set. Failure here doesn't block posting. Storage key
     // is the EDITION date — matches og:image and `/mlb/[editionDate]`.
     try {
-      await uploadShareImages({ editionDate, images });
+      await uploadShareImages({ editionDate, images, sport });
     } catch (err) {
       console.error(`share-storage upload failed: ${(err as Error).message}`);
     }
@@ -103,7 +115,7 @@ export async function GET(req: Request) {
 
       // No digestUrl for Twitter: URL-bearing posts cost $0.20 vs $0.015
       // without. The bio link covers click-through.
-      const { text, alt } = imagePostContent(entry, captionDates);
+      const { text, alt } = imagePostContent(entry, captionDates, undefined, sport);
       const mimeType = mime === "image/jpeg" ? EUploadMimeType.Jpeg : EUploadMimeType.Png;
 
       try {

@@ -85,7 +85,10 @@ export function buildLeagueEntryEmbed(args: {
   let description: string | undefined;
   if (args.entry.type === "scoreboard") {
     const gamesLabel = args.entry.gameCount === 1 ? "1 game" : `${args.entry.gameCount} games`;
-    title = `${sportLabel} Scoreboard · ${args.prettyGamesDate}`;
+    // A board label ("Top 25", "SEC") leads when a sport fans out into several
+    // boards (NCAAF); otherwise the league label leads ("MLB Scoreboard").
+    const heading = args.entry.label ?? sportLabel;
+    title = `${heading} Scoreboard · ${args.prettyGamesDate}`;
     description = `Final scores from ${gamesLabel}.`;
   } else if (args.entry.type === "standings") {
     const leagueName = args.entry.league === "AL" ? "American League" : "National League";

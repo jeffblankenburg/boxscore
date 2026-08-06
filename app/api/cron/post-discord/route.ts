@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { EMAIL_LINK_BASE, siteOrigin } from "@/lib/site";
+import { socialSendsAllowed } from "@/lib/sports";
 import { renderShareImages } from "@/lib/render-images";
 import { uploadShareImages } from "@/lib/share-storage";
 import {
@@ -46,6 +47,14 @@ export async function GET(req: Request) {
   const runId = await startCronRun({ route: "post-discord", sport, date, trigger });
 
   try {
+    // Cron-triggered posts only run for a publicly-launched sport with sends
+    // enabled; manual admin triggers bypass so pre-launch sports can be tested.
+    if (trigger !== "manual" && !(await socialSendsAllowed(sport))) {
+      const result = { sport, date, skipped: "sport not public or sends disabled" };
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
     const origin = await siteOrigin();
     const editionDate = nextDay(date);
     const digestUrl = `${EMAIL_LINK_BASE}/${sport}/${editionDate}`;
@@ -55,16 +64,19 @@ export async function GET(req: Request) {
     // Re-use the same share-image rendering path as post-bluesky. Images
     // are rendered in-memory by Puppeteer, then uploaded to Supabase
     // Storage so the embed URLs are stable public links Discord can fetch.
+    // NCAAF ships scoreboards only (Top 25 + per-conference) to its league
+    // channel; per-game box posting to team channels would be dozens of games.
+    const scoreboardsOnly = sport === "ncaaf";
     let images: Awaited<ReturnType<typeof renderShareImages>>;
     try {
-      images = await renderShareImages({ date, baseUrl: origin });
+      images = await renderShareImages({ date, baseUrl: origin, sport, scoreboardsOnly });
     } catch (err) {
       throw new Error(`render failed: ${(err as Error).message}`);
     }
 
     let manifest: Awaited<ReturnType<typeof uploadShareImages>>;
     try {
-      manifest = await uploadShareImages({ editionDate, images });
+      manifest = await uploadShareImages({ editionDate, images, sport });
     } catch (err) {
       throw new Error(`upload failed: ${(err as Error).message}`);
     }

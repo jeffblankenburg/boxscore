@@ -4,19 +4,31 @@ import { prettyDate as formatPrettyDate, prevDay } from "./dates";
 
 // Storage strategy for share images:
 //   - Images accumulate per date so RSS items can embed their own day's images.
-//     Files live at bucket root keyed by `{date}_{file}`, e.g.
-//     "2026-05-14_al-standings.png".
+//     MLB files live at bucket root keyed by `{date}_{file}`, e.g.
+//     "2026-05-14_al-standings.png". Other sports (nba/wnba/nfl/ncaaf) live in a
+//     per-sport subfolder, e.g. "wnba/2026-08-04_boxscore-01.png". MLB stays at
+//     root so its long-standing og:image URLs don't move.
 //   - Each generate `upsert`s its set — re-running a date overwrites in place.
 //     `clearShareImages` exists for an explicit wipe but the normal cron path
 //     doesn't call it.
-//   - Manifest: "_manifest.json" — full entry metadata (titles, teams, league)
-//     for downstream consumers like the admin Twitter page that need to
-//     compose post text without re-rendering. Tracks only the most recently
-//     generated date.
+//   - Manifest: "_manifest.json" (per sport, so "wnba/_manifest.json") — full
+//     entry metadata (titles, teams, league) for downstream consumers like the
+//     admin Twitter page that need to compose post text without re-rendering.
+//     Tracks only the most recently generated date for that sport.
 //   - Public bucket → <img> tags work without auth.
 
 const BUCKET = "share-images";
 const MANIFEST_FILE = "_manifest.json";
+
+// MLB lives at bucket root (preserving its historical keys + og:image URLs);
+// every other sport gets its own subfolder. `folderFor` is the list() path,
+// `pathFor` prefixes an object key.
+function folderFor(sport: string): string {
+  return sport === "mlb" ? "" : sport;
+}
+function pathFor(sport: string, name: string): string {
+  return sport === "mlb" ? name : `${sport}/${name}`;
+}
 
 export type StoredImage = {
   file: string;        // e.g. "al-standings.png" (without the date_ prefix)
@@ -41,13 +53,15 @@ export type StoredManifest = {
   entries: ManifestImage[];
 };
 
-export async function clearShareImages(): Promise<number> {
+export async function clearShareImages(sport = "mlb"): Promise<number> {
   const supa = supabaseAdmin();
-  const { data, error } = await supa.storage.from(BUCKET).list("", { limit: 1000 });
+  const folder = folderFor(sport);
+  const { data, error } = await supa.storage.from(BUCKET).list(folder, { limit: 1000 });
   if (error) throw new Error(`storage list: ${error.message}`);
   const names = (data ?? [])
     .map((f) => f.name)
-    .filter((n) => n !== ".emptyFolderPlaceholder");
+    .filter((n) => n !== ".emptyFolderPlaceholder")
+    .map((n) => pathFor(sport, n));
   if (names.length === 0) return 0;
   const { error: rmErr } = await supa.storage.from(BUCKET).remove(names);
   if (rmErr) throw new Error(`storage remove: ${rmErr.message}`);
@@ -57,6 +71,7 @@ export async function clearShareImages(): Promise<number> {
 export async function uploadShareImages(args: {
   editionDate: string;
   images: RenderedImage[];
+  sport?: string;
 }): Promise<StoredManifest> {
   // Historical accumulation: every edition's images stay in the bucket so the
   // RSS feed can embed them per-item. Each upload uses `upsert: true` so
@@ -71,9 +86,10 @@ export async function uploadShareImages(args: {
   // per-image CONTENT date (e.g. box-score images showing the games date) is
   // handled at render time and is independent of the storage key.
   const supa = supabaseAdmin();
+  const sport = args.sport ?? "mlb";
   const entries: ManifestImage[] = [];
   for (const { entry, png, mime } of args.images) {
-    const path = `${args.editionDate}_${entry.file}`;
+    const path = pathFor(sport, `${args.editionDate}_${entry.file}`);
     const { error } = await supa.storage.from(BUCKET).upload(path, png, {
       contentType: mime,
       upsert: true,
@@ -90,7 +106,7 @@ export async function uploadShareImages(args: {
     entries,
   };
   const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
-  const { error: mErr } = await supa.storage.from(BUCKET).upload(MANIFEST_FILE, manifestBytes, {
+  const { error: mErr } = await supa.storage.from(BUCKET).upload(pathFor(sport, MANIFEST_FILE), manifestBytes, {
     contentType: "application/json",
     upsert: true,
   });
@@ -99,9 +115,9 @@ export async function uploadShareImages(args: {
   return manifest;
 }
 
-export async function getStoredManifest(): Promise<StoredManifest | null> {
+export async function getStoredManifest(sport = "mlb"): Promise<StoredManifest | null> {
   const supa = supabaseAdmin();
-  const { data, error } = await supa.storage.from(BUCKET).download(MANIFEST_FILE);
+  const { data, error } = await supa.storage.from(BUCKET).download(pathFor(sport, MANIFEST_FILE));
   if (error || !data) return null;
   try {
     const text = await data.text();
@@ -121,13 +137,14 @@ const STORAGE_PAGE = 1000;
 // linearly with days of accumulated images (≈16 per day for MLB), so the
 // admin's "what dates have files" query and the default-latest-date lookup
 // both need every page.
-async function listAllFiles(): Promise<Array<{ name: string; updated_at?: string | null }>> {
+async function listAllFiles(sport = "mlb"): Promise<Array<{ name: string; updated_at?: string | null }>> {
   const supa = supabaseAdmin();
+  const folder = folderFor(sport);
   const all: Array<{ name: string; updated_at?: string | null }> = [];
   for (let offset = 0; ; offset += STORAGE_PAGE) {
     const { data, error } = await supa.storage
       .from(BUCKET)
-      .list("", { limit: STORAGE_PAGE, offset });
+      .list(folder, { limit: STORAGE_PAGE, offset });
     if (error) throw new Error(`storage list: ${error.message}`);
     const page = data ?? [];
     all.push(...page);
@@ -142,8 +159,10 @@ async function listAllFiles(): Promise<Array<{ name: string; updated_at?: string
 // lets the admin view label the grid correctly even when defaulting.
 export async function listStoredImages(
   date?: string,
+  sport = "mlb",
 ): Promise<{ date: string | null; images: StoredImage[] }> {
   const supa = supabaseAdmin();
+  const folder = folderFor(sport);
 
   // When the caller knows the date, hit the server-side `search:` prefix
   // filter — that's a LIKE on the storage objects table and isn't subject
@@ -151,21 +170,21 @@ export async function listStoredImages(
   if (date) {
     const { data, error } = await supa.storage
       .from(BUCKET)
-      .list("", { search: `${date}_`, limit: STORAGE_PAGE });
+      .list(folder, { search: `${date}_`, limit: STORAGE_PAGE });
     if (error) throw new Error(`storage list: ${error.message}`);
     const images: StoredImage[] = [];
     for (const f of data ?? []) {
       const m = f.name.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
       if (!m || m[1] !== date) continue;
-      const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(f.name);
+      const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(pathFor(sport, f.name));
       images.push({ file: m[2]!, url: urlData.publicUrl, updatedAt: f.updated_at ?? null });
     }
     images.sort((a, b) => imagePriority(a.file) - imagePriority(b.file));
     return { date: images.length > 0 ? date : null, images };
   }
 
-  // No date — find the latest one by scanning the full bucket (paginated).
-  const allFiles = await listAllFiles();
+  // No date — find the latest one by scanning the full folder (paginated).
+  const allFiles = await listAllFiles(sport);
   type FileEntry = { date: string; file: string; updatedAt: string | null };
   const parsed: FileEntry[] = [];
   for (const f of allFiles) {
@@ -179,17 +198,17 @@ export async function listStoredImages(
   const images: StoredImage[] = [];
   for (const f of parsed) {
     if (f.date !== targetDate) continue;
-    const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(`${f.date}_${f.file}`);
+    const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(pathFor(sport, `${f.date}_${f.file}`));
     images.push({ file: f.file, url: urlData.publicUrl, updatedAt: f.updatedAt });
   }
   images.sort((a, b) => imagePriority(a.file) - imagePriority(b.file));
   return { date: targetDate, images };
 }
 
-// All distinct dates present in the bucket, newest first. Used by the admin
-// images view to populate a date selector.
-export async function listStoredDates(): Promise<string[]> {
-  const all = await listAllFiles();
+// All distinct dates present in the sport's folder, newest first. Used by the
+// admin images view to populate a date selector.
+export async function listStoredDates(sport = "mlb"): Promise<string[]> {
+  const all = await listAllFiles(sport);
   const dates = new Set<string>();
   for (const f of all) {
     const m = f.name.match(/^(\d{4}-\d{2}-\d{2})_/);
@@ -218,9 +237,10 @@ function imagePriority(file: string): number {
 export async function uploadScoreboardShareImage(args: {
   editionDate: string;
   png: Uint8Array;
+  sport?: string;
 }): Promise<{ path: string; publicUrl: string }> {
   const supa = supabaseAdmin();
-  const path = `${args.editionDate}_scoreboard.png`;
+  const path = pathFor(args.sport ?? "mlb", `${args.editionDate}_scoreboard.png`);
   const { error } = await supa.storage.from(BUCKET).upload(path, args.png, {
     contentType: "image/png",
     upsert: true,
@@ -268,13 +288,14 @@ export async function uploadArtBoxImage(gamePk: number, png: Uint8Array): Promis
 // Look up an already-uploaded scoreboard image for an edition date. Returns
 // null when the file doesn't exist. Used by /mlb/[editionDate]'s
 // generateMetadata to set og:image when we've already rendered the image.
-export async function getScoreboardShareImageUrl(editionDate: string): Promise<string | null> {
+export async function getScoreboardShareImageUrl(editionDate: string, sport = "mlb"): Promise<string | null> {
   const supa = supabaseAdmin();
-  const path = `${editionDate}_scoreboard.png`;
+  const folder = folderFor(sport);
+  const name = `${editionDate}_scoreboard.png`;
   // list with a tight prefix filter is cheaper than HEAD or download.
-  const { data, error } = await supa.storage.from(BUCKET).list("", { search: path, limit: 1 });
+  const { data, error } = await supa.storage.from(BUCKET).list(folder, { search: name, limit: 1 });
   if (error) return null;
-  if (!data?.some((f) => f.name === path)) return null;
-  const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(path);
+  if (!data?.some((f) => f.name === name)) return null;
+  const { data: urlData } = supa.storage.from(BUCKET).getPublicUrl(pathFor(sport, name));
   return urlData.publicUrl;
 }

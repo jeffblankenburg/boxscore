@@ -35,7 +35,7 @@ import type {
 import type { DigestMode } from "@/lib/digest-mode";
 import { findTeam } from "@/lib/teams";
 import { nextDay, prettyDate, issueNumber, volumeNumber } from "@/lib/dates";
-import { lastName } from "@/lib/names";
+import { lastName, boxSurname, collidingSurnames } from "@/lib/names";
 import { lastNameLinkWeb, fullNameLinkWeb } from "@/lib/player-links";
 import { sortTransactionsByTeam } from "../transactions";
 
@@ -1009,8 +1009,18 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
     }
     return null;
   };
+  // Which team the decision pitcher is on — so we can apply the same
+  // same-surname initial the pitching table uses ("Sv: J Hernández").
+  const findPitcherTeam = (id: string): MlbBoxTeam | null => {
+    for (const team of [box.away, box.home]) {
+      if (team.pitchers.some((p) => p.player.id === id)) return team;
+    }
+    return null;
+  };
   const fmtDecision = (label: string, pitcher: MlbPlayerRef, kind: "wl" | "sv"): string => {
-    const name = lastNameLinkWeb(pitcher);
+    const team = findPitcherTeam(pitcher.id);
+    const display = team ? boxSurname(pitcher.fullName, teamCollisions(team)) : undefined;
+    const name = lastNameLinkWeb(pitcher, display);
     const s = findPitcherSeason(pitcher.id);
     let suffix = "";
     if (s) {
@@ -1059,11 +1069,26 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
 </div>`;
 }
 
+// Surnames shared by 2+ players who appear in this team's box (batters +
+// pitchers, deduped by id) — those players get a leading first initial to tell
+// them apart ("J Hernández"). Computed once per team.
+function teamCollisions(team: MlbBoxTeam): Set<string> {
+  const seen = new Set<string>();
+  const fullNames: string[] = [];
+  for (const p of [...team.batters, ...team.pitchers]) {
+    if (seen.has(p.player.id)) continue;
+    seen.add(p.player.id);
+    fullNames.push(p.player.fullName);
+  }
+  return collidingSurnames(fullNames);
+}
+
 function renderBatting(team: MlbBoxTeam, cityName: string, bkey?: string, side?: "away" | "home", hl?: HighlightMap): string {
   // Production renderer iterates team.batters (player IDs) and looks each
   // up in team.players. Canonical stores batters as the player array
   // directly, in display order — same iteration.
   const ordered = team.batters;
+  const colliding = teamCollisions(team);
 
   const rows = ordered.map((p) => {
     const b = p.batting;
@@ -1079,7 +1104,7 @@ function renderBatting(team: MlbBoxTeam, cityName: string, bkey?: string, side?:
       ? diffAttrs(hl, `${bkey}:${side}:batters:${normalizeName(p.player.fullName)}`)
       : "";
     return `<tr${rowAttrs}>
-      <td class="${playerCls}">${lastNameLinkWeb(p.player)} ${esc(pos)}</td>
+      <td class="${playerCls}">${lastNameLinkWeb(p.player, boxSurname(p.player.fullName, colliding))} ${esc(pos)}</td>
       <td class="stat-col">${pad(b.atBats)}</td>
       <td class="r-col">${pad(b.runs)}</td>
       <td class="stat-col">${pad(b.hits)}</td>
@@ -1105,7 +1130,7 @@ function renderBatting(team: MlbBoxTeam, cityName: string, bkey?: string, side?:
     <td class="ops-col"></td>
   </tr>`;
 
-  const extras = hittingExtras(ordered, team.pitchers);
+  const extras = hittingExtras(ordered, team.pitchers, colliding);
   return `<table class="batting-table">
     <thead>
       <tr>
@@ -1125,7 +1150,7 @@ function renderBatting(team: MlbBoxTeam, cityName: string, bkey?: string, side?:
   ${extras ? `<div class="notes">${extras}</div>` : ""}`;
 }
 
-function hittingExtras(batters: MlbBoxPlayer[], pitchers: MlbBoxPlayer[]): string {
+function hittingExtras(batters: MlbBoxPlayer[], pitchers: MlbBoxPlayer[], colliding: Set<string>): string {
   type Bucket = { last: string; count: number; season: number };
   const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[], RBI: [] as Bucket[], E: [] as Bucket[] };
   // One entry per player-stat combo. Multi-count games render as
@@ -1138,7 +1163,7 @@ function hittingExtras(batters: MlbBoxPlayer[], pitchers: MlbBoxPlayer[]): strin
     const b = p.batting;
     if (!b) continue;
     const s = p.seasonBatting;
-    const name = lastName(p.player.fullName);
+    const name = boxSurname(p.player.fullName, colliding);
     push(cat["2B"], name, b.doubles,     s?.doubles     ?? 0);
     push(cat["3B"], name, b.triples,     s?.triples     ?? 0);
     push(cat.HR,   name, b.homeRuns,     s?.homeRuns    ?? 0);
@@ -1154,7 +1179,7 @@ function hittingExtras(batters: MlbBoxPlayer[], pitchers: MlbBoxPlayer[]): strin
     const key = p.player.id;
     if (seen.has(key)) continue;
     seen.add(key);
-    push(cat.E, lastName(p.player.fullName), p.errors, p.seasonErrors);
+    push(cat.E, boxSurname(p.player.fullName, colliding), p.errors, p.seasonErrors);
   }
   const parts: string[] = [];
   for (const [label, list] of Object.entries(cat)) {
@@ -1169,6 +1194,7 @@ function hittingExtras(batters: MlbBoxPlayer[], pitchers: MlbBoxPlayer[]): strin
 
 function renderPitching(team: MlbBoxTeam, cityName: string, bkey?: string, side?: "away" | "home", hl?: HighlightMap): string {
   const ordered = team.pitchers;
+  const colliding = teamCollisions(team);
   const rows = ordered.map((p) => {
     const pi = p.pitching;
     if (!pi) return "";
@@ -1178,7 +1204,7 @@ function renderPitching(team: MlbBoxTeam, cityName: string, bkey?: string, side?
       ? diffAttrs(hl, `${bkey}:${side}:pitchers:${normalizeName(p.player.fullName)}`)
       : "";
     return `<tr${rowAttrs}>
-      <td class="player-col">${lastNameLinkWeb(p.player)}${note}</td>
+      <td class="player-col">${lastNameLinkWeb(p.player, boxSurname(p.player.fullName, colliding))}${note}</td>
       <td class="ip-col">${esc(fmtIp(pi.inningsPitched))}</td>
       <td class="stat-col">${pad(pi.hits)}</td>
       <td class="stat-col">${pad(pi.runs)}</td>
@@ -1191,7 +1217,7 @@ function renderPitching(team: MlbBoxTeam, cityName: string, bkey?: string, side?
     </tr>`;
   }).join("");
 
-  const extras = pitchingExtras(ordered);
+  const extras = pitchingExtras(ordered, colliding);
   return `<table class="pitching-table">
     <thead>
       <tr>
@@ -1212,7 +1238,7 @@ function renderPitching(team: MlbBoxTeam, cityName: string, bkey?: string, side?
   ${extras ? `<div class="notes">${extras}</div>` : ""}`;
 }
 
-function pitchingExtras(players: MlbBoxPlayer[]): string {
+function pitchingExtras(players: MlbBoxPlayer[], colliding: Set<string>): string {
   type Row = { last: string; p: number; s: number };
   const rows: Row[] = [];
   for (const p of players) {
@@ -1220,7 +1246,7 @@ function pitchingExtras(players: MlbBoxPlayer[]): string {
     if (!pi) continue;
     const pitches = pi.pitchesThrown ?? 0;
     if (pitches === 0) continue;
-    rows.push({ last: lastName(p.player.fullName), p: pitches, s: pi.strikes ?? 0 });
+    rows.push({ last: boxSurname(p.player.fullName, colliding), p: pitches, s: pi.strikes ?? 0 });
   }
   if (rows.length === 0) return "";
   const pcst = rows.map((r) => `${esc(r.last)} (${r.s}-${r.p})`).join(", ");

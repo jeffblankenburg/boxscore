@@ -141,6 +141,18 @@ export async function getSportRow(id: string): Promise<SportRow | null> {
 }
 
 /**
+ * Whether automated social posting (Twitter/BlueSky/Discord) should run for a
+ * sport: it must be publicly launched AND have sends enabled. Admin-only sports
+ * (every league before its public launch) return false, so their post crons can
+ * be scheduled ahead of time yet stay dormant until the sport goes live. Manual
+ * admin triggers bypass this check at the call site.
+ */
+export async function socialSendsAllowed(id: string): Promise<boolean> {
+  const row = await getSportRow(id);
+  return !!row && row.visibility === "public" && row.sends_enabled;
+}
+
+/**
  * Admin-only: flip a sport's public/admin-only visibility. Writes the row and
  * busts the cache tag so getVisibleSports/isSportVisible pick it up immediately
  * on the next render. Independent of sends_enabled — a sport can be public with

@@ -28,8 +28,11 @@ const esc = (s: string): string =>
    .replace(/"/g, "&quot;")
    .replace(/'/g, "&#39;");
 
-export function lastNameLinkWeb(p: PersonRef): string {
-  const text = esc(lastName(p.fullName ?? ""));
+// `displayText` overrides the shown name (still HTML-escaped) — used by box
+// scores to inject a disambiguating first initial ("J Hernandez") while the
+// link target stays the player's slug.
+export function lastNameLinkWeb(p: PersonRef, displayText?: string): string {
+  const text = esc(displayText ?? lastName(p.fullName ?? ""));
   const slug = slugOf(p);
   return slug
     ? `<a class="player-link" href="/mlb/player/${encodeURIComponent(slug)}">${text}</a>`
@@ -39,8 +42,8 @@ export function lastNameLinkWeb(p: PersonRef): string {
 // Email variant: absolute URL + inline color/decoration overrides since
 // many mail clients strip <style> blocks and the underline default reads
 // wrong against the digest's text-forward aesthetic.
-export function lastNameLinkEmail(p: PersonRef): string {
-  const text = esc(lastName(p.fullName ?? ""));
+export function lastNameLinkEmail(p: PersonRef, displayText?: string): string {
+  const text = esc(displayText ?? lastName(p.fullName ?? ""));
   const slug = slugOf(p);
   return slug
     ? `<a class="es-player-link" href="${EMAIL_LINK_BASE}/mlb/player/${encodeURIComponent(slug)}" style="color:inherit;text-decoration:none">${text}</a>`

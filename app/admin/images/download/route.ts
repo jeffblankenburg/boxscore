@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
 
   const rawDate = req.nextUrl.searchParams.get("date");
   const requestedDate = rawDate && isValidIsoDate(rawDate) ? rawDate : undefined;
-  const { date, images } = await listStoredImages(requestedDate);
+  const rawSport = req.nextUrl.searchParams.get("sport");
+  const sport = rawSport || "mlb";
+  const { date, images } = await listStoredImages(requestedDate, sport);
   if (images.length === 0) {
     return NextResponse.json({ error: "no images" }, { status: 404 });
   }
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest) {
   );
 
   const buf = await zip.generateAsync({ type: "nodebuffer" });
-  const filename = `boxscore-images-${date ?? "current"}.zip`;
+  const filename = `boxscore-images-${sport}-${date ?? "current"}.zip`;
   return new NextResponse(new Uint8Array(buf), {
     status: 200,
     headers: {

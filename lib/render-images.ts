@@ -18,7 +18,9 @@ export type ManifestEntry =
   | { file: string; subId: string; type: "leaders"; league: "AL" | "NL" }
   | { file: string; subId: string; type: "boxscore"; title: string; teams: [string, string] }
   | { file: string; subId: string; type: "full"; gameCount: number }
-  | { file: string; subId: string; type: "scoreboard"; gameCount: number };
+  // `label` names a specific board when a sport fans out into several
+  // (NCAAF: "Top 25", "SEC", …). Absent for single-board sports.
+  | { file: string; subId: string; type: "scoreboard"; gameCount: number; label?: string };
 
 export type ImageMime = "image/png" | "image/jpeg";
 
@@ -177,7 +179,7 @@ const SPORT_SHARE_SPECS: Record<string, SportShareSpec> = {
     sport: "nfl",
     gameSelector: ".fb-game",
     gameTitleSelector: ".fb-game-matchup",
-    stripFromTitle: [".fb-upset"],
+    stripFromTitle: [".fb-upset", ".fb-rank-badge"],
     parseTitle: parseAtMatchup,
     boxContainerSelector: ".fb-boxscores",
     boxWidth: 680,
@@ -188,7 +190,7 @@ const SPORT_SHARE_SPECS: Record<string, SportShareSpec> = {
     sport: "ncaaf",
     gameSelector: ".fb-game",
     gameTitleSelector: ".fb-game-matchup",
-    stripFromTitle: [".fb-upset"],
+    stripFromTitle: [".fb-upset", ".fb-rank-badge"],
     parseTitle: parseAtMatchup,
     boxContainerSelector: ".fb-boxscores",
     boxWidth: 680,
@@ -201,6 +203,36 @@ function shareSpecFor(sport: string): SportShareSpec {
   const spec = SPORT_SHARE_SPECS[sport];
   if (!spec) throw new Error(`renderShareImages: unsupported sport "${sport}"`);
   return spec;
+}
+
+type ScoreboardBoard = { file: string; subId: string; conf?: string; label?: string };
+
+// The scoreboard boards to capture for a sport on a given games date. Every
+// sport posts a single board except NCAAF, which fans out into a Top 25 board
+// plus one per conference — and only boards that actually had games that day
+// (see the ncaaf-scoreboard-cadence note). Uses the pure data path
+// (scoreTilesForSport) to skip empties before spending a puppeteer capture.
+async function scoreboardBoardsFor(sport: string, gamesDate: string): Promise<ScoreboardBoard[]> {
+  if (sport !== "ncaaf") {
+    return [{ file: "scoreboard.png", subId: "scoreboard" }];
+  }
+  const { scoreTilesForSport } = await import("./scoreboard-tiles");
+  const { NCAAF_CONFERENCES } = await import("./sports/football/conferences");
+  const scopes = ["top25", ...NCAAF_CONFERENCES.map((c) => c.slug)];
+  const boards: ScoreboardBoard[] = [];
+  for (const scope of scopes) {
+    const tiles = await scoreTilesForSport("ncaaf", gamesDate, { ncaafScope: scope });
+    if (tiles.length === 0) continue;
+    const label =
+      scope === "top25" ? "Top 25" : (NCAAF_CONFERENCES.find((c) => c.slug === scope)?.short ?? scope);
+    boards.push({
+      file: `scoreboard-${scope}.png`,
+      subId: `scoreboard-${scope}`,
+      conf: scope === "top25" ? undefined : scope,
+      label,
+    });
+  }
+  return boards;
 }
 
 // Shared brand+date header / tagline+URL footer styling for every per-section
@@ -488,8 +520,12 @@ export async function renderShareImages(args: {
   date: string;
   baseUrl: string; // e.g. "https://boxscore.email" or "http://localhost:3001"
   sport?: string;  // defaults to "mlb"
+  // Scoreboard(s) only — skip the full digest, standings/leaders, and per-game
+  // box scores. Used by the NCAAF posting path, which ships Top 25 + per-
+  // conference boards rather than one image per (often 40+) game.
+  scoreboardsOnly?: boolean;
 }): Promise<RenderedImage[]> {
-  const { date, baseUrl } = args;
+  const { date, baseUrl, scoreboardsOnly } = args;
   const spec = shareSpecFor(args.sport ?? "mlb");
   // Caller passes games_date; the public page now lives at edition_date.
   const url = `${baseUrl}/${spec.sport}/${nextDay(date)}`;
@@ -505,33 +541,43 @@ export async function renderShareImages(args: {
   try {
     const results: RenderedImage[] = [];
 
-    // FIRST capture: the 1200×630 scoreboard share-image from /share/mlb/[date].
-    // Goes at index 0 so the post-* crons (which loop and post one image per
-    // platform call) put the scoreboard at the top of the daily Twitter,
-    // Bluesky, and Facebook series. Render failures are caught — losing the
-    // scoreboard shouldn't block the rest of the per-section captures.
-    try {
-      const sb = await captureScoreboardOnBrowser(browser, {
-        sport: spec.sport, editionDate: nextDay(date), baseUrl,
-      });
-      // Skip an empty scoreboard (0 completed games — All-Star break, offseason);
-      // a blank grid isn't worth posting to social.
-      if (sb.gameCount > 0) {
-        results.push({
-          entry: {
-            file: "scoreboard.png",
-            subId: "scoreboard",
-            type: "scoreboard",
-            gameCount: sb.gameCount,
-          },
-          png: sb.png,
-          mime: "image/png",
-          width: sb.width,
-          height: sb.height,
+    // FIRST captures: the 1200×630 scoreboard share-image(s) from
+    // /share/[sport]/[date]. These go at the front so the post-* crons (which
+    // loop and post one image per platform call) lead the daily series with the
+    // scoreboard(s). NCAAF fans out into Top 25 + per-conference boards; every
+    // other sport captures a single board. Render failures are caught per board
+    // — losing one shouldn't block the rest.
+    const boards = await scoreboardBoardsFor(spec.sport, date);
+    for (const board of boards) {
+      try {
+        const sb = await captureScoreboardOnBrowser(browser, {
+          sport: spec.sport, editionDate: nextDay(date), baseUrl, conf: board.conf,
         });
+        // Skip an empty board (0 completed games — offseason, quiet weekday);
+        // a blank grid isn't worth posting to social.
+        if (sb.gameCount > 0) {
+          results.push({
+            entry: {
+              file: board.file,
+              subId: board.subId,
+              type: "scoreboard",
+              gameCount: sb.gameCount,
+              ...(board.label ? { label: board.label } : {}),
+            },
+            png: sb.png,
+            mime: "image/png",
+            width: sb.width,
+            height: sb.height,
+          });
+        }
+      } catch (err) {
+        console.error(`scoreboard capture failed (${board.subId}): ${(err as Error).message}`);
       }
-    } catch (err) {
-      console.error(`scoreboard capture failed: ${(err as Error).message}`);
+    }
+
+    // Scoreboard-only sports (NCAAF) stop here — no digest page walk.
+    if (scoreboardsOnly) {
+      return results;
     }
 
     const page = await browser.newPage();

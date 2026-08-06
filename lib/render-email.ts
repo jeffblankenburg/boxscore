@@ -27,7 +27,7 @@ import type { Transaction } from "./mlb";
 import { nextDay, prettyDate } from "./dates";
 import { findTeamByMlbApiId } from "./teams";
 import { EMAIL_LINK_BASE } from "./site";
-import { lastName } from "./names";
+import { lastName, boxSurname, collidingSurnames } from "./names";
 import { lastNameLinkEmail } from "./player-links";
 
 // Re-exported for the basketball renderer, which imports lastName from here.
@@ -536,10 +536,24 @@ function renderInningLine(team: string, line: string): string {
   </tr>`;
 }
 
+// Surnames shared by 2+ players in this team's box (batters + pitchers,
+// deduped) — those players get a leading first initial ("J Hernandez"). Same
+// rule as the web renderer; see lib/render.ts.
+function teamCollisions(team: BoxTeam): Set<string> {
+  const ids = new Set([...team.batters, ...team.pitchers]);
+  const fullNames: string[] = [];
+  for (const id of ids) {
+    const p = team.players[`ID${id}`];
+    if (p) fullNames.push(p.person.fullName);
+  }
+  return collidingSurnames(fullNames);
+}
+
 function renderBatting(team: BoxTeam, cityName: string): string {
   const ordered = team.batters
     .map((id) => team.players[`ID${id}`])
     .filter((p): p is BoxPlayer => !!p);
+  const colliding = teamCollisions(team);
   const rows = ordered.map((p) => {
     const b = p.stats.batting;
     if (b.atBats == null && b.baseOnBalls == null && b.strikeOuts == null && b.hits == null) return "";
@@ -549,7 +563,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     const isStarter = !!p.battingOrder && p.battingOrder.endsWith("00");
     const indent = isStarter ? "" : ' style="padding-left:10px;"';
     return `<tr>
-      <td align="left"${indent}>${lastNameLinkEmail(p.person)} <span class="es-mut">${esc(pos)}</span></td>
+      <td align="left"${indent}>${lastNameLinkEmail(p.person, boxSurname(p.person.fullName, colliding))} <span class="es-mut">${esc(pos)}</span></td>
       <td align="right">${pad(b.atBats)}</td>
       <td align="right">${pad(b.runs)}</td>
       <td align="right">${pad(b.hits)}</td>
@@ -572,7 +586,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     <td></td>
     <td></td>
   </tr>`;
-  const extras = hittingExtras(ordered);
+  const extras = hittingExtras(ordered, colliding);
   return `<div class="es-team-label">${esc(cityName)} Batting</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
@@ -598,7 +612,7 @@ function renderBatting(team: BoxTeam, cityName: string): string {
 // "Newspaper extras" line under a team's batting table: 2B, 3B, HR, SB lines
 // with each player's season total in parentheses. Returns "" if nothing to
 // show (e.g., bunt-only game).
-function hittingExtras(players: BoxPlayer[]): string {
+function hittingExtras(players: BoxPlayer[], colliding: Set<string>): string {
   type Bucket = { last: string; count: number; season: number };
   const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[] };
   // One entry per player-stat combo. Multi-count games render as
@@ -610,7 +624,7 @@ function hittingExtras(players: BoxPlayer[]): string {
   for (const p of players) {
     const b = p.stats.batting;
     const s = p.seasonStats.batting;
-    const name = lastName(p.person.fullName);
+    const name = boxSurname(p.person.fullName, colliding);
     push(cat["2B"], name, b.doubles ?? 0, s.doubles ?? 0);
     push(cat["3B"], name, b.triples ?? 0, s.triples ?? 0);
     push(cat.HR, name, b.homeRuns ?? 0, s.homeRuns ?? 0);
@@ -631,6 +645,7 @@ function renderPitching(team: BoxTeam, cityName: string): string {
   const ordered = team.pitchers
     .map((id) => team.players[`ID${id}`])
     .filter((p): p is BoxPlayer => !!p);
+  const colliding = teamCollisions(team);
   const rows = ordered.map((p) => {
     const pi = p.stats.pitching;
     const era = fmtEra(p.seasonStats.pitching.era);
@@ -638,7 +653,7 @@ function renderPitching(team: BoxTeam, cityName: string): string {
       ? ` <span style="color:#6a6354;font-weight:400;">${esc(pi.note)}</span>`
       : "";
     return `<tr>
-      <td align="left">${lastNameLinkEmail(p.person)}${note}</td>
+      <td align="left">${lastNameLinkEmail(p.person, boxSurname(p.person.fullName, colliding))}${note}</td>
       <td align="right">${esc(pi.inningsPitched ?? "-")}</td>
       <td align="right">${pad(pi.hits)}</td>
       <td align="right">${pad(pi.runs)}</td>
@@ -650,7 +665,7 @@ function renderPitching(team: BoxTeam, cityName: string): string {
       <td align="right">${era}</td>
     </tr>`;
   }).join("");
-  const extras = pitchingExtras(ordered);
+  const extras = pitchingExtras(ordered, colliding);
   return `<div class="es-team-label">${esc(cityName)} Pitching</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
@@ -678,7 +693,7 @@ function renderPitching(team: BoxTeam, cityName: string): string {
 // "Newspaper extras" line under a team's pitching table: strikes-of-pitches
 // per pitcher (e.g., "62-96" = 62 strikes thrown out of 96 total). BF lives
 // in the table itself; this line is just for stats the table doesn't carry.
-function pitchingExtras(players: BoxPlayer[]): string {
+function pitchingExtras(players: BoxPlayer[], colliding: Set<string>): string {
   type Row = { last: string; p: number; s: number };
   const rows: Row[] = [];
   for (const p of players) {
@@ -686,7 +701,7 @@ function pitchingExtras(players: BoxPlayer[]): string {
     const pitches = pi.pitchesThrown ?? pi.numberOfPitches ?? 0;
     if (pitches === 0) continue;
     rows.push({
-      last: lastName(p.person.fullName),
+      last: boxSurname(p.person.fullName, colliding),
       p: pitches,
       s: pi.strikes ?? 0,
     });

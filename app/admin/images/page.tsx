@@ -14,13 +14,21 @@ import { requireAdmin } from "../require-admin";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Share images · admin · boxscore", robots: { index: false } };
 
+// Every sport renderShareImages supports. MLB stores at bucket root; the others
+// each get their own subfolder (see lib/share-storage.ts).
+const SPORTS = ["mlb", "nba", "wnba", "nfl", "ncaaf"] as const;
+
 export default async function AdminImagesView({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; ok?: string; date?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string; date?: string; sport?: string }>;
 }) {
   await requireAdmin();
-  const { error, ok, date: rawDate } = await searchParams;
+  const { error, ok, date: rawDate, sport: rawSport } = await searchParams;
+
+  const sport = (SPORTS as readonly string[]).includes(rawSport ?? "")
+    ? rawSport!
+    : "mlb";
 
   // Explicit ?date= shows exactly that date — even when empty — so the URL is
   // a stable bookmark. No ?date= defaults to the latest date present in the
@@ -30,8 +38,8 @@ export default async function AdminImagesView({
     rawDate && isValidIsoDate(rawDate) ? rawDate : null;
 
   const [latestSet, allDates] = await Promise.all([
-    listStoredImages(),
-    listStoredDates(),
+    listStoredImages(undefined, sport),
+    listStoredDates(sport),
   ]);
 
   const viewDate =
@@ -39,12 +47,23 @@ export default async function AdminImagesView({
 
   const { images } =
     explicitDate && explicitDate !== latestSet.date
-      ? await listStoredImages(explicitDate)
+      ? await listStoredImages(explicitDate, sport)
       : { images: latestSet.images };
 
   return (
     <main className="admin">
       <h1>Share images</h1>
+      <form method="get" className="admin-regen-form">
+        <label>
+          Sport:{" "}
+          <select name="sport" defaultValue={sport} className="admin-input">
+            {SPORTS.map((s) => (
+              <option key={s} value={s}>{s.toUpperCase()}</option>
+            ))}
+          </select>
+        </label>
+        <SubmitButton idleLabel="Switch" pendingLabel="Loading…" />
+      </form>
       {ok && (
         <p className="admin-success">
           <strong>✓</strong> {ok}
@@ -68,13 +87,16 @@ export default async function AdminImagesView({
           action={async (formData: FormData) => {
             "use server";
             const d = formData.get("date");
+            const s = formData.get("sport");
+            const sq = typeof s === "string" && s ? `&sport=${s}` : "";
             if (typeof d === "string" && isValidIsoDate(d)) {
-              redirect(`/admin/images?date=${d}`);
+              redirect(`/admin/images?date=${d}${sq}`);
             }
-            redirect("/admin/images");
+            redirect(`/admin/images?sport=${typeof s === "string" ? s : "mlb"}`);
           }}
           className="admin-regen-form"
         >
+          <input type="hidden" name="sport" value={sport} />
           <label>
             View date:{" "}
             <select name="date" defaultValue={viewDate} className="admin-input">
@@ -100,6 +122,7 @@ export default async function AdminImagesView({
         }}
         className="admin-regen-form"
       >
+        <input type="hidden" name="sport" value={sport} />
         <label>
           Regenerate date:{" "}
           <input
@@ -118,7 +141,7 @@ export default async function AdminImagesView({
 
       {images.length > 0 && (
         <p className="admin-meta">
-          <a href={`/admin/images/download?date=${viewDate}`} className="admin-link">
+          <a href={`/admin/images/download?date=${viewDate}&sport=${sport}`} className="admin-link">
             Download all as ZIP
           </a>
         </p>

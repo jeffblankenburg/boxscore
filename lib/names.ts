@@ -55,6 +55,36 @@ const PARTICLES = new Set([
   "saint", "st.",
 ]);
 
+// First initial of the given name ("Jose Hernandez" → "J"), for box-score
+// disambiguation. Returns "" when there's no distinct first name to draw from.
+export function firstInitial(full: string): string {
+  const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
+  return parts.length > 1 ? (parts[0]!.charAt(0).toUpperCase()) : "";
+}
+
+// The surnames shared by two or more of the given full names — i.e. the
+// players a box score can't tell apart by last name alone, so each needs a
+// leading first initial ("J Hernandez"). Computed per team over the players
+// who actually appear in that team's box.
+export function collidingSurnames(fullNames: string[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const full of fullNames) {
+    const ln = lastName(full);
+    if (ln) counts.set(ln, (counts.get(ln) ?? 0) + 1);
+  }
+  return new Set([...counts].filter(([, n]) => n >= 2).map(([ln]) => ln));
+}
+
+// Box-score display surname: the plain surname, or "F Surname" when it
+// collides with a teammate's (per `colliding` from collidingSurnames()).
+// Falls back to the plain surname if there's no usable first initial.
+export function boxSurname(full: string, colliding: Set<string>): string {
+  const ln = lastName(full);
+  if (!colliding.has(ln)) return ln;
+  const init = firstInitial(full);
+  return init ? `${init} ${ln}` : ln;
+}
+
 export function lastName(full: string): string {
   if (!full) return full;
   const parts = full.split(/\s+/).filter(Boolean);

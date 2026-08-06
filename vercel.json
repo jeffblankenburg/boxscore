@@ -33,6 +33,38 @@
       "schedule": "27 9 * * *"
     },
     {
+      "path": "/api/cron/post-twitter?sport=nfl",
+      "schedule": "45 8 * * *"
+    },
+    {
+      "path": "/api/cron/post-bluesky?sport=nfl",
+      "schedule": "48 8 * * *"
+    },
+    {
+      "path": "/api/cron/post-twitter?sport=ncaaf",
+      "schedule": "5 9 * * *"
+    },
+    {
+      "path": "/api/cron/post-bluesky?sport=ncaaf",
+      "schedule": "8 9 * * *"
+    },
+    {
+      "path": "/api/cron/post-twitter?sport=nba",
+      "schedule": "50 9 * * *"
+    },
+    {
+      "path": "/api/cron/post-bluesky?sport=nba",
+      "schedule": "53 9 * * *"
+    },
+    {
+      "path": "/api/cron/post-twitter?sport=wnba",
+      "schedule": "5 10 * * *"
+    },
+    {
+      "path": "/api/cron/post-bluesky?sport=wnba",
+      "schedule": "8 10 * * *"
+    },
+    {
       "path": "/api/cron/send-email?sport=nba",
       "schedule": "30 9 * * *"
     },
