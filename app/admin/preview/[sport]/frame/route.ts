@@ -159,10 +159,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
     emailBody = renderBasketballEmailContent(data);
   }
 
+  // Resolve the day's announcement once (sport-specific or the global "*"
+  // banner) so both surfaces show what a subscriber would actually receive.
+  const { getAnnouncement } = await import("@/lib/announcements");
+  const announcementBanner = (await getAnnouncement(sport, digestDate)) ?? undefined;
+
   let html: string;
   if (surface === "email") {
-    const { getAnnouncement } = await import("@/lib/announcements");
-    const announcementBanner = (await getAnnouncement(sport, digestDate)) ?? undefined;
     html = dailyEmail({
       sport,
       digestDate,
@@ -178,6 +181,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
   } else {
     const globalsCss = await readFile(join(process.cwd(), "app", "globals.css"), "utf-8");
     const iconUrl = "https://boxscore.email/icon.png";
+    // Web is email-only for the banner in production, but the preview shows it
+    // inline so an operator can verify the announcement without switching to
+    // the email surface.
+    const bannerHtml = announcementBanner
+      ? `<div class="preview-announcement">${announcementBanner}</div>`
+      : "";
     html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -191,6 +200,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
 <body>
 <div class="newspaper">
 ${siteHeaderHtml(iconUrl)}
+${bannerHtml}
 ${webBody}
 ${siteFooterHtml()}
 </div>

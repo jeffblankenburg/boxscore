@@ -745,6 +745,13 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 }
 .settings-preview-link:hover { color: var(--text-primary);
                                 text-decoration: underline; }
+/* Announcement banner as shown inline in the admin preview (email-only in
+   production). Newspaper look: double rule above, single below. Monochrome. */
+.preview-announcement {
+  margin: 12px 0 4px; padding: 9px 2px;
+  border-top: 3px double #161410; border-bottom: 1px solid #161410;
+  font-size: 14px; line-height: 1.45;
+}
 .subscribe-input-block { width: 100%; box-sizing: border-box; margin: 4px 0; }
 .subscribe-button-block { width: 100%; margin-top: 16px; }
 .settings-toggle-on { background: #000; color: #fff; border: 1px solid #000; }

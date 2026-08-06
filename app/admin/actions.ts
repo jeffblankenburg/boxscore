@@ -214,14 +214,16 @@ export async function setAnnouncement(formData: FormData): Promise<void> {
     typeof returnToRaw === "string" && returnToRaw.startsWith("/") ? returnToRaw : `/admin/${pageSport}`;
 
   // The actual sport value we write under. "*" for global; the page's sport
-  // otherwise. /admin/[sport] always passes one of mlb/nba/wnba.
+  // otherwise. /admin/[sport] passes any live digest sport.
   const scope = applyAll ? "*" : pageSport;
   const label = applyAll ? "all sports" : pageSport;
+  // Sports with a digest send that can carry a sport-specific banner.
+  const ANNOUNCEMENT_SPORTS = ["mlb", "nba", "wnba", "nfl", "ncaaf"];
 
   let target: string;
   try {
     if (!isValidIsoDate(date)) throw new Error(`Bad date: ${date}`);
-    if (!applyAll && !["mlb", "nba", "wnba"].includes(pageSport)) {
+    if (!applyAll && !ANNOUNCEMENT_SPORTS.includes(pageSport)) {
       throw new Error(`Unknown sport: ${pageSport}`);
     }
     const { upsertAnnouncement, deleteAnnouncement } = await import("@/lib/announcements");

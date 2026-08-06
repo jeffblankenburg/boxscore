@@ -541,6 +541,10 @@
 .a-muted   { color: var(--a-text-muted); }
 .a-subtle  { color: var(--a-text-subtle); }
 .a-mono    { font-family: var(--a-mono); font-size: 12px; }
+/* Right-aligned numeric cells + 24h trend (email-lists grid). */
+.a-num     { text-align: right; font-variant-numeric: tabular-nums; }
+.a-up      { color: #1a7f37; font-weight: 600; }
+.a-down    { color: #b3261e; font-weight: 600; }
 .a-row     { display: flex; gap: 12px; align-items: center; }
 .a-spacer  { flex: 1; }
 

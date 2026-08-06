@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { requireAdmin } from "./require-admin";
 import { PageHeader } from "./_components/primitives";
 import {
+  EmailListsBlock,
+  EmailListsSkeleton,
   PulseBlock,
   PulseSkeleton,
   QueueBlock,
@@ -55,6 +57,10 @@ export default async function AdminDashboard() {
 
       <Suspense fallback={<PulseSkeleton />}>
         <PulseBlock />
+      </Suspense>
+
+      <Suspense fallback={<EmailListsSkeleton />}>
+        <EmailListsBlock />
       </Suspense>
 
       <Suspense fallback={<QueueSkeleton />}>

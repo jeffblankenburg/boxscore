@@ -10,14 +10,20 @@ export type ScoreTile = {
   home: string;
   aR: number;
   hR: number;
+  aRank?: number; // AP rank of the away team (NCAAF); undefined = unranked
+  hRank?: number;
 };
 
 export function ScoreboardImage({
   scores,
   date,
+  sport = "mlb",
+  label,
 }: {
   scores: ScoreTile[];
   date: string; // pretty-formatted, e.g. "Tuesday, June 2, 2026"
+  sport?: string; // footer URL: boxscore.email/{sport}
+  label?: string; // optional scope label (e.g. "Top 25", "SEC")
 }) {
   return (
     <div style={{
@@ -41,7 +47,12 @@ export function ScoreboardImage({
           <img src="/icon.png" alt="" width={56} height={56} style={{ borderRadius: 8, display: "block" }} />
           boxscore
         </div>
-        <div style={{ fontSize: 22, fontStyle: "italic", color: "#161410" }}>{date}</div>
+        <div style={{ textAlign: "right" }}>
+          {label && (
+            <div style={{ fontSize: 18, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
+          )}
+          <div style={{ fontSize: 22, fontStyle: "italic", color: "#161410" }}>{date}</div>
+        </div>
       </div>
 
       <ScoreboardGrid scores={scores} />
@@ -49,30 +60,37 @@ export function ScoreboardImage({
       {/* Footer — same tagline as the site footer (BRAND.tagline). */}
       <div style={{ marginTop: 12, paddingTop: 8, borderTop: "1px solid #161410", display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 14, color: "#161410" }}>
         <div style={{ fontStyle: "italic" }}>{BRAND.tagline}</div>
-        <div style={{ letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700 }}>boxscore.email/mlb</div>
+        <div style={{ letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700 }}>boxscore.email/{sport}</div>
       </div>
     </div>
   );
 }
 
-// 5×3 grid of completed-game tiles. Renders as many as we have, up to 15.
-// Fewer days leave empty cells at the bottom-right (left-aligned fill).
+// Grid of completed-game tiles — renders EVERY game (NCAAF Saturdays run past 20
+// on the Top 25 board). Columns + tile scale adapt to the count so it always
+// fits the fixed 1200×630 canvas: 5 wide up to 15 games, 6 wide beyond, and the
+// fonts shrink as rows stack.
 function ScoreboardGrid({ scores }: { scores: ScoreTile[] }) {
+  const n = Math.max(scores.length, 1);
+  const cols = n <= 15 ? 5 : 6;
+  const rows = Math.ceil(n / cols);
+  const scale = rows <= 3 ? 1 : rows === 4 ? 0.84 : rows === 5 ? 0.72 : 0.62;
   return (
     <div style={{
       flex: 1,
       display: "grid",
-      gridTemplateColumns: "repeat(5, 1fr)",
-      gridTemplateRows: "repeat(3, 1fr)",
-      gap: "10px 14px",
+      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      gridTemplateRows: `repeat(${rows}, 1fr)`,
+      gap: `${Math.round(10 * scale)}px ${Math.round(14 * scale)}px`,
       marginTop: 14,
+      minHeight: 0,
     }}>
-      {scores.slice(0, 15).map((g, i) => <Tile key={i} g={g} />)}
+      {scores.map((g, i) => <Tile key={i} g={g} scale={scale} />)}
     </div>
   );
 }
 
-function Tile({ g }: { g: ScoreTile }) {
+function Tile({ g, scale }: { g: ScoreTile; scale: number }) {
   const awayWon = g.aR > g.hR;
   return (
     <div
@@ -82,27 +100,35 @@ function Tile({ g }: { g: ScoreTile }) {
       style={{
         border: "1px solid #161410",
         background: "#fff",
-        padding: "10px 14px",
+        padding: `${Math.round(10 * scale)}px ${Math.round(14 * scale)}px`,
         fontVariantNumeric: "tabular-nums",
         display: "flex", flexDirection: "column", justifyContent: "center",
+        overflow: "hidden",
       }}
     >
-      <Row tla={g.away} r={g.aR} winner={awayWon} />
-      <Row tla={g.home} r={g.hR} winner={!awayWon} />
+      <Row tla={g.away} r={g.aR} winner={awayWon} rank={g.aRank} scale={scale} />
+      <Row tla={g.home} r={g.hR} winner={!awayWon} rank={g.hRank} scale={scale} />
     </div>
   );
 }
 
-function Row({ tla, r, winner }: { tla: string; r: number; winner: boolean }) {
+function Row({ tla, r, winner, rank, scale }: { tla: string; r: number; winner: boolean; rank?: number; scale: number }) {
   return (
     <div style={{
       display: "flex",
       justifyContent: "space-between",
       alignItems: "baseline",
-      padding: "3px 0",
+      padding: `${Math.round(3 * scale)}px 0`,
     }}>
-      <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: "0.03em", color: winner ? "#161410" : "#6a6354" }}>{tla}</span>
-      <span style={{ fontSize: 32, fontWeight: 900, color: winner ? "#161410" : "#9a9282" }}>{r}</span>
+      <span style={{ fontSize: Math.round(30 * scale), fontWeight: 800, letterSpacing: "0.03em", color: winner ? "#161410" : "#6a6354" }}>
+        {tla}
+        {/* AP rank as a smaller raised superscript AFTER the abbr, so the team
+            names stay left-aligned across every tile ("OSU¹"). */}
+        {rank != null && (
+          <span style={{ fontSize: Math.round(16 * scale), fontWeight: 700, color: winner ? "#161410" : "#6a6354", position: "relative", top: Math.round(-10 * scale), marginLeft: 3 }}>{rank}</span>
+        )}
+      </span>
+      <span style={{ fontSize: Math.round(32 * scale), fontWeight: 900, color: winner ? "#161410" : "#9a9282" }}>{r}</span>
     </div>
   );
 }

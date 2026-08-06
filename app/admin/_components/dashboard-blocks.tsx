@@ -13,9 +13,10 @@ import {
   getTodaysSendSummaries,
 } from "@/lib/dashboard";
 import { loadDailyMetrics, type DailyMetric } from "@/lib/daily-metrics";
+import { getEmailListStats, type EmailListStat } from "@/lib/email-list-stats";
 import { yesterdayInET, prettyDate } from "@/lib/dates";
 import { Watchwall } from "../charts";
-import { Section, StatusBadge, type BadgeVariant } from "./primitives";
+import { Section, StatusBadge, DataTable, type BadgeVariant, type Column } from "./primitives";
 
 // ─── Today's send results ──────────────────────────────────────────────
 
@@ -647,6 +648,39 @@ export function TickerSkeleton() {
           </div>
         ))}
       </div>
+    </Section>
+  );
+}
+
+// ─── Email lists (subscriber counts + 24h change) ──────────────────────
+
+export async function EmailListsBlock() {
+  const lists = await getEmailListStats();
+  const total = lists.reduce((sum, l) => sum + l.count, 0);
+  const columns: Column<EmailListStat>[] = [
+    { header: "List", cell: (l) => l.label },
+    { header: "Subscribers", className: "a-num", width: "26%", cell: (l) => l.count.toLocaleString() },
+    { header: "24h", className: "a-num", width: "20%", cell: (l) => <ChangeCell n={l.change24h} /> },
+  ];
+  return (
+    <Section
+      title="Email lists"
+      actions={<span className="a-muted">{total.toLocaleString()} total opt-ins</span>}
+    >
+      <DataTable rows={lists} columns={columns} />
+    </Section>
+  );
+}
+
+function ChangeCell({ n }: { n: number }) {
+  if (n === 0) return <span className="a-muted">—</span>;
+  return <span className={n > 0 ? "a-up" : "a-down"}>{n > 0 ? "▲" : "▼"} {Math.abs(n)}</span>;
+}
+
+export function EmailListsSkeleton() {
+  return (
+    <Section title="Email lists">
+      <SkeletonBar height={360} />
     </Section>
   );
 }

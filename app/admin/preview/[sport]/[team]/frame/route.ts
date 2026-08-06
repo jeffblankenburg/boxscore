@@ -47,6 +47,12 @@ export async function GET(
       ? renderBasketballTeamContent(await loadBasketballTeamData(sport, slug, date))
       : renderTeamWebContent(await loadTeamEmailData(team, date));
     const globalsCss = await readFile(join(process.cwd(), "app", "globals.css"), "utf-8");
+    // Show the day's announcement inline (email-only in production) so the
+    // operator can verify it here too — sport-specific or the global banner.
+    const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
+    const bannerHtml = announcementBanner
+      ? `<div class="preview-announcement">${announcementBanner}</div>`
+      : "";
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,7 +62,7 @@ export async function GET(
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap">
 <style>${globalsCss}</style>
 </head>
-<body><div class="newspaper">${webBody}</div></body>
+<body><div class="newspaper">${bannerHtml}${webBody}</div></body>
 </html>`;
     return new NextResponse(html, {
       headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },

@@ -9,26 +9,30 @@ import { isValidIsoDate, prettyDate } from "../lib/dates";
 import { renderShareImages, type ManifestEntry } from "../lib/render-images";
 
 type Manifest = {
-  sport: "mlb";
+  sport: string;
   date: string;
   prettyDate: string;
   entries: ManifestEntry[];
 };
 
+// Usage: screenshot-sections.ts [date] [sport]
+//   date passed here is the GAMES date (renderShareImages fetches /[sport]/[date+1]).
 async function main() {
   const date = process.argv[2] ?? "2026-05-14";
+  const sport = process.argv[3] ?? "mlb";
   if (!isValidIsoDate(date)) {
     console.error(`Bad date: ${date}. Use YYYY-MM-DD.`);
     process.exit(1);
   }
 
   const shareRoot = resolve("out/share");
-  const outDir = resolve(shareRoot, date);
+  const outDir = resolve(shareRoot, `${sport}-${date}`);
 
   // Clean up other dates' folders — they can be regenerated any time.
+  const keep = `${sport}-${date}`;
   try {
     for (const entry of await readdir(shareRoot)) {
-      if (entry !== date) {
+      if (entry !== keep) {
         await rm(resolve(shareRoot, entry), { recursive: true, force: true });
         console.log(`Cleaned up out/share/${entry}/`);
       }
@@ -36,12 +40,12 @@ async function main() {
   } catch { /* first run */ }
 
   await mkdir(outDir, { recursive: true });
-  console.log(`Rendering share images for ${date} ...`);
+  console.log(`Rendering ${sport} share images for ${date} ...`);
   const baseUrl = process.env.SHARE_BASE_URL ?? "http://localhost:3001";
-  const images = await renderShareImages({ date, baseUrl });
+  const images = await renderShareImages({ date, baseUrl, sport });
 
   const manifest: Manifest = {
-    sport: "mlb",
+    sport,
     date,
     prettyDate: prettyDate(date),
     entries: [],

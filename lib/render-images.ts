@@ -94,7 +94,148 @@ async function launchBrowser(): Promise<Browser> {
   });
 }
 
-const SHARE_CSS = `
+// Per-sport share config. MLB is the original; nba/wnba/nfl/ncaaf reuse the
+// same capture machinery with a different game-block selector, title parsing,
+// box width, and footer URL. Only MLB emits standings/leaders/full-digest
+// images — the other sports ship a scoreboard plus one image per game.
+type BoxParse = { title: string; teams: [string, string] };
+
+export type SportShareSpec = {
+  sport: string;
+  // Element selector for a single game's box-score block.
+  gameSelector: string;
+  // Selector (within the game element) whose text is the box title.
+  gameTitleSelector: string;
+  // Sub-selectors removed from the title element before reading its text
+  // (paper-mode short nicknames for MLB, the "Upset" badge for football).
+  stripFromTitle: string[];
+  // Turn the cleaned title text into a display title + [away/loser, home/winner].
+  parseTitle: (text: string) => BoxParse;
+  // Multi-column container to flatten to one column so each game block stays
+  // intact for element capture (null when the layout is already single-column).
+  boxContainerSelector: string | null;
+  // Box element width in CSS px in the share layout.
+  boxWidth: number;
+  // MLB-only sections.
+  standingsAndLeaders: boolean;
+  fullDigest: boolean;
+};
+
+// MLB game header text is "Winner 5, Loser 3" (winner first), optionally with a
+// " · " detail tail. Strip the tail, then pull the two team nicknames.
+function parseMlbTitle(text: string): BoxParse {
+  const titleOnly = text.split(" · ")[0]?.trim() ?? text.trim();
+  const m = titleOnly.match(/^(.+?)\s+\d+,\s+(.+?)\s+\d+$/);
+  const teams: [string, string] = m ? [m[1]!.trim(), m[2]!.trim()] : ["", ""];
+  return { title: titleOnly, teams };
+}
+
+// Basketball/football matchup text reads "Away @ Home" (nicknames), no score.
+function parseAtMatchup(text: string): BoxParse {
+  const titleOnly = text.replace(/\s+/g, " ").trim();
+  const parts = titleOnly.split(" @ ");
+  const teams: [string, string] =
+    parts.length === 2 ? [parts[0]!.trim(), parts[1]!.trim()] : ["", ""];
+  return { title: titleOnly, teams };
+}
+
+const SPORT_SHARE_SPECS: Record<string, SportShareSpec> = {
+  mlb: {
+    sport: "mlb",
+    gameSelector: ".game-container",
+    gameTitleSelector: ".game-header",
+    stripFromTitle: [".nick-short"],
+    parseTitle: parseMlbTitle,
+    boxContainerSelector: ".boxscores-container",
+    boxWidth: 540,
+    standingsAndLeaders: true,
+    fullDigest: true,
+  },
+  nba: {
+    sport: "nba",
+    gameSelector: ".bb-game",
+    gameTitleSelector: ".bb-game-matchup",
+    stripFromTitle: [],
+    parseTitle: parseAtMatchup,
+    boxContainerSelector: ".bb-boxscores",
+    boxWidth: 640,
+    standingsAndLeaders: false,
+    fullDigest: false,
+  },
+  wnba: {
+    sport: "wnba",
+    gameSelector: ".bb-game",
+    gameTitleSelector: ".bb-game-matchup",
+    stripFromTitle: [],
+    parseTitle: parseAtMatchup,
+    boxContainerSelector: ".bb-boxscores",
+    boxWidth: 640,
+    standingsAndLeaders: false,
+    fullDigest: false,
+  },
+  nfl: {
+    sport: "nfl",
+    gameSelector: ".fb-game",
+    gameTitleSelector: ".fb-game-matchup",
+    stripFromTitle: [".fb-upset"],
+    parseTitle: parseAtMatchup,
+    boxContainerSelector: ".fb-boxscores",
+    boxWidth: 680,
+    standingsAndLeaders: false,
+    fullDigest: false,
+  },
+  ncaaf: {
+    sport: "ncaaf",
+    gameSelector: ".fb-game",
+    gameTitleSelector: ".fb-game-matchup",
+    stripFromTitle: [".fb-upset"],
+    parseTitle: parseAtMatchup,
+    boxContainerSelector: ".fb-boxscores",
+    boxWidth: 680,
+    standingsAndLeaders: false,
+    fullDigest: false,
+  },
+};
+
+function shareSpecFor(sport: string): SportShareSpec {
+  const spec = SPORT_SHARE_SPECS[sport];
+  if (!spec) throw new Error(`renderShareImages: unsupported sport "${sport}"`);
+  return spec;
+}
+
+// Shared brand+date header / tagline+URL footer styling for every per-section
+// share image, plus the box-block chrome for the given sport.
+function shareCssFor(spec: SportShareSpec): string {
+  const chrome = `
+  .share-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 10px; margin-bottom: 0 !important;
+    border-bottom: 1px solid #c4baa5;
+    font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
+  }
+  .share-header .brand-cell { display: flex; align-items: center; gap: 8px; }
+  .share-header .brand-cell img { width: 22px; height: 22px; border-radius: 4px; display: block; }
+  .share-header .brand { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; color: #161410; }
+  .share-header .brand .dot { color: #6a6354; }
+  .share-header .share-date { font-size: 13px; font-style: italic; color: #6a6354; }
+
+  /* Footer for per-section share images. Stacked vertically (tagline above
+     URL) because the narrowest column (MLB leaders, 360 CSS px) can't fit the
+     space-between layout used on the wide scoreboard image without wrapping. */
+  .share-footer {
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: 10px; margin-top: 12px !important;
+    border-top: 1px solid #c4baa5;
+    font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
+    text-align: center;
+  }
+  .share-footer .tagline { font-size: 13px; font-style: italic; color: #6a6354; margin-bottom: 4px; }
+  .share-footer .url { font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; color: #161410; }
+  `;
+
+  // MLB flattens its two-up standings/leaders and three-column boxscores into a
+  // single column, and fixes column widths. Kept verbatim from the original.
+  const mlb = `
   .column-container { flex-direction: column !important; gap: 0 !important; }
   .leaders-cols { column-count: 1 !important; }
   .games-grid { grid-template-columns: 1fr !important; }
@@ -110,55 +251,43 @@ const SHARE_CSS = `
     margin: 0 auto !important; padding: 18px 20px !important;
     background: #fff !important; box-sizing: border-box !important;
   }
-  .game-container {
-    max-width: 540px; width: 540px;
+  .col-standings .boxscores-title,
+  .col-leaders .boxscores-title { margin: 0 !important; padding: 14px 0 !important; }
+  `;
+
+  // Every sport: flatten the box container to one column so each game block is
+  // captured intact, then give the game block a fixed width, white background,
+  // and padding.
+  const boxes = `
+  ${spec.boxContainerSelector ? `${spec.boxContainerSelector} { column-count: 1 !important; }` : ""}
+  ${spec.gameSelector} {
+    max-width: ${spec.boxWidth}px; width: ${spec.boxWidth}px;
     margin: 0 auto 18px; padding: 18px 20px;
     background: #fff; box-sizing: border-box;
   }
+  ${spec.gameSelector} ${spec.gameTitleSelector} { margin: 0 !important; padding: 14px 0 !important; }
+  `;
 
-  .share-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding-bottom: 10px; margin-bottom: 0 !important;
-    border-bottom: 1px solid #c4baa5;
-    font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
-  }
-  .share-header .brand-cell { display: flex; align-items: center; gap: 8px; }
-  .share-header .brand-cell img { width: 22px; height: 22px; border-radius: 4px; display: block; }
-  .share-header .brand { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; color: #161410; }
-  .share-header .brand .dot { color: #6a6354; }
-  .share-header .share-date { font-size: 13px; font-style: italic; color: #6a6354; }
-
-  /* Footer for per-section share images. Stacked vertically (tagline above
-     URL) because the leaders column is only 360 CSS px wide — the
-     space-between layout used on the scoreboard image (1200 px) caused the
-     tagline to wrap to two lines and look broken on the narrower cols. */
-  .share-footer {
-    display: flex; flex-direction: column; align-items: center;
-    padding-top: 10px; margin-top: 12px !important;
-    border-top: 1px solid #c4baa5;
-    font-family: 'Source Sans 3', Helvetica, Arial, sans-serif;
-    text-align: center;
-  }
-  .share-footer .tagline { font-size: 13px; font-style: italic; color: #6a6354; margin-bottom: 4px; }
-  .share-footer .url { font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; color: #161410; }
-
-  .col-standings .boxscores-title,
-  .col-leaders .boxscores-title,
-  .game-container .game-header {
-    margin: 0 !important;
-    padding: 14px 0 !important;
-  }
-`;
+  return `${chrome}\n${spec.standingsAndLeaders ? mlb : ""}\n${boxes}`;
+}
 
 async function injectShareChrome(
   page: Page,
+  spec: SportShareSpec,
   editionDateStr: string,
   gamesDateStr: string,
   tagline: string,
 ): Promise<void> {
-  await page.addStyleTag({ content: SHARE_CSS });
+  await page.addStyleTag({ content: shareCssFor(spec) });
   await page.evaluate(
-    (args: { edition: string; games: string; tagline: string }) => {
+    (args: {
+      edition: string;
+      games: string;
+      tagline: string;
+      sport: string;
+      gameSelector: string;
+      standingsAndLeaders: boolean;
+    }) => {
       const header = (d: string) => `
         <div class="share-header">
           <div class="brand-cell">
@@ -170,35 +299,44 @@ async function injectShareChrome(
       const footer = `
         <div class="share-footer">
           <div class="tagline">${args.tagline}</div>
-          <div class="url">boxscore.email/mlb</div>
+          <div class="url">boxscore.email/${args.sport}</div>
         </div>`;
-      // Standings + leaders are a snapshot of the morning the digest ships, so
-      // they get stamped with the edition date.
-      const standings = Array.from(document.querySelectorAll(".col-standings"));
-      standings.forEach((el, i) => {
-        const league = i === 0 ? "American League" : "National League";
-        const title = el.querySelector(".boxscores-title");
-        if (title) title.textContent = `${league} Standings`;
-        el.insertAdjacentHTML("afterbegin", header(args.edition));
-        el.insertAdjacentHTML("beforeend", footer);
-      });
-      const leaders = Array.from(document.querySelectorAll(".col-leaders"));
-      leaders.forEach((el, i) => {
-        const league = i === 0 ? "American League" : "National League";
-        const title = el.querySelector(".boxscores-title");
-        if (title) title.textContent = `${league} Leaders`;
-        el.insertAdjacentHTML("afterbegin", header(args.edition));
-        el.insertAdjacentHTML("beforeend", footer);
-      });
+      if (args.standingsAndLeaders) {
+        // MLB only. Standings + leaders are a snapshot of the morning the
+        // digest ships, so they get stamped with the edition date.
+        const standings = Array.from(document.querySelectorAll(".col-standings"));
+        standings.forEach((el, i) => {
+          const league = i === 0 ? "American League" : "National League";
+          const title = el.querySelector(".boxscores-title");
+          if (title) title.textContent = `${league} Standings`;
+          el.insertAdjacentHTML("afterbegin", header(args.edition));
+          el.insertAdjacentHTML("beforeend", footer);
+        });
+        const leaders = Array.from(document.querySelectorAll(".col-leaders"));
+        leaders.forEach((el, i) => {
+          const league = i === 0 ? "American League" : "National League";
+          const title = el.querySelector(".boxscores-title");
+          if (title) title.textContent = `${league} Leaders`;
+          el.insertAdjacentHTML("afterbegin", header(args.edition));
+          el.insertAdjacentHTML("beforeend", footer);
+        });
+      }
       // Box scores describe one game played on a specific day, so they get
       // stamped with the games date — not the day the digest happens to ship.
-      const games = Array.from(document.querySelectorAll(".game-container"));
+      const games = Array.from(document.querySelectorAll(args.gameSelector));
       games.forEach((el) => {
         el.insertAdjacentHTML("afterbegin", header(args.games));
         el.insertAdjacentHTML("beforeend", footer);
       });
     },
-    { edition: editionDateStr, games: gamesDateStr, tagline },
+    {
+      edition: editionDateStr,
+      games: gamesDateStr,
+      tagline,
+      sport: spec.sport,
+      gameSelector: spec.gameSelector,
+      standingsAndLeaders: spec.standingsAndLeaders,
+    },
   );
 }
 
@@ -208,9 +346,13 @@ async function injectShareChrome(
 // capture multiple images per cron invocation).
 async function captureScoreboardOnBrowser(
   browser: Browser,
-  args: { editionDate: string; baseUrl: string },
+  args: { sport: string; editionDate: string; baseUrl: string; conf?: string },
 ): Promise<{ png: Uint8Array; width: number; height: number; gameCount: number }> {
-  const url = `${args.baseUrl}/share/mlb/${args.editionDate}`;
+  // MLB serves its own /share/mlb/[date] page; every other sport uses the
+  // generic /share/[sport]/[date] canvas, with NCAAF taking an optional
+  // ?conf=<slug> for its per-conference boards.
+  const query = args.conf ? `?conf=${encodeURIComponent(args.conf)}` : "";
+  const url = `${args.baseUrl}/share/${args.sport}/${args.editionDate}${query}`;
   const page = await browser.newPage();
   try {
     await page.evaluateOnNewDocument(
@@ -325,10 +467,17 @@ export async function renderElementPng(args: {
 export async function renderScoreboardShareImage(args: {
   editionDate: string;
   baseUrl: string;
+  sport?: string;
+  conf?: string;
 }): Promise<{ png: Uint8Array; width: number; height: number }> {
   const browser = await launchBrowser();
   try {
-    const { png, width, height } = await captureScoreboardOnBrowser(browser, args);
+    const { png, width, height } = await captureScoreboardOnBrowser(browser, {
+      sport: args.sport ?? "mlb",
+      editionDate: args.editionDate,
+      baseUrl: args.baseUrl,
+      conf: args.conf,
+    });
     return { png, width, height };
   } finally {
     await browser.close();
@@ -338,10 +487,12 @@ export async function renderScoreboardShareImage(args: {
 export async function renderShareImages(args: {
   date: string;
   baseUrl: string; // e.g. "https://boxscore.email" or "http://localhost:3001"
+  sport?: string;  // defaults to "mlb"
 }): Promise<RenderedImage[]> {
   const { date, baseUrl } = args;
+  const spec = shareSpecFor(args.sport ?? "mlb");
   // Caller passes games_date; the public page now lives at edition_date.
-  const url = `${baseUrl}/mlb/${nextDay(date)}`;
+  const url = `${baseUrl}/${spec.sport}/${nextDay(date)}`;
   // Per-section captures use two different date stamps:
   //   - standings + leaders: edition date (a "this morning" snapshot)
   //   - box scores: games date (anchored to when the game was actually played)
@@ -361,7 +512,7 @@ export async function renderShareImages(args: {
     // scoreboard shouldn't block the rest of the per-section captures.
     try {
       const sb = await captureScoreboardOnBrowser(browser, {
-        editionDate: nextDay(date), baseUrl,
+        sport: spec.sport, editionDate: nextDay(date), baseUrl,
       });
       // Skip an empty scoreboard (0 completed games — All-Star break, offseason);
       // a blank grid isn't worth posting to social.
@@ -410,54 +561,56 @@ export async function renderShareImages(args: {
     // Capture the full-day image FIRST, against the natural web layout —
     // two-up standings/leaders, three-column boxscores. Doing this before
     // injectShareChrome avoids the single-column flattening that the
-    // per-section CSS imposes.
-    const gameCount = (await page.$$(".game-container")).length;
-    const fullImage = await captureFullDigest(page, editionDateStr, gameCount, dpr);
-    if (fullImage) results.push(fullImage);
+    // per-section CSS imposes. MLB-only for now: the dedup pass and the
+    // header/footer chrome inside captureFullDigest are MLB-specific.
+    const gameCount = (await page.$$(spec.gameSelector)).length;
+    if (spec.fullDigest) {
+      const fullImage = await captureFullDigest(page, editionDateStr, gameCount, dpr);
+      if (fullImage) results.push(fullImage);
+    }
 
     // Now flatten the page for per-section captures.
-    await injectShareChrome(page, editionDateStr, gamesDateStr, BRAND.tagline);
+    await injectShareChrome(page, spec, editionDateStr, gamesDateStr, BRAND.tagline);
     await ensureFontsLoaded(page);
     await new Promise((r) => setTimeout(r, 200));
 
-    const standings = await page.$$(".col-standings");
-    const leaders = await page.$$(".col-leaders");
-    const games = await page.$$(".game-container");
+    const games = await page.$$(spec.gameSelector);
 
-    const captures: Array<{ handle: typeof standings[0]; entry: ManifestEntry }> = [];
+    const captures: Array<{ handle: typeof games[0]; entry: ManifestEntry }> = [];
 
-    if (standings[0]) {
-      captures.push({ handle: standings[0], entry: { file: "al-standings.png", subId: "al-standings", type: "standings", league: "AL" } });
-    }
-    if (leaders[0]) {
-      captures.push({ handle: leaders[0], entry: { file: "al-leaders.png", subId: "al-leaders", type: "leaders", league: "AL" } });
-    }
-    if (standings[1]) {
-      captures.push({ handle: standings[1], entry: { file: "nl-standings.png", subId: "nl-standings", type: "standings", league: "NL" } });
-    }
-    if (leaders[1]) {
-      captures.push({ handle: leaders[1], entry: { file: "nl-leaders.png", subId: "nl-leaders", type: "leaders", league: "NL" } });
+    // Standings + leaders are MLB-only. Other sports ship scoreboard + per-game
+    // box scores only.
+    if (spec.standingsAndLeaders) {
+      const standings = await page.$$(".col-standings");
+      const leaders = await page.$$(".col-leaders");
+      if (standings[0]) {
+        captures.push({ handle: standings[0], entry: { file: "al-standings.png", subId: "al-standings", type: "standings", league: "AL" } });
+      }
+      if (leaders[0]) {
+        captures.push({ handle: leaders[0], entry: { file: "al-leaders.png", subId: "al-leaders", type: "leaders", league: "AL" } });
+      }
+      if (standings[1]) {
+        captures.push({ handle: standings[1], entry: { file: "nl-standings.png", subId: "nl-standings", type: "standings", league: "NL" } });
+      }
+      if (leaders[1]) {
+        captures.push({ handle: leaders[1], entry: { file: "nl-leaders.png", subId: "nl-leaders", type: "leaders", league: "NL" } });
+      }
     }
 
     for (let i = 0; i < games.length; i++) {
       const game = games[i]!;
-      const headerEl = await game.$(".game-header");
-      // The header may contain `.nick-full` + `.nick-short` span pairs that
-      // CSS swaps for paper mode (e.g. "Diamondbacks" vs "D-Backs"). Strip
-      // the short forms before reading text so social posts and image
-      // captions only carry the full nickname.
+      const headerEl = await game.$(spec.gameTitleSelector);
+      // Strip sport-specific noise before reading the title text: MLB's paper-
+      // mode short nicknames (`.nick-short`, e.g. "D-Backs" vs "Diamondbacks")
+      // and football's "Upset" badge, so captions carry only the matchup.
       const text = headerEl
-        ? (await headerEl.evaluate((el) => {
+        ? (await headerEl.evaluate((el, strip: string[]) => {
             const clone = el.cloneNode(true) as HTMLElement;
-            clone.querySelectorAll(".nick-short").forEach((n) => n.remove());
+            for (const sel of strip) clone.querySelectorAll(sel).forEach((n) => n.remove());
             return clone.textContent ?? "";
-          })) || ""
+          }, spec.stripFromTitle)) || ""
         : "";
-      const titleOnly = text.split(" · ")[0]?.trim() ?? text.trim();
-      const m = titleOnly.match(/^(.+?)\s+\d+,\s+(.+?)\s+\d+$/);
-      const teams: [string, string] = m
-        ? [m[1]!.trim(), m[2]!.trim()]
-        : ["", ""];
+      const { title: titleOnly, teams } = spec.parseTitle(text);
       const seq = String(i + 1).padStart(2, "0");
       captures.push({
         handle: game,
