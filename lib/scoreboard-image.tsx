@@ -66,22 +66,48 @@ export function ScoreboardImage({
   );
 }
 
+// Drawing area for the grid inside the 1200×630 canvas, after the brand header,
+// footer, and page padding. Deliberately a hair under the true available height
+// so a bottom row of tiles never bleeds into the footer.
+const GRID_W = 1104;
+const GRID_H = 440;
+// Up to five games per row; a sixth wraps to a new row. Tiles fill left-to-right
+// and are top-left justified, so one game is a single box in the top-left corner
+// — the same box size as any tile in a five-across row.
+const COLS = 5;
+// Every tile is sized to this width:height ratio so it always reads as a box,
+// never the tall ribbon a lone game used to stretch into (fixed 2026-08).
+const TILE_AR = 1.5;
+const GAP_X = 14;
+const GAP_Y = 10;
+
 // Grid of completed-game tiles — renders EVERY game (NCAAF Saturdays run past 20
-// on the Top 25 board). Columns + tile scale adapt to the count so it always
-// fits the fixed 1200×630 canvas: 5 wide up to 15 games, 6 wide beyond, and the
-// fonts shrink as rows stack.
+// on the Top 25 board). Fixed five-wide, top-left justified; tiles hold a
+// constant box size until enough rows stack that they must shrink uniformly to
+// keep the whole grid inside the fixed 1200×630 canvas.
 function ScoreboardGrid({ scores }: { scores: ScoreTile[] }) {
   const n = Math.max(scores.length, 1);
-  const cols = n <= 15 ? 5 : 6;
-  const rows = Math.ceil(n / cols);
-  const scale = rows <= 3 ? 1 : rows === 4 ? 0.84 : rows === 5 ? 0.72 : 0.62;
+  const cols = Math.min(n, COLS);
+  const rows = Math.ceil(n / COLS);
+  // The canonical box: width if five sit across, height from the box ratio.
+  const fullW = (GRID_W - GAP_X * (COLS - 1)) / COLS;
+  const fullH = fullW / TILE_AR;
+  // Only shrink (keeping the ratio) once the stacked rows wouldn't otherwise
+  // fit the canvas height; few-row slates keep the full box size.
+  const rowH = (GRID_H - GAP_Y * (rows - 1)) / rows;
+  const tileH = Math.floor(Math.min(fullH, rowH));
+  const tileW = Math.round(tileH * TILE_AR);
+  // Text tracks the box size so it fills a full-size tile and shrinks with it.
+  const scale = Math.max(tileH / fullH, 0.45);
   return (
     <div style={{
       flex: 1,
       display: "grid",
-      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-      gridTemplateRows: `repeat(${rows}, 1fr)`,
-      gap: `${Math.round(10 * scale)}px ${Math.round(14 * scale)}px`,
+      gridTemplateColumns: `repeat(${cols}, ${tileW}px)`,
+      gridTemplateRows: `repeat(${rows}, ${tileH}px)`,
+      justifyContent: "start",
+      alignContent: "start",
+      gap: `${Math.round(GAP_Y * scale)}px ${Math.round(GAP_X * scale)}px`,
       marginTop: 14,
       minHeight: 0,
     }}>

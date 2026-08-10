@@ -37,8 +37,9 @@ export type SportFeatures = {
   // grid use this to know what "missing" means — a route that's not in this
   // list is silently absent rather than red.
   expectedRoutes: readonly CronRoute[];
-  // True for sports that only email on days a game was played (football:
-  // NFL Thu/Sun/Mon, NCAAF mostly Saturdays). The generate cron runs daily
+  // True for sports that only email on days a game was played (football is
+  // the main case — NFL and NCAAF play irregular, off-pattern slates). The
+  // generate cron runs daily, checks whether that date actually had games,
   // and skips persisting a digest on game-less days; send-email treats a
   // missing digest as a clean skip rather than a failure. Baseball/basketball
   // send every day in-season, so they leave this false.

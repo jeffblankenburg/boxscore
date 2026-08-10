@@ -1,12 +1,13 @@
 // One source of truth for how often each sport's email digest goes out, shown
 // on /subscribe and /settings so subscribers know what cadence they're opting
 // into. MLB plays nearly every day, so it ships daily; the others recap the
-// morning after a game day (NFL's game days land on Thu/Sun/Mon, so its sends
-// land Fri/Mon/Tue).
+// morning after any day a game was played — the cron is data-driven (see
+// hasPlayedGames), not keyed to fixed weekdays, so it also covers off-pattern
+// slates like preseason Fridays.
 
 const DIGEST_FREQUENCY: Record<string, string> = {
   mlb: "Daily during the season",
-  nfl: "After each game day (Fri, Mon, Tue)",
+  nfl: "After each game day",
   nba: "After each game day",
   wnba: "After each game day",
   ncaaf: "After each game day",
