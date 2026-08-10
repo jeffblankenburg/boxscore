@@ -452,9 +452,12 @@ function ordinal(n: number): string {
   return `${n}th`;
 }
 
-function renderInningLine(team: string, line: string): string {
+function renderInningLine(team: string, line: string, rec?: string): string {
+  // Season record trails the TLA in normal weight / muted color so the team
+  // label still reads first. Inline styles only — email clients ignore classes.
+  const recHtml = rec ? ` <span style="font-weight:400;color:#6a6354;">(${esc(rec)})</span>` : "";
   return `<tr>
-    <td align="left" style="font-size:13px;font-weight:700;padding:1px 0;white-space:nowrap;">${esc(team)}</td>
+    <td align="left" style="font-size:13px;font-weight:700;padding:1px 0;white-space:nowrap;">${esc(team)}${recHtml}</td>
     <td align="right" style="font-family:'Courier New',Courier,monospace;font-size:13px;white-space:pre;padding:1px 0;">${esc(line)}</td>
   </tr>`;
 }
@@ -672,7 +675,7 @@ function renderGameInfo(info: { label: string; value: string }[]): string {
   return `<p class="es-info">${parts.join(" &nbsp; ")}</p>`;
 }
 
-function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[]): string {
+function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], records?: Map<string, string>): string {
   const aScore = game.awayScore ?? 0;
   const hScore = game.homeScore ?? 0;
   const winnerFirst = hScore >= aScore
@@ -704,8 +707,8 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[]):
     ${gameH(winnerFirst)}
     <table cellpadding="0" cellspacing="0" border="0" width="100%">
       <tbody>
-        ${renderInningLine(tla(game.awayTeam.name), aLine)}
-        ${renderInningLine(tla(game.homeTeam.name), hLine)}
+        ${renderInningLine(tla(game.awayTeam.name), aLine, records?.get(game.awayTeam.id))}
+        ${renderInningLine(tla(game.homeTeam.name), hLine, records?.get(game.homeTeam.id))}
       </tbody>
     </table>
     ${innings.length >= EXTRAS_THRESHOLD ? `<p class="es-info"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</p>` : ""}
@@ -722,8 +725,9 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[]):
 function renderBoxScores(data: CanonicalDailyData): string {
   const completed = data.games.filter((g) => g.status === "final" && data.boxScores.has(g.id));
   if (completed.length === 0) return "";
+  const records = buildTeamRecordMap(data.standings);
   return `${sectionH("Yesterday's Box Scores")}
-    ${completed.map((g) => renderGame(g, data.boxScores.get(g.id)!, data.scoringPlays.get(g.id) ?? [])).join("")}`;
+    ${completed.map((g) => renderGame(g, data.boxScores.get(g.id)!, data.scoringPlays.get(g.id) ?? [], records)).join("")}`;
 }
 
 const asgShortTeam = (name: string): string =>

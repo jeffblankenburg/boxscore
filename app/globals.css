@@ -380,6 +380,9 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
   min-width: 0; flex: 1 1 auto;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Season record trailing the TLA in the linescore label — normal weight and
+   muted so the abbreviation still reads first. */
+.team-line .team-name .ls-rec { font-weight: 400; color: var(--text-muted); }
 .team-line .team-score {
   flex: 0 0 auto;
   display: grid;
@@ -1256,7 +1259,8 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   border-bottom: 1px solid #161410;
 }
 .bb-ls-team      { text-align: left !important; font-weight: 700;
-                   width: 18%; font-size: 12px; }
+                   width: 26%; white-space: nowrap; font-size: 12px; }
+.bb-ls-team .bb-ls-rec { font-weight: 400; color: var(--text-muted); }
 .bb-ls-team-head { text-align: left !important; }
 .bb-ls-total     { font-weight: 700; }
 .bb-ls-cell      { min-width: 22px; }
@@ -1419,7 +1423,8 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .fb-linescore th, .fb-linescore td { padding: 1px 3px; text-align: right; white-space: nowrap; }
 .fb-linescore thead th { font-size: 10px; font-weight: 700; text-transform: uppercase;
                          letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
-.fb-ls-team { text-align: left !important; font-weight: 700; width: 18%; font-size: 12px; }
+.fb-ls-team { text-align: left !important; font-weight: 700; width: 26%; font-size: 12px; }
+.fb-ls-team .fb-ls-rec { font-weight: 400; color: var(--text-muted); }
 .fb-ls-team-head { text-align: left !important; }
 .fb-ls-total { font-weight: 700; }
 .fb-ls-cell { min-width: 22px; }

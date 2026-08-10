@@ -590,6 +590,18 @@ function isUpset(g: FootballGame): boolean {
 
 // `web` links box-score player names to their player pages; defaults true so
 // the team page (which reuses this) links them. The email digest passes false.
+// team id → season record ("W-L", or "W-L-T" when there are ties) from the
+// standings groups, for the linescore labels.
+function buildRecordMap(data: CanonicalFootballDailyData): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const group of data.standings) {
+    for (const r of group.rows) {
+      out.set(r.team.id, r.ties > 0 ? `${r.wins}-${r.losses}-${r.ties}` : `${r.wins}-${r.losses}`);
+    }
+  }
+  return out;
+}
+
 export function renderGameBlock(data: CanonicalFootballDailyData, g: FootballGame, box: FootballBoxScore | undefined, web = true): string {
   const upset = isUpset(g) ? `<span class="fb-upset">Upset</span>` : "";
   const context =
@@ -613,13 +625,13 @@ export function renderGameBlock(data: CanonicalFootballDailyData, g: FootballGam
     <span class="fb-game-matchup">${head(g.awayTeam)} @ ${head(g.homeTeam)} ${upset}</span>
     <span class="fb-game-status">${escapeHtml(g.statusDetail)}</span>
   </header>
-  ${renderLineScore(g)}
+  ${renderLineScore(g, buildRecordMap(data))}
   ${box ? renderScoringSummary(box.scoringPlays) : ""}
   ${box ? renderBox(box, data.league, web) : ""}
 </article>`.trim();
 }
 
-function renderLineScore(g: FootballGame): string {
+function renderLineScore(g: FootballGame, records?: Map<string, string>): string {
   const periods = Math.max(g.awayLine.length, g.homeLine.length, 4);
   const labels: string[] = [];
   for (let i = 1; i <= periods; i++) labels.push(i <= 4 ? String(i) : `OT${i - 4}`);
@@ -628,7 +640,9 @@ function renderLineScore(g: FootballGame): string {
     const cells = labels
       .map((_, i) => `<td class="fb-ls-cell">${line[i]?.points ?? ""}</td>`)
       .join("");
-    return `<tr><th class="fb-ls-team">${escapeHtml(ref.abbr)}</th>${cells}<td class="fb-ls-total">${total ?? ""}</td></tr>`;
+    const rec = records?.get(ref.id);
+    const recHtml = rec ? ` <span class="fb-ls-rec">(${escapeHtml(rec)})</span>` : "";
+    return `<tr><th class="fb-ls-team">${escapeHtml(ref.abbr)}${recHtml}</th>${cells}<td class="fb-ls-total">${total ?? ""}</td></tr>`;
   };
 
   return `
@@ -1059,7 +1073,8 @@ export const FOOTBALL_EMAIL_STYLES = `
 .fb-linescore th, .fb-linescore td { padding: 1px 3px; text-align: right; white-space: nowrap; }
 .fb-linescore thead th { font-size: 10px; font-weight: 700; text-transform: uppercase;
                          letter-spacing: 0.04em; border-bottom: 1px solid #161410; }
-.fb-ls-team { text-align: left !important; font-weight: 700; width: 18%; font-size: 12px; }
+.fb-ls-team { text-align: left !important; font-weight: 700; width: 26%; font-size: 12px; }
+.fb-ls-team .fb-ls-rec { font-weight: 400; color: #6a6354; }
 .fb-ls-team-head { text-align: left !important; }
 .fb-ls-total { font-weight: 700; }
 .fb-ls-cell { min-width: 22px; }

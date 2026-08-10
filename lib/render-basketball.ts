@@ -19,6 +19,7 @@ import type {
   BasketballBoxTeam,
   BasketballPlayerLine,
   BasketballConferenceStandings,
+  BasketballStandings,
   BasketballStandingsEntry,
   BasketballLeaders,
   LeaderCategory,
@@ -158,6 +159,19 @@ function renderYesterdayResults(data: BasketballData, web: boolean, league: Bask
 
 // ---- Yesterday's box scores -----------------------------------------------
 
+// team id → "W-L" from the conference standings, for the linescore labels.
+function buildRecordMap(standings: BasketballStandings): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const conf of standings.conferences) {
+    for (const e of conf.entries) {
+      const w = e.stats["wins"]?.displayValue;
+      const l = e.stats["losses"]?.displayValue;
+      if (w && l) out.set(e.team.id, `${w}-${l}`);
+    }
+  }
+  return out;
+}
+
 function renderResults(data: BasketballData, title: string, web: boolean, league: BasketballLeague): string {
   const finalsAndLive = data.games.filter(
     (g) => g.event.status === "final" || g.event.status === "in_progress",
@@ -171,7 +185,8 @@ function renderResults(data: BasketballData, title: string, web: boolean, league
 </section>
 `.trim();
   }
-  const blocks = finalsAndLive.map((g) => renderGameBlock(g.event, g.box, web, league));
+  const records = buildRecordMap(data.standings);
+  const blocks = finalsAndLive.map((g) => renderGameBlock(g.event, g.box, web, league, records));
   // Box scores flow into CSS columns on wide web (same technique as the MLB
   // digest's .boxscores-container) — 3 → 2 → 1 by viewport. The .bb-boxscores
   // class is web-only; it's absent from BASKETBALL_EMAIL_STYLES, so email
@@ -189,8 +204,9 @@ export function renderGameBlock(
   box: BasketballBoxscore | undefined,
   web: boolean,
   league: BasketballLeague,
+  records?: Map<string, string>,
 ): string {
-  const lineScore = renderLineScore(event);
+  const lineScore = renderLineScore(event, records);
   const boxTables = box ? renderBoxScore(box, web, league) : "";
   // Playoff series context: round + current state above the matchup. Only
   // present on postseason events; regular-season game blocks skip it. Round
@@ -222,7 +238,7 @@ export function renderGameBlock(
 `.trim();
 }
 
-function renderLineScore(event: BasketballScoreboardEvent): string {
+function renderLineScore(event: BasketballScoreboardEvent, records?: Map<string, string>): string {
   // Periods 1-4 are quarters; 5+ are overtime. Render whichever periods
   // either side has a linescore for. ESPN's linescores arrays are sorted
   // by period, so taking the max length covers both sides.
@@ -244,7 +260,10 @@ function renderLineScore(event: BasketballScoreboardEvent): string {
       return `<td class="bb-ls-cell">${ls ? ls.value : ""}</td>`;
     }).join("");
     const total = side.score == null ? "" : String(side.score);
-    return `<tr><th class="bb-ls-team">${escapeHtml(side.team.abbreviation || side.team.name)}</th>${cells}<td class="bb-ls-total">${total}</td></tr>`;
+    const label = escapeHtml(side.team.abbreviation || side.team.name);
+    const rec = records?.get(side.team.id);
+    const recHtml = rec ? ` <span class="bb-ls-rec">(${escapeHtml(rec)})</span>` : "";
+    return `<tr><th class="bb-ls-team">${label}${recHtml}</th>${cells}<td class="bb-ls-total">${total}</td></tr>`;
   };
 
   return `
@@ -797,7 +816,8 @@ export const BASKETBALL_EMAIL_STYLES = `
   border-bottom: 1px solid #161410;
 }
 .bb-ls-team       { text-align: left !important; font-weight: 700;
-                    width: 18%; font-size: 12px; }
+                    width: 26%; white-space: nowrap; font-size: 12px; }
+.bb-ls-team .bb-ls-rec { font-weight: 400; color: #6a6354; }
 .bb-ls-team-head  { text-align: left !important; }
 .bb-ls-total      { font-weight: 700; }
 .bb-ls-cell       { min-width: 22px; }

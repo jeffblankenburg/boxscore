@@ -18,6 +18,7 @@ import type {
   MlbDivisionStandings,
   MlbDivision,
   MlbGame,
+  MlbTeamRef,
   MlbGameStatus,
   MlbInningLine,
   MlbLeaderboard,
@@ -896,8 +897,9 @@ function renderTodaysGames(
 
 function renderGames(data: CanonicalDailyData, hl?: HighlightMap): string {
   const completed = data.games.filter((g) => g.status === "final" && data.boxScores.has(g.id));
+  const records = buildTeamRecordMap(data.standings);
   return `<div class="boxscores-container">
-${completed.map((g) => renderGame(g, data.boxScores.get(g.id)!, data.scoringPlays.get(g.id) ?? [], hl)).join("")}
+${completed.map((g) => renderGame(g, data.boxScores.get(g.id)!, data.scoringPlays.get(g.id) ?? [], hl, records)).join("")}
 </div>`;
 }
 
@@ -979,10 +981,17 @@ function normalizeName(name: string): string {
     .trim();
 }
 
-function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], hl?: HighlightMap): string {
+function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], hl?: HighlightMap, records?: Map<string, string>): string {
   // Match key from diff.ts diffBoxScores. Canonical-slug team pair, no
   // game-id dependency, so it lines up across vendor renders.
   const bkey = `box:${box.away.team.id}/${box.home.team.id}`;
+  // Linescore row label: TLA plus the team's current season record when we
+  // have standings (absent for All-Star squads, which aren't in the table).
+  const teamLabel = (t: MlbTeamRef): string => {
+    const name = esc(tla(t.name));
+    const rec = records?.get(t.id);
+    return rec ? `${name} <span class="ls-rec">(${esc(rec)})</span>` : name;
+  };
   const aScore = game.awayScore ?? 0;
   const hScore = game.homeScore ?? 0;
   const innings = game.innings;
@@ -1049,11 +1058,11 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
   return `<div class="game-container">
   <div class="game-header">${winnerFirst}</div>
   <div class="team-line">
-    <div class="team-name">${esc(tla(game.awayTeam.name))}</div>
+    <div class="team-name">${teamLabel(game.awayTeam)}</div>
     <div class="${scoreClass}">${aCells}</div>
   </div>
   <div class="team-line">
-    <div class="team-name">${esc(tla(game.homeTeam.name))}</div>
+    <div class="team-name">${teamLabel(game.homeTeam)}</div>
     <div class="${scoreClass}">${hCells}</div>
   </div>
   ${innings.length >= EXTRAS_THRESHOLD ? `<div class="notes"><b>Extras:</b> Game ended in the ${ordinal(innings.length)} — see Scoring for details.</div>` : ""}
