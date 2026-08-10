@@ -1,21 +1,65 @@
 import { EUploadMimeType, TwitterApi } from "twitter-api-v2";
 
-let cached: TwitterApi | null = null;
+// Per-league credential resolution. MLB owns the shared/base account
+// (TWITTER_API_KEY etc.) — its posts are unchanged. Every other sport posts to
+// its own profile via _<SPORT>-suffixed vars (TWITTER_API_KEY_NFL, ...). If a
+// sport has no suffixed creds it is treated as "not configured" and the caller
+// skips it — we never leak a league's posts onto the shared MLB account.
 
-function client(): TwitterApi {
-  if (cached) return cached;
-  const appKey = process.env.TWITTER_API_KEY;
-  const appSecret = process.env.TWITTER_API_SECRET;
-  const accessToken = process.env.TWITTER_ACCESS_TOKEN;
-  const accessSecret = process.env.TWITTER_ACCESS_SECRET;
-  if (!appKey || !appSecret || !accessToken || !accessSecret) {
+type TwitterCreds = {
+  appKey: string;
+  appSecret: string;
+  accessToken: string;
+  accessSecret: string;
+  handle: string;
+};
+
+function envSuffix(sport: string): string {
+  return sport === "mlb" ? "" : `_${sport.toUpperCase()}`;
+}
+
+function credsForSport(sport: string): TwitterCreds | null {
+  const s = envSuffix(sport);
+  const appKey = process.env[`TWITTER_API_KEY${s}`];
+  const appSecret = process.env[`TWITTER_API_SECRET${s}`];
+  const accessToken = process.env[`TWITTER_ACCESS_TOKEN${s}`];
+  const accessSecret = process.env[`TWITTER_ACCESS_SECRET${s}`];
+  if (!appKey || !appSecret || !accessToken || !accessSecret) return null;
+  // Handle only shapes the post URL, so it isn't required for "configured".
+  const handle =
+    process.env[`TWITTER_HANDLE${s}`] ?? (sport === "mlb" ? "boxscoreemail" : "");
+  return { appKey, appSecret, accessToken, accessSecret, handle };
+}
+
+/**
+ * Whether an X/Twitter account is set up for this sport. Crons call this to
+ * skip a league before rendering images when its profile isn't wired yet.
+ */
+export function twitterAccountConfigured(sport: string): boolean {
+  return credsForSport(sport) !== null;
+}
+
+const clients = new Map<string, TwitterApi>();
+
+function client(sport: string): TwitterApi {
+  const existing = clients.get(sport);
+  if (existing) return existing;
+  const creds = credsForSport(sport);
+  if (!creds) {
+    const s = envSuffix(sport);
     throw new Error(
-      "Twitter credentials missing: set TWITTER_API_KEY, TWITTER_API_SECRET, " +
-      "TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET.",
+      `Twitter credentials missing for sport "${sport}": set TWITTER_API_KEY${s}, ` +
+      `TWITTER_API_SECRET${s}, TWITTER_ACCESS_TOKEN${s}, TWITTER_ACCESS_SECRET${s}.`,
     );
   }
-  cached = new TwitterApi({ appKey, appSecret, accessToken, accessSecret });
-  return cached;
+  const c = new TwitterApi({
+    appKey: creds.appKey,
+    appSecret: creds.appSecret,
+    accessToken: creds.accessToken,
+    accessSecret: creds.accessSecret,
+  });
+  clients.set(sport, c);
+  return c;
 }
 
 function wrapError(err: unknown): Error {
@@ -35,8 +79,8 @@ function wrapError(err: unknown): Error {
   );
 }
 
-function tweetUrl(id: string): string {
-  const handle = process.env.TWITTER_HANDLE ?? "boxscoreemail";
+function tweetUrl(sport: string, id: string): string {
+  const handle = credsForSport(sport)?.handle || "boxscoreemail";
   return `https://twitter.com/${handle}/status/${id}`;
 }
 
@@ -45,9 +89,10 @@ export async function postTweetWithImage(args: {
   altText: string;
   imageBytes: Uint8Array;
   mimeType?: EUploadMimeType;
+  sport: string;
 }): Promise<{ id: string; url: string }> {
   try {
-    const c = client();
+    const c = client(args.sport);
     const buf = Buffer.from(args.imageBytes);
     const mediaId = await c.v2.uploadMedia(buf, {
       media_type: args.mimeType ?? EUploadMimeType.Png,
@@ -66,15 +111,15 @@ export async function postTweetWithImage(args: {
     if (!res.data?.id) {
       throw new Error(`twitter: no id returned (${JSON.stringify(res)})`);
     }
-    return { id: res.data.id, url: tweetUrl(res.data.id) };
+    return { id: res.data.id, url: tweetUrl(args.sport, res.data.id) };
   } catch (err) {
     throw wrapError(err);
   }
 }
 
-export async function deleteTweet(id: string): Promise<void> {
+export async function deleteTweet(sport: string, id: string): Promise<void> {
   try {
-    await client().v2.deleteTweet(id);
+    await client(sport).v2.deleteTweet(id);
   } catch (err) {
     throw wrapError(err);
   }

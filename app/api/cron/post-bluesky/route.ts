@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
-import { deleteBlueskyPost, postToBlueskyWithImage } from "@/lib/bluesky";
+import { blueskyAccountConfigured, blueskyTargetsForSport, deleteBlueskyPost, postToBlueskyWithImage } from "@/lib/bluesky";
 import { EMAIL_LINK_BASE, siteOrigin } from "@/lib/site";
 import { socialSendsAllowed } from "@/lib/sports";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -47,6 +47,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, ...result });
   }
 
+  // Skip sports whose Bluesky account isn't wired up yet (no per-league creds).
+  // Other leagues skip until their BLUESKY_*_<SPORT> vars exist — never leaking
+  // onto another account.
+  if (!blueskyAccountConfigured(sport)) {
+    const result = { sport, date, skipped: "no bluesky account configured for this sport" };
+    await finishCronRun(runId, { status: "ok", result });
+    return NextResponse.json({ ok: true, ...result });
+  }
+
+  // Account(s) this sport posts to. MLB is dual-homed this season (shared +
+  // dedicated); every other sport has a single target. See blueskyTargetsForSport.
+  const targets = blueskyTargetsForSport(sport);
+
   if (reset) {
     const { data: prior, error: priorErr } = await supabaseAdmin()
       .from("social_posts")
@@ -57,7 +70,11 @@ export async function GET(req: Request) {
     if (priorErr) throw new Error(`reset query: ${priorErr.message}`);
     for (const row of prior ?? []) {
       if (row.remote_id) {
-        try { await deleteBlueskyPost(row.remote_id); } catch { /* gone */ }
+        // A post's AT URI belongs to exactly one account; try each target and
+        // let the non-owners fail harmlessly.
+        for (const t of targets) {
+          try { await deleteBlueskyPost(t, row.remote_id); } catch { /* not owner / gone */ }
+        }
       }
     }
     const { error: delErr } = await supabaseAdmin()
@@ -117,35 +134,41 @@ export async function GET(req: Request) {
       results.push({ subId: entry.subId, url: "(skipped: full image disabled)" });
       continue;
     }
-    if (await hasAlreadyPosted("bluesky", sport, date, entry.subId)) {
-      skipped++;
-      results.push({ subId: entry.subId, url: "(already posted)" });
-      continue;
-    }
 
     const { text, alt } = imagePostContent(entry, captionDates, digestUrl, sport, officialMap);
     const dims = width > 0 && height > 0 ? { width, height } : undefined;
 
-    try {
-      const { uri, url: postUrl } = await postToBlueskyWithImage({
-        text, altText: alt, imageBytes: png, imageMime: mime, aspectRatio: dims,
-      });
-      await recordPost({
-        platform: "bluesky", sport, date, subId: entry.subId,
-        remoteId: uri, remoteUrl: postUrl, error: null,
-      });
-      posted++;
-      results.push({ subId: entry.subId, url: postUrl });
-      // Pace the posts so the feed reads as a series, not a burst.
-      await new Promise((r) => setTimeout(r, 500));
-    } catch (err) {
-      const msg = (err as Error).message;
-      await recordPost({
-        platform: "bluesky", sport, date, subId: entry.subId,
-        remoteId: null, remoteUrl: null, error: msg,
-      });
-      failed++;
-      results.push({ subId: entry.subId, error: msg });
+    // Post the image to each target account. Each account gets its own dedup
+    // row via the target's sub_id suffix (bare for the primary account).
+    for (const target of targets) {
+      const subId = `${entry.subId}${target.subIdSuffix}`;
+      if (await hasAlreadyPosted("bluesky", sport, date, subId)) {
+        skipped++;
+        results.push({ subId, url: "(already posted)" });
+        continue;
+      }
+
+      try {
+        const { uri, url: postUrl } = await postToBlueskyWithImage({
+          target, text, altText: alt, imageBytes: png, imageMime: mime, aspectRatio: dims,
+        });
+        await recordPost({
+          platform: "bluesky", sport, date, subId,
+          remoteId: uri, remoteUrl: postUrl, error: null,
+        });
+        posted++;
+        results.push({ subId, url: postUrl });
+        // Pace the posts so the feed reads as a series, not a burst.
+        await new Promise((r) => setTimeout(r, 500));
+      } catch (err) {
+        const msg = (err as Error).message;
+        await recordPost({
+          platform: "bluesky", sport, date, subId,
+          remoteId: null, remoteUrl: null, error: msg,
+        });
+        failed++;
+        results.push({ subId, error: msg });
+      }
     }
   }
 

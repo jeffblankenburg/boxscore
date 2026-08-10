@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { EUploadMimeType } from "twitter-api-v2";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
-import { deleteTweet, postTweetWithImage } from "@/lib/twitter";
+import { deleteTweet, postTweetWithImage, twitterAccountConfigured } from "@/lib/twitter";
 import { siteOrigin } from "@/lib/site";
 import { socialSendsAllowed } from "@/lib/sports";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -47,6 +47,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
 
+    // Skip sports whose X account isn't wired up yet (no per-league creds).
+    // MLB always resolves to the shared base account; other leagues skip until
+    // their TWITTER_*_<SPORT> vars exist — never leaking onto the MLB profile.
+    if (!twitterAccountConfigured(sport)) {
+      const result = { sport, date, skipped: "no twitter account configured for this sport" };
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
     if (reset) {
       const { data: prior, error: priorErr } = await supabaseAdmin()
         .from("social_posts")
@@ -57,7 +66,7 @@ export async function GET(req: Request) {
       if (priorErr) throw new Error(`reset query: ${priorErr.message}`);
       for (const row of prior ?? []) {
         if (row.remote_id) {
-          try { await deleteTweet(row.remote_id); } catch { /* gone */ }
+          try { await deleteTweet(sport, row.remote_id); } catch { /* gone */ }
         }
       }
       const { error: delErr } = await supabaseAdmin()
@@ -124,7 +133,7 @@ export async function GET(req: Request) {
 
       try {
         const { id, url: postUrl } = await postTweetWithImage({
-          text, altText: alt, imageBytes: png, mimeType,
+          text, altText: alt, imageBytes: png, mimeType, sport,
         });
         await recordPost({
           platform: "twitter", sport, date, subId: entry.subId,
