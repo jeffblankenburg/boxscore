@@ -75,7 +75,11 @@ const STANDINGS_COLUMNS: ReadonlyArray<{ key: string; label: string }> = [
 ];
 
 export function renderBasketballContent(data: BasketballData): string {
-  return renderBody(data, true);
+  // Web dateline = the edition date (digest date + 1), same newspaper convention
+  // as the email below and the MLB web renderer (lib/sports/mlb/render/web.ts):
+  // today's edition shows yesterday's results. `data.prettyDate` is the games
+  // date (kept as-is for the admin preview), so override it here just like email.
+  return renderBody({ ...data, prettyDate: prettyDate(nextDay(data.date)) }, true);
 }
 
 export function renderBasketballEmailContent(data: BasketballData): string {

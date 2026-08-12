@@ -1,10 +1,63 @@
 import { notFound } from "next/navigation";
 import { getLatestDigest } from "@/lib/digests";
-import { prettyDate, yesterdayInET, nextDay } from "@/lib/dates";
+import { prettyDate, yesterdayInET, nextDay, daysBetweenISO } from "@/lib/dates";
 import { getSportById, isSportVisible } from "@/lib/sports";
+import { nextScheduledGameDate, seasonStartMonth } from "@/lib/next-game";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { PaperMasthead } from "@/app/PaperMasthead";
 import { DateHeaderCalendar } from "@/app/DateHeaderCalendar";
+
+// The latest in-season digest can be weeks old between seasons. Longer than the
+// biggest legitimate in-season break — the NFL's ~2 weeks between the
+// conference title games and the Super Bowl — means the sport is between
+// seasons, so show a countdown to its return instead of a stale edition.
+const OFFSEASON_STALE_DAYS = 21;
+
+// Countdown-only offseason state. Exact days when the next opener is on the
+// published schedule; otherwise a month-level "returns in <Month>".
+function OffseasonNotice({
+  name,
+  nextIso,
+  todayIso,
+  fallbackMonth,
+}: {
+  name: string;
+  nextIso: string | null;
+  todayIso: string;
+  fallbackMonth: string | null;
+}) {
+  const days = nextIso ? daysBetweenISO(todayIso, nextIso) : null;
+  const known = days != null && days > 0;
+  return (
+    <div
+      style={{
+        maxWidth: 620,
+        margin: "0 auto",
+        padding: "5rem 1.5rem",
+        textAlign: "center",
+        fontFamily: "'Source Sans 3', system-ui, -apple-system, sans-serif",
+        color: "#161410",
+      }}
+    >
+      <div style={{ textTransform: "uppercase", letterSpacing: "0.18em", fontSize: 13, color: "#6b6862" }}>
+        {name} — Offseason
+      </div>
+      {known ? (
+        <>
+          <div style={{ fontSize: 72, fontWeight: 800, lineHeight: 1.02, margin: "1.25rem 0 0.25rem" }}>
+            {days}
+          </div>
+          <div style={{ fontSize: 19 }}>{days === 1 ? "day" : "days"} until {name} returns</div>
+          <div style={{ fontSize: 15, color: "#6b6862", marginTop: 8 }}>{prettyDate(nextIso!)}</div>
+        </>
+      ) : (
+        <div style={{ fontSize: 24, marginTop: "1.25rem", fontWeight: 600 }}>
+          {name} returns in {fallbackMonth ?? "the coming months"}.
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Bookmarkable league page. URL stays as `/mlb` while rendering the latest
 // finalized day's digest. The dated route `/mlb/[date]` continues to serve
@@ -58,13 +111,28 @@ export default async function SportLatest({
   // yet — the bookmarkable URL 404'd during that ~5-hour window before this
   // fix. Latest-available preserves the "always shows fresh content" story.
   const digest = await getLatestDigest(sport);
-  if (!digest) notFound();
+  const today = nextDay(yesterdayInET());
+
+  // Offseason: no in-season digest, or the newest one is older than the longest
+  // legitimate in-season break. Show a countdown to the sport's return rather
+  // than a 404 or a weeks-stale edition.
+  if (!digest || daysBetweenISO(digest.date, today) > OFFSEASON_STALE_DAYS) {
+    const row = await getSportById(sport);
+    const nextIso = await nextScheduledGameDate(sport);
+    return (
+      <OffseasonNotice
+        name={row?.name ?? sport.toUpperCase()}
+        nextIso={nextIso}
+        todayIso={today}
+        fallbackMonth={seasonStartMonth(sport)}
+      />
+    );
+  }
 
   const date = digest.date;
   const { paper } = await searchParams;
   const paperMode = paper === "1";
   const editionDate = nextDay(date);
-  const today = nextDay(yesterdayInET());
 
   return (
     <div className={paperMode ? "paper-mode" : undefined}>

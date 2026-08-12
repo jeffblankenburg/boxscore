@@ -58,7 +58,10 @@ const UPSET_RANK_GAP = 10;
 
 export function renderFootballContent(data: CanonicalFootballDailyData): string {
   // Web surface: player/team names link to their pages with relative hrefs.
-  return renderBody(data, prettyDate(data.date), true);
+  // Dateline is the edition date (digest date + 1) — same newspaper convention
+  // as the email below and the MLB/basketball web renderers; today's edition
+  // recaps yesterday's games.
+  return renderBody(data, prettyDate(nextDay(data.date)), true);
 }
 
 export function renderFootballEmailContent(data: CanonicalFootballDailyData): string {
@@ -78,7 +81,8 @@ export function renderFootballConferenceContent(
   data: CanonicalFootballDailyData,
   conf: NcaafConference,
 ): string {
-  return renderConferenceBody(scopeToConference(data, conf), conf, prettyDate(data.date), true);
+  // Edition-date dateline (digest date + 1), matching renderFootballContent.
+  return renderConferenceBody(scopeToConference(data, conf), conf, prettyDate(nextDay(data.date)), true);
 }
 
 export function renderFootballConferenceEmailContent(
