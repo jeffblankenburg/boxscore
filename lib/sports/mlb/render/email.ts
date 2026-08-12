@@ -36,6 +36,7 @@ import type {
 } from "../types";
 
 import type { DigestMode } from "@/lib/digest-mode";
+import { wildCardVisibleTeams } from "./wild-card";
 import { findTeam } from "@/lib/teams";
 import { nextDay, prettyDate } from "@/lib/dates";
 import { lastName, boxSurname, collidingSurnames } from "@/lib/names";
@@ -270,26 +271,7 @@ function renderDivisionTable(
 }
 
 function renderWildCardTable(wc: MlbWildCardStandings, editionDate: string): string {
-  // Top 6 by wild-card rank, with the standard tiebreaker walk: if the
-  // 7th team is tied with the 6th on W-L, extend the cut. Matches the
-  // web renderer's logic in lib/sports/mlb/render/web.ts.
-  const sorted = [...wc.teams].sort(
-    (a, b) => (a.wildCardRank ?? 99) - (b.wildCardRank ?? 99),
-  );
-  const minTeams = 6;
-  let cutoff = Math.min(minTeams, sorted.length);
-  const lastIncluded = sorted[cutoff - 1];
-  while (cutoff < sorted.length) {
-    const next = sorted[cutoff];
-    if (next && lastIncluded
-        && next.wins === lastIncluded.wins
-        && next.losses === lastIncluded.losses) {
-      cutoff++;
-    } else {
-      break;
-    }
-  }
-  const top = sorted.slice(0, cutoff);
+  const top = wildCardVisibleTeams(wc);
   const rows = top.map((t, i) => {
     // Position 4 (0-indexed = 3) is the first team OUTSIDE the wild
     // card picture — draw a hairline top border to mark the cutoff so

@@ -206,6 +206,11 @@ export async function GET(req: Request) {
       const email_html = renderFootballEmailContent(fb);
       await upsertDigest({
         sport, date, html, email_html, game_count: fb.games.length,
+        // Football only persists a digest on days a game was played (it returns
+        // early above otherwise), so every football digest is an in-season
+        // edition. Tag it "regular" so getLatestDigest surfaces it on /[sport];
+        // without a mode it defaults to null and the landing page 404s.
+        mode: "regular",
       });
 
       // Per-team recap digests. Weekly cadence (Jeff, 2026-07-20): a team's
@@ -264,6 +269,12 @@ export async function GET(req: Request) {
     const email_html = renderBasketballEmailContent(bb);
     await upsertDigest({
       sport, date, html, email_html, game_count: bb.games.length,
+      // Tag in-season vs offseason so getLatestDigest surfaces the latest game
+      // day on /[sport] but skips the empty 0-game rows this cron writes daily
+      // year-round. Basketball plays near-daily in-season, so "0 games today"
+      // reliably means offseason; a rare in-season dark day just falls back to
+      // the prior day's digest, which getLatestDigest already returns.
+      mode: bb.games.length > 0 ? "regular" : "offseason",
     });
 
     // Per-team digests — basketball/football/hockey cadence: write a digest ONLY

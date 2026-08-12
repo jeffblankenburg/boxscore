@@ -34,6 +34,7 @@ import type {
 } from "../types";
 
 import type { DigestMode } from "@/lib/digest-mode";
+import { wildCardVisibleTeams } from "./wild-card";
 import { findTeam } from "@/lib/teams";
 import { nextDay, prettyDate, issueNumber, volumeNumber } from "@/lib/dates";
 import { lastName, boxSurname, collidingSurnames } from "@/lib/names";
@@ -594,22 +595,7 @@ function renderWildCardTable(
   opts: { date?: string; tableClass?: string } = {},
   hl?: HighlightMap,
 ): string {
-  const sorted = [...wc.teams]
-    .sort((a, b) => (a.wildCardRank ?? 99) - (b.wildCardRank ?? 99));
-  const minTeams = 6;
-  let cutoff = Math.min(minTeams, sorted.length);
-  const lastIncluded = sorted[cutoff - 1];
-  while (cutoff < sorted.length) {
-    const next = sorted[cutoff];
-    if (next && lastIncluded
-        && next.wins === lastIncluded.wins
-        && next.losses === lastIncluded.losses) {
-      cutoff++;
-    } else {
-      break;
-    }
-  }
-  const top = sorted.slice(0, cutoff);
+  const top = wildCardVisibleTeams(wc);
   const rows = top.map((t, i) => {
     const cutoffClass = i === 3 ? " wc-cutoff" : "";
     const slug = findTeam("mlb", t.team.id)?.slug;
