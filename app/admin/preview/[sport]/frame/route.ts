@@ -30,6 +30,8 @@ import {
   renderFootballConferenceEmailContent,
 } from "@/lib/sports/football/render/digest";
 import { findConferenceBySlug } from "@/lib/sports/football/conferences";
+import { getVisibleSports } from "@/lib/sports";
+import { mastheadNavSports } from "@/lib/masthead";
 import { FOOTBALL_PREVIEW_FIXTURES } from "@/lib/sports/football/preview-fixtures";
 
 export const runtime = "nodejs";
@@ -120,6 +122,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
   let digestPrettyDate: string;
   let webBody: string;
   let emailBody: string;
+  const navSports = mastheadNavSports(await getVisibleSports());
   if (sport === "mlb") {
     const raw = await loadDailyRaw(targetDate);
     await getCanonicalPlayerLookup();
@@ -131,8 +134,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
     // the admin preview shows the digest as recipients will actually
     // see it (sponsor lines, display boxes, classifieds, etc.).
     [webBody, emailBody] = await Promise.all([
-      renderCanonicalContentWithAds(canonical, sport),
-      renderCanonicalEmailContentWithAds(canonical, sport),
+      renderCanonicalContentWithAds(canonical, sport, navSports),
+      renderCanonicalEmailContentWithAds(canonical, sport, navSports),
     ]);
   } else if (sport === "nfl" || sport === "ncaaf") {
     const fb = await loadFootballData(sport, targetDate);
@@ -143,11 +146,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
     const conf =
       sport === "ncaaf" ? findConferenceBySlug(url.searchParams.get("conf") ?? "") : undefined;
     if (conf) {
-      webBody = renderFootballConferenceContent(fb, conf);
-      emailBody = renderFootballConferenceEmailContent(fb, conf);
+      webBody = renderFootballConferenceContent(fb, conf, navSports);
+      emailBody = renderFootballConferenceEmailContent(fb, conf, navSports);
     } else {
-      webBody = renderFootballContent(fb);
-      emailBody = renderFootballEmailContent(fb);
+      webBody = renderFootballContent(fb, navSports);
+      emailBody = renderFootballEmailContent(fb, navSports);
     }
   } else {
     const data = sport === "nba"
@@ -155,8 +158,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
       : await loadWnbaData(targetDate);
     digestDate = data.date;
     digestPrettyDate = data.prettyDate;
-    webBody = renderBasketballContent(data);
-    emailBody = renderBasketballEmailContent(data);
+    webBody = renderBasketballContent(data, navSports);
+    emailBody = renderBasketballEmailContent(data, navSports);
   }
 
   // Resolve the day's announcement once (sport-specific or the global "*"

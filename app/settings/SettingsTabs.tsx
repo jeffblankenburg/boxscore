@@ -10,8 +10,12 @@ import { useState, type ReactNode } from "react";
 
 export type SettingsTab = { id: string; label: string; content: ReactNode };
 
-export function SettingsTabs({ tabs }: { tabs: SettingsTab[] }) {
-  const [active, setActive] = useState(tabs[0]?.id ?? "");
+export function SettingsTabs({ tabs, initialTab }: { tabs: SettingsTab[]; initialTab?: string }) {
+  // Open a specific tab when linked with ?sport= (e.g. the offseason page's
+  // "Subscribe Now" button); fall back to the first tab (MLB) otherwise.
+  const [active, setActive] = useState(
+    initialTab && tabs.some((t) => t.id === initialTab) ? initialTab : (tabs[0]?.id ?? ""),
+  );
 
   return (
     <div className="settings-tabs">

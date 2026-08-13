@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import { getLatestDigest } from "@/lib/digests";
 import { prettyDate, yesterdayInET, nextDay, daysBetweenISO } from "@/lib/dates";
-import { getSportById, isSportVisible } from "@/lib/sports";
+import { getSportById, isSportVisible, getVisibleSports } from "@/lib/sports";
+import { renderMasthead, mastheadNavSports } from "@/lib/masthead";
 import { nextScheduledGameDate, seasonStartMonth } from "@/lib/next-game";
+import { getSessionSubscriber } from "@/lib/subscriber-session";
+import { getLeagueSubscriptions } from "@/lib/email-subscriptions";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { PaperMasthead } from "@/app/PaperMasthead";
 import { DateHeaderCalendar } from "@/app/DateHeaderCalendar";
@@ -20,11 +23,15 @@ function OffseasonNotice({
   nextIso,
   todayIso,
   fallbackMonth,
+  subscribeHref,
 }: {
   name: string;
   nextIso: string | null;
   todayIso: string;
   fallbackMonth: string | null;
+  // Where "Subscribe Now" points (/subscribe or /settings?sport=…), or null when
+  // the viewer already subscribes to this sport — then we show a note instead.
+  subscribeHref: string | null;
 }) {
   const days = nextIso ? daysBetweenISO(todayIso, nextIso) : null;
   const known = days != null && days > 0;
@@ -33,7 +40,7 @@ function OffseasonNotice({
       style={{
         maxWidth: 620,
         margin: "0 auto",
-        padding: "5rem 1.5rem",
+        padding: "3rem 1.5rem 5rem",
         textAlign: "center",
         fontFamily: "'Source Sans 3', system-ui, -apple-system, sans-serif",
         color: "#161410",
@@ -55,6 +62,41 @@ function OffseasonNotice({
           {name} returns in {fallbackMonth ?? "the coming months"}.
         </div>
       )}
+      <div style={{ marginTop: "2rem" }}>
+        {subscribeHref ? (
+          <a
+            href={subscribeHref}
+            style={{
+              display: "inline-block",
+              background: "#161410",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 15,
+              letterSpacing: "0.02em",
+              textDecoration: "none",
+              padding: "10px 22px",
+              borderRadius: 999,
+            }}
+          >
+            Subscribe Now
+          </a>
+        ) : (
+          <div
+            style={{
+              display: "inline-block",
+              background: "#ecebe4",
+              color: "#6b6862",
+              fontWeight: 500,
+              fontSize: 15,
+              letterSpacing: "0.02em",
+              padding: "10px 22px",
+              borderRadius: 999,
+            }}
+          >
+            You’re already subscribed to this newsletter.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -119,13 +161,33 @@ export default async function SportLatest({
   if (!digest || daysBetweenISO(digest.date, today) > OFFSEASON_STALE_DAYS) {
     const row = await getSportById(sport);
     const nextIso = await nextScheduledGameDate(sport);
+    // Button target by viewer state:
+    //   - not signed in            → /subscribe
+    //   - signed in, not on sport  → /settings with this sport's tab open
+    //   - signed in, already on it → null (component shows a note, not a button)
+    const subscriber = await getSessionSubscriber();
+    let subscribeHref: string | null = "/subscribe";
+    if (subscriber) {
+      const leagueSubs = await getLeagueSubscriptions(subscriber.id);
+      subscribeHref = leagueSubs.get(sport) === true ? null : `/settings?sport=${sport}`;
+    }
+    // Keep the digest masthead (sport nav + dateline) above the countdown. No
+    // edition today, so the dateline shows today's date (yesterday + 1).
+    const navSports = mastheadNavSports(await getVisibleSports());
+    const masthead = renderMasthead({
+      date: yesterdayInET(), sport, surface: "web", navSports,
+    });
     return (
-      <OffseasonNotice
-        name={row?.name ?? sport.toUpperCase()}
-        nextIso={nextIso}
-        todayIso={today}
-        fallbackMonth={seasonStartMonth(sport)}
-      />
+      <div>
+        <div dangerouslySetInnerHTML={{ __html: masthead }} />
+        <OffseasonNotice
+          name={row?.name ?? sport.toUpperCase()}
+          nextIso={nextIso}
+          todayIso={today}
+          fallbackMonth={seasonStartMonth(sport)}
+          subscribeHref={subscribeHref}
+        />
+      </div>
     );
   }
 

@@ -9,6 +9,8 @@ import { teamDailyEmail } from "@/lib/emails/templates";
 import { getAnnouncement } from "@/lib/announcements";
 import { loadFootballData } from "@/lib/sports/football/data";
 import { renderFootballConferenceEmailContent } from "@/lib/sports/football/render/digest";
+import { getVisibleSports } from "@/lib/sports";
+import { mastheadNavSports } from "@/lib/masthead";
 import { findConferenceBySlug, scopeToConference } from "@/lib/sports/football/conferences";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
@@ -81,6 +83,7 @@ export async function GET(req: Request) {
 
     // One bundle for the day, reused across every conference (scoped per conf).
     const bundle = await loadFootballData(sport, date);
+    const navSports = mastheadNavSports(await getVisibleSports());
     const digestPrettyDate = prettyDate(date);
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
     const allActive = await getActiveSubscribers();
@@ -105,7 +108,7 @@ export async function GET(req: Request) {
           continue;
         }
 
-        const body = renderFootballConferenceEmailContent(bundle, conf);
+        const body = renderFootballConferenceEmailContent(bundle, conf, navSports);
 
         const optedIds = await getConferenceOptInSubscriberIds(sport, slug);
         const subscribers: Subscriber[] = [];

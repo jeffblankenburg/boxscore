@@ -36,7 +36,8 @@ import type {
 import type { DigestMode } from "@/lib/digest-mode";
 import { wildCardVisibleTeams } from "./wild-card";
 import { findTeam } from "@/lib/teams";
-import { nextDay, prettyDate, issueNumber, volumeNumber } from "@/lib/dates";
+import { nextDay, prettyDate } from "@/lib/dates";
+import { renderMasthead, type NavSport } from "@/lib/masthead";
 import { lastName, boxSurname, collidingSurnames } from "@/lib/names";
 import { lastNameLinkWeb, fullNameLinkWeb } from "@/lib/player-links";
 import { sortTransactionsByTeam } from "../transactions";
@@ -310,17 +311,17 @@ function leadersThroughTies<T extends { rank: number }>(rows: T[], limit: number
 
 // ─── Public entry ────────────────────────────────────────────────────────
 
-export function renderCanonicalWeb(data: CanonicalDailyData, hl?: HighlightMap): string {
-  const editionDate = nextDay(data.date);
-  const datelineOpts = {
-    volume: volumeNumber(editionDate),
-    issue:  issueNumber(editionDate),
-  };
+export function renderCanonicalWeb(
+  data: CanonicalDailyData,
+  hl?: HighlightMap,
+  navSports: NavSport[] = [],
+): string {
+  const masthead = renderMasthead({ date: data.date, sport: "mlb", surface: "web", navSports });
   const teamRecords = buildTeamRecordMap(data.standings);
   const mode = classifyMode(data.games, data.date, data.nextDayGames);
 
   if (mode === "no-games") {
-    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+    return `${masthead}
 
 <p class="no-games-note">No games yesterday.</p>
 
@@ -332,7 +333,7 @@ ${renderTransactions(data.transactions, hl)}`;
   // Recap: exclusively the All-Star Game — masthead, MVP, the final box, and
   // real transactions. No standings/leaders/Today's Games.
   if (mode === "all-star") {
-    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+    return `${masthead}
 
 ${asgRecapMasthead(data)}
 
@@ -346,7 +347,7 @@ ${renderTransactions(data.transactions, hl)}`;
   // Day before the ASG: masthead + AL/NL rosters (with first-half season
   // lines) + pitching matchup, then the normal first-half standings/leaders.
   if (mode === "all-star-preview") {
-    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+    return `${masthead}
 
 ${asgMasthead(data)}
 
@@ -368,7 +369,7 @@ ${renderTransactions(data.transactions, hl)}`;
   // Day after the ASG: first-half recap — standings + extended leaders +
   // Today's Games (second half resumes).
   if (mode === "mid-season") {
-    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+    return `${masthead}
 
 <div class="asg-edition">First-Half Recap</div>
 
@@ -385,7 +386,7 @@ ${renderTodaysGames(data.nextDayGames, teamRecords, hl)}
 ${renderTransactions(data.transactions, hl)}`;
   }
 
-  return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+  return `${masthead}
 
 <div class="section">
   ${renderLeague("American League", "AL", data, hl)}
@@ -511,17 +512,7 @@ function renderAsgRosters(data: CanonicalDailyData): string {
   return `<div class="league-layout">${asgRosterCard("American League", r.AL)}${asgRosterCard("National League", r.NL)}</div>`;
 }
 
-// ─── Dateline + transactions ─────────────────────────────────────────────
-
-export function renderDateline(
-  pretty: string,
-  opts: { volume?: number; issue?: number } = {},
-): string {
-  const counter = opts.volume && opts.issue
-    ? `<div class="dateline-issue-no">Vol. ${opts.volume}, Issue ${opts.issue}</div>`
-    : "";
-  return `<div class="dateline"><div class="dateline-row"><span class="dateline-text">${esc(pretty)}</span></div>${counter}</div>`;
-}
+// ─── Transactions ────────────────────────────────────────────────────────
 
 function renderTransactions(txs: MlbTransaction[], hl?: HighlightMap): string {
   if (txs.length === 0) return "";

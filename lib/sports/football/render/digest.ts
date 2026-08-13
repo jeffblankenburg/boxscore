@@ -31,7 +31,7 @@ import type {
   FootballPlayerRef,
   FootballLeague,
 } from "../types";
-import { prettyDate, nextDay } from "../../../dates";
+import { renderMasthead, type NavSport } from "../../../masthead";
 import { findTeam, findTeamByAbbr } from "../../../teams";
 import { EMAIL_LINK_BASE } from "../../../site";
 import { footballPlayerPath } from "../player-links";
@@ -56,19 +56,12 @@ const DEFENSE_ROW_CAP = 8;
 // another ranked at least this many spots higher. Tunable single knob.
 const UPSET_RANK_GAP = 10;
 
-export function renderFootballContent(data: CanonicalFootballDailyData): string {
-  // Web surface: player/team names link to their pages with relative hrefs.
-  // Dateline is the edition date (digest date + 1) — same newspaper convention
-  // as the email below and the MLB/basketball web renderers; today's edition
-  // recaps yesterday's games.
-  return renderBody(data, prettyDate(nextDay(data.date)), true);
+export function renderFootballContent(data: CanonicalFootballDailyData, navSports: NavSport[] = []): string {
+  return renderBody(data, true, navSports);
 }
 
-export function renderFootballEmailContent(data: CanonicalFootballDailyData): string {
-  // Newspaper convention: today's edition recaps yesterday's games, so the
-  // email dateline is the day it goes out (digest date + 1). Email links use
-  // absolute EMAIL_LINK_BASE urls (relative ones don't resolve in mail).
-  return renderBody(data, prettyDate(nextDay(data.date)), false);
+export function renderFootballEmailContent(data: CanonicalFootballDailyData, navSports: NavSport[] = []): string {
+  return renderBody(data, false, navSports);
 }
 
 // ---- Conference digest ----------------------------------------------------
@@ -80,21 +73,17 @@ export function renderFootballEmailContent(data: CanonicalFootballDailyData): st
 export function renderFootballConferenceContent(
   data: CanonicalFootballDailyData,
   conf: NcaafConference,
+  navSports: NavSport[] = [],
 ): string {
-  // Edition-date dateline (digest date + 1), matching renderFootballContent.
-  return renderConferenceBody(scopeToConference(data, conf), conf, prettyDate(nextDay(data.date)), true);
+  return renderConferenceBody(scopeToConference(data, conf), conf, true, navSports);
 }
 
 export function renderFootballConferenceEmailContent(
   data: CanonicalFootballDailyData,
   conf: NcaafConference,
+  navSports: NavSport[] = [],
 ): string {
-  return renderConferenceBody(
-    scopeToConference(data, conf),
-    conf,
-    prettyDate(nextDay(data.date)),
-    false,
-  );
+  return renderConferenceBody(scopeToConference(data, conf), conf, false, navSports);
 }
 
 // A conference's upcoming matchups: the earliest upcoming week among its games
@@ -112,9 +101,12 @@ function renderConferenceMatchups(data: CanonicalFootballDailyData, web: boolean
 function renderConferenceBody(
   scoped: CanonicalFootballDailyData,
   conf: NcaafConference,
-  dateline: string,
   web: boolean,
+  navSports: NavSport[],
 ): string {
+  const masthead = renderMasthead({
+    date: scoped.date, sport: scoped.league, surface: web ? "web" : "email", navSports,
+  });
   // No rankings section — a team's AP rank shows inline in the standings. On
   // wide web two paired rows sit side by side (fb-conf-2col): Standings|Leaders
   // and Scores|Matchups; box scores span full width below. Leaders is an empty
@@ -127,7 +119,7 @@ function renderConferenceBody(
   const row = (a: string, b: string) =>
     a || b ? `<div class="fb-conf-2col">${a}${b}</div>` : "";
   const sections = [
-    renderDateline(dateline),
+    masthead,
     `<div class="fb-conf-heading">${escapeHtml(conf.short)}</div>`,
     row(standings, leaders),
     row(scores, matchups),
@@ -139,11 +131,14 @@ function renderConferenceBody(
 
 // ---- Body -----------------------------------------------------------------
 
-function renderBody(data: CanonicalFootballDailyData, dateline: string, web: boolean): string {
+function renderBody(data: CanonicalFootballDailyData, web: boolean, navSports: NavSport[]): string {
+  const masthead = renderMasthead({
+    date: data.date, sport: data.league, surface: web ? "web" : "email", navSports,
+  });
   // Section order mirrors the MLB league digest: Standings, Leaders, Game
   // Scores, Next Matchups, Box Scores, Transactions. (Rankings lead for NCAAF.)
   const sections = [
-    renderDateline(dateline),
+    masthead,
     renderRankings(data.rankings, web),
     renderStandings(data, web),
     renderLeaders(data, web),
@@ -154,10 +149,6 @@ function renderBody(data: CanonicalFootballDailyData, dateline: string, web: boo
     renderTransactions(data),
   ];
   return sections.filter((s) => s.length > 0).join("\n");
-}
-
-function renderDateline(dateline: string): string {
-  return `<div class="fb-dateline"><div class="fb-dateline-text">${escapeHtml(dateline)}</div></div>`;
 }
 
 // ---- Rankings (NCAAF) -----------------------------------------------------

@@ -28,6 +28,7 @@ import { renderEmailContent } from "./render-email";
 import { renderCanonicalWeb } from "./sports/mlb/render/web";
 import { renderCanonicalEmail } from "./sports/mlb/render/email";
 import type { CanonicalDailyData } from "./sports/mlb/canonical";
+import type { NavSport } from "./masthead";
 
 // Setting key the admin toggle on /admin/ads writes/reads.
 export const ADS_ENABLED_FLAG = "ads_enabled";
@@ -267,8 +268,9 @@ export async function renderEmailContentWithAds(
 export async function renderCanonicalContentWithAds(
   data: CanonicalDailyData,
   sport: string,
+  navSports: NavSport[] = [],
 ): Promise<string> {
-  const baseHtml = renderCanonicalWeb(data);
+  const baseHtml = renderCanonicalWeb(data, undefined, navSports);
   const editionDate = nextDay(data.date);
   const result = await spliceLiveAds({
     digestHtml: baseHtml,
@@ -286,8 +288,9 @@ export async function renderCanonicalContentWithAds(
 export async function renderCanonicalEmailContentWithAds(
   data: CanonicalDailyData,
   sport: string,
+  navSports: NavSport[] = [],
 ): Promise<string> {
-  const baseHtml = renderCanonicalEmail(data);
+  const baseHtml = renderCanonicalEmail(data, navSports);
   const editionDate = nextDay(data.date);
   const result = await spliceLiveAds({
     digestHtml: baseHtml,

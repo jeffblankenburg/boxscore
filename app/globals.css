@@ -107,22 +107,25 @@ a { color: inherit; }
   font-size: clamp(18px, 4.2vw, 28px);
   position: relative;
 }
-/* "Vol. X, Issue Y" overlays the band's bottom-right corner on wider
-   viewports — same band as the date, no extra vertical space consumed. On
-   narrow viewports (~480px and below) the overlay collides with the centered
-   date text, so we drop it to its own row beneath. */
-.dateline-issue-no {
-  position: absolute; right: 8px; bottom: 4px;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--text-muted);
+/* Sport nav row — sits between the site/email header band and the dateline.
+   Links are undecorated; the current sport is bold. */
+.masthead-nav {
+  text-align: center;
+  border-top: 2px solid var(--border-strong);
+  padding: 7px 0 3px;
+  line-height: 1.1;
 }
-@media (max-width: 520px) {
-  .dateline-issue-no {
-    position: static; right: auto; bottom: auto;
-    display: block; text-align: center;
-    margin-top: 4px;
-  }
+.masthead-nav-link {
+  display: inline-block;
+  margin: 0 6px;
+  text-decoration: none;
+  color: var(--border-strong);
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
+.masthead-nav-link.is-current { font-weight: 800; }
+.masthead-nav-link:hover { text-decoration: underline; }
 .dateline-text { display: inline-block; }
 /* Day-nav arrows were removed when the date-header dropdown calendar
    shipped. New digests no longer emit them; this hides the leftovers in

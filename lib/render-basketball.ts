@@ -26,7 +26,8 @@ import type {
   BasketballTransaction,
 } from "./basketball";
 import { lastName } from "./render-email";
-import { nextDay, prettyDate, timeInET } from "./dates";
+import { timeInET } from "./dates";
+import { renderMasthead, type NavSport } from "./masthead";
 import {
   teamLinkByNickname,
   playerLink,
@@ -74,24 +75,21 @@ const STANDINGS_COLUMNS: ReadonlyArray<{ key: string; label: string }> = [
   { key: "streak", label: "STRK" },
 ];
 
-export function renderBasketballContent(data: BasketballData): string {
-  // Web dateline = the edition date (digest date + 1), same newspaper convention
-  // as the email below and the MLB web renderer (lib/sports/mlb/render/web.ts):
-  // today's edition shows yesterday's results. `data.prettyDate` is the games
-  // date (kept as-is for the admin preview), so override it here just like email.
-  return renderBody({ ...data, prettyDate: prettyDate(nextDay(data.date)) }, true);
+export function renderBasketballContent(data: BasketballData, navSports: NavSport[] = []): string {
+  return renderBody(data, true, navSports);
 }
 
-export function renderBasketballEmailContent(data: BasketballData): string {
-  // Email dateline = the day this email goes out (i.e. digest date + 1).
-  // Mirrors a newspaper: today's edition shows yesterday's results.
-  return renderBody({ ...data, prettyDate: prettyDate(nextDay(data.date)) }, false);
+export function renderBasketballEmailContent(data: BasketballData, navSports: NavSport[] = []): string {
+  return renderBody(data, false, navSports);
 }
 
 // ---- Body -----------------------------------------------------------------
 
-function renderBody(data: BasketballData, web: boolean): string {
+function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): string {
   const league = data.sport;
+  const masthead = renderMasthead({
+    date: data.date, sport: data.sport, surface: web ? "web" : "email", navSports,
+  });
   // Playoffs and regular-season modes use different section orders. Playoffs
   // leads with the result (the big news is the game just played), then the
   // current series state, then what's coming up. Regular season mirrors
@@ -99,7 +97,7 @@ function renderBody(data: BasketballData, web: boolean): string {
   // schedule, then yesterday's box scores, then transactions.
   if (data.isPlayoffs) {
     const sections = [
-      renderDateline(data),
+      masthead,
       renderResults(data, "Yesterday\u2019s games", web, league),
       renderPlayoffSeries(data, web, league),
       // Today's games surfaces a Game N of an ongoing series scheduled for
@@ -112,7 +110,7 @@ function renderBody(data: BasketballData, web: boolean): string {
   }
 
   const sections = [
-    renderDateline(data),
+    masthead,
     renderStandingsColumns(data.standings, web, league),
     renderLeaders(data.leaders, data.sport, web, league),
     renderYesterdayResults(data, web, league),
@@ -121,12 +119,6 @@ function renderBody(data: BasketballData, web: boolean): string {
     renderTransactions(data.transactions, data.date),
   ];
   return sections.filter((s) => s.length > 0).join("\n");
-}
-
-// Centered date in a bordered masthead band. Send-date drives the value —
-// matches the MLB renderer.
-function renderDateline(data: BasketballData): string {
-  return `<div class="bb-dateline"><div class="bb-dateline-text">${escapeHtml(data.prettyDate)}</div></div>`;
 }
 
 // ---- Yesterday's results (compact score-line list) ------------------------

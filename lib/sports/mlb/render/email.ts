@@ -43,8 +43,9 @@ import { lastName, boxSurname, collidingSurnames } from "@/lib/names";
 import { lastNameLinkEmail, fullNameLinkEmail } from "@/lib/player-links";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import {
-  esc, pad, fmtAvg, fmtOps, fmtEra, dateline, sectionH,
+  esc, pad, fmtAvg, fmtOps, fmtEra, sectionH,
 } from "@/lib/render-email";
+import { renderMasthead, type NavSport } from "@/lib/masthead";
 import { sortTransactionsByTeam } from "../transactions";
 
 // ─── Display tables (name-keyed) ─────────────────────────────────────────
@@ -883,14 +884,15 @@ function asgRosters(data: CanonicalDailyData): string {
 
 // ─── Entry ──────────────────────────────────────────────────────────────
 
-export function renderCanonicalEmail(data: CanonicalDailyData): string {
+export function renderCanonicalEmail(data: CanonicalDailyData, navSports: NavSport[] = []): string {
   const editionDate = nextDay(data.date);
+  const masthead = renderMasthead({ date: data.date, sport: "mlb", surface: "email", navSports });
   const teamRecords = buildTeamRecordMap(data.standings);
   const mode = classifyMode(data.games, data.date, data.nextDayGames);
 
   if (mode === "no-games") {
     return `<div class="es">
-${dateline(prettyDate(editionDate))}
+${masthead}
 <p class="es-no-games">No games yesterday.</p>
 ${renderTodaysGames(data.nextDayGames, teamRecords)}
 ${renderTransactions(data.transactions)}
@@ -901,7 +903,7 @@ ${renderTransactions(data.transactions)}
   // real transactions. No standings/leaders/Today's Games.
   if (mode === "all-star") {
     return `<div class="es">
-${dateline(prettyDate(editionDate))}
+${masthead}
 ${asgRecapMasthead(data)}
 ${asgMvpLine(data)}
 ${renderAllStarGame(data)}
@@ -913,7 +915,7 @@ ${renderTransactions(data.transactions)}
   // first-half standings/leaders.
   if (mode === "all-star-preview") {
     return `<div class="es">
-${dateline(prettyDate(editionDate))}
+${masthead}
 ${asgMasthead(data)}
 ${asgMatchupByline(data)}
 ${asgRosters(data)}
@@ -929,7 +931,7 @@ ${renderTransactions(data.transactions)}
   // Today's Games (second half resumes).
   if (mode === "mid-season") {
     return `<div class="es">
-${dateline(prettyDate(editionDate))}
+${masthead}
 <div class="es-asg-edition">First-Half Recap</div>
 ${renderLeague("American League", "AL", data, editionDate)}
 ${renderSingleLeagueLeaders("American League", data.leaderboards.filter((b) => b.league === "AL"), 15)}
@@ -941,7 +943,7 @@ ${renderTransactions(data.transactions)}
   }
 
   return `<div class="es">
-${dateline(prettyDate(editionDate))}
+${masthead}
 ${renderLeague("American League", "AL", data, editionDate)}
 ${renderSingleLeagueLeaders("American League", data.leaderboards.filter((b) => b.league === "AL"))}
 ${renderLeague("National League", "NL", data, editionDate)}

@@ -44,9 +44,9 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string; error?: string; welcome?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string; welcome?: string; sport?: string }>;
 }) {
-  const { sent, error, welcome } = await searchParams;
+  const { sent, error, welcome, sport } = await searchParams;
   const jar = await cookies();
   const sessionToken = jar.get(SUBSCRIBER_SESSION_COOKIE)?.value;
   const session = await validateSession(sessionToken);
@@ -152,7 +152,7 @@ export default async function SettingsPage({
           </a>
         )}
 
-        <SettingsTabs tabs={tabs} />
+        <SettingsTabs tabs={tabs} initialTab={sport} />
         {error === "forbidden" && (
           <p className="subscribe-error">That sport isn&apos;t available yet.</p>
         )}

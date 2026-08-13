@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { isSportVisible } from "@/lib/sports";
+import { isSportVisible, getVisibleSports } from "@/lib/sports";
+import { mastheadNavSports } from "@/lib/masthead";
 import { isAdminSession } from "@/lib/admin-auth";
 import { getLatestDigest } from "@/lib/digests";
 import { yesterdayInET } from "@/lib/dates";
@@ -52,7 +53,8 @@ export default async function ConferencePage({
   const gamesDate = latest?.date ?? yesterdayInET();
 
   const data = await loadFootballData("ncaaf", gamesDate);
-  const html = renderFootballConferenceContent(data, conf);
+  const navSports = mastheadNavSports(await getVisibleSports());
+  const html = renderFootballConferenceContent(data, conf, navSports);
 
   const schema = {
     "@context": "https://schema.org",

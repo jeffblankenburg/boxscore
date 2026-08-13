@@ -36,6 +36,8 @@ import {
 } from "@/lib/sports/football/render/team";
 import { yesterdayInET, isValidIsoDate, nextDay } from "@/lib/dates";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
+import { getVisibleSports } from "@/lib/sports";
+import { mastheadNavSports } from "@/lib/masthead";
 import { renderScoreboardShareImage } from "@/lib/render-images";
 import { uploadScoreboardShareImage } from "@/lib/share-storage";
 import { siteOrigin } from "@/lib/site";
@@ -83,6 +85,10 @@ export async function GET(req: Request) {
   try {
     runId = await startCronRun({ route: "generate", sport, date, trigger });
 
+    // Masthead sport-nav — the public sports, ordered + labeled, baked into
+    // every digest's masthead so web + email share one nav.
+    const navSports = mastheadNavSports(await getVisibleSports());
+
     if (sport === "mlb") {
       // League digest renders from the canonical model (lib/sports/mlb).
       // Same DailyRaw underneath; we just adapt it twice — once into the
@@ -99,8 +105,8 @@ export async function GET(req: Request) {
       // ads_enabled is OFF, scope check fails, or any layer throws, they
       // return the base HTML unchanged — the digest still ships. See
       // safety comments in lib/ad-placements.ts.
-      const html = await renderCanonicalContentWithAds(canonical, sport);
-      const email_html = await renderCanonicalEmailContentWithAds(canonical, sport);
+      const html = await renderCanonicalContentWithAds(canonical, sport, navSports);
+      const email_html = await renderCanonicalEmailContentWithAds(canonical, sport, navSports);
       await upsertDigest({
         sport, date, html, email_html,
         game_count: canonical.games.length,
@@ -202,8 +208,8 @@ export async function GET(req: Request) {
         await finishCronRun(runId, { status: "ok", result });
         return NextResponse.json({ ok: true, ...result });
       }
-      const html = renderFootballContent(fb);
-      const email_html = renderFootballEmailContent(fb);
+      const html = renderFootballContent(fb, navSports);
+      const email_html = renderFootballEmailContent(fb, navSports);
       await upsertDigest({
         sport, date, html, email_html, game_count: fb.games.length,
         // Football only persists a digest on days a game was played (it returns
@@ -265,8 +271,8 @@ export async function GET(req: Request) {
     const bb = sport === "nba"
       ? await loadNbaData(date, { refetch })
       : await loadWnbaData(date, { refetch });
-    const html = renderBasketballContent(bb);
-    const email_html = renderBasketballEmailContent(bb);
+    const html = renderBasketballContent(bb, navSports);
+    const email_html = renderBasketballEmailContent(bb, navSports);
     await upsertDigest({
       sport, date, html, email_html, game_count: bb.games.length,
       // Tag in-season vs offseason so getLatestDigest surfaces the latest game

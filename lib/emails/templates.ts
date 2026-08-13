@@ -633,7 +633,7 @@ ${pixel}${preview}
         ${opts.announcementBanner}
       </td></tr>` : ""}
 
-      <tr><td style="padding-top:6px;">
+      <tr><td style="padding-top:2px;">
         ${opts.digestEmailHtml}
       </td></tr>
 
