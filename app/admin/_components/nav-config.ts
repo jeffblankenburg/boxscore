@@ -51,6 +51,7 @@ export const PLATFORM_AREAS: PlatformArea[] = [
     match: ["/admin/metrics", "/admin/clicks", "/admin/demographics", "/admin/games"],
     links: [
       { href: "/admin/metrics/subscribers", label: "Subscribers" },
+      { href: "/admin/metrics/churn", label: "Churn" },
       { href: "/admin/metrics/sources", label: "Sources" },
       { href: "/admin/metrics/qr", label: "QR codes" },
       { href: "/admin/metrics/sends", label: "Sends" },

@@ -540,6 +540,7 @@
 
 .a-muted   { color: var(--a-text-muted); }
 .a-subtle  { color: var(--a-text-subtle); }
+.a-note    { color: var(--a-text-muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px; max-width: 70ch; }
 .a-mono    { font-family: var(--a-mono); font-size: 12px; }
 /* Right-aligned numeric cells + 24h trend (email-lists grid). */
 .a-num     { text-align: right; font-variant-numeric: tabular-nums; }
