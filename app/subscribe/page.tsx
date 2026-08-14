@@ -66,6 +66,12 @@ export default async function SubscribePage({
           list.
         </p>
       )}
+      {reason === "expired" && (
+        <p className="subscribe-welcome">
+          That confirmation link has expired. Enter your email below and
+          we&rsquo;ll send a fresh one.
+        </p>
+      )}
       <p className="subscribe-lede">
         Like the sports pages we used to read every day. Standings, full box
         scores, league leaders — in your inbox early every morning.

@@ -61,13 +61,17 @@ export async function GET(
   const { token } = await params;
   const url = new URL(req.url);
 
+  // Unknown / malformed / already-rotated token → send them somewhere useful
+  // instead of a bare JSON 404. Confirm tokens rotate when an address re-submits
+  // (see startSubscription), so an earlier email's link can legitimately be
+  // stale; /subscribe?reason=expired re-collects the email and resends.
   if (!TOKEN_RE.test(token)) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
+    return NextResponse.redirect(new URL("/subscribe?reason=expired", url));
   }
 
   const subscriber = await findByConfirmToken(token);
   if (!subscriber) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
+    return NextResponse.redirect(new URL("/subscribe?reason=expired", url));
   }
 
   if (subscriber.status === "unsubscribed") {

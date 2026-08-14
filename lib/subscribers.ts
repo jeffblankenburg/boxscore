@@ -63,9 +63,9 @@ export async function startSubscription(
   // attribution. Cheap — single PK-ish lookup by email.
   const { data: existing, error: existingErr } = await db
     .from("subscribers")
-    .select("id")
+    .select("id, status")
     .eq("email", normalized)
-    .maybeSingle<{ id: string }>();
+    .maybeSingle<{ id: string; status: string }>();
   if (existingErr) throw new Error(`startSubscription lookup: ${existingErr.message}`);
 
   const row: Record<string, unknown> = {
@@ -73,9 +73,16 @@ export async function startSubscription(
     status: "pending" as const,
     confirmed_at: null,
     unsubscribed_at: null,
-    confirm_token: crypto.randomUUID(),
-    unsubscribe_token: crypto.randomUUID(),
   };
+  // Mint fresh tokens only for a brand-new signup or a re-subscribing
+  // (previously unsubscribed) address. A row that's ALREADY pending keeps its
+  // tokens, so an earlier confirmation email's /c/ link stays valid — otherwise
+  // a double-submit or a second signup silently breaks the first link (the bug
+  // that sent a live subscriber to a 404).
+  if (!existing || existing.status !== "pending") {
+    row.confirm_token = crypto.randomUUID();
+    row.unsubscribe_token = crypto.randomUUID();
+  }
   if (!existing && attribution) {
     row.utm_source = attribution.utm_source;
     row.utm_medium = attribution.utm_medium;
