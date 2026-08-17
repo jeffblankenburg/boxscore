@@ -606,6 +606,17 @@ footer.site-footer a { color: var(--text-secondary); }
 }
 .legal-page p { margin: 0 0 12px; }
 .legal-page a { color: var(--text-secondary); }
+
+/* RSS chooser (/rss) — one row per sport feed. */
+.rss-feed-list { list-style: none; padding: 0; margin: 0 0 20px; }
+.rss-feed-list li { border-bottom: 1px dotted var(--rule, #d8d2c4); }
+.rss-feed-list li:last-child { border-bottom: none; }
+.rss-feed-list a {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 10px 2px; text-decoration: none;
+}
+.rss-feed-list strong { font-size: 16px; color: var(--text-primary, #161410); }
+.rss-feed-list code { font-size: 13px; color: var(--text-muted); }
 .legal-updated {
   font-size: 13px;
   color: var(--text-muted);

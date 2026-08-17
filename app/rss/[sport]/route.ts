@@ -1,6 +1,13 @@
-// RSS 2.0 feed for the daily MLB digest. One item per cached digest going back
-// FEED_LIMIT days. Each item embeds the full digest HTML so feed readers show
-// the same dense layout subscribers get in email and on the web.
+// RSS 2.0 feed for any publicly-launched sport's daily digest, at
+// /rss/<sport> (e.g. /rss/mlb, /rss/nfl). One item per cached digest going
+// back FEED_LIMIT editions. Each item embeds the full digest HTML so feed
+// readers show the same dense layout subscribers get in email and on the web.
+//
+// One route serves every sport — the sport comes from the path segment and is
+// validated against the public sports registry (admin-only leagues 404 so
+// unlaunched content can't leak through the feed). The human-facing chooser
+// lives at /rss (app/rss/page.tsx); auto-discovery <link>s are emitted by the
+// root layout and each /[sport] page.
 //
 // Cache strategy: NONE. The route runs on every request so we can log polls
 // to `rss_polls` for the dashboard readership stats — Vercel's edge cache
@@ -8,29 +15,40 @@
 // drop the user-agent data we need to count aggregators + subscribers. The
 // underlying query is a single indexed select returning <= 30 rows so the
 // per-request cost is negligible. Headers tell clients to revalidate.
-//
-// IMPORTANT: When a new sport goes public (NBA, WNBA, NFL, NHL, etc.), add
-// a parallel route at `app/rss/[sport]/route.ts` AND a new entry in
-// `app/layout.tsx`'s `alternates.types["application/rss+xml"]` array. The
-// footer "RSS" link in BRAND.footerLinks currently points at MLB; once a
-// second sport ships, consider a chooser page at `/rss` or per-sport links.
 
 import { supabaseAdmin } from "@/lib/supabase";
 import { nextDay, prettyDate } from "@/lib/dates";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { BRAND } from "@/lib/brand";
+import { getSportById } from "@/lib/sports";
+import { IN_SEASON_MODES } from "@/lib/digests";
 import { logRssPoll } from "@/lib/rss-polls";
 
 export const dynamic = "force-dynamic";
 
 const SHARE_BUCKET = "share-images";
+const FEED_LIMIT = 30;
+// Channel-level <image> (the feed-list icon Feedly shows) and the per-item
+// <media:thumbnail> fallback for items without a section share image.
+const LOGO_URL = `${EMAIL_LINK_BASE}/icon.png`;
+const LOGO_SIZE = 256;
 
 type ShareImage = { url: string; alt: string; priority: number };
+
+type DigestRow = {
+  date: string;
+  generated_at: string;
+  game_count: number;
+  html: string;
+  email_html: string | null;
+};
 
 // Map a stored share-image filename (suffix after the YYYY-MM-DD_ prefix) to
 // an ordered (alt, priority) pair. Returns null for files that shouldn't go
 // in the RSS body — `full.png/.jpg` is wide and unreadable in feed-reader
-// preview widths, and `_manifest.json` isn't an image.
+// preview widths, and `_manifest.json` isn't an image. This recognizes MLB's
+// per-section digest images; share images are only wired for MLB today (see
+// loadShareImagesByDate's caller), so other sports fall back to the HTML body.
 function classifyShareFile(name: string): { alt: string; priority: number } | null {
   if (name === "al-standings.png") return { alt: "American League Standings", priority: 1 };
   if (name === "nl-standings.png") return { alt: "National League Standings", priority: 2 };
@@ -41,9 +59,12 @@ function classifyShareFile(name: string): { alt: string; priority: number } | nu
   return null;
 }
 
-// Pull every share-images file once at the top of a feed request and group
-// the relevant ones by games_date (which matches `daily_digests.date`). Pages
-// through if storage ever exceeds the 1000-file list cap.
+// Pull the MLB share-images files once at the top of a feed request and group
+// the relevant ones by games_date (which matches `daily_digests.date`). MLB
+// images live at the bucket root; other sports live in a per-sport subfolder
+// (see lib/share-storage.ts) and don't have a per-section set curated for the
+// feed, so this is MLB-only — keeping it root-scoped avoids one sport's images
+// bleeding into another's feed on a shared date.
 async function loadShareImagesByDate(): Promise<Map<string, ShareImage[]>> {
   const supa = supabaseAdmin();
   const byDate = new Map<string, ShareImage[]>();
@@ -77,30 +98,6 @@ async function loadShareImagesByDate(): Promise<Map<string, ShareImage[]>> {
   return byDate;
 }
 
-const SPORT = "mlb";
-const SPORT_LABEL = "MLB";
-const FEED_LIMIT = 30;
-const FEED_URL = `${EMAIL_LINK_BASE}/rss/${SPORT}`;
-const SITE_URL = EMAIL_LINK_BASE;
-// Used for the channel-level <image> (the feed-list icon Feedly shows) and as
-// a per-item <media:thumbnail> placeholder. Once the per-section share-images
-// pipeline lands, item thumbnails should prefer that day's first share image.
-const LOGO_URL = `${EMAIL_LINK_BASE}/icon.png`;
-const LOGO_SIZE = 256;
-
-// Modes that correspond to a real digest page worth feeding. Offseason /
-// preseason placeholder rows are skipped — they exist in `daily_digests` to
-// give the archive page something to return, but aren't navigable content.
-const IN_SEASON_MODES = ["regular", "no-games", "all-star-preview", "all-star", "mid-season", "postseason"];
-
-type DigestRow = {
-  date: string;
-  generated_at: string;
-  game_count: number;
-  html: string;
-  email_html: string | null;
-};
-
 function escapeXml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -111,19 +108,11 @@ function escapeXml(s: string): string {
 }
 
 // RSS 2.0 requires pubDate in RFC 822. The publish instant is the row's real
-// `generated_at` (when the generate cron wrote the digest, ~5am ET / ~09:00 UTC).
-//
-// We used to synthesize a fixed edition-day stamp at 6am ET (10:00 UTC). That
-// sat ~1h AFTER the 5am generation, so every morning between ~5–6am ET the
-// freshest edition carried a *future* pubDate. Strict feed readers hide or
-// de-prioritize future-dated items, so the newest edition vanished and readers
-// surfaced yesterday's edition instead — the "two-day-old box scores" report.
-// Using generated_at, the pubDate is the moment the item became fetchable, so
-// it's never in the future for anyone who can see it.
-//
-// Cap at the edition day's 6am ET so a midday *regeneration* (e.g. a backfill —
-// see the afternoon `generated_at` values in daily_digests) doesn't bump an old
-// edition's pubDate forward and re-notify readers about stale games.
+// `generated_at` (when the generate cron wrote the digest, ~5am ET). We cap it
+// at the edition day's 6am ET so a midday regeneration (backfill) doesn't bump
+// an old edition's pubDate forward and re-notify readers; and because it's the
+// real write time, the newest edition is never stamped in the future — which
+// strict readers would hide, silently making the feed look a day stale.
 function rfc822PubDate(generatedAtIso: string, isoEditionDate: string): string {
   const generated = new Date(generatedAtIso).getTime();
   const [y, m, d] = isoEditionDate.split("-").map(Number) as [number, number, number];
@@ -133,21 +122,34 @@ function rfc822PubDate(generatedAtIso: string, isoEditionDate: string): string {
   return new Date(Math.min(generated, editionCap)).toUTCString();
 }
 
-export async function GET(req: Request) {
+export async function GET(req: Request, ctx: { params: Promise<{ sport: string }> }) {
+  const { sport } = await ctx.params;
+
+  // Only publicly-launched sports get a feed. Admin-only leagues 404 so their
+  // pre-launch content never leaks through RSS.
+  const row = await getSportById(sport);
+  if (!row || row.visibility !== "public") {
+    return new Response("Not found", { status: 404 });
+  }
+  const label = row.name;
+  const feedUrl = `${EMAIL_LINK_BASE}/rss/${sport}`;
+  const siteUrl = EMAIL_LINK_BASE;
+
   // Fire-and-forget poll log. We don't await; the response shouldn't wait on a
   // side-effect write, and any DB error is internal-only (already logged in
   // logRssPoll). Voiding the promise also makes the intent obvious.
-  void logRssPoll({ sport: SPORT, userAgent: req.headers.get("user-agent") });
+  void logRssPoll({ sport, userAgent: req.headers.get("user-agent") });
 
   const [{ data, error }, imagesByDate] = await Promise.all([
     supabaseAdmin()
       .from("daily_digests")
       .select("date, generated_at, game_count, html, email_html")
-      .eq("sport", SPORT)
+      .eq("sport", sport)
       .in("mode", IN_SEASON_MODES)
       .order("date", { ascending: false })
       .limit(FEED_LIMIT),
-    loadShareImagesByDate(),
+    // Share images are an MLB-only pipeline; other sports use the HTML body.
+    sport === "mlb" ? loadShareImagesByDate() : Promise.resolve(new Map<string, ShareImage[]>()),
   ]);
 
   if (error) {
@@ -162,19 +164,18 @@ export async function GET(req: Request) {
     // games_date → edition_date for the canonical permalink and for the
     // item title (readers expect the date they're seeing it, not yesterday).
     const editionDate = nextDay(r.date);
-    const title = `${SPORT_LABEL} — ${prettyDate(editionDate)}`;
-    const link = `${SITE_URL}/${SPORT}/${editionDate}`;
+    const title = `${label} — ${prettyDate(editionDate)}`;
+    const link = `${siteUrl}/${sport}/${editionDate}`;
     const images = imagesByDate.get(r.date) ?? [];
 
     // Body composition:
     //   - "View on the web" anchor at the top — accessibility net for readers
     //     whose feed app stripped images or who use a screen reader, and a
     //     general escape hatch to the full HTML view.
-    //   - If per-section share images exist for this date, render them as
+    //   - If per-section share images exist for this date (MLB), render them as
     //     <img> tags. Inline width:100% so feed readers fit them to whatever
     //     column width they render in (typically ~400-700px).
-    //   - Otherwise fall back to the email_html (or web html) body. Mixed
-    //     feeds are expected until the backfill script runs.
+    //   - Otherwise fall back to the email_html (or web html) body.
     const viewOnWeb = `<p><a href="${escapeXml(link)}">View on the web</a></p>`;
     let body: string;
     if (images.length > 0) {
@@ -187,10 +188,9 @@ export async function GET(req: Request) {
       body = viewOnWeb + fallback;
     }
 
-    // Per-item thumbnail prefers the first share image for that date (the AL
-    // standings, by priority) so each item gets a visually distinct
-    // preview in Feedly. Falls back to the brand logo for items without
-    // images yet.
+    // Per-item thumbnail prefers the first share image for that date so each
+    // item gets a visually distinct preview in Feedly. Falls back to the brand
+    // logo for items (and sports) without images.
     const thumbUrl = images[0]?.url ?? LOGO_URL;
     const thumbAttrs = images[0]
       ? `url="${escapeXml(thumbUrl)}"`
@@ -215,17 +215,17 @@ export async function GET(req: Request) {
      xmlns:atom="http://www.w3.org/2005/Atom"
      xmlns:media="http://search.yahoo.com/mrss/">
   <channel>
-    <title>${escapeXml(`${BRAND.name} — ${SPORT_LABEL}`)}</title>
-    <link>${escapeXml(`${SITE_URL}/${SPORT}`)}</link>
-    <atom:link href="${escapeXml(FEED_URL)}" rel="self" type="application/rss+xml" />
-    <description>${escapeXml(`Daily ${SPORT_LABEL} box scores, standings, and leaders from ${BRAND.name}.`)}</description>
+    <title>${escapeXml(`${BRAND.name} — ${label}`)}</title>
+    <link>${escapeXml(`${siteUrl}/${sport}`)}</link>
+    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />
+    <description>${escapeXml(`Daily ${label} box scores, standings, and leaders from ${BRAND.name}.`)}</description>
     <language>en-us</language>
     <lastBuildDate>${lastBuildDate}</lastBuildDate>
     <ttl>1440</ttl>
     <image>
       <url>${escapeXml(LOGO_URL)}</url>
-      <title>${escapeXml(`${BRAND.name} — ${SPORT_LABEL}`)}</title>
-      <link>${escapeXml(`${SITE_URL}/${SPORT}`)}</link>
+      <title>${escapeXml(`${BRAND.name} — ${label}`)}</title>
+      <link>${escapeXml(`${siteUrl}/${sport}`)}</link>
     </image>${items}
   </channel>
 </rss>`;

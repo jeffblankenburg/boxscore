@@ -13,25 +13,31 @@ import {
   SUBSCRIBER_SESSION_COOKIE,
 } from "@/lib/subscriber-auth";
 import { SOCIAL_ICON_BY_SLUG } from "./brand-icons";
+import { getVisibleSports } from "@/lib/sports";
 
-export const metadata = {
-  title: "boxscore",
-  description: "Daily MLB digest. Sent every morning at 5am ET.",
-  icons: {
-    icon: "/background_icon.png",
-    apple: "/background_icon.png",
-  },
-  // Auto-discovery for feed readers. Feedly / Inoreader / NetNewsWire pick this
-  // up when a user pastes any boxscore.email URL — they read the <head>, find
-  // the application/rss+xml alternate, and offer to subscribe.
-  alternates: {
-    types: {
-      "application/rss+xml": [
-        { title: "boxscore — MLB", url: "/rss/mlb" },
-      ],
+// Async so the RSS auto-discovery list reflects the live public sports
+// registry (DB-backed, cached) — every launched sport's feed is advertised,
+// not just MLB. Feedly / Inoreader / NetNewsWire read these <head> alternates
+// when a user pastes any boxscore.email URL and offer to subscribe.
+export async function generateMetadata() {
+  const sports = await getVisibleSports();
+  return {
+    title: "boxscore",
+    description: "Daily MLB digest. Sent every morning at 5am ET.",
+    icons: {
+      icon: "/background_icon.png",
+      apple: "/background_icon.png",
     },
-  },
-};
+    alternates: {
+      types: {
+        "application/rss+xml": sports.map((s) => ({
+          title: `boxscore — ${s.name}`,
+          url: `/rss/${s.id}`,
+        })),
+      },
+    },
+  };
+}
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Middleware sets `x-admin: 1` (admin shell) or `x-games: 1` (games

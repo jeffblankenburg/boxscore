@@ -7,6 +7,7 @@ import { nextScheduledGameDate, seasonStartMonth } from "@/lib/next-game";
 import { getSessionSubscriber } from "@/lib/subscriber-session";
 import { getLeagueSubscriptions } from "@/lib/email-subscriptions";
 import { EMAIL_LINK_BASE } from "@/lib/site";
+import { BRAND } from "@/lib/brand";
 import { PaperMasthead } from "@/app/PaperMasthead";
 import { DateHeaderCalendar } from "@/app/DateHeaderCalendar";
 
@@ -134,6 +135,14 @@ export async function generateMetadata({
     description: `Daily ${row.name} box scores, standings, and stat leaders for ${editionDate}.`,
     alternates: {
       canonical: `${EMAIL_LINK_BASE}/${sport}/${editionDateIso}`,
+      // Feed-reader auto-discovery for this sport's edition feed. Set here (not
+      // just in the root layout) because page-level `alternates` replaces the
+      // layout's, so without this the sport page would advertise no feed.
+      types: {
+        "application/rss+xml": [
+          { title: `${BRAND.name} — ${row.name}`, url: `${EMAIL_LINK_BASE}/rss/${sport}` },
+        ],
+      },
     },
   };
 }

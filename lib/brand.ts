@@ -20,7 +20,7 @@ export const BRAND = {
     { label: "About", href: "/about", external: false },
     { label: "Art", href: "/mlb/art", external: false },
     { label: "Advertise", href: "/advertise", external: false },
-    { label: "RSS", href: "/rss/mlb", external: false },
+    { label: "RSS", href: "/rss", external: false },
     { label: "Privacy", href: "/privacy", external: false },
     { label: "Terms", href: "/terms", external: false },
     { label: "Tip Jar", href: "/r/support?src=web-footer", external: true },

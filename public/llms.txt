@@ -18,7 +18,7 @@ boxscore is structured data only: no narrative, no editorial, no human-voiced ta
 ## Feeds + indexes
 
 - [/sitemap.xml](https://boxscore.email/sitemap.xml): Full URL index for every daily and team-day archive page
-- [/rss/mlb](https://boxscore.email/rss/mlb): RSS feed of new daily MLB editions
+- [/rss](https://boxscore.email/rss): Index of per-sport RSS feeds (one feed per launched sport, e.g. /rss/mlb, /rss/nfl)
 - [/robots.txt](https://boxscore.email/robots.txt): Crawl rules
 
 ## Notes for citation
