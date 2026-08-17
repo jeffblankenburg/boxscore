@@ -10,6 +10,7 @@ import { findTeam } from "./teams";
 import {
   loadBasketballRawFor,
   rawToBasketballData,
+  transactionsSinceLastTeamGame,
   type BasketballData,
   type BasketballGameDetail,
 } from "./basketball-daily";
@@ -173,7 +174,11 @@ export async function loadBasketballTeamData(
   }
   roster.sort((a, b) => (b.stats.avgPoints ?? -1) - (a.stats.avgPoints ?? -1));
 
-  const transactions = data.transactions.filter((t) => t.teamAbbr === espn.abbr);
+  // Team edition: this team's moves since ITS previous game (not the league's),
+  // so an off-day signing during the team's multi-day gap still surfaces the
+  // next time the team plays. teamAbbr matches ESPN's abbreviation, as the raw
+  // transaction feed carries it.
+  const transactions = await transactionsSinceLastTeamGame(sport, slug, espn.abbr, date);
 
   const mode: BasketballTeamMode =
     games.length > 0 ? "game" : upcoming.length > 0 ? "no-game" : "offseason";

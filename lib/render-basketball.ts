@@ -26,7 +26,7 @@ import type {
   BasketballTransaction,
 } from "./basketball";
 import { lastName } from "./render-email";
-import { timeInET } from "./dates";
+import { timeInET, etDateFromISO } from "./dates";
 import { renderMasthead, type NavSport } from "./masthead";
 import {
   teamLinkByNickname,
@@ -116,7 +116,7 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
     renderYesterdayResults(data, web, league),
     renderTodaysGames(data, web, league),
     renderResults(data, "Box scores", web, league),
-    renderTransactions(data.transactions, data.date),
+    renderTransactions(data.transactions),
   ];
   return sections.filter((s) => s.length > 0).join("\n");
 }
@@ -488,14 +488,16 @@ function etDayLabel(iso: string): string {
 }
 
 // ET calendar date (YYYY-MM-DD) for the event. Group key for upcoming games.
-function etCalendarDate(iso: string): string {
-  const d = new Date(iso);
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(d);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
+const etCalendarDate = etDateFromISO;
+
+// "Sat, Aug 16" — compact header for a transaction day group. Exported so the
+// team renderer groups identically. Input is a YYYY-MM-DD (ET); render in UTC
+// so the label matches the key it was grouped under.
+export function txDateLabel(isoDay: string): string {
+  const [y, m, d] = isoDay.split("-").map(Number) as [number, number, number];
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short", month: "short", day: "numeric", timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
 function renderUpcomingGames(data: BasketballData, web: boolean, league: BasketballLeague): string {
@@ -650,33 +652,40 @@ function renderTodaysGames(data: BasketballData, web: boolean, league: Basketbal
 
 // ---- Transactions --------------------------------------------------------
 
-function renderTransactions(
-  transactions: BasketballTransaction[],
-  digestDate: string,
-): string {
-  // Daily digest, daily transactions — filter to moves on the digest's ET
-  // calendar date. ESPN's transaction.date is a full ISO timestamp, so we
-  // normalize via etCalendarDate before comparing.
-  const sameDay = transactions.filter(
-    (t) => t.date && etCalendarDate(t.date) === digestDate,
-  );
-  if (sameDay.length === 0) return "";
-  const sorted = sameDay.sort(
-    (a, b) =>
-      (a.teamAbbr ?? "").localeCompare(b.teamAbbr ?? "") ||
-      a.description.localeCompare(b.description),
-  );
-  const rows = sorted.map((t) => {
-    const team = t.teamAbbr ? `<span class="bb-tx-team">${escapeHtml(t.teamAbbr)}</span>` : "";
-    return `<li class="bb-tx-row">
+function renderTransactions(transactions: BasketballTransaction[]): string {
+  if (transactions.length === 0) return "";
+  // The list spans every move since the previous league game (see
+  // transactionsSinceLastLeagueGame), so group by ET day — newest first — with
+  // a date header; an off-day move reads as its own day even a week later.
+  const byDay = new Map<string, BasketballTransaction[]>();
+  for (const t of transactions) {
+    const day = etCalendarDate(t.date);
+    if (!day) continue;
+    (byDay.get(day) ?? byDay.set(day, []).get(day)!).push(t);
+  }
+  const blocks = [...byDay.keys()]
+    .sort((a, b) => b.localeCompare(a))
+    .map((day) => {
+      const rows = byDay.get(day)!
+        .sort((a, b) => (a.teamAbbr ?? "").localeCompare(b.teamAbbr ?? "") || a.description.localeCompare(b.description))
+        .map((t) => {
+          const team = t.teamAbbr ? `<span class="bb-tx-team">${escapeHtml(t.teamAbbr)}</span>` : "";
+          return `<li class="bb-tx-row">
       ${team}
       <span class="bb-tx-desc">${escapeHtml(t.description)}</span>
     </li>`;
-  }).join("");
+        })
+        .join("");
+      return `<div class="bb-tx-day">
+    <h3 class="bb-tx-date">${escapeHtml(txDateLabel(day))}</h3>
+    <ul class="bb-tx-list">${rows}</ul>
+  </div>`;
+    })
+    .join("");
   return `
 <section class="bb-section">
   <h2 class="bb-section-title">Transactions</h2>
-  <ul class="bb-tx-list">${rows}</ul>
+  ${blocks}
 </section>
 `.trim();
 }
@@ -774,7 +783,12 @@ export const BASKETBALL_EMAIL_STYLES = `
                 font-size: 11px; }
 .bb-ldr-value { width: 48px; text-align: right; font-weight: 700; }
 
-.bb-tx-list { list-style: none; padding: 0; margin: 8px 0 0; }
+.bb-tx-day { margin-top: 10px; }
+.bb-tx-day:first-child { margin-top: 0; }
+.bb-tx-date { font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+              text-transform: uppercase; color: #6a6354; margin: 0;
+              padding-bottom: 2px; border-bottom: 1px solid #161410; }
+.bb-tx-list { list-style: none; padding: 0; margin: 6px 0 0; }
 .bb-tx-row { display: flex; gap: 10px; padding: 4px 0;
              border-bottom: 1px dotted #e8e2d4;
              font-size: 12px; line-height: 1.4; }

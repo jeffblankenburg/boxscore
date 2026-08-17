@@ -8,7 +8,7 @@
 // line not batter/pitcher split, conferences not divisions).
 
 import { supabaseAdmin } from "./supabase";
-import { prettyDate } from "./dates";
+import { prettyDate, etDateFromISO } from "./dates";
 import {
   fetchScoreboardRaw,
   fetchScoreboardRangeRaw,
@@ -280,9 +280,120 @@ export async function loadBasketballRawFor(
   return raw;
 }
 
+// ---- Transactions across editions -----------------------------------------
+//
+// A digest ships to a reader only on the days their edition runs — the league
+// digest on league game days, a team digest the morning after THAT team plays.
+// But roster moves happen every day, and basketball has frequent off days (a
+// team's 2-3 day gaps; the All-Star break; dark league days). If each digest
+// only showed its own date's moves, an off-day signing would never reach a
+// reader. We already persist a daily_raw payload every day (loadBasketballRawFor
+// write-through, including 0-game days), each carrying that date's ESPN
+// transactions — so we union the persisted payloads since the reader's previous
+// edition, dedup, and let the renderer date each move.
+//
+// Hard floor so a long cron outage (or the first edition of a season, whose
+// previous game is months back) can't dump an unbounded backlog.
+const MAX_TX_LOOKBACK_DAYS = 14;
+
+function sinceBound(prev: string | null, date: string): string {
+  const floor = addDays(date, -MAX_TX_LOOKBACK_DAYS);
+  return prev && prev > floor ? prev : floor;
+}
+
+async function previousLeagueGameDate(sport: BasketballLeagueSlug, date: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("daily_digests")
+    .select("date")
+    .eq("sport", sport)
+    .lt("date", date)
+    .gt("game_count", 0)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ date: string }>();
+  if (error) throw new Error(`previousLeagueGameDate: ${error.message}`);
+  return data?.date ?? null;
+}
+
+async function previousTeamGameDate(
+  sport: BasketballLeagueSlug,
+  teamSlug: string,
+  date: string,
+): Promise<string | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("team_digests")
+    .select("date")
+    .eq("sport", sport)
+    .eq("team_slug", teamSlug)
+    .eq("has_game", true)
+    .lt("date", date)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ date: string }>();
+  if (error) throw new Error(`previousTeamGameDate: ${error.message}`);
+  return data?.date ?? null;
+}
+
+// Union transactions from every persisted daily_raw payload dated in
+// (sinceExclusive, uptoDate], deduped on (ET date, team, text) since each
+// day's ESPN pull spills into the next ET date. Optional teamAbbr filter for
+// team editions. Newest day first.
+async function aggregateTransactions(
+  sport: BasketballLeagueSlug,
+  sinceExclusive: string,
+  uptoDate: string,
+  teamAbbr?: string,
+): Promise<BasketballTransaction[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("daily_raw")
+    .select("payload")
+    .eq("sport", sport)
+    .gt("date", sinceExclusive)
+    .lte("date", uptoDate)
+    .order("date", { ascending: false });
+  if (error) throw new Error(`aggregateTransactions: ${error.message}`);
+
+  const byKey = new Map<string, BasketballTransaction>();
+  for (const row of (data ?? []) as Array<{ payload: BasketballRaw }>) {
+    if (!row.payload?.transactions) continue;
+    for (const t of parseTransactions(row.payload.transactions)) {
+      const txDate = etDateFromISO(t.date);
+      if (!txDate || txDate <= sinceExclusive || txDate > uptoDate) continue; // (since, upto]
+      if (teamAbbr && t.teamAbbr !== teamAbbr) continue;
+      const key = `${txDate}|${t.teamAbbr ?? ""}|${t.description}`;
+      if (!byKey.has(key)) byKey.set(key, t);
+    }
+  }
+  return [...byKey.values()].sort((a, b) => etDateFromISO(b.date).localeCompare(etDateFromISO(a.date)));
+}
+
+/** League-edition transactions: every move since the previous league game day. */
+export async function transactionsSinceLastLeagueGame(
+  sport: BasketballLeagueSlug,
+  date: string,
+): Promise<BasketballTransaction[]> {
+  const since = sinceBound(await previousLeagueGameDate(sport, date), date);
+  return aggregateTransactions(sport, since, date);
+}
+
+/** Team-edition transactions: that team's moves since its own previous game. */
+export async function transactionsSinceLastTeamGame(
+  sport: BasketballLeagueSlug,
+  teamSlug: string,
+  teamAbbr: string,
+  date: string,
+): Promise<BasketballTransaction[]> {
+  const since = sinceBound(await previousTeamGameDate(sport, teamSlug, date), date);
+  return aggregateTransactions(sport, since, date, teamAbbr);
+}
+
 /**
  * Read-through: stored raw → BasketballData. League-specific entry points
  * (loadNbaData, loadWnbaData) call this with their own season-for-date logic.
+ *
+ * Transactions are the one section NOT taken from the single-day payload: they
+ * union every league move since the previous league game day so off-day moves
+ * aren't lost between editions (see transactionsSinceLastLeagueGame).
  */
 export async function loadBasketballDataFor(
   sport: BasketballLeagueSlug,
@@ -291,7 +402,9 @@ export async function loadBasketballDataFor(
   opts?: { refetch?: boolean },
 ): Promise<BasketballData> {
   const raw = await loadBasketballRawFor(sport, date, season, opts);
-  return rawToBasketballData(raw, sport, date);
+  const data = rawToBasketballData(raw, sport, date);
+  data.transactions = await transactionsSinceLastLeagueGame(sport, date);
+  return data;
 }
 
 // Exposed so the team-digest loader can turn one raw read into both the daily

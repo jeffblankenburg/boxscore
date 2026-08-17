@@ -555,7 +555,7 @@ function adaptLeaders(raw: FootballRaw): FootballLeaderboard[] {
   }).filter((b) => b.entries.length > 0);
 }
 
-function adaptTransactions(raw: FootballRaw): FootballTransaction[] {
+export function adaptTransactions(raw: FootballRaw): FootballTransaction[] {
   const mapped = arr(rec(raw.transactions).transactions).map(rec).map((t): FootballTransaction => ({
     date: str(t.date),
     description: str(t.description),

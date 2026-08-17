@@ -137,6 +137,20 @@ export function etDateFromUnixSeconds(unixSeconds: number): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+// The ET calendar date (YYYY-MM-DD) an ISO-8601 instant falls on. ESPN stamps
+// transactions/events in UTC; digests bucket by ET day, so normalize before
+// comparing or grouping. Returns "" for an unparseable input.
+export function etDateFromISO(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 // Format an ISO-8601 timestamp (UTC) as a short ET clock time, e.g. "7:05 PM ET".
 // Returns "TBD" without the suffix when the input isn't a valid date.
 export function timeInET(iso: string): string {

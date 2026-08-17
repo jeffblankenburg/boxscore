@@ -10,8 +10,8 @@ import type {
   BasketballStandingsEntry,
   BasketballTransaction,
 } from "./basketball";
-import { renderGameBlock, initialLast, escapeHtml, teamNameLink, playerNameLink } from "./render-basketball";
-import { nextDay, prettyDate, timeInET } from "./dates";
+import { renderGameBlock, initialLast, escapeHtml, teamNameLink, playerNameLink, txDateLabel } from "./render-basketball";
+import { nextDay, prettyDate, timeInET, etDateFromISO } from "./dates";
 
 // Stat formatters. Averages → 1 decimal; GP → integer; percentages → ".476"
 // newspaper style (ESPN pct is 0–100). "—" for players yet to appear.
@@ -230,13 +230,32 @@ function renderUpcoming(data: BasketballTeamData, web: boolean, league: Basketba
 
 function renderTransactions(transactions: BasketballTransaction[]): string {
   if (transactions.length === 0) return "";
-  const rows = transactions.map((t) =>
-    `<li class="bb-tx-row"><span class="bb-tx-desc">${escapeHtml(t.description)}</span></li>`,
-  ).join("");
+  // Spans this team's moves since its previous game (see
+  // transactionsSinceLastTeamGame), so group by ET day, newest first — an
+  // off-day signing reads as its own day in the next post-game digest.
+  const byDay = new Map<string, BasketballTransaction[]>();
+  for (const t of transactions) {
+    const day = etDateFromISO(t.date);
+    if (!day) continue;
+    (byDay.get(day) ?? byDay.set(day, []).get(day)!).push(t);
+  }
+  const blocks = [...byDay.keys()]
+    .sort((a, b) => b.localeCompare(a))
+    .map((day) => {
+      const rows = byDay.get(day)!
+        .sort((a, b) => a.description.localeCompare(b.description))
+        .map((t) => `<li class="bb-tx-row"><span class="bb-tx-desc">${escapeHtml(t.description)}</span></li>`)
+        .join("");
+      return `<div class="bb-tx-day">
+    <h3 class="bb-tx-date">${escapeHtml(txDateLabel(day))}</h3>
+    <ul class="bb-tx-list">${rows}</ul>
+  </div>`;
+    })
+    .join("");
   return `
 <section class="bb-section">
   <h2 class="bb-section-title">Transactions</h2>
-  <ul class="bb-tx-list">${rows}</ul>
+  ${blocks}
 </section>
 `.trim();
 }

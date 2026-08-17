@@ -133,7 +133,12 @@ export function leaderStatUrl(cfg: FootballLeagueConfig, season: number, categor
 }
 
 export function transactionsUrl(cfg: FootballLeagueConfig): string {
-  return `${FOOTBALL_BASE}/${cfg.espnSlug}/transactions`;
+  // ESPN defaults to ~25 rows (~3 days). We persist a payload daily and the
+  // digest unions across days (see data.ts), but a widened window makes each
+  // day's capture more resilient on high-volume days — roster cutdowns push
+  // 1000+ league-wide moves through in a single day, and a 25-row window there
+  // covers only minutes.
+  return `${FOOTBALL_BASE}/${cfg.espnSlug}/transactions?limit=200`;
 }
 
 // Add whole days to an ISO date (UTC math, no timezone drift).

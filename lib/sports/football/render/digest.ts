@@ -526,27 +526,52 @@ function renderBoxScores(data: CanonicalFootballDailyData, web: boolean, onlyTop
 
 // ---- Transactions ---------------------------------------------------------
 
+// "Sat, Aug 16" — a compact date header for a transaction group. Input is a
+// YYYY-MM-DD; render in UTC so the calendar day never shifts.
+function txDateLabel(isoDay: string): string {
+  const [y, m, d] = isoDay.split("-").map(Number) as [number, number, number];
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short", month: "short", day: "numeric", timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
 function renderTransactions(data: CanonicalFootballDailyData): string {
   const txs = data.transactions;
   if (txs.length === 0) return "";
-  // Alphabetical by full team name (falls back to abbr / description) so the
-  // list scans by team rather than by ESPN's reverse-chronological order.
+  // The list spans every move since the previous edition (see
+  // transactionsSincePrevEdition), so group by day — newest first — with a
+  // date header; a Tuesday move now reads as Tuesday's even in Friday's digest.
   const teamName = (abbr: string | null): string =>
     abbr ? (findTeam(data.league, abbr.toLowerCase())?.name ?? abbr) : "";
-  const rows = [...txs]
-    .sort((a, b) => teamName(a.teamAbbr).localeCompare(teamName(b.teamAbbr)) || a.description.localeCompare(b.description))
-    .slice(0, 25)
-    .map(
-      (t) => `<li class="fb-tx-row">
+  const byDay = new Map<string, FootballTransaction[]>();
+  for (const t of txs) {
+    const day = t.date.slice(0, 10);
+    (byDay.get(day) ?? byDay.set(day, []).get(day)!).push(t);
+  }
+  // Within a day, sort by full team name so the list scans by club rather than
+  // by ESPN's arbitrary within-day order.
+  const blocks = [...byDay.keys()]
+    .sort((a, b) => b.localeCompare(a))
+    .map((day) => {
+      const rows = byDay.get(day)!
+        .sort((a, b) => teamName(a.teamAbbr).localeCompare(teamName(b.teamAbbr)) || a.description.localeCompare(b.description))
+        .map(
+          (t) => `<li class="fb-tx-row">
         <span class="fb-tx-team">${escapeHtml(t.teamAbbr ?? "")}</span>
         <span class="fb-tx-desc">${escapeHtml(t.description)}</span>
       </li>`,
-    )
+        )
+        .join("");
+      return `<div class="fb-tx-day">
+    <h3 class="fb-tx-date">${escapeHtml(txDateLabel(day))}</h3>
+    <ul class="fb-tx-list">${rows}</ul>
+  </div>`;
+    })
     .join("");
   return `
 <section class="fb-section">
   <h2 class="fb-section-title">Transactions</h2>
-  <ul class="fb-tx-list">${rows}</ul>
+  ${blocks}
 </section>`.trim();
 }
 
@@ -1170,6 +1195,11 @@ export const FOOTBALL_EMAIL_STYLES = `
 .fb-ldr-val { text-align: right; }
 
 /* Transactions. */
+.fb-tx-day { margin-top: 10px; }
+.fb-tx-day:first-child { margin-top: 0; }
+.fb-tx-date { font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+              text-transform: uppercase; color: #6b6355; margin: 0;
+              padding-bottom: 2px; border-bottom: 1px solid #161410; }
 .fb-tx-list { list-style: none; padding: 0; margin: 4px 0 0; }
 .fb-tx-row { display: flex; gap: 10px; padding: 3px 0; border-bottom: 1px dotted #e8e2d4;
              font-size: 13px; line-height: 1.4; }
