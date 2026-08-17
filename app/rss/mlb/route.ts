@@ -110,14 +110,27 @@ function escapeXml(s: string): string {
     .replace(/'/g, "&apos;");
 }
 
-// RSS 2.0 requires pubDate in RFC 822. Item dates are the digest's edition day
-// (the day we ship it = games_date + 1) at 6am ET — close enough to when the
-// digest actually went out without needing the real send time per item.
-function rfc822(isoEditionDate: string): string {
+// RSS 2.0 requires pubDate in RFC 822. The publish instant is the row's real
+// `generated_at` (when the generate cron wrote the digest, ~5am ET / ~09:00 UTC).
+//
+// We used to synthesize a fixed edition-day stamp at 6am ET (10:00 UTC). That
+// sat ~1h AFTER the 5am generation, so every morning between ~5–6am ET the
+// freshest edition carried a *future* pubDate. Strict feed readers hide or
+// de-prioritize future-dated items, so the newest edition vanished and readers
+// surfaced yesterday's edition instead — the "two-day-old box scores" report.
+// Using generated_at, the pubDate is the moment the item became fetchable, so
+// it's never in the future for anyone who can see it.
+//
+// Cap at the edition day's 6am ET so a midday *regeneration* (e.g. a backfill —
+// see the afternoon `generated_at` values in daily_digests) doesn't bump an old
+// edition's pubDate forward and re-notify readers about stale games.
+function rfc822PubDate(generatedAtIso: string, isoEditionDate: string): string {
+  const generated = new Date(generatedAtIso).getTime();
   const [y, m, d] = isoEditionDate.split("-").map(Number) as [number, number, number];
   // 6:00 ET = 10:00 UTC during EDT, 11:00 UTC during EST. Use 10:00 UTC
   // year-round — the hour drift is invisible to feed readers polling daily.
-  return new Date(Date.UTC(y, m - 1, d, 10, 0, 0)).toUTCString();
+  const editionCap = Date.UTC(y, m - 1, d, 10, 0, 0);
+  return new Date(Math.min(generated, editionCap)).toUTCString();
 }
 
 export async function GET(req: Request) {
@@ -187,13 +200,15 @@ export async function GET(req: Request) {
       <title>${escapeXml(title)}</title>
       <link>${escapeXml(link)}</link>
       <guid isPermaLink="true">${escapeXml(link)}</guid>
-      <pubDate>${rfc822(editionDate)}</pubDate>
+      <pubDate>${rfc822PubDate(r.generated_at, editionDate)}</pubDate>
       <media:thumbnail ${thumbAttrs} />
       <description><![CDATA[${body}]]></description>
     </item>`;
   }).join("");
 
-  const lastBuildDate = rows[0] ? rfc822(nextDay(rows[0].date)) : new Date().toUTCString();
+  const lastBuildDate = rows[0]
+    ? rfc822PubDate(rows[0].generated_at, nextDay(rows[0].date))
+    : new Date().toUTCString();
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"
