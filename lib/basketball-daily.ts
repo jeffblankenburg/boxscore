@@ -8,6 +8,7 @@
 // line not batter/pitcher split, conferences not divisions).
 
 import { supabaseAdmin } from "./supabase";
+import { getCachedDailyRawPayload } from "./daily-raw";
 import { prettyDate, etDateFromISO } from "./dates";
 import {
   fetchScoreboardRaw,
@@ -107,18 +108,14 @@ export type BasketballData = {
 
 // ---- Cache helpers (same table as MLB, different payload shape) -----------
 
-async function getBasketballRaw(
+function getBasketballRaw(
   sport: BasketballLeagueSlug,
   date: string,
 ): Promise<BasketballRaw | null> {
-  const { data, error } = await supabaseAdmin()
-    .from("daily_raw")
-    .select("payload")
-    .eq("sport", sport)
-    .eq("date", date)
-    .maybeSingle<{ payload: BasketballRaw }>();
-  if (error) throw new Error(`getBasketballRaw: ${error.message}`);
-  return data?.payload ?? null;
+  // Served from the Next Data Cache (see getCachedDailyRawPayload) so the big
+  // payload isn't re-read from Postgres on every render; the generate cron
+  // busts the (sport, date) tag when it rewrites the row.
+  return getCachedDailyRawPayload<BasketballRaw>(sport, date);
 }
 
 async function upsertBasketballRaw(
@@ -344,9 +341,12 @@ async function aggregateTransactions(
   uptoDate: string,
   teamAbbr?: string,
 ): Promise<BasketballTransaction[]> {
+  // Project just payload->transactions, not the whole payload blob — this
+  // scans a multi-day range, so pulling only the transactions envelope keeps
+  // the read small (same trick the /[sport]/transactions page uses).
   const { data, error } = await supabaseAdmin()
     .from("daily_raw")
-    .select("payload")
+    .select("txns:payload->transactions")
     .eq("sport", sport)
     .gt("date", sinceExclusive)
     .lte("date", uptoDate)
@@ -354,9 +354,9 @@ async function aggregateTransactions(
   if (error) throw new Error(`aggregateTransactions: ${error.message}`);
 
   const byKey = new Map<string, BasketballTransaction>();
-  for (const row of (data ?? []) as Array<{ payload: BasketballRaw }>) {
-    if (!row.payload?.transactions) continue;
-    for (const t of parseTransactions(row.payload.transactions)) {
+  for (const row of (data ?? []) as Array<{ txns: BasketballRaw["transactions"] }>) {
+    if (!row.txns) continue;
+    for (const t of parseTransactions(row.txns)) {
       const txDate = etDateFromISO(t.date);
       if (!txDate || txDate <= sinceExclusive || txDate > uptoDate) continue; // (since, upto]
       if (teamAbbr && t.teamAbbr !== teamAbbr) continue;

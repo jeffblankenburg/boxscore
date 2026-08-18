@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase";
+import { cachedRead } from "./data-cache";
 
 export type Digest = {
   sport: string;
@@ -10,15 +11,31 @@ export type Digest = {
   email_html: string | null;
 };
 
-export async function getDigest(sport: string, date: string): Promise<Digest | null> {
-  const { data, error } = await supabaseAdmin()
-    .from("daily_digests")
-    .select("sport, date, generated_at, game_count, mode, html, email_html")
-    .eq("sport", sport)
-    .eq("date", date)
-    .maybeSingle<Digest>();
-  if (error) throw new Error(`getDigest: ${error.message}`);
-  return data ?? null;
+// The /[sport] and /[sport]/[date] pages render pre-built digest HTML and are
+// the highest-traffic surfaces on the site, so their digest reads run on nearly
+// every request. A digest changes at most once a day (when the generate cron
+// rewrites it), so serve it from the Next Data Cache with a short TTL: a burst
+// of requests collapses to one Postgres read per interval, at most
+// DIGEST_REVALIDATE_S stale — immaterial for once-a-day content. (TTL rather
+// than tag invalidation because Next 16's revalidateTag belongs to the Cache
+// Components model this app hasn't adopted.)
+const DIGEST_REVALIDATE_S = 300;
+
+export function getDigest(sport: string, date: string): Promise<Digest | null> {
+  return cachedRead(
+    async () => {
+      const { data, error } = await supabaseAdmin()
+        .from("daily_digests")
+        .select("sport, date, generated_at, game_count, mode, html, email_html")
+        .eq("sport", sport)
+        .eq("date", date)
+        .maybeSingle<Digest>();
+      if (error) throw new Error(`getDigest: ${error.message}`);
+      return data ?? null;
+    },
+    ["digest", sport, date],
+    DIGEST_REVALIDATE_S,
+  );
 }
 
 /**
@@ -32,17 +49,23 @@ export async function getDigest(sport: string, date: string): Promise<Digest | n
  * preseason placeholder during the offseason. Callers that want the
  * placeholder should ask for it explicitly by date via getDigest.
  */
-export async function getLatestDigest(sport: string): Promise<Digest | null> {
-  const { data, error } = await supabaseAdmin()
-    .from("daily_digests")
-    .select("sport, date, generated_at, game_count, mode, html, email_html")
-    .eq("sport", sport)
-    .in("mode", IN_SEASON_MODES)
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle<Digest>();
-  if (error) throw new Error(`getLatestDigest: ${error.message}`);
-  return data ?? null;
+export function getLatestDigest(sport: string): Promise<Digest | null> {
+  return cachedRead(
+    async () => {
+      const { data, error } = await supabaseAdmin()
+        .from("daily_digests")
+        .select("sport, date, generated_at, game_count, mode, html, email_html")
+        .eq("sport", sport)
+        .in("mode", IN_SEASON_MODES)
+        .order("date", { ascending: false })
+        .limit(1)
+        .maybeSingle<Digest>();
+      if (error) throw new Error(`getLatestDigest: ${error.message}`);
+      return data ?? null;
+    },
+    ["digest-latest", sport],
+    DIGEST_REVALIDATE_S,
+  );
 }
 
 // In-season modes — preseason and offseason rows exist in the cache but

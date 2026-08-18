@@ -1,5 +1,44 @@
 import { supabaseAdmin } from "./supabase";
+import { cachedRead } from "./data-cache";
 import type { AsgRosters, AsgMvp } from "./sports/mlb/canonical";
+
+// ─── daily_raw payload cache ────────────────────────────────────────────────
+//
+// Every uncached page render used to read the full ~650kB `daily_raw.payload`
+// JSONB blob straight from Postgres — the top query by CPU and the driver of
+// the 2026-08-18 OOM crash loop. These payloads change at most once a day (a
+// past date never changes; today's is rewritten only by the ~5am ET generate
+// cron), so we serve the read from Next's Data Cache with a short TTL. That
+// collapses a burst of requests for the same (sport, date) into one Postgres
+// read per interval — the fix for the per-request read storm — while staying at
+// most DAILY_RAW_REVALIDATE_S stale, which is immaterial for once-a-day content.
+// (We use a TTL rather than tag invalidation because Next 16's revalidateTag
+// belongs to the Cache Components model this app hasn't adopted.)
+const DAILY_RAW_REVALIDATE_S = 300;
+
+/**
+ * Cached read of a daily_raw payload for (sport, date). Returns null when no
+ * row exists. Generic over the sport's payload shape (DailyRaw / FootballRaw /
+ * BasketballRaw). Pure read — the fetch-on-miss write-through stays uncached in
+ * each sport's loader, and the cron passes refetch:true so it always bypasses
+ * this cache and writes fresh.
+ */
+export function getCachedDailyRawPayload<T>(sport: string, date: string): Promise<T | null> {
+  return cachedRead(
+    async () => {
+      const { data, error } = await supabaseAdmin()
+        .from("daily_raw")
+        .select("payload")
+        .eq("sport", sport)
+        .eq("date", date)
+        .maybeSingle<{ payload: T }>();
+      if (error) throw new Error(`getCachedDailyRawPayload: ${error.message}`);
+      return data?.payload ?? null;
+    },
+    ["daily_raw", sport, date],
+    DAILY_RAW_REVALIDATE_S,
+  );
+}
 
 // The raw MLB payloads for a single date. Stored as a single JSON blob in
 // daily_raw; consumed by lib/daily.ts to produce a DailyData without re-

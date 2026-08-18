@@ -5,6 +5,7 @@
 // stay I/O-free and testable. Parallels lib/basketball-daily.ts.
 
 import { supabaseAdmin } from "../../supabase";
+import { getCachedDailyRawPayload } from "../../daily-raw";
 import { footballLeagueConfig, seasonForDate } from "./leagues";
 import { fetchFootballRaw, FOOTBALL_LEADER_STATS, type FootballRaw } from "./sources/espn";
 import { adaptEspnFootball, adaptTransactions } from "./adapters/from-espn";
@@ -12,18 +13,14 @@ import type { CanonicalFootballDailyData } from "./canonical";
 import type { FootballLeague, FootballTransaction } from "./types";
 import { addDaysToISO } from "../../dates";
 
-async function getFootballRaw(
+function getFootballRaw(
   league: FootballLeague,
   date: string,
 ): Promise<FootballRaw | null> {
-  const { data, error } = await supabaseAdmin()
-    .from("daily_raw")
-    .select("payload")
-    .eq("sport", league)
-    .eq("date", date)
-    .maybeSingle<{ payload: FootballRaw }>();
-  if (error) throw new Error(`getFootballRaw: ${error.message}`);
-  return data?.payload ?? null;
+  // Served from the Next Data Cache (see getCachedDailyRawPayload) so the
+  // ~650kB payload isn't re-read from Postgres on every page render. The
+  // generate cron busts the (sport, date) tag when it rewrites the row.
+  return getCachedDailyRawPayload<FootballRaw>(league, date);
 }
 
 async function upsertFootballRaw(
@@ -103,9 +100,12 @@ async function transactionsSincePrevEdition(
   // compare lexicographically, so `>` / `<=` are correct calendar comparisons.
   const sinceExclusive = prev && prev > floor ? prev : floor;
 
+  // Project just payload->transactions, not the whole ~650kB blob — this scans
+  // up to MAX_TX_LOOKBACK_DAYS rows, so pulling only the transactions envelope
+  // keeps the read small (same trick the /[sport]/transactions page uses).
   const { data, error } = await supabaseAdmin()
     .from("daily_raw")
-    .select("payload")
+    .select("txns:payload->transactions")
     .eq("sport", league)
     .gt("date", sinceExclusive)
     .lte("date", date)
@@ -115,9 +115,9 @@ async function transactionsSincePrevEdition(
   // Each day's payload carries a rolling multi-day window, so a given move
   // recurs across consecutive days' payloads — dedup on (date, team, text).
   const byKey = new Map<string, FootballTransaction>();
-  for (const row of (data ?? []) as Array<{ payload: FootballRaw }>) {
-    if (!row.payload?.transactions) continue;
-    for (const t of adaptTransactions(row.payload)) {
+  for (const row of (data ?? []) as Array<{ txns: FootballRaw["transactions"] }>) {
+    if (!row.txns) continue;
+    for (const t of adaptTransactions({ transactions: row.txns } as FootballRaw)) {
       const txDate = t.date.slice(0, 10);
       if (txDate <= sinceExclusive || txDate > date) continue; // (prev, date]
       const key = `${txDate}|${t.teamAbbr ?? ""}|${t.description}`;

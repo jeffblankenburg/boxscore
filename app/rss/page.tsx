@@ -51,7 +51,7 @@ export default async function RssIndexPage() {
 
       <p>
         Most readers also auto-detect these: open any{" "}
-        <a href={`https://${host}`}>{host}</a> sport page in your reader and it
+        <a href={`https://${host}`}>{host}</a>  sport page in your reader and it
         will offer that sport&apos;s feed automatically.
       </p>
     </article>

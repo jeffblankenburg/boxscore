@@ -98,30 +98,41 @@ export async function setLeagueSubscription(
   sport: string,
   active: boolean,
 ): Promise<void> {
-  // Try insert first; on unique-violation, fall back to update. Using
-  // .upsert() with onConflict requires a named unique constraint and ours
-  // is a partial index, so the two-step pattern is more reliable here.
-  const { error: insertErr } = await supabaseAdmin()
-    .from("email_subscriptions")
-    .insert({
-      subscriber_id: subscriberId,
-      sport,
-      scope: "league",
-      team_id: null,
-      active,
-    });
-  if (!insertErr) return;
-  const code = (insertErr as { code?: string }).code;
-  const isDup = code === "23505" || /duplicate key/i.test(insertErr.message);
-  if (!isDup) throw new Error(`setLeagueSubscription insert: ${insertErr.message}`);
-
-  const { error: updateErr } = await supabaseAdmin()
+  // Update-first, insert only when nothing matched. The common case is toggling
+  // an existing row, and an insert-first pattern makes Postgres log a 23505 on
+  // every such toggle (the partial unique index blocks the duplicate) — a real
+  // error-log storm even though we handle it. Updating first is silent when the
+  // row exists; .upsert() can't help because onConflict can't target a partial
+  // index by column list.
+  const db = supabaseAdmin();
+  const { data: updated, error: updateErr } = await db
     .from("email_subscriptions")
     .update({ active, updated_at: new Date().toISOString() })
     .eq("subscriber_id", subscriberId)
     .eq("sport", sport)
-    .eq("scope", "league");
+    .eq("scope", "league")
+    .select("id");
   if (updateErr) throw new Error(`setLeagueSubscription update: ${updateErr.message}`);
+  if (updated && updated.length > 0) return;
+
+  const { error: insertErr } = await db
+    .from("email_subscriptions")
+    .insert({ subscriber_id: subscriberId, sport, scope: "league", team_id: null, active });
+  if (!insertErr) return;
+  // Race: a concurrent request inserted the row between our update and insert.
+  // Reconcile with one more update so our value wins without a constraint hit.
+  const code = (insertErr as { code?: string }).code;
+  if (code === "23505" || /duplicate key/i.test(insertErr.message)) {
+    const { error: reErr } = await db
+      .from("email_subscriptions")
+      .update({ active, updated_at: new Date().toISOString() })
+      .eq("subscriber_id", subscriberId)
+      .eq("sport", sport)
+      .eq("scope", "league");
+    if (reErr) throw new Error(`setLeagueSubscription reconcile: ${reErr.message}`);
+    return;
+  }
+  throw new Error(`setLeagueSubscription insert: ${insertErr.message}`);
 }
 
 /**
@@ -295,28 +306,38 @@ export async function setTeamSubscription(
   teamId: string,
   active: boolean,
 ): Promise<void> {
-  const { error: insertErr } = await supabaseAdmin()
-    .from("email_subscriptions")
-    .insert({
-      subscriber_id: subscriberId,
-      sport,
-      scope: "team",
-      team_id: teamId,
-      active,
-    });
-  if (!insertErr) return;
-  const code = (insertErr as { code?: string }).code;
-  const isDup = code === "23505" || /duplicate key/i.test(insertErr.message);
-  if (!isDup) throw new Error(`setTeamSubscription insert: ${insertErr.message}`);
-
-  const { error: updateErr } = await supabaseAdmin()
+  // Update-first (see setLeagueSubscription) so toggling an already-subscribed
+  // team doesn't log a 23505 on every save — the source of the observed
+  // email_subscriptions_team_unique error storm.
+  const db = supabaseAdmin();
+  const { data: updated, error: updateErr } = await db
     .from("email_subscriptions")
     .update({ active, updated_at: new Date().toISOString() })
     .eq("subscriber_id", subscriberId)
     .eq("sport", sport)
     .eq("team_id", teamId)
-    .eq("scope", "team");
+    .eq("scope", "team")
+    .select("id");
   if (updateErr) throw new Error(`setTeamSubscription update: ${updateErr.message}`);
+  if (updated && updated.length > 0) return;
+
+  const { error: insertErr } = await db
+    .from("email_subscriptions")
+    .insert({ subscriber_id: subscriberId, sport, scope: "team", team_id: teamId, active });
+  if (!insertErr) return;
+  const code = (insertErr as { code?: string }).code;
+  if (code === "23505" || /duplicate key/i.test(insertErr.message)) {
+    const { error: reErr } = await db
+      .from("email_subscriptions")
+      .update({ active, updated_at: new Date().toISOString() })
+      .eq("subscriber_id", subscriberId)
+      .eq("sport", sport)
+      .eq("team_id", teamId)
+      .eq("scope", "team");
+    if (reErr) throw new Error(`setTeamSubscription reconcile: ${reErr.message}`);
+    return;
+  }
+  throw new Error(`setTeamSubscription insert: ${insertErr.message}`);
 }
 
 /**
@@ -354,26 +375,35 @@ export async function setConferenceSubscription(
   conferenceSlug: string,
   active: boolean,
 ): Promise<void> {
-  const { error: insertErr } = await supabaseAdmin()
-    .from("email_subscriptions")
-    .insert({
-      subscriber_id: subscriberId,
-      sport,
-      scope: "conference",
-      team_id: conferenceSlug,
-      active,
-    });
-  if (!insertErr) return;
-  const code = (insertErr as { code?: string }).code;
-  const isDup = code === "23505" || /duplicate key/i.test(insertErr.message);
-  if (!isDup) throw new Error(`setConferenceSubscription insert: ${insertErr.message}`);
-
-  const { error: updateErr } = await supabaseAdmin()
+  // Update-first (see setLeagueSubscription) so re-saving an existing
+  // conference subscription doesn't log a 23505 on every toggle.
+  const db = supabaseAdmin();
+  const { data: updated, error: updateErr } = await db
     .from("email_subscriptions")
     .update({ active, updated_at: new Date().toISOString() })
     .eq("subscriber_id", subscriberId)
     .eq("sport", sport)
     .eq("team_id", conferenceSlug)
-    .eq("scope", "conference");
+    .eq("scope", "conference")
+    .select("id");
   if (updateErr) throw new Error(`setConferenceSubscription update: ${updateErr.message}`);
+  if (updated && updated.length > 0) return;
+
+  const { error: insertErr } = await db
+    .from("email_subscriptions")
+    .insert({ subscriber_id: subscriberId, sport, scope: "conference", team_id: conferenceSlug, active });
+  if (!insertErr) return;
+  const code = (insertErr as { code?: string }).code;
+  if (code === "23505" || /duplicate key/i.test(insertErr.message)) {
+    const { error: reErr } = await db
+      .from("email_subscriptions")
+      .update({ active, updated_at: new Date().toISOString() })
+      .eq("subscriber_id", subscriberId)
+      .eq("sport", sport)
+      .eq("team_id", conferenceSlug)
+      .eq("scope", "conference");
+    if (reErr) throw new Error(`setConferenceSubscription reconcile: ${reErr.message}`);
+    return;
+  }
+  throw new Error(`setConferenceSubscription insert: ${insertErr.message}`);
 }
