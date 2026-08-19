@@ -586,7 +586,10 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     <td></td>
     <td></td>
   </tr>`;
-  const extras = hittingExtras(ordered, colliding);
+  const pitchers = team.pitchers
+    .map((id) => team.players[`ID${id}`])
+    .filter((p): p is BoxPlayer => !!p);
+  const extras = hittingExtras(ordered, pitchers, colliding);
   return `<div class="es-team-label">${esc(cityName)} Batting</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
@@ -609,19 +612,19 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     ${extras ? `<p class="es-info" style="border-bottom:1px dotted #e8e2d4;padding-bottom:4px;">${extras}</p>` : ""}`;
 }
 
-// "Newspaper extras" line under a team's batting table: 2B, 3B, HR, SB lines
-// with each player's season total in parentheses. Returns "" if nothing to
-// show (e.g., bunt-only game).
-function hittingExtras(players: BoxPlayer[], colliding: Set<string>): string {
+// "Newspaper extras" line under a team's batting table: 2B, 3B, HR, SB, E
+// lines with each player's season total in parentheses. Returns "" if nothing
+// to show (e.g., bunt-only game with no miscues).
+function hittingExtras(batters: BoxPlayer[], pitchers: BoxPlayer[], colliding: Set<string>): string {
   type Bucket = { last: string; count: number; season: number };
-  const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[] };
+  const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[], E: [] as Bucket[] };
   // One entry per player-stat combo. Multi-count games render as
   // "Alvarez 2 (20)"; singles as "Alvarez (20)" (newspaper convention).
   const push = (bucket: Bucket[], name: string, gameCount: number, seasonTotal: number) => {
     if (gameCount <= 0) return;
     bucket.push({ last: name, count: gameCount, season: seasonTotal });
   };
-  for (const p of players) {
+  for (const p of batters) {
     const b = p.stats.batting;
     const s = p.seasonStats.batting;
     const name = boxSurname(p.person.fullName, colliding);
@@ -629,6 +632,19 @@ function hittingExtras(players: BoxPlayer[], colliding: Set<string>): string {
     push(cat["3B"], name, b.triples ?? 0, s.triples ?? 0);
     push(cat.HR, name, b.homeRuns ?? 0, s.homeRuns ?? 0);
     push(cat.SB, name, b.stolenBases ?? 0, s.stolenBases ?? 0);
+  }
+  // Errors come from anyone who took the field. Union batters + pitchers and
+  // dedupe by player id so two-way players (Ohtani) aren't double-counted,
+  // while AL pitchers who never batted still surface their fielding miscues.
+  const fieldErrors = (s: BoxPlayer["stats"]): number => {
+    const e = s.fielding?.errors;
+    return typeof e === "number" ? e : 0;
+  };
+  const seen = new Set<number>();
+  for (const p of [...batters, ...pitchers]) {
+    if (seen.has(p.person.id)) continue;
+    seen.add(p.person.id);
+    push(cat.E, boxSurname(p.person.fullName, colliding), fieldErrors(p.stats), fieldErrors(p.seasonStats));
   }
   const parts: string[] = [];
   for (const [label, list] of Object.entries(cat)) {

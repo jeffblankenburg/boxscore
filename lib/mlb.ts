@@ -576,6 +576,10 @@ export type RosterPlayer = {
   statusCode?: string;
   hitting?: PersonHittingStats;
   pitching?: PersonPitchingStats;
+  /** Total season fielding errors, summed across every position played.
+   *  Undefined for players with no fielding split (e.g. pure DHs). Surfaced
+   *  as the E column in the team digest's Team Statistics hitters table. */
+  fieldingErrors?: number;
 };
 
 export type TeamRoster = {
@@ -589,7 +593,9 @@ export async function fetchTeamRosterWithStatsRaw(
 ): Promise<unknown> {
   // Hydrate both `season` (standard counting stats) and `seasonAdvanced`
   // (sabermetric splits). MLB returns BABIP for pitchers only in advanced.
-  const hydrate = `person(stats(group=[hitting,pitching],type=[season,seasonAdvanced],season=${season}))`;
+  // `fielding` is included for the Team Statistics season-error (E) column;
+  // statsapi returns it as one split per position, summed at parse time.
+  const hydrate = `person(stats(group=[hitting,pitching,fielding],type=[season,seasonAdvanced],season=${season}))`;
   // 40Man (not "active") so IL'd players still surface — fans expect to
   // see Jose Ramirez in the Guardians digest even when he's on the 10-day.
   // Optioned-to-minors players (status code "RM") are filtered out at
@@ -624,6 +630,24 @@ function extractStatGroup(
   if (!Array.isArray(stats)) return undefined;
   const entry = stats.find((s) => s.group?.displayName === group && s.type?.displayName === type);
   return entry?.splits?.[0]?.stat;
+}
+
+// Season errors live in the fielding group, which statsapi returns as one
+// split per position a player appeared at (2B, 3B, SS, …). Sum across splits
+// for the player's total. Returns undefined when there's no fielding split at
+// all (pure DHs) so the renderer can show "—" rather than a misleading 0.
+function sumFieldingErrors(stats: RawStatEntry[] | undefined): number | undefined {
+  if (!Array.isArray(stats)) return undefined;
+  const entry = stats.find(
+    (s) => s.group?.displayName === "fielding" && s.type?.displayName === "season",
+  );
+  if (!entry?.splits?.length) return undefined;
+  let total = 0;
+  for (const sp of entry.splits) {
+    const e = sp.stat?.errors;
+    if (typeof e === "number") total += e;
+  }
+  return total;
 }
 
 function pickHitting(stat: Record<string, unknown> | undefined): PersonHittingStats | undefined {
@@ -704,6 +728,7 @@ export function parseTeamRoster(raw: unknown, teamId: number): TeamRoster {
       statusCode,
       hitting,
       pitching,
+      fieldingErrors: sumFieldingErrors(stats),
     }];
   });
   return { teamId, players };

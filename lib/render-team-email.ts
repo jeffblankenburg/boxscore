@@ -228,6 +228,7 @@ function renderHitters(players: RosterPlayer[]): string {
       <td align="right">${pad(h.baseOnBalls)}</td>
       <td align="right">${pad(h.strikeOuts)}</td>
       <td align="right">${pad(h.stolenBases)}</td>
+      <td align="right">${pad(p.fieldingErrors)}</td>
       <td align="right">${fmtAvg(h.avg)}</td>
       <td align="right">${esc(h.ops ?? "—")}</td>
     </tr>`;
@@ -235,9 +236,9 @@ function renderHitters(players: RosterPlayer[]): string {
   return `<div class="es-team-label">Hitters</div>
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
       <colgroup>
-        <col width="26%"><col width="5%"><col width="6%"><col width="5%">
+        <col width="24%"><col width="5%"><col width="6%"><col width="5%">
         <col width="6%"><col width="5%"><col width="6%"><col width="5%">
-        <col width="6%"><col width="5%"><col width="9%"><col width="9%">
+        <col width="6%"><col width="5%"><col width="5%"><col width="8%"><col width="8%">
       </colgroup>
       <thead><tr>
         <th align="left">Player</th>
@@ -250,6 +251,7 @@ function renderHitters(players: RosterPlayer[]): string {
         <th align="right">BB</th>
         <th align="right">SO</th>
         <th align="right">SB</th>
+        <th align="right">E</th>
         <th align="right">AVG</th>
         <th align="right">OPS</th>
       </tr></thead>

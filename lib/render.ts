@@ -5,7 +5,7 @@ import type {
 } from "./mlb";
 import type { DigestMode } from "./digest-mode";
 import { findTeamByMlbApiId } from "./teams";
-import { prevDay, nextDay, prettyDate, issueNumber, volumeNumber } from "./dates";
+import { prevDay, nextDay, prettyDate } from "./dates";
 import { lastName, boxSurname, collidingSurnames } from "./names";
 import { lastNameLinkWeb } from "./player-links";
 
@@ -205,17 +205,12 @@ function buildTeamRecordMap(standings: DivisionStandings[]): Map<number, string>
 }
 
 export function renderContent(data: DailyData): string {
-  // League digests live at /mlb/{edition_date}. data.date is games_date,
-  // so editionDate = games_date + 1.
-  const editionDate = nextDay(data.date);
-  const datelineOpts = {
-    volume: volumeNumber(editionDate),
-    issue: issueNumber(editionDate),
-  };
+  // League digests live at /mlb/{edition_date}, which is games_date + 1;
+  // data.date is games_date, hence the nextDay() in the datelines below.
   const teamRecords = buildTeamRecordMap(data.standings);
 
   if (data.mode === "no-games") {
-    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+    return `${renderDateline(prettyDate(nextDay(data.date)))}
 
 <p class="no-games-note">No games yesterday.</p>
 
@@ -225,7 +220,7 @@ ${renderTransactions(data.transactions)}`;
   }
 
   if (data.mode === "all-star") {
-    return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+    return `${renderDateline(prettyDate(nextDay(data.date)))}
 
 <div class="edition-subtitle">All-Star Game Edition</div>
 
@@ -244,7 +239,7 @@ ${renderAllStarGame(data.games, data.teamAbbrev)}
 ${renderTransactions(data.transactions)}`;
   }
 
-  return `${renderDateline(prettyDate(nextDay(data.date)), datelineOpts)}
+  return `${renderDateline(prettyDate(nextDay(data.date)))}
 
 <div class="section">
   ${renderLeague("American League", 103, data)}
@@ -276,16 +271,10 @@ export function renderTransactions(txs: Transaction[]): string {
 }
 
 
-export function renderDateline(
-  pretty: string,
-  opts: { volume?: number; issue?: number } = {},
-): string {
+export function renderDateline(pretty: string): string {
   // Day-nav arrows were removed once the date-header dropdown calendar
   // shipped — the calendar covers the same navigation with richer context.
-  const counter = opts.volume && opts.issue
-    ? `<div class="dateline-issue-no">Vol. ${opts.volume}, Issue ${opts.issue}</div>`
-    : "";
-  return `<div class="dateline"><div class="dateline-row"><span class="dateline-text">${esc(pretty)}</span></div>${counter}</div>`;
+  return `<div class="dateline"><div class="dateline-row"><span class="dateline-text">${esc(pretty)}</span></div></div>`;
 }
 
 function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leaderLimit = 5): string {
@@ -810,7 +799,10 @@ function renderBatting(team: BoxTeam, cityName: string): string {
     <td class="avg-col"></td>
   </tr>`;
 
-  const extras = hittingExtras(ordered, colliding);
+  const pitchers = team.pitchers
+    .map((id) => team.players[`ID${id}`])
+    .filter((p): p is BoxPlayer => !!p);
+  const extras = hittingExtras(ordered, pitchers, colliding);
   return `<table class="batting-table">
     <thead>
       <tr>
@@ -830,16 +822,16 @@ function renderBatting(team: BoxTeam, cityName: string): string {
   ${extras ? `<div class="notes">${extras}</div>` : ""}`;
 }
 
-function hittingExtras(players: BoxPlayer[], colliding: Set<string>): string {
+function hittingExtras(batters: BoxPlayer[], pitchers: BoxPlayer[], colliding: Set<string>): string {
   type Bucket = { last: string; count: number; season: number };
-  const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[] };
+  const cat = { "2B": [] as Bucket[], "3B": [] as Bucket[], HR: [] as Bucket[], SB: [] as Bucket[], E: [] as Bucket[] };
   // One entry per player-stat combo. Multi-count games render as
   // "Alvarez 2 (20)"; singles as "Alvarez (20)" (newspaper convention).
   const push = (bucket: Bucket[], name: string, gameCount: number, seasonTotal: number) => {
     if (gameCount <= 0) return;
     bucket.push({ last: name, count: gameCount, season: seasonTotal });
   };
-  for (const p of players) {
+  for (const p of batters) {
     const b = p.stats.batting;
     const s = p.seasonStats.batting;
     const name = boxSurname(p.person.fullName, colliding);
@@ -847,6 +839,19 @@ function hittingExtras(players: BoxPlayer[], colliding: Set<string>): string {
     push(cat["3B"], name, b.triples ?? 0, s.triples ?? 0);
     push(cat.HR, name, b.homeRuns ?? 0, s.homeRuns ?? 0);
     push(cat.SB, name, b.stolenBases ?? 0, s.stolenBases ?? 0);
+  }
+  // Errors come from anyone who took the field. Union batters + pitchers and
+  // dedupe by player id so two-way players (Ohtani) aren't double-counted,
+  // while AL pitchers who never batted still surface their fielding miscues.
+  const fieldErrors = (s: BoxPlayer["stats"]): number => {
+    const e = s.fielding?.errors;
+    return typeof e === "number" ? e : 0;
+  };
+  const seen = new Set<number>();
+  for (const p of [...batters, ...pitchers]) {
+    if (seen.has(p.person.id)) continue;
+    seen.add(p.person.id);
+    push(cat.E, boxSurname(p.person.fullName, colliding), fieldErrors(p.stats), fieldErrors(p.seasonStats));
   }
   const parts: string[] = [];
   for (const [label, list] of Object.entries(cat)) {

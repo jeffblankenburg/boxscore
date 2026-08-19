@@ -9,7 +9,7 @@
 // cached output. No request-time rendering.
 
 import type { ScheduleGame, RosterPlayer } from "./mlb";
-import { issueNumber, prettyDate, prevDay, nextDay, timeInET, volumeNumber } from "./dates";
+import { prettyDate, prevDay, nextDay, timeInET } from "./dates";
 import {
   esc, pad, fmtAvg, fmtEra, lastName,
   renderGame, renderDateline, renderTransactions, renderDivisionTable,
@@ -101,6 +101,7 @@ function renderSeasonHitters(players: RosterPlayer[]): string {
       <td>${pad(h.baseOnBalls)}</td>
       <td>${pad(h.strikeOuts)}</td>
       <td>${pad(h.stolenBases)}</td>
+      <td>${pad(p.fieldingErrors)}</td>
       <td>${fmtAvg(h.avg)}</td>
       <td>${esc(h.ops ?? "—")}</td>
     </tr>`;
@@ -110,7 +111,7 @@ function renderSeasonHitters(players: RosterPlayer[]): string {
       <thead><tr>
         <th class="player-col">Player</th>
         <th>G</th><th>AB</th><th>R</th><th>H</th><th>HR</th>
-        <th>RBI</th><th>BB</th><th>SO</th><th>SB</th>
+        <th>RBI</th><th>BB</th><th>SO</th><th>SB</th><th>E</th>
         <th>AVG</th><th>OPS</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -304,12 +305,8 @@ export function renderTeamWebContent(data: TeamEmailData): string {
   // Team digests live at /{sport}/{slug}/{edition_date}. data.date is the
   // games_date the digest was built from; editionDate = games_date + 1.
   const editionDate = nextDay(data.date);
-  const datelineOpts = {
-    volume: volumeNumber(editionDate),
-    issue: issueNumber(editionDate),
-  };
   const parts: string[] = [
-    renderDateline(prettyDate(editionDate), datelineOpts),
+    renderDateline(prettyDate(editionDate)),
     teamHeading(data),
   ];
 

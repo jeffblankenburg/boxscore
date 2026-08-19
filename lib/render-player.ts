@@ -8,7 +8,7 @@
 // log. Hitters and pitchers use different stat columns; two-way players are
 // rendered as whichever group matches their primary position for now.
 
-import { issueNumber, prettyDate, prevDay, nextDay, volumeNumber, yesterdayInET } from "./dates";
+import { prettyDate, nextDay, yesterdayInET } from "./dates";
 import { esc, fmtAvg, fmtEra, fmtOps, pad, renderDateline } from "./render";
 import {
   fetchPersonRaw, parsePerson,
@@ -403,15 +403,9 @@ export function renderPlayerContent(data: PlayerPageData): string {
   // their own, so we use the same edition convention as the league page
   // (yesterday's games rolled forward by one day).
   const editionDate = nextDay(yesterdayInET());
-  const datelineOpts = {
-    volume: volumeNumber(editionDate),
-    issue: issueNumber(editionDate),
-    prevUrl: `/mlb/${prevDay(editionDate)}`,
-    nextUrl: `/mlb/${nextDay(editionDate)}`,
-  };
 
   const parts: string[] = [
-    renderDateline(prettyDate(editionDate), datelineOpts),
+    renderDateline(prettyDate(editionDate)),
     renderHeader(data),
   ];
 
