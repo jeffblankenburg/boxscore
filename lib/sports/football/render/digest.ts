@@ -679,18 +679,21 @@ function renderLineScore(g: FootballGame, records?: Map<string, string>): string
 </table>`.trim();
 }
 
+// Rendered as a <table>, not a flex <ul>: email clients (Gmail et al.) strip
+// `display: flex`, which collapsed the running-score column inline right after
+// the play text. Tables hold the right-aligned tally column on every surface.
 function renderScoringSummary(plays: FootballScoringPlay[]): string {
   if (plays.length === 0) return "";
   const rows = plays
     .map(
-      (p) => `<li class="fb-score-row">
-        <span class="fb-score-clock">${escapeHtml(p.team.abbr)} Q${p.period} ${escapeHtml(p.clock)}</span>
-        <span class="fb-score-text">${escapeHtml(p.text)}</span>
-        <span class="fb-score-tally">${p.awayScore}&ndash;${p.homeScore}</span>
-      </li>`,
+      (p) => `<tr class="fb-score-row">
+        <td class="fb-score-clock" width="72" nowrap valign="top">${escapeHtml(p.team.abbr)} Q${p.period} ${escapeHtml(p.clock)}</td>
+        <td class="fb-score-text" valign="top">${escapeHtml(p.text)}</td>
+        <td class="fb-score-tally" width="48" valign="top" align="right">${p.awayScore}&ndash;${p.homeScore}</td>
+      </tr>`,
     )
     .join("");
-  return `<ul class="fb-score-list">${rows}</ul>`;
+  return `<table class="fb-score-list" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table>`;
 }
 
 // ---- Box score ------------------------------------------------------------
@@ -1100,15 +1103,16 @@ export const FOOTBALL_EMAIL_STYLES = `
 .fb-ls-cell { min-width: 22px; }
 .fb-linescore tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
 
-.fb-score-list { list-style: none; padding: 0; margin: 4px 0 8px; }
-.fb-score-row { display: flex; gap: 8px; align-items: baseline; padding: 2px 0;
-                border-bottom: 1px dotted #e8e2d4; font-size: 11px; line-height: 1.35; }
-.fb-score-row:last-child { border-bottom: none; }
-.fb-score-row:nth-child(even) { background: rgba(0,0,0,0.025); }
-.fb-score-clock { flex-shrink: 0; min-width: 72px; font-weight: 700; color: #2a2620;
-                  font-size: 10px; letter-spacing: 0.02em; }
-.fb-score-text { flex: 1; }
-.fb-score-tally { flex-shrink: 0; font-weight: 700; min-width: 44px; text-align: right; }
+.fb-score-list { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 4px 0 8px;
+                 font-size: 11px; line-height: 1.35; }
+.fb-score-row td { border-bottom: 1px dotted #e8e2d4; padding-top: 2px; padding-bottom: 2px;
+                   vertical-align: top; }
+.fb-score-row:last-child td { border-bottom: none; }
+.fb-score-row:nth-child(even) td { background: rgba(0,0,0,0.025); }
+.fb-score-clock { width: 72px; white-space: nowrap; font-weight: 700; color: #2a2620;
+                  font-size: 10px; letter-spacing: 0.02em; padding-right: 8px; }
+.fb-score-text { padding-right: 8px; overflow-wrap: break-word; }
+.fb-score-tally { width: 48px; white-space: nowrap; font-weight: 700; text-align: right; }
 
 .fb-box { display: block; margin: 6px 0 0; }
 .fb-team-box { margin: 8px 0 4px; }
@@ -1219,6 +1223,6 @@ export const FOOTBALL_EMAIL_STYLES = `
 @media only screen and (max-width: 480px) {
   .fb-stat-table td, .fb-rank-table td { font-size: 11px; padding: 1px 2px; }
   .fb-stat-table th, .fb-rank-table th { font-size: 9px; }
-  .fb-score-clock { min-width: 60px; }
+  .fb-score-clock { width: 60px; }
 }
 `;

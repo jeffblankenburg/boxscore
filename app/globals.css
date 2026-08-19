@@ -1444,15 +1444,19 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .fb-ls-cell { min-width: 22px; }
 .fb-linescore tbody tr:nth-child(even) td { background: rgba(0,0,0,0.025); }
 
-.fb-score-list { list-style: none; padding: 0; margin: 4px 0 8px; }
-.fb-score-row { display: flex; gap: 8px; align-items: baseline; padding: 2px 0;
-                border-bottom: 1px dotted #e8e2d4; font-size: 11px; line-height: 1.35; }
-.fb-score-row:last-child { border-bottom: none; }
-.fb-score-row:nth-child(even) { background: rgba(0,0,0,0.025); }
-.fb-score-clock { flex-shrink: 0; min-width: 72px; font-weight: 700; color: #2a2620;
-                  font-size: 10px; letter-spacing: 0.02em; }
-.fb-score-text { flex: 1; }
-.fb-score-tally { flex-shrink: 0; font-weight: 700; min-width: 44px; text-align: right; }
+.fb-score-list { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 4px 0 8px;
+                 font-size: 11px; line-height: 1.35; }
+.fb-score-row td { border-bottom: 1px dotted #e8e2d4; padding-top: 2px; padding-bottom: 2px;
+                   vertical-align: top; }
+.fb-score-row:last-child td { border-bottom: none; }
+.fb-score-row:nth-child(even) td { background: rgba(0,0,0,0.025); }
+.fb-score-clock { width: 72px; white-space: nowrap; text-align: left; font-weight: 700; color: #2a2620;
+                  font-size: 10px; letter-spacing: 0.02em; padding-right: 8px; }
+/* Override the sitewide `th, td { white-space: nowrap; overflow: hidden; text-align: right }`
+   (globals.css ~L230) so long scoring descriptions wrap instead of clipping. */
+.fb-score-text { padding-right: 8px; text-align: left; white-space: normal; overflow: visible;
+                 overflow-wrap: break-word; }
+.fb-score-tally { width: 48px; white-space: nowrap; font-weight: 700; text-align: right; }
 
 .fb-box { display: block; margin: 6px 0 0; }
 .fb-team-box { margin: 8px 0 4px; }
@@ -1647,7 +1651,7 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 @media only screen and (max-width: 480px) {
   .fb-stat-table td, .fb-rank-table td { font-size: 11px; padding: 1px 2px; }
   .fb-stat-table th, .fb-rank-table th { font-size: 9px; }
-  .fb-score-clock { min-width: 60px; }
+  .fb-score-clock { width: 60px; }
 }
 
 /* Cron pulse — today's status of each scheduled route for a league. */
