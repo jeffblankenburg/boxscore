@@ -12,7 +12,7 @@ import {
   PREDICTIONS_MODEL_VERSION,
 } from "@/lib/sports/mlb/predictions-data";
 import { predictGames, type PredictionsResult } from "@/lib/sports/mlb/predictions";
-import { predictGamesV7, predictGamesV71, V7_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
+import { predictGamesV7, predictGamesV71, predictGamesV72, V7_MODEL_VERSION, V71_MODEL_VERSION, V72_MODEL_VERSION } from "@/lib/sports/mlb/predictions-v7";
 
 // v6 is no longer the production model (v7.1 is, via PREDICTIONS_MODEL_VERSION)
 // but we keep snapshotting + grading it as a shadow for the live head-to-head.
@@ -60,10 +60,14 @@ export async function GET(req: Request) {
   const v6Res  = predictGames(inputs);
   const v7Res  = predictGamesV7(inputs);
   const v71Res = predictGamesV71(inputs);
-  // v7.1 is primary (PREDICTIONS_MODEL_VERSION === "v7.1"); v6 + v7 are
-  // retained as graded shadows.
+  const v72Res = predictGamesV72(inputs);
+  // v7.2 is production (PREDICTIONS_MODEL_VERSION === "v7.2"); v6, v7, and
+  // v7.1 are retained as graded shadows for the live head-to-head. Every
+  // version is written explicitly and graded by the comparator; the page
+  // reads whichever equals PREDICTIONS_MODEL_VERSION.
   const producers: Array<[string, PredictionsResult]> = [
-    [PREDICTIONS_MODEL_VERSION, v71Res],
+    [V72_MODEL_VERSION, v72Res],
+    [V71_MODEL_VERSION, v71Res],
     [V6_SHADOW_VERSION, v6Res],
     [V7_MODEL_VERSION, v7Res],
   ];
@@ -193,7 +197,7 @@ export async function GET(req: Request) {
     ok: true,
     date,
     written: rows.length,
-    models: [PREDICTIONS_MODEL_VERSION, V6_SHADOW_VERSION, V7_MODEL_VERSION],
+    models: [V72_MODEL_VERSION, V71_MODEL_VERSION, V6_SHADOW_VERSION, V7_MODEL_VERSION],
     card_written: cardWritten,
     ...(cardError ? { card_error: cardError } : {}),
     ...(oddsReport ? {

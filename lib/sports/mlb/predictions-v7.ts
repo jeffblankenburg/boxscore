@@ -46,6 +46,33 @@ export const V71_PRIOR_RPG1 = 0.5209;  // 2024-25 league 1st-inning runs/half (f
 export const V71_PRIOR_K = 100;        // EB prior weight, in team-games
 export const V71_R1 = 0.55;            // first-inning NB dispersion, 2026 walk-forward
 
+// v7.2 — v7.1 plus a recent-form OFFENSE blend, motivated by the
+// post-2026-07-31-trade-deadline collapse (scripts/fit-offense-form.ts).
+//
+// v7.1 feeds offense from season-to-date team RPG only. That estimate goes
+// STALE whenever the current roster stops matching the season sample —
+// acutely right after the deadline, chronically in April. Diagnosis
+// (2026-08-19): v7.1's ML edge over "just back the market favorite" ran
+// +1% through July, then flipped to −3% in August as it kept backing teams
+// whose season run-rate overstated their post-deadline strength (fade-market
+// rate 24.5%→28.6%; Aug win rate 56.4%→52.0%). v6 — same season pythag but
+// heavily shrunk — did NOT degrade (Aug 57.3%), confirming the fault is
+// v7.1's sharp reliance on a stale INPUT, not the league.
+//
+// Fix: blend the 21-day team RS/g into the offense rate (season aggregates
+// already compute teamRecentForm for exactly this). offenseRecentWeight=0.5
+// is the SP-blend's counterpart: an equal season/recent mix. Held at the
+// shipped V7_CONFIG and swept over the full 2026 season, wOff=0.5 lifts ML
+// directional accuracy in BOTH halves (pre-deadline 58.4%→58.8%, post
+// 51.4%→54.1%) while August log-loss improves and pre-deadline log-loss is
+// unchanged (Δ +0.0002) — the induced August pick-flips are 71% correct.
+// SP recent form stays OFF (wSp=0): every fit fold and the sweep confirm
+// 2-5 starts of ERA is variance (v7.1's finding, unchanged). Because the
+// change is ~free on the 1,600-game pre-deadline set and helps the
+// roster-churn regime, the downside is bounded even on a one-deadline sample.
+export const V72_MODEL_VERSION = "v7.2";
+export const V72_OFFENSE_RECENT_WEIGHT = 0.5;
+
 // Fitted 2026-07-22, walk-forward on the 2026 season (scripts/fit-v7.ts):
 // betaOff heavily shrunk (team run-rate is noisy → lean on pitching),
 // betaPitch 0.7, HFA 1.05. r + firstInningBump from linescore fixtures
@@ -75,9 +102,19 @@ export function buildV7TeamInputs(
   spStats: Map<number, ProbableSpStats>,
   aggregates: SeasonAggregates | undefined,
   spRecentWeight = 0.5,
+  offenseRecentWeight = 0,
 ): TeamInputs {
   const rec = records.get(teamId);
-  const rpg = rec && rec.gamesPlayed > 0 ? rec.runsScored / rec.gamesPlayed : 4.5;
+  const seasonRpg = rec && rec.gamesPlayed > 0 ? rec.runsScored / rec.gamesPlayed : 4.5;
+  // Blend season RPG with 21-day recent RS/g so the offense rate tracks the
+  // CURRENT roster, not the season-long one that goes stale post-deadline.
+  // Same ≥8-game guard the fit harness (scripts/_v7-eval.ts SideRaw) uses so
+  // production and the sweep resolve recentRpg identically. v7/v7.1 pass 0.
+  const recent = aggregates?.teamRecentForm.get(teamId);
+  const recentRpg = recent && recent.games >= 8 ? recent.runsScored / recent.games : null;
+  const rpg = recentRpg !== null
+    ? offenseRecentWeight * recentRpg + (1 - offenseRecentWeight) * seasonRpg
+    : seasonRpg;
 
   let spEra = 4.2;
   if (spId != null) {
@@ -135,10 +172,10 @@ function toSide(t: SlateTeam, isHome: boolean, winProbability: number, inputs: P
   };
 }
 
-function runV7(inputs: PredictionInputs, spRecentWeight: number, nrfiOverride?: (away: TeamInputs, home: TeamInputs) => number): PredictionsResult {
+function runV7(inputs: PredictionInputs, spRecentWeight: number, offenseRecentWeight: number, nrfiOverride?: (away: TeamInputs, home: TeamInputs) => number): PredictionsResult {
   const games: GamePrediction[] = inputs.slate.map((g) => {
-    const away = buildV7TeamInputs(g.away.teamId, g.away.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates, spRecentWeight);
-    const home = buildV7TeamInputs(g.home.teamId, g.home.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates, spRecentWeight);
+    const away = buildV7TeamInputs(g.away.teamId, g.away.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates, spRecentWeight, offenseRecentWeight);
+    const home = buildV7TeamInputs(g.home.teamId, g.home.probablePitcher?.id ?? null, g.home.teamId, inputs.recordsByTeamId, inputs.spStatsById, inputs.aggregates, spRecentWeight, offenseRecentWeight);
     const m = deriveMarkets(away, home, V7_CONFIG);
     const rawNrfi = nrfiOverride ? nrfiOverride(away, home) : m.nrfi;
     // Guard the rare missing-input NaN so one game can't break the batch.
@@ -161,21 +198,34 @@ function runV7(inputs: PredictionInputs, spRecentWeight: number, nrfiOverride?: 
 }
 
 export function predictGamesV7(inputs: PredictionInputs): PredictionsResult {
-  return runV7(inputs, 0.5);
+  return runV7(inputs, 0.5, 0);
 }
 
-/** v7.1 — v7 with the loop-fitted changes: season-only SP ERA and the
- *  season-adaptive NRFI read (see the V71 block comment above). */
-export function predictGamesV71(inputs: PredictionInputs): PredictionsResult {
+/** Shared v7.1-family runner: season-only SP ERA (spRecentWeight=0) and the
+ *  season-adaptive NRFI read. `offenseRecentWeight` is the only knob that
+ *  separates v7.1 (0) from v7.2 (V72_OFFENSE_RECENT_WEIGHT). */
+function runV71Family(inputs: PredictionInputs, offenseRecentWeight: number): PredictionsResult {
   const aggs = inputs.aggregates;
   const leagueGames = aggs ? [...aggs.team1stInning.values()].reduce((s, t) => s + t.games, 0) : 0;
   const rpg1 = aggs && leagueGames > 0
     ? shrinkRate(aggs.league.avgFirstInningRpg, leagueGames, V71_PRIOR_RPG1, V71_PRIOR_K)
     : V71_PRIOR_RPG1;
   const cfg: V7Config = { ...V7_CONFIG, firstInningBump: Math.log(rpg1 / V7_CONFIG.leagueLambda) };
-  return runV7(inputs, 0, (away, home) => {
+  return runV7(inputs, 0, offenseRecentWeight, (away, home) => {
     const a1 = halfInningLambdas(away, home, false, cfg)[0]!;
     const h1 = halfInningLambdas(home, away, true, cfg)[0]!;
     return scorelessProb(a1, V71_R1) * scorelessProb(h1, V71_R1);
   });
+}
+
+/** v7.1 — v7 with the loop-fitted changes: season-only SP ERA and the
+ *  season-adaptive NRFI read (see the V71 block comment above). */
+export function predictGamesV71(inputs: PredictionInputs): PredictionsResult {
+  return runV71Family(inputs, 0);
+}
+
+/** v7.2 — v7.1 plus the recent-form offense blend (see the V72 block
+ *  comment above). Everything else is identical to v7.1. */
+export function predictGamesV72(inputs: PredictionInputs): PredictionsResult {
+  return runV71Family(inputs, V72_OFFENSE_RECENT_WEIGHT);
 }

@@ -20,7 +20,7 @@ import {
   type TeamSeasonRecord,
   type ProbableSpStats,
 } from "./predictions";
-import { predictGamesV71 } from "./predictions-v7";
+import { predictGamesV72 } from "./predictions-v7";
 import { loadSeasonAggregates } from "./season-aggregates";
 
 const PYTHAG_FALLBACK_SP_ERA = 4.20;
@@ -144,7 +144,7 @@ export async function loadPredictionInputsForDate(date: string): Promise<{
 export async function loadPredictionsForDate(date: string): Promise<PredictionsResult> {
   const inputs = await loadPredictionInputsForDate(date);
   if (!inputs) return { date, gameCount: 0, games: [], generatedAt: new Date().toISOString() };
-  return predictGamesV71(inputs);
+  return predictGamesV72(inputs);
 }
 
 /** Stable version string for predictions snapshots. Bump when the model
@@ -158,8 +158,15 @@ export async function loadPredictionsForDate(date: string): Promise<PredictionsR
  *  factor model). Promoted 2026-07-23 after a full-2026 regeneration
  *  backtest: over all ~1,524 graded games v7.1 beat v6 on directional
  *  accuracy (58.7% vs 53.7% ML, 55.1% vs 51.8% NRFI), Brier, and
- *  log-loss in both markets — see scripts/backfill-v71.ts (which wrote
- *  the historical prediction_results) and the loop-iteration commits
- *  that fit it (season-adaptive NRFI, season-only SP ERA). v6 and
- *  v7-run-model keep running as graded shadows for ongoing comparison. */
-export const PREDICTIONS_MODEL_VERSION = "v7.1";
+ *  log-loss in both markets — see scripts/backfill-v71.ts.
+ *
+ *  v7.2 (promoted 2026-08-19) is v7.1 plus a 21-day recent-form OFFENSE
+ *  blend (predictions-v7.ts V72 block; fitted in scripts/fit-offense-form.ts).
+ *  v7.1's season-only offense rate went stale after the 2026-07-31 trade
+ *  deadline — it kept backing teams whose season run-rate overstated their
+ *  post-deadline strength, and its ML win rate fell 56.4%→52.0% while v6
+ *  (same pythag, but heavily shrunk) held at 57.3%. Blending season RPG
+ *  with the 21-day rate at 0.5 lifts ML accuracy in both halves of 2026
+ *  (pre-deadline 58.4%→58.8%, post 51.4%→54.1%) at ~zero pre-deadline cost.
+ *  v6, v7, and v7.1 keep running as graded shadows for ongoing comparison. */
+export const PREDICTIONS_MODEL_VERSION = "v7.2";
