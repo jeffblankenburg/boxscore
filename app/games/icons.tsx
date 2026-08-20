@@ -22,10 +22,22 @@ export function StatSharksIcon(): ReactElement {
 export function TimeMachineIcon(): ReactElement {
   return <PngIcon src="/timemachine_icon.png" />;
 }
+// Inline SVG until a PNG asset exists — a 2×2 grid of grouped tiles.
+export function TeammatesIcon(): ReactElement {
+  const c = ["#4f7cc4", "#b58b2e", "#5a9e6f", "#9b6fb0"];
+  return (
+    <svg viewBox="0 0 48 48" width="48" height="48" role="img" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <rect key={i} x={4 + (i % 2) * 22} y={4 + Math.floor(i / 2) * 22} width="18" height="18" rx="4" fill={c[i]} />
+      ))}
+    </svg>
+  );
+}
 
 /** Map game slug to icon component. */
 export const GAME_ICONS: Record<string, () => ReactElement> = {
   "linescordle":  LinescordleIcon,
   "statsharks":   StatSharksIcon,
   "time-machine": TimeMachineIcon,
+  "teammates":    TeammatesIcon,
 };

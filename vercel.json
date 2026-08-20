@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/teammates-generate",
+      "schedule": "10 5 * * *"
+    },
+    {
       "path": "/api/cron/generate?sport=mlb&refetch=true",
       "schedule": "0 9 * * *"
     },

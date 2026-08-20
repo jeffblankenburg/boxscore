@@ -1,0 +1,209 @@
+/* Teammates — Connections-style grid, mobile-first, capped at a phone
+   column so the 4×4 board is tappable on a 375px screen. Inherits the
+   games-surface tokens (--ink/--muted/--border) from games.css. */
+
+.tm {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 16px 12px 48px;
+}
+
+.tm-head { text-align: center; margin-bottom: 14px; }
+.tm-head h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 0.01em; }
+.tm-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+.tm-meta { margin: 2px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Solved bands */
+.tm-solved { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.tm-band-wrap { display: flex; flex-direction: column; }
+.tm-band {
+  position: relative;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+  color: #121212;
+  animation: tm-pop 0.28s ease;
+}
+.tm-band-team { font-weight: 800; font-size: 15px; letter-spacing: 0.02em; }
+.tm-band-players { font-size: 13px; opacity: 0.95; margin-top: 2px; }
+/* Accordion: finished-screen bands tap to reveal player cards. */
+.tm-band-acc { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tm-band.open { border-radius: 10px 10px 0 0; }
+.tm-band-caret {
+  position: absolute; right: 16px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 28px; font-weight: 700; line-height: 0;
+  transition: transform 0.15s ease;
+}
+.tm-band-caret.open { transform: translateY(-50%) rotate(90deg); }
+.tm-team-cards {
+  border: 1.5px solid #000; border-top: none; border-radius: 0 0 10px 10px;
+  padding: 12px 10px 4px; background: #fff;
+}
+
+/* NYT Connections palette (yellow, green, blue, purple) — dark text on pastel. */
+.grp-0 { background: #f9df6d; } /* yellow */
+.grp-1 { background: #a0c35a; } /* green */
+.grp-2 { background: #b0c4ef; } /* blue */
+.grp-3 { background: #ba81c5; } /* purple */
+
+/* Grid */
+.tm-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tm-tile {
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: var(--ink);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.05;
+  padding: 4px 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  word-break: break-word;
+  hyphens: auto;
+  transition: transform 0.06s ease, background 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.tm-tile:hover { background: #e9ebee; }
+.tm-tile.on {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+  transform: scale(0.97);
+}
+.tm-tile.shake { animation: tm-shake 0.45s ease; }
+
+/* Flash message — lives in a fixed-height slot so showing/hiding it never
+   moves anything else on the page. */
+.tm-flash-slot { height: 34px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+.tm-flash {
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 999px;
+  padding: 7px 14px;
+  width: fit-content;
+  animation: tm-pop 0.2s ease;
+}
+
+/* Mistakes */
+.tm-mistakes {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.tm-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--ink); display: inline-block;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.tm-dot.used { opacity: 0.16; transform: scale(0.8); }
+
+/* Controls */
+.tm-controls { display: flex; gap: 8px; justify-content: center; }
+.tm-btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.tm-btn:disabled { opacity: 0.4; cursor: default; }
+.tm-submit {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+/* Hydration placeholder — reserves board height so the layout doesn't jump
+   when the real board/results render after localStorage is read. */
+.tm-loading { min-height: 520px; }
+
+/* Reset — low-emphasis, centered under the board so it isn't mis-tapped. */
+.tm-reset {
+  display: block; margin: 22px auto 0;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  color: var(--muted); background: none; border: none;
+  text-decoration: underline; cursor: pointer;
+}
+.tm-reset:hover { color: var(--ink); }
+
+/* Baseball-card stat tables — newspaper-style monochrome, shown inside an
+   expanded accordion band. */
+.tm-card { margin: 0 0 16px; text-align: left; }
+.tm-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+.tm-card-name { font-weight: 800; font-size: 14px; }
+.tm-card-meta { font-weight: 600; font-size: 11px; color: var(--muted); margin-left: 6px; }
+.tm-card-hof {
+  font-weight: 800; font-size: 9px; letter-spacing: 0.05em; margin-left: 6px;
+  padding: 1px 4px; border: 1px solid #000; border-radius: 3px; vertical-align: middle;
+}
+.tm-card-toggle { display: inline-flex; gap: 2px; }
+.tm-card-toggle button {
+  font-family: inherit; font-size: 11px; font-weight: 700; padding: 2px 8px;
+  border: 1px solid #000; background: #fff; color: #000; cursor: pointer; border-radius: 5px;
+}
+.tm-card-toggle button.on { background: #000; color: #fff; }
+
+.tm-card-table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.tm-card-table th, .tm-card-table td { padding: 3px 4px; text-align: right; white-space: nowrap; }
+.tm-card-table th.l, .tm-card-table td.l { text-align: left; }
+.tm-card-table thead th {
+  color: #000; font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em;
+  border-bottom: 2px solid #000;
+}
+.tm-card-table tbody td { border-bottom: 1px solid #d7d7d7; }
+/* Every puzzle-team season is shaded a light version of that team's color
+   (table-scoped pt-N class so it doesn't inherit the solid band .grp-N fill);
+   only the player's ASSIGNED team rows are bold. */
+.tm-card-table tbody tr.assigned td { font-weight: 700; border-top: 2px solid #000; border-bottom: 2px solid #000; }
+.tm-card-table tbody tr.pt-0 td { background: #fcf3cf; } /* yellow */
+.tm-card-table tbody tr.pt-1 td { background: #e6efd6; } /* green */
+.tm-card-table tbody tr.pt-2 td { background: #e8eefb; } /* blue */
+.tm-card-table tbody tr.pt-3 td { background: #f1e6f6; } /* purple */
+/* Career totals row: separated by a heavy rule, bold. */
+.tm-card-table tbody tr.tm-career td { border-top: 2px solid #000; font-weight: 800; background: #f3f4f6; }
+
+/* End screen */
+.tm-end { margin-top: 18px; text-align: center; }
+.tm-end-title { font-size: 20px; font-weight: 800; margin: 0 0 14px; }
+.tm-stats { display: flex; justify-content: center; gap: 22px; margin: 4px 0 18px; }
+.tm-stat { display: flex; flex-direction: column; align-items: center; }
+.tm-stat-n { font-size: 24px; font-weight: 800; line-height: 1; }
+.tm-stat-l { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.tm-traps { text-align: left; margin: 0 auto 18px; max-width: 400px; }
+.tm-traps-h { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 6px; }
+.tm-trap { font-size: 13px; margin: 6px 0; line-height: 1.35; }
+
+@keyframes tm-pop { from { transform: scale(0.94); opacity: 0.4; } to { transform: scale(1); opacity: 1; } }
+@keyframes tm-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
