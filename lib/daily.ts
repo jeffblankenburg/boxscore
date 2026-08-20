@@ -10,6 +10,7 @@ import {
   fetchPersonSeasonStatsRaw, parsePersonSeasonStat,
   fetchAllStarMvpRaw, parseAllStarMvp,
   fetchTransactionsRaw, parseTransactions,
+  type Leader, type PlayerStats,
 } from "./mlb";
 import type { AsgRosters, AsgSide, AsgHitter, AsgPitcher } from "./sports/mlb/canonical";
 import type { GameDetail, DailyData, UpcomingGame } from "./render";
@@ -30,6 +31,88 @@ const LEADER_CATEGORIES = [
   { category: "strikeouts", label: "Strikeouts (Pitching)", valueLabel: "SO" },
   { category: "saves", label: "Saves", valueLabel: "SV" },
 ] as const;
+
+// ── Leader reconciliation ────────────────────────────────────────────────
+// The /v1/stats/leaders endpoint is batch-updated on a long lag: at our 09:00
+// UTC (5 AM ET) generate time it still reflects totals through the *previous*
+// slate, while the box scores in the very same fetch already carry each
+// player's up-to-the-game seasonStats. Concretely, on 2026-08-19 the leaders
+// block had Ben Rice at 33 HR / 78 RBI while his Aug-19 box score seasonStats
+// read 34 / 79 — the leaderboard trailed its own game data by a full day. We
+// trust the box-score seasonStats (authoritative, real-time) and patch every
+// displayed leader who played that day, then re-rank the returned set so an
+// intra-list leapfrog lands in the right order. We never add players the
+// endpoint didn't already return, so the batting-average / ERA qualification
+// the endpoint applied is preserved.
+const LEADER_STAT: Record<string, { group: "batting" | "pitching"; field: string; asc?: boolean }> = {
+  battingAverage:   { group: "batting",  field: "avg" },
+  homeRuns:         { group: "batting",  field: "homeRuns" },
+  runsBattedIn:     { group: "batting",  field: "rbi" },
+  stolenBases:      { group: "batting",  field: "stolenBases" },
+  wins:             { group: "pitching", field: "wins" },
+  earnedRunAverage: { group: "pitching", field: "era", asc: true }, // lower is better
+  strikeouts:       { group: "pitching", field: "strikeOuts" },
+  saves:            { group: "pitching", field: "saves" },
+};
+
+// The type declares only a subset of the fields statsapi actually returns
+// (e.g. pitching wins/saves live in the payload but not the type), so read the
+// group as an open record.
+function statField(s: PlayerStats, group: "batting" | "pitching", field: string): number | string | undefined {
+  const g = (group === "batting" ? s.batting : s.pitching) as Record<string, unknown>;
+  const v = g[field];
+  return typeof v === "number" || typeof v === "string" ? v : undefined;
+}
+
+function gamesPlayed(s: PlayerStats): number {
+  const b = (s.batting as Record<string, unknown>).gamesPlayed;
+  const p = (s.pitching as Record<string, unknown>).gamesPlayed;
+  return Math.max(typeof b === "number" ? b : 0, typeof p === "number" ? p : 0);
+}
+
+// person id → freshest seasonStats across the day's box scores. On a
+// doubleheader a player has two lines; keep the one with more games played.
+function seasonStatsByPlayer(games: GameDetail[]): Map<number, PlayerStats> {
+  const out = new Map<number, PlayerStats>();
+  for (const g of games) {
+    if (!g.box) continue;
+    for (const side of [g.box.teams.away, g.box.teams.home]) {
+      for (const p of Object.values(side.players)) {
+        const prev = out.get(p.person.id);
+        if (!prev || gamesPlayed(p.seasonStats) >= gamesPlayed(prev)) {
+          out.set(p.person.id, p.seasonStats);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function reconcileLeaders(
+  rows: Leader[], category: string, seasonStats: Map<number, PlayerStats>,
+): Leader[] {
+  const map = LEADER_STAT[category];
+  if (!map || rows.length === 0) return rows;
+
+  const patched = rows.map((r) => {
+    const s = seasonStats.get(r.person.id);
+    if (!s) return r;
+    const fresh = statField(s, map.group, map.field);
+    if (fresh === undefined) return r;
+    const value = typeof fresh === "number" ? String(fresh) : fresh;
+    return value === r.value ? r : { ...r, value };
+  });
+
+  // Re-rank by the patched values with competition ranking (ties share a rank,
+  // the next rank skips). ERA sorts ascending; every other category descending.
+  const scored = patched.map((r) => ({ r, n: Number(r.value) }));
+  const better = (a: number, b: number) => (map.asc ? a < b : a > b);
+  scored.sort((a, b) => (map.asc ? a.n - b.n : b.n - a.n));
+  return scored.map(({ r, n }) => ({
+    ...r,
+    rank: 1 + scored.filter((o) => better(o.n, n)).length,
+  }));
+}
 
 // Extract probable pitcher IDs from a parsed schedule.
 function probablePitcherIds(scheduleRaw: unknown): number[] {
@@ -317,6 +400,10 @@ export function rawToDailyData(raw: DailyRaw, date: string): DailyData {
     };
   });
 
+  // Fresh season totals from this slate's box scores, used to correct the
+  // lagging /v1/stats/leaders board (see reconcileLeaders).
+  const seasonStats = seasonStatsByPlayer(games);
+
   return {
     date,
     prettyDate: prettyDate(date),
@@ -327,11 +414,11 @@ export function rawToDailyData(raw: DailyRaw, date: string): DailyData {
     leaders: {
       AL: LEADER_CATEGORIES.map((c) => ({
         label: c.label, valueLabel: c.valueLabel,
-        rows: parseLeaders(raw.leaders[`103/${c.category}`]),
+        rows: reconcileLeaders(parseLeaders(raw.leaders[`103/${c.category}`]), c.category, seasonStats),
       })),
       NL: LEADER_CATEGORIES.map((c) => ({
         label: c.label, valueLabel: c.valueLabel,
-        rows: parseLeaders(raw.leaders[`104/${c.category}`]),
+        rows: reconcileLeaders(parseLeaders(raw.leaders[`104/${c.category}`]), c.category, seasonStats),
       })),
     },
     todaysGames: upcomingFromRaw(raw.nextDaySchedule, raw.probablePitcherStats),
