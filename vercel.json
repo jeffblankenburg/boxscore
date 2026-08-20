@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/teammates-generate",
+      "path": "/api/cron/clubhouse-generate",
       "schedule": "10 5 * * *"
     },
     {

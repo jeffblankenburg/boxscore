@@ -43,8 +43,8 @@ type GameEntry = {
 // lands. See #65 for the redesign options.
 const GAMES: GameEntry[] = [
   {
-    slug: "teammates",
-    title: "Teammates",
+    slug: "clubhouse",
+    title: "Clubhouse",
     desc: "Group 16 players into the 4 teams they played for.",
     status: "live",
   },

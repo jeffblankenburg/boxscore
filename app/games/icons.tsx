@@ -23,8 +23,8 @@ export function TimeMachineIcon(): ReactElement {
   return <PngIcon src="/timemachine_icon.png" />;
 }
 // Inline SVG until a PNG asset exists — a 2×2 grid of grouped tiles.
-export function TeammatesIcon(): ReactElement {
-  const c = ["#4f7cc4", "#b58b2e", "#5a9e6f", "#9b6fb0"];
+export function ClubhouseIcon(): ReactElement {
+  const c = ["#f9df6d", "#a0c35a", "#b0c4ef", "#ba81c5"];
   return (
     <svg viewBox="0 0 48 48" width="48" height="48" role="img" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => (
@@ -39,5 +39,5 @@ export const GAME_ICONS: Record<string, () => ReactElement> = {
   "linescordle":  LinescordleIcon,
   "statsharks":   StatSharksIcon,
   "time-machine": TimeMachineIcon,
-  "teammates":    TeammatesIcon,
+  "clubhouse":    ClubhouseIcon,
 };

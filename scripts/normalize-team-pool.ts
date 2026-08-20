@@ -91,7 +91,7 @@ function canonical(id: number, name: string): string {
 
 type Team = { id: number; name?: string; label?: string; g?: number; years?: number[] };
 type SeasonLine = { y: number; tid: number; tm: string; k: "bat" | "pit"; s: Record<string, unknown>; label?: string };
-type Player = { id: number; name: string; teams: Team[]; lines?: SeasonLine[]; fame: string[]; careerG: number | null; careerIP: number | null };
+type Player = { id: number; name: string; teams: Team[]; lines?: SeasonLine[]; fame: unknown; careerG: number | null; careerIP: number | null };
 
 const pool: Player[] = JSON.parse(readFileSync(FILE, "utf8"));
 

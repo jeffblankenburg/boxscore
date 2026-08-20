@@ -1,4 +1,4 @@
-// Builds the player -> {teams} pool for the "Teammates" game (a Connections-style
+// Builds the player -> {teams} pool for the "Clubhouse" game (a Connections-style
 // grid where you group players by teams they've played for).
 //
 // The pool is the UNION of two buckets:
@@ -47,6 +47,10 @@ type Team = { id: number; name: string; g: number; years: number[] };
 // the bundled pool small; `s` holds the stat subset for the line's kind.
 type StatBlock = Record<string, number | string | null>;
 type SeasonLine = { y: number; tid: number; tm: string; k: "bat" | "pit"; s: StatBlock };
+// Fame MAGNITUDE, not a yes/no tag — so a 1× All-Star (Whitey Lockman) is
+// distinguishable from an 11× All-Star (Mel Ott). Drives admission + ranking.
+type Fame = { hof: boolean; mvp: number; cy: number; roy: number; allstar: number };
+const EMPTY_FAME = (): Fame => ({ hof: false, mvp: 0, cy: 0, roy: 0, allstar: 0 });
 type PoolPlayer = {
   id: number;
   name: string;
@@ -55,7 +59,7 @@ type PoolPlayer = {
   teams: Team[];
   lines: SeasonLine[];
   career: { bat?: StatBlock; pit?: StatBlock }; // career totals per kind
-  fame: string[]; // reasons: HOF | MVP | CY | ROY | ALLSTAR ; [] = modern-regular only
+  fame: Fame;
   careerG: number | null;
   careerIP: number | null;
 };
@@ -83,33 +87,29 @@ async function recipients(awardId: string, season?: number) {
 }
 
 // ---- bucket 1: fame roster ------------------------------------------------
-async function buildFame(): Promise<Map<number, { name: string; reasons: Set<string> }>> {
-  const fame = new Map<number, { name: string; reasons: Set<string> }>();
-  const add = (id: number, name: string, why: string) => {
-    const e = fame.get(id) ?? { name: name ?? "", reasons: new Set<string>() };
+async function buildFame(): Promise<Map<number, { name: string; fame: Fame }>> {
+  const fame = new Map<number, { name: string; fame: Fame }>();
+  const ensure = (id: number, name: string) => {
+    let e = fame.get(id);
+    if (!e) { e = { name: name ?? "", fame: EMPTY_FAME() }; fame.set(id, e); }
     if (name) e.name = name;
-    e.reasons.add(why);
-    fame.set(id, e);
+    return e;
   };
 
   // All-time career awards return every recipient in one call (no season param).
-  const career: Array<[string, string]> = [
-    ["MLBHOF", "HOF"],
-    ["ALMVP", "MVP"],
-    ["NLMVP", "MVP"],
-    ["ALCY", "CY"],
-    ["NLCY", "CY"],
-    ["ALROY", "ROY"],
-    ["NLROY", "ROY"],
+  // A repeat winner appears once per win, so counting them yields the magnitude.
+  for (const r of await recipients("MLBHOF")) ensure(r.id, r.name).fame.hof = true;
+  const counted: Array<[string, "mvp" | "cy" | "roy"]> = [
+    ["ALMVP", "mvp"], ["NLMVP", "mvp"], ["ALCY", "cy"], ["NLCY", "cy"], ["ALROY", "roy"], ["NLROY", "roy"],
   ];
-  for (const [aw, why] of career) {
-    for (const r of await recipients(aw)) add(r.id, r.name, why);
+  for (const [aw, key] of counted) {
+    for (const r of await recipients(aw)) ensure(r.id, r.name).fame[key]++;
   }
 
-  // All-Star selections must be pulled per season.
+  // All-Star selections, one per (player, season, league).
   for (let yr = FIRST_ASG_YEAR; yr <= MAX_YEAR; yr++) {
     for (const aw of ["ALAS", "NLAS"]) {
-      for (const r of await recipients(aw, yr)) add(r.id, r.name, "ALLSTAR");
+      for (const r of await recipients(aw, yr)) ensure(r.id, r.name).fame.allstar++;
     }
   }
   return fame;
@@ -268,7 +268,7 @@ async function main() {
       teams: h.teams,
       lines: h.lines ?? [],
       career: h.career ?? {},
-      fame: [...(fame.get(id)?.reasons ?? [])].sort(),
+      fame: fame.get(id)?.fame ?? EMPTY_FAME(),
       careerG: m?.careerG ?? null,
       careerIP: m?.careerIP ?? null,
     });
@@ -277,7 +277,9 @@ async function main() {
   writeFileSync(OUT, JSON.stringify(pool, null, 0));
 
   // ---- summary ----
-  const famous = pool.filter((p) => p.fame.length > 0);
+  const hasFame = (f: Fame) => f.hof || f.mvp > 0 || f.cy > 0 || f.roy > 0 || f.allstar > 0;
+  const fameStr = (f: Fame) => [f.hof && "HOF", f.mvp && `MVPx${f.mvp}`, f.cy && `CYx${f.cy}`, f.roy && "ROY", f.allstar && `ASx${f.allstar}`].filter(Boolean).join(",");
+  const famous = pool.filter((p) => hasFame(p.fame));
   const multi = pool.filter((p) => p.teams.length >= 2);
   const teamCounts = new Map<string, number>();
   for (const p of pool) for (const t of p.teams) teamCounts.set(t.name, (teamCounts.get(t.name) ?? 0) + 1);
@@ -293,7 +295,7 @@ async function main() {
 
   console.log(`\n  sample famous, well-traveled players:`);
   for (const p of famous.filter((p) => p.teams.length >= 3).slice(0, 8)) {
-    console.log(`    ${p.name.padEnd(22)} [${p.fame.join(",")}]  ${p.teams.map((t) => t.name).join(" / ")}`);
+    console.log(`    ${p.name.padEnd(22)} [${fameStr(p.fame)}]  ${p.teams.map((t) => t.name).join(" / ")}`);
   }
 }
 

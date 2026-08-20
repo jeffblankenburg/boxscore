@@ -14,7 +14,7 @@ import { usePathname } from "next/navigation";
 // route still resolves for direct visitors — we just don't link to it.
 // See #65 for the redesign options.
 const PILLS: Array<{ slug: string; label: string; href: string }> = [
-  { slug: "teammates",    label: "Teammates",     href: "/games/teammates"    },
+  { slug: "clubhouse",    label: "Clubhouse",     href: "/games/clubhouse"    },
   { slug: "statsharks",   label: "Stat Sharks",   href: "/games/statsharks"   },
   { slug: "time-machine", label: "Time Machine",  href: "/games/time-machine" },
 ];
