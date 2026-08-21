@@ -37,6 +37,7 @@ export type ClubhousePuzzle = {
   groups: SolutionGroup[];
   cards: PlayerCard[];
   traps: { name: string; team: string; decoys: { team: string; years: string }[] }[];
+  anchor?: number; // player id who played for all four teams (anchor days only)
 };
 
 // Compress a sorted distinct year list into readable ranges: [1979,1980,1981,1985]
@@ -107,12 +108,14 @@ function shuffle<T>(a: T[], rng: Rng): T[] { const r = [...a]; for (let i = r.le
 
 // ---- career-share difficulty tiers ----
 // A category's difficulty is set by how obviously its players belong to the team,
-// measured as career SHARE = games-with-team / total-career-games:
-//   yellow  4 players all >=80%             (pure)
-//   green   all >=50%, at least 2 at >=80%  (a majority guy or two mixed in)
-//   blue    >=1 anchor at >=80%, exactly one <=25%, rest >=50%
-//   purple  >=1 anchor at >=80%, up to two <=25%, rest >=50%
-const LOCK = 0.80, MAJOR = 0.50, CAMEO = 0.25;
+// measured as career SHARE = games-with-team / total-career-games. LOCK is 70%
+// (not 80%) so more franchises can field a "lock"-heavy yellow column — at 80%
+// only ~23 of 31 teams could, which drove heavy repetition of the deep few.
+//   yellow  4 players all >=70%             (mostly-this-team)
+//   green   all >=50%, at least 2 at >=70%  (a majority guy or two mixed in)
+//   blue    >=1 anchor at >=70%, exactly one <=25%, rest >=50%
+//   purple  >=1 anchor at >=70%, up to two <=25%, rest >=50%
+const LOCK = 0.70, MAJOR = 0.50, CAMEO = 0.25;
 
 // ---- precomputed pool structures (built once at module load) ----
 const known = (p: PoolPlayer) => famous(p.fame) || (p.careerG ?? 0) >= 300 || (p.careerIP ?? 0) >= 400;
@@ -143,6 +146,17 @@ for (const p of knownPool) for (const t of tenureTeams.get(p.id)!) {
   if (!labelFranchise.has(t.label)) labelFranchise.set(t.label, t.id);
 }
 const usableTeams = [...byLabel.entries()].filter(([, ps]) => ps.length >= MIN_DEPTH).map(([l]) => l);
+const usableSet = new Set(usableTeams);
+
+// Anchor candidates: recognizable players who played (tenure) for >=4 usable
+// franchises — the "keystone journeyman" who can connect a four-team grid.
+const anchorTeamSet = new Map<number, Set<string>>();
+const anchorPlayers: PoolPlayer[] = [];
+for (const p of knownPool) {
+  const ts = new Set(tenureTeams.get(p.id)!.map((t) => t.label).filter((l) => usableSet.has(l)));
+  if (ts.size >= 4 && recognizable(p)) { anchorTeamSet.set(p.id, ts); anchorPlayers.push(p); }
+}
+anchorPlayers.sort((a, b) => rec(b) - rec(a));
 
 function countSolutions(elig: number[][]): number {
   const counts = [0, 0, 0, 0];
@@ -172,26 +186,43 @@ function perms4<T>(a: T[]): T[][] {
 
 // Build a puzzle whose four columns hit the yellow/green/blue/purple career-share
 // profiles. Returns cols already ordered yellow(easiest)..purple(hardest).
-function tryBuild(teams: string[], rng: Rng): Built | null {
+// `anchor`, if set, must land as a cameo — it's a keystone journeyman who played
+// for all four teams, so it's the only tile eligible for every column (the "which
+// team?" trap). Everything else is the normal profile build.
+function tryBuild(teams: string[], rng: Rng, exclude: Set<number>, anchor: PoolPlayer | null = null): Built | null {
   type Tier = { locks: PoolPlayer[]; majors: PoolPlayer[]; cameos: PoolPlayer[] };
   const buckets = new Map<string, Tier>();
   for (const t of teams) {
     const locks: PoolPlayer[] = [], majors: PoolPlayer[] = [], cameos: PoolPlayer[] = [];
     for (const p of byLabel.get(t) ?? []) {
+      if (exclude.has(p.id) || (anchor && p.id === anchor.id)) continue; // recent, or placed manually
+      if (!recognizable(p)) continue; // every tile must be famous-or-known (no obscure filler)
       const a = assoc(p, t);
       if (a >= LOCK) locks.push(p);
       else if (a >= MAJOR) majors.push(p);
-      else if (a <= CAMEO && recognizable(p)) cameos.push(p); // a cameo trap must be famous
+      else if (a <= CAMEO) cameos.push(p);
     }
-    const s = (arr: PoolPlayer[]) => shuffle(arr, rng).sort((x, y) => rec(y) - rec(x));
-    buckets.set(t, { locks: s(locks), majors: s(majors), cameos: s(cameos) });
+    // Everyday tiles (locks/majors): shuffle only — random within the recognizable
+    // band so puzzles surface famous-and-known players, not always the biggest
+    // legends. Cameos stay fame-ranked: a misdirection trap should be a name you know.
+    buckets.set(t, {
+      locks: shuffle(locks, rng),
+      majors: shuffle(majors, rng),
+      cameos: shuffle(cameos, rng).sort((x, y) => rec(y) - rec(x)),
+    });
   }
 
+  const anchorRef = { placed: false };
   // Fill one team's column to a color profile (0=yellow,1=green,2=blue,3=purple).
   const buildCol = (team: string, color: number, used: Set<number>): PoolPlayer[] | null => {
     const t = buckets.get(team)!;
     const av = (arr: PoolPlayer[]) => arr.filter((p) => !used.has(p.id));
-    const locks = av(t.locks), cameos = av(t.cameos);
+    const locks = av(t.locks);
+    // Inject the anchor as a cameo of this team, if it played there ≤25% and
+    // hasn't been placed yet (only the cameo columns take one).
+    const useAnchor = !!anchor && !anchorRef.placed && (color === 2 || color === 3)
+      && assoc(anchor, team) <= CAMEO && tenureTeams.get(anchor.id)!.some((tt) => tt.label === team);
+    const cameos = useAnchor ? [anchor, ...av(t.cameos)] : av(t.cameos);
     const ge50 = [...locks, ...av(t.majors)]; // >=50% share, locks first
     const fromGe50 = (n: number, minLocks: number): PoolPlayer[] | null => {
       const col = ge50.slice(0, n);
@@ -203,11 +234,13 @@ function tryBuild(teams: string[], rng: Rng): Built | null {
     else if (color === 2) { const b = fromGe50(3, 1); col = b && cameos.length >= 1 ? [...cameos.slice(0, 1), ...b] : null; } // blue
     else { const b = fromGe50(2, 1); col = b && cameos.length >= 2 ? [...cameos.slice(0, 2), ...b] : null; }                  // purple
     if (!col || col.length !== 4) return null;
+    if (useAnchor && anchor && col.includes(anchor)) anchorRef.placed = true;
     col.forEach((p) => used.add(p.id));
     return col;
   };
 
   for (const perm of perms4(teams)) {
+    anchorRef.placed = false;
     const used = new Set<number>();
     const cols: PoolPlayer[][] = [[], [], [], []];
     let ok = true;
@@ -218,6 +251,7 @@ function tryBuild(teams: string[], rng: Rng): Built | null {
       cols[color] = c;
     }
     if (!ok) continue;
+    if (anchor && !anchorRef.placed) continue; // anchor was required but didn't fit
 
     const idx = new Map(perm.map((t, i) => [t, i]));
     const inGrid = (p: PoolPlayer) => tenureTeams.get(p.id)!.filter((t) => idx.has(t.label));
@@ -237,11 +271,13 @@ function tryBuild(teams: string[], rng: Rng): Built | null {
   return null;
 }
 
-// Pick 4 teams whose franchise ids are all distinct (no two eras of one team).
-function pickTeams(rng: Rng): string[] {
+// Pick 4 teams whose franchise ids are all distinct (no two eras of one team),
+// skipping any franchise used in the last few days (soft team no-repeat).
+function pickTeams(rng: Rng, excludeTeams: Set<string>): string[] {
   const teams: string[] = [];
   const usedFranchise = new Set<number>();
   for (const t of shuffle(usableTeams, rng)) {
+    if (excludeTeams.has(t)) continue;
     const fid = labelFranchise.get(t)!;
     if (usedFranchise.has(fid)) continue;
     usedFranchise.add(fid);
@@ -251,12 +287,12 @@ function pickTeams(rng: Rng): string[] {
   return teams;
 }
 
-function buildForSeed(seed: number): Built | null {
+function buildForSeed(seed: number, exclude: Set<number>, excludeTeams: Set<string>): Built | null {
   const rng = mulberry32(seed);
   for (let attempt = 0; attempt < 800; attempt++) {
-    const teams = pickTeams(rng);
+    const teams = pickTeams(rng, excludeTeams);
     if (teams.length < 4) continue;
-    const b = tryBuild(teams, rng);
+    const b = tryBuild(teams, rng, exclude);
     if (b) return b;
   }
   return null;
@@ -264,8 +300,14 @@ function buildForSeed(seed: number): Built | null {
 
 const cache = new Map<string, ClubhousePuzzle>();
 
-export function getPuzzleForDate(dateISO: string): ClubhousePuzzle {
-  const cached = cache.get(dateISO);
+// `exclude` = player ids used in the prior 7 days (no player repeats);
+// `excludeTeams` = franchises used in the last few days (soft team no-repeat).
+// The cron threads both in date order; standalone callers may pass none.
+export function getPuzzleForDate(dateISO: string, exclude: Set<number> = new Set(), excludeTeams: Set<string> = new Set()): ClubhousePuzzle {
+  const key = exclude.size || excludeTeams.size
+    ? `${dateISO}#${[...exclude].sort((a, b) => a - b).join(",")}#${[...excludeTeams].sort().join(",")}`
+    : dateISO;
+  const cached = cache.get(key);
   if (cached) return cached;
 
   // Weekday label kept only as flavor metadata — generation no longer varies by
@@ -275,17 +317,22 @@ export function getPuzzleForDate(dateISO: string): ClubhousePuzzle {
 
   // Try the date seed; if a seed can't yield a valid unique puzzle, perturb it.
   let built: Built | null = null;
-  for (let k = 0; k < 12 && !built; k++) built = buildForSeed(hashSeed(`${dateISO}#${k}`));
+  for (let k = 0; k < 12 && !built; k++) built = buildForSeed(hashSeed(`${dateISO}#${k}`), exclude, excludeTeams);
   if (!built) throw new Error(`clubhouse: no puzzle for ${dateISO}`);
 
-  // cols are already ordered yellow(easiest)..purple(hardest) by the profiles.
+  const puzzle = assemble(dateISO, difficulty, built);
+  cache.set(key, puzzle);
+  return puzzle;
+}
+
+// Build the shippable puzzle payload (tiles + cards + groups) from a Built.
+// cols are already ordered yellow(easiest)..purple(hardest) by the profiles.
+function assemble(dateISO: string, difficulty: Difficulty, built: Built, anchorId?: number): ClubhousePuzzle {
   const orderedPlayers = built.cols.flat();
   const rng = mulberry32(hashSeed(`${dateISO}#tiles`));
-  const groups: SolutionGroup[] = built.cols.map((col, i) => ({ team: built!.teams[i]!, playerIds: col.map((p) => p.id) }));
+  const groups: SolutionGroup[] = built.cols.map((col, i) => ({ team: built.teams[i]!, playerIds: col.map((p) => p.id) }));
   const tiles: Tile[] = shuffle(orderedPlayers.map((p) => ({ id: p.id, name: displayName(p.name) })), rng);
-
-  // Attach each of the 16 players' baseball-card lines (year-sorted). Only these
-  // 16 ship to the client, so the payload stays small despite the big pool.
+  // Only these 16 players' baseball-card lines ship to the client.
   const cards: PlayerCard[] = orderedPlayers.map((p) => ({
     id: p.id,
     name: displayName(p.name),
@@ -293,12 +340,37 @@ export function getPuzzleForDate(dateISO: string): ClubhousePuzzle {
     num: p.num,
     hof: p.fame.hof,
     career: p.career ?? {},
-    lines: [...p.lines]
-      .sort((a, b) => a.y - b.y)
-      .map((l) => ({ y: l.y, label: l.label, team: l.tm, k: l.k, s: l.s })),
+    lines: [...p.lines].sort((a, b) => a.y - b.y).map((l) => ({ y: l.y, label: l.label, team: l.tm, k: l.k, s: l.s })),
   }));
+  return { date: dateISO, difficulty, tiles, groups, cards, traps: built.traps, ...(anchorId !== undefined ? { anchor: anchorId } : {}) };
+}
 
-  const puzzle: ClubhousePuzzle = { date: dateISO, difficulty, tiles, groups, cards, traps: built.traps };
-  cache.set(dateISO, puzzle);
-  return puzzle;
+// 4-element subsets of an array.
+function subsets4(a: string[]): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < a.length - 3; i++) for (let j = i + 1; j < a.length - 2; j++)
+    for (let k = j + 1; k < a.length - 1; k++) for (let l = k + 1; l < a.length; l++)
+      out.push([a[i]!, a[j]!, a[k]!, a[l]!]);
+  return out;
+}
+
+// An "anchor day" puzzle: the normal profile puzzle, but guaranteed to contain a
+// keystone journeyman (a tile eligible for all four teams). Returns null if none
+// buildable for this date/exclusions — the caller falls back to a normal puzzle.
+export function getAnchorPuzzleForDate(dateISO: string, exclude: Set<number> = new Set(), excludeTeams: Set<string> = new Set(), usedAnchors: Set<number> = new Set()): ClubhousePuzzle | null {
+  const dow = new Date(`${dateISO}T12:00:00Z`).getUTCDay();
+  const difficulty = WEEKDAY_DIFFICULTY[dow] ?? "medium";
+  const rng = mulberry32(hashSeed(`${dateISO}#anchor`));
+  const cands = shuffle(anchorPlayers.filter((p) => !usedAnchors.has(p.id) && !exclude.has(p.id)), rng);
+  let attempts = 0;
+  for (const anchor of cands) {
+    for (const combo of shuffle(subsets4([...anchorTeamSet.get(anchor.id)!]), rng)) {
+      if (combo.some((t) => excludeTeams.has(t))) continue;
+      if (new Set(combo.map((t) => labelFranchise.get(t)!)).size < 4) continue;
+      if (++attempts > 400) return null;
+      const b = tryBuild(combo, rng, exclude, anchor);
+      if (b) return assemble(dateISO, difficulty, b, anchor.id);
+    }
+  }
+  return null;
 }

@@ -39,8 +39,22 @@ export default async function ClubhousePage({
   // keeps the multi-MB player pool off the normal request path.
   let puzzle = await getStoredPuzzle(date);
   if (!puzzle) {
-    const { getPuzzleForDate } = await import("@/lib/games/clubhouse/generate");
-    puzzle = getPuzzleForDate(date);
+    const [{ getPuzzleForDate, getAnchorPuzzleForDate }, { getRecentPuzzleTiles, getUsedAnchorIds }] = await Promise.all([
+      import("@/lib/games/clubhouse/generate"),
+      import("@/lib/games/clubhouse/store"),
+    ]);
+    // Exclude players (7d) and teams (5d) from the stored days before this date.
+    const windowStart = new Date(`${date}T12:00:00Z`); windowStart.setUTCDate(windowStart.getUTCDate() - 7);
+    const teamStart = new Date(`${date}T12:00:00Z`); teamStart.setUTCDate(teamStart.getUTCDate() - 5);
+    const recent = (await getRecentPuzzleTiles(windowStart.toISOString().slice(0, 10))).filter((r) => r.date < date);
+    const exclude = new Set(recent.flatMap((r) => r.ids));
+    const excludeTeams = new Set(recent.filter((r) => r.date >= teamStart.toISOString().slice(0, 10)).flatMap((r) => r.teams));
+    // Wed/Sat are anchor days (one player quietly eligible for all four teams);
+    // fall back to the normal generator off-schedule or if no anchor build fits.
+    const isAnchorDay = new Set([3, 6]).has(new Date(`${date}T12:00:00Z`).getUTCDay());
+    puzzle =
+      (isAnchorDay ? getAnchorPuzzleForDate(date, exclude, excludeTeams, await getUsedAnchorIds()) : null) ??
+      getPuzzleForDate(date, exclude, excludeTeams);
     await savePuzzle(date, puzzle).catch(() => {});
   }
 

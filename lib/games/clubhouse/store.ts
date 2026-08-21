@@ -21,3 +21,26 @@ export async function savePuzzle(date: string, puzzle: ClubhousePuzzle): Promise
     .from("clubhouse_puzzles")
     .upsert({ puzzle_date: date, data: puzzle }, { onConflict: "puzzle_date" });
 }
+
+// Player ids + team labels per stored puzzle from `sinceDate` onward — used to
+// build the rolling no-repeat exclusion sets (players + teams) for generation.
+export async function getRecentPuzzleTiles(sinceDate: string): Promise<Array<{ date: string; ids: number[]; teams: string[] }>> {
+  const { data } = await supabaseAdmin()
+    .from("clubhouse_puzzles")
+    .select("puzzle_date, data")
+    .gte("puzzle_date", sinceDate)
+    .order("puzzle_date", { ascending: true });
+  return ((data ?? []) as Array<{ puzzle_date: string; data: ClubhousePuzzle }>)
+    .map((r) => ({ date: r.puzzle_date, ids: r.data.tiles.map((t) => t.id), teams: r.data.groups.map((g) => g.team) }));
+}
+
+// Anchor player ids already used by any stored puzzle — so anchor days never
+// reuse a keystone journeyman.
+export async function getUsedAnchorIds(): Promise<Set<number>> {
+  const { data } = await supabaseAdmin().from("clubhouse_puzzles").select("data");
+  const ids = new Set<number>();
+  for (const r of (data ?? []) as Array<{ data: ClubhousePuzzle }>) {
+    if (typeof r.data.anchor === "number") ids.add(r.data.anchor);
+  }
+  return ids;
+}
