@@ -7,7 +7,7 @@
 
 import { supabaseAdmin } from "../supabase";
 
-export type GameKey = "linescordle" | "year" | "player" | "hilo" | "statsharks" | "time-machine";
+export type GameKey = "linescordle" | "year" | "player" | "hilo" | "statsharks" | "time-machine" | "clubhouse";
 
 export type AttemptRow = {
   id: number;

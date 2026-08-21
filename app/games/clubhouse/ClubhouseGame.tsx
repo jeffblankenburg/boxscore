@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ClubhousePuzzle } from "@/lib/games/clubhouse/generate";
 import { TeamStatCards } from "./StatCards";
 import { computeStreaks, type DayResult, type ClubhouseStats } from "@/lib/games/clubhouse/stats";
+import { persistClubhouseAttempt, syncClubhouseStreak } from "./actions";
 
 const MAX_MISTAKES = 4;
 
@@ -71,18 +72,28 @@ export function ClubhouseGame({ puzzle, isAdmin = false }: { puzzle: ClubhousePu
   // Reruns when status flips (win/loss) so the streak updates immediately.
   useEffect(() => {
     if (!hydrated) return;
-    const results: DayResult[] = [];
+    const local: Array<{ date: string; solved: boolean; mistakes: number }> = [];
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (!k || !k.startsWith("clubhouse:")) continue;
         const parsed = JSON.parse(localStorage.getItem(k) || "{}");
         if (parsed.status === "won" || parsed.status === "lost") {
-          results.push({ date: k.slice("clubhouse:".length), solved: parsed.status === "won" });
+          local.push({ date: k.slice("clubhouse:".length), solved: parsed.status === "won", mistakes: parsed.mistakes ?? 0 });
         }
       }
     } catch { /* ignore */ }
-    setStats(computeStreaks(results, puzzle.date));
+    const localResults: DayResult[] = local.map((d) => ({ date: d.date, solved: d.solved }));
+    setStats(computeStreaks(localResults, puzzle.date)); // immediate, device-local
+
+    // Logged-in players: merge in the cross-device history from the server.
+    syncClubhouseStreak(local).then((server) => {
+      if (!server) return; // anonymous — keep the local-only streak
+      const merged = new Map<string, boolean>();
+      for (const d of localResults) merged.set(d.date, d.solved);
+      for (const d of server) merged.set(d.date, d.solved);
+      setStats(computeStreaks([...merged].map(([date, solved]) => ({ date, solved })), puzzle.date));
+    }).catch(() => { /* ignore */ });
   }, [hydrated, status, puzzle.date]);
 
   const persist = (next: Partial<Saved>) => {
@@ -139,6 +150,7 @@ export function ClubhouseGame({ puzzle, isAdmin = false }: { puzzle: ClubhousePu
       setFlash(won ? "" : team);
       setTimeout(() => setFlash(""), 1400);
       persist({ solvedTeams: nextSolved, guesses: nextGuesses, guessedKeys: [...nextGuessed], status: nextStatus });
+      void persistClubhouseAttempt({ puzzleDate: puzzle.date, guesses: nextGuesses, mistakes, solved: won ? true : null });
     } else {
       const nextMistakes = mistakes + 1;
       setMistakes(nextMistakes);
@@ -159,6 +171,7 @@ export function ClubhouseGame({ puzzle, isAdmin = false }: { puzzle: ClubhousePu
         setStatus("playing");
         persist({ mistakes: nextMistakes, guesses: nextGuesses, guessedKeys: [...nextGuessed], status: "playing", solvedTeams });
       }
+      void persistClubhouseAttempt({ puzzleDate: puzzle.date, guesses: nextGuesses, mistakes: nextMistakes, solved: nextMistakes >= MAX_MISTAKES ? false : null });
     }
   };
 

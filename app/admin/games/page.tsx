@@ -28,6 +28,13 @@ type LinescordleAttempt = {
   subscriber_id: string;
 };
 
+type ClubhouseAttempt = {
+  puzzle_date: string;
+  guess_count: number;             // stored as the mistakes count (0-4)
+  solved: boolean | null;
+  subscriber_id: string;
+};
+
 type EndlessRun = {
   subscriber_id: string;
   stat_key: string;
@@ -90,6 +97,30 @@ async function loadLinescordleAttempts(): Promise<LinescordleAttempt[]> {
     if (error) throw new Error(`linescordle: ${error.message}`);
     if (!data || data.length === 0) break;
     for (const r of data) out.push(r as unknown as LinescordleAttempt);
+    cursor = String((data[data.length - 1] as { id: number }).id);
+    if (data.length < PAGE) break;
+  }
+  return out;
+}
+
+async function loadClubhouseAttempts(): Promise<ClubhouseAttempt[]> {
+  const { from } = recentDateRange();
+  const db = supabaseAdmin();
+  const PAGE = 1000;
+  const out: ClubhouseAttempt[] = [];
+  let cursor = "0";
+  for (;;) {
+    const { data, error } = await db
+      .from("puzzle_attempts")
+      .select("puzzle_date, guess_count, solved, subscriber_id, id")
+      .eq("game", "clubhouse")
+      .gte("puzzle_date", from)
+      .gt("id", cursor)
+      .order("id", { ascending: true })
+      .limit(PAGE);
+    if (error) throw new Error(`clubhouse: ${error.message}`);
+    if (!data || data.length === 0) break;
+    for (const r of data) out.push(r as unknown as ClubhouseAttempt);
     cursor = String((data[data.length - 1] as { id: number }).id);
     if (data.length < PAGE) break;
   }
@@ -241,6 +272,46 @@ function aggLinescordle(rows: LinescordleAttempt[]): LinescordleDayRow[] {
   return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+type ClubhouseDayRow = {
+  date:       string;
+  attempts:   number;
+  wins:       number;
+  losses:     number;
+  inProgress: number;
+  winRatePct: number;
+  avgMistakes: number;   // across wins only (0-3)
+  mistakeDist: number[]; // length 5 — counts of finished games by mistakes 0..4
+};
+
+function aggClubhouse(rows: ClubhouseAttempt[]): ClubhouseDayRow[] {
+  const byDay = new Map<string, ClubhouseAttempt[]>();
+  for (const r of rows) {
+    const arr = byDay.get(r.puzzle_date) ?? [];
+    arr.push(r);
+    byDay.set(r.puzzle_date, arr);
+  }
+  const out: ClubhouseDayRow[] = [];
+  for (const [date, rs] of byDay) {
+    const attempts = rs.length;
+    let wins = 0, losses = 0, inProgress = 0, winMistakeSum = 0;
+    const mistakeDist = new Array<number>(5).fill(0);
+    for (const r of rs) {
+      if (r.solved === null) { inProgress++; continue; }
+      const m = Math.min(4, Math.max(0, r.guess_count));
+      mistakeDist[m] = (mistakeDist[m] ?? 0) + 1;
+      if (r.solved) { wins++; winMistakeSum += m; } else { losses++; }
+    }
+    const completed = wins + losses;
+    out.push({
+      date, attempts, wins, losses, inProgress,
+      winRatePct:  completed > 0 ? (wins / completed) * 100 : 0,
+      avgMistakes: wins > 0 ? winMistakeSum / wins : 0,
+      mistakeDist,
+    });
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
 type EndlessStatRow = {
   stat:        string;
   runs:        number;
@@ -325,14 +396,16 @@ function PctBar({ pct, color }: { pct: number; color: string }) {
 
 export default async function AdminGamesView() {
   await requireAdmin();
-  const [sharksDailyRows, lineRows, endlessRuns, leaderboard] = await Promise.all([
+  const [sharksDailyRows, lineRows, clubhouseRows, endlessRuns, leaderboard] = await Promise.all([
     loadStatSharksDaily(),
     loadLinescordleAttempts(),
+    loadClubhouseAttempts(),
     loadEndlessRuns(),
     loadEndlessLeaderboard(),
   ]);
   const sharksDaily   = aggSharksDaily(sharksDailyRows);
   const lineDaily     = aggLinescordle(lineRows);
+  const clubhouseDaily = aggClubhouse(clubhouseRows);
   const endlessByStat = aggEndless(endlessRuns);
   const endlessTotal  = endlessRuns.length;
   const endlessUniqueSubs = new Set(endlessRuns.map((r) => r.subscriber_id)).size;
@@ -341,6 +414,58 @@ export default async function AdminGamesView() {
     <main className="admin">
       <h1>Games analytics</h1>
       <p className="admin-meta">Last {RECENT_DAYS} days of Daily attempts; all-time Endless runs.</p>
+
+      {/* ─── Clubhouse ───────────────────────────────────────── */}
+      <h2 style={{ marginTop: 24 }}>Clubhouse</h2>
+      {clubhouseDaily.length === 0 ? (
+        <p className="admin-meta">No attempts in the last {RECENT_DAYS} days.</p>
+      ) : (
+        <table className="admin-clicks-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th style={{ textAlign: "right" }}>Attempts</th>
+              <th style={{ textAlign: "right" }}>Wins</th>
+              <th style={{ textAlign: "right" }}>Losses</th>
+              <th style={{ textAlign: "right" }}>In progress</th>
+              <th style={{ textAlign: "right" }}>Win rate</th>
+              <th></th>
+              <th style={{ textAlign: "right" }}>Avg mistakes (wins)</th>
+              <th>Mistakes 0–4</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clubhouseDaily.map((r) => {
+              const maxBucket = Math.max(1, ...r.mistakeDist);
+              return (
+                <tr key={r.date}>
+                  <td><code>{r.date}</code></td>
+                  <td style={{ textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{r.attempts.toLocaleString()}</td>
+                  <td style={{ textAlign: "right", fontFamily: "ui-monospace, monospace", color: "#1f7a3a", fontWeight: 700 }}>{r.wins}</td>
+                  <td style={{ textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{r.losses}</td>
+                  <td style={{ textAlign: "right", fontFamily: "ui-monospace, monospace", color: "#888" }}>{r.inProgress}</td>
+                  <td style={{ textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{r.winRatePct.toFixed(1)}%</td>
+                  <td><PctBar pct={r.winRatePct} color="#1f7a3a" /></td>
+                  <td style={{ textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{r.avgMistakes.toFixed(2)}</td>
+                  <td>
+                    <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: 28 }} title={r.mistakeDist.map((c, i) => `${i}: ${c}`).join(", ")}>
+                      {r.mistakeDist.map((c, i) => (
+                        <div key={i} style={{
+                          width: 12,
+                          height: `${(c / maxBucket) * 100}%`,
+                          minHeight: c > 0 ? 2 : 0,
+                          background: i === 4 ? "#c4392a" : "#3a5fcc",
+                          opacity: c > 0 ? 1 : 0.2,
+                        }} />
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
 
       {/* ─── Stat Sharks Daily ───────────────────────────────── */}
       <h2 style={{ marginTop: 24 }}>Stat Sharks · Daily</h2>
