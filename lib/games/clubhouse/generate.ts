@@ -18,9 +18,15 @@ type PoolPlayer = { id: number; name: string; pos: string | null; num: string | 
 const pool = poolData as PoolPlayer[];
 
 // Admission bar: HOF is always in; everyone else needs real magnitude — an
-// MVP/Cy Young/ROY, or 3+ All-Star selections (one-time All-Stars like Whitey
-// Lockman no longer qualify). fameScore weights the ranking of who anchors.
-const famous = (f: Fame) => f.hof || f.mvp > 0 || f.cy > 0 || f.roy > 0 || f.allstar >= 3;
+// MVP or Cy Young, or 3+ All-Star selections (one-time All-Stars like Whitey
+// Lockman no longer qualify). A Rookie of the Year counts only *paired* with
+// >=2 All-Star nods or a 500-game career: a bare ROY (Joe Charboneau, Butch
+// Metzger) isn't famous, but a paired one (José Fernández, Gunnar Henderson) is.
+// fameScore weights the ranking of who anchors.
+const careerGames = (p: PoolPlayer) => p.teams.reduce((a, t) => a + t.g, 0);
+const famous = (p: PoolPlayer) =>
+  p.fame.hof || p.fame.mvp > 0 || p.fame.cy > 0 || p.fame.allstar >= 3 ||
+  (p.fame.roy > 0 && (p.fame.allstar >= 2 || careerGames(p) >= 500));
 const fameScore = (f: Fame) => (f.hof ? 2000 : 0) + f.mvp * 1500 + f.cy * 1200 + f.roy * 400 + f.allstar * 300;
 
 export type Tile = { id: number; name: string };
@@ -118,7 +124,7 @@ function shuffle<T>(a: T[], rng: Rng): T[] { const r = [...a]; for (let i = r.le
 const LOCK = 0.70, MAJOR = 0.50, CAMEO = 0.25;
 
 // ---- precomputed pool structures (built once at module load) ----
-const known = (p: PoolPlayer) => famous(p.fame) || (p.careerG ?? 0) >= 300 || (p.careerIP ?? 0) >= 400;
+const known = (p: PoolPlayer) => famous(p) || (p.careerG ?? 0) >= 300 || (p.careerIP ?? 0) >= 400;
 const tenuredEdge = (t: PoolTeam) => t.g >= TENURE_G || t.years.length >= TENURE_S;
 
 const knownPool = pool.filter(known);
@@ -132,7 +138,7 @@ for (const p of knownPool) {
 // whole fame roster, so lean on total career games (populated for everyone) —
 // otherwise Mel Ott and a borderline HOFer would score identically.
 const rec = (p: PoolPlayer) => fameScore(p.fame) + (totalG.get(p.id) ?? 0);
-const recognizable = (p: PoolPlayer) => famous(p.fame) || (totalG.get(p.id) ?? 0) >= 1000;
+const recognizable = (p: PoolPlayer) => famous(p) || (totalG.get(p.id) ?? 0) >= 1000;
 const assoc = (p: PoolPlayer, label: string) => (p.teams.find((t) => t.label === label)?.g ?? 0) / (totalG.get(p.id) || 1);
 
 const byLabel = new Map<string, PoolPlayer[]>();
