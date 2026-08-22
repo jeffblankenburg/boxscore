@@ -1,5 +1,5 @@
 import { prettyDate, yesterdayInET } from "@/lib/dates";
-import { QUARTERLY_STATS } from "@/lib/quarterly-stats";
+import { getPublicAdHeadlineStats } from "@/lib/dashboard";
 import {
   CLASSIFIEDS,
   DISPLAY_BOXES,
@@ -19,12 +19,14 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { InquiryForm } from "./InquiryForm";
 import { CountUp, DemographicBars, Reveal } from "./Animations";
 
-// Public advertiser-facing page. Headline stats come from the shared
-// QUARTERLY_STATS module so the PDF one-pager and this page always
-// agree — a prospect who reads both sees identical numbers. Stats
-// refresh once per quarter (see lib/quarterly-stats.ts for the
-// procedure); demographics are still pulled live so the bar chart
-// reflects new survey responses as they come in.
+// Public advertiser-facing page. Headline stats are LIVE and all-surface
+// (MLB league + team digests), so subscribers, impressions, open rate, and
+// 30-day sends all describe the same audience — the page updates itself as
+// the list grows (ISR revalidates hourly). MLB-scoped on purpose: the
+// inventory sold here is MLB. See getPublicAdHeadlineStats for methodology.
+// Demographics are pulled live too. The quarterly PDF one-pager
+// (scripts/render-ad-onepager.ts) still reads the frozen quarterly-stats.ts
+// — it's a point-in-time export, no longer guaranteed to match this page.
 
 export const revalidate = 3600;
 
@@ -102,12 +104,15 @@ export const metadata = {
 
 export default async function AdvertisePage() {
   const today = yesterdayInET();
-  const Q = QUARTERLY_STATS;
 
-  // Demographics still pulled live — the survey grows continuously and
-  // the bar chart wants the most-recent split. Headline stats stay
-  // frozen per quarter via QUARTERLY_STATS so the PDF and page match.
-  const demoRows = await loadDemographics();
+  // Headline stats — live, all-surface MLB (league + team digests). See
+  // getPublicAdHeadlineStats. Demographics pulled live alongside.
+  const [head, demoRows] = await Promise.all([
+    getPublicAdHeadlineStats("mlb"),
+    loadDemographics(),
+  ]);
+  const { slots, impressionsPerEdition, sends30d } = head;
+  const openRatePct = head.openRate * 100;
   const ageDist     = bucketPct(demoRows, "age_band",    AGE_BANDS);
   const incomeDist  = bucketPct(demoRows, "income_band", INCOME_BANDS);
   const genderDist  = bucketPct(demoRows, "gender",      GENDERS);
@@ -132,21 +137,21 @@ export default async function AdvertisePage() {
       <Section eyebrow="By the numbers" title="An engaged, daily-read audience">
         <dl className="advertise-stats">
           <Stat
-            value={<CountUp to={Q.totalSubscribers} />}
+            value={<CountUp to={slots} />}
             label="Subscribers"
           />
           <Stat
-            value={<CountUp to={Q.dailyImpressions} />}
+            value={<CountUp to={impressionsPerEdition} />}
             label="Avg daily impressions"
-            note="unique league-digest opens + web views, trailing 14-day avg"
+            note="unique digest opens (league + team) + web views, trailing 14-day avg"
           />
           <Stat
-            value={<CountUp to={Q.openRate} format="percent" />}
+            value={<CountUp to={openRatePct} format="percent" />}
             label="Open rate"
             note={`industry avg ${INDUSTRY_OPEN_RATE_LABEL}`}
           />
           <Stat
-            value={<CountUp to={Q.sendsLast30d} />}
+            value={<CountUp to={sends30d} />}
             label="Sends · last 30 days"
           />
         </dl>

@@ -1498,6 +1498,81 @@ export async function writeAdStatsSnapshot(stats: PublicAdStats): Promise<void> 
   if (error) throw new Error(`writeAdStatsSnapshot: ${error.message}`);
 }
 
+// Non-deduped newsletter "slots" for a sport: active league opt-ins + active
+// team opt-ins, counting a subscriber once per list they're on. This is the
+// honest reach number the /advertise page headlines — someone on the league
+// paper plus two team papers is three slots an advertiser's line runs in.
+// Gates on subscribers.status='active' because an unsubscribe doesn't always
+// deactivate the underlying email_subscriptions rows (stale opt-ins would
+// otherwise inflate the count by ~10%).
+export async function getSubscriberSlots(sport: string): Promise<number> {
+  const { count, error } = await supabaseAdmin()
+    .from("email_subscriptions")
+    .select("subscriber_id, subscribers!inner(status)", { count: "exact", head: true })
+    .eq("active", true)
+    .eq("sport", sport)
+    .eq("subscribers.status", "active");
+  if (error) throw new Error(`getSubscriberSlots: ${error.message}`);
+  return count ?? 0;
+}
+
+// All-surface (league + team digests) headline reach for the public
+// /advertise page, so every stat describes the same MLB audience as the
+// non-deduped subscriber-slots count above. Reads daily_metrics — which
+// already stores team_* aggregates, so this is O(days) not a raw-event
+// rescan — for impressions and open rate, and the sends table for volume.
+//
+// Deliberately separate from ad_stats_snapshot (read by the per-advertiser
+// dashboards), which stays LEAGUE-only: v1 ad placements run only in the
+// league digest, so a placement's measured reach is league-scoped. This
+// public marketing surface instead tells the honest total-reach story across
+// every MLB digest a sponsor could buy into.
+export type PublicAdHeadline = {
+  slots: number;                 // non-deduped active league + team opt-ins
+  impressionsPerEdition: number; // trailing 14-edition all-surface avg
+  openRate: number;              // 30d all-surface fraction
+  sends30d: number;              // 30d all-surface send count
+};
+
+export async function getPublicAdHeadlineStats(sport: string): Promise<PublicAdHeadline> {
+  const db = supabaseAdmin();
+  const dateAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const d14 = dateAgo(14);
+  const d30 = dateAgo(30);
+  const iso30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+  const [slots, m14, m30, sends] = await Promise.all([
+    getSubscriberSlots(sport),
+    db.from("daily_metrics").select("opened, team_opened, web_pageviews").eq("sport", sport).gte("date", d14),
+    db.from("daily_metrics").select("opened, team_opened, delivered, team_delivered").eq("sport", sport).gte("date", d30),
+    db.from("sends").select("id", { count: "exact", head: true }).gte("sent_at", iso30).eq("digest_sport", sport),
+  ]);
+
+  // Impressions/edition: all-surface opens + league web views (team web
+  // pageviews aren't path-matched yet), averaged over editions that shipped —
+  // zero-activity days excluded so off-days don't drag the average down.
+  let imprTotal = 0, editions = 0;
+  for (const r of (m14.data ?? []) as Array<{ opened: number | null; team_opened: number | null; web_pageviews: number | null }>) {
+    const t = (r.opened ?? 0) + (r.team_opened ?? 0) + (r.web_pageviews ?? 0);
+    if (t === 0) continue;
+    imprTotal += t;
+    editions += 1;
+  }
+
+  let opened = 0, delivered = 0;
+  for (const r of (m30.data ?? []) as Array<{ opened: number | null; team_opened: number | null; delivered: number | null; team_delivered: number | null }>) {
+    opened    += (r.opened ?? 0) + (r.team_opened ?? 0);
+    delivered += (r.delivered ?? 0) + (r.team_delivered ?? 0);
+  }
+
+  return {
+    slots,
+    impressionsPerEdition: editions ? Math.round(imprTotal / editions) : 0,
+    openRate: delivered ? opened / delivered : 0,
+    sends30d: sends.count ?? 0,
+  };
+}
+
 export async function readAdStatsSnapshot(): Promise<PublicAdStatsWithGeneratedAt | null> {
   const { data, error } = await supabaseAdmin()
     .from("ad_stats_snapshot")
