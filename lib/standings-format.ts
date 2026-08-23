@@ -32,6 +32,33 @@ export function magicFor(t: TeamRecord): string | null {
   return mn && mn !== "-" ? mn : null;
 }
 
+// Division magic number to display for one team — for EVERY team, not just the
+// leader (Jeff, 2026-08-23). The feed only populates magicNumber for the
+// leader, so:
+//   - leaders use the feed's authoritative value (matches MLB.com exactly,
+//     including its "-" suppression once the team clinches anything);
+//   - non-leaders get the computed magic to WIN THE DIVISION,
+//     M = 163 − wins − (fewest losses among division rivals). 163 = 162-game
+//     season + 1. Validated against the feed's leader values for 2025.
+//   - "—" when the team has clinched the division or is eliminated from it
+//     (a team out of its division race genuinely has no division magic number,
+//     even if still alive for a wild card).
+// Rival losses are passed in (the caller has the division's rows); the helper
+// stays pure and shape-agnostic so both the canonical and legacy renderers use it.
+export function divisionMagicDisplay(opts: {
+  wins: number;
+  isDivisionLeader: boolean;
+  feedMagic: number | null;
+  clinchedDivision: boolean;
+  eliminatedFromDivision: boolean;
+  rivalMinLosses: number;
+}): string {
+  if (opts.eliminatedFromDivision || opts.clinchedDivision) return "—";
+  if (opts.isDivisionLeader) return opts.feedMagic != null ? String(opts.feedMagic) : "—";
+  // A non-leader that hasn't clinched can't be at 0; clamp defensively.
+  return String(Math.max(1, 163 - opts.wins - opts.rivalMinLosses));
+}
+
 // The clinch letter for a team, or null when it hasn't clinched (or the feed
 // returned an unrecognized value).
 export function clinchLetter(t: TeamRecord): string | null {

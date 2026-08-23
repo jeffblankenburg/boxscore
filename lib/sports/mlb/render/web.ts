@@ -35,7 +35,7 @@ import type {
 
 import type { DigestMode } from "@/lib/digest-mode";
 import { wildCardVisibleTeams } from "./wild-card";
-import { showMagicNumbers, clinchKeyLine } from "@/lib/standings-format";
+import { showMagicNumbers, divisionMagicDisplay, clinchKeyLine } from "@/lib/standings-format";
 import { findTeam } from "@/lib/teams";
 import { nextDay, prettyDate } from "@/lib/dates";
 import { renderMasthead, type NavSport } from "@/lib/masthead";
@@ -569,9 +569,12 @@ function renderDivisionTable(
   hl?: HighlightMap,
 ): string {
   const showMagic = opts.showMagic ?? false;
-  const rows = [...d.teams]
-    .sort((a, b) => a.divisionRank - b.divisionRank)
-    .map((t) => standingsRow(t, { date: opts.date, league: d.league, division: d.division, showMagic }, hl))
+  const sorted = [...d.teams].sort((a, b) => a.divisionRank - b.divisionRank);
+  const rows = sorted
+    .map((t, i) => {
+      const rivalMinLosses = Math.min(...sorted.filter((_, j) => j !== i).map((x) => x.losses));
+      return standingsRow(t, { date: opts.date, league: d.league, division: d.division, showMagic, rivalMinLosses }, hl);
+    })
     .join("");
   const magicHead = showMagic ? `<th class="mn-col">MN</th>` : "";
   return `<div class="stats-subheader">${esc(label)}</div>
@@ -646,7 +649,7 @@ function renderWildCardTable(
 
 function standingsRow(
   t: MlbStandingRow,
-  opts: { date?: string; league?: MlbLeague; division?: MlbDivision; showMagic?: boolean },
+  opts: { date?: string; league?: MlbLeague; division?: MlbDivision; showMagic?: boolean; rivalMinLosses?: number },
   hl?: HighlightMap,
 ): string {
   const slug = findTeam("mlb", t.team.id)?.slug;
@@ -666,7 +669,16 @@ function standingsRow(
   // Clinch letter sits outside the link, agate-style ("y-Rays"); MN column
   // (leader-only, September on) mirrors the header from renderDivisionTable.
   const namePrefix = t.clinchIndicator ? `${t.clinchIndicator}-` : "";
-  const magicCell = opts.showMagic ? `<td class="mn-col">${t.magicNumber ?? "—"}</td>` : "";
+  const magicCell = opts.showMagic ? `<td class="mn-col">${divisionMagicDisplay({
+    wins: t.wins,
+    isDivisionLeader: t.divisionRank === 1,
+    feedMagic: t.magicNumber,
+    clinchedDivision: t.clinchedDivision,
+    // eliminatedFromPlayoffs is mapped from statsapi eliminationNumber="E",
+    // which is specifically division elimination — the right gate here.
+    eliminatedFromDivision: t.eliminatedFromPlayoffs,
+    rivalMinLosses: opts.rivalMinLosses ?? 0,
+  })}</td>` : "";
   return `<tr${attrs}>
         <td class="team-col">${namePrefix}${teamCell}</td>
         <td class="w-col">${t.wins}</td>

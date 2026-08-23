@@ -9,7 +9,7 @@ import { prevDay, nextDay, prettyDate } from "./dates";
 import { lastName, boxSurname, collidingSurnames } from "./names";
 import { lastNameLinkWeb } from "./player-links";
 import {
-  showMagicNumbers, magicFor, clinchLetter, eliminatedFromWildCard, clinchKeyLine,
+  showMagicNumbers, divisionMagicDisplay, clinchLetter, eliminatedFromWildCard, clinchKeyLine,
 } from "./standings-format";
 
 // Re-exported for backwards compatibility with any caller that imports
@@ -404,9 +404,9 @@ export function renderDivisionTable(
   // MN column appears only from September on (see showMagicNumbers). Only the
   // division leader carries a magic number, so all other rows render blank.
   const showMagic = opts.showMagic ?? false;
-  const rows = [...d.teamRecords]
-    .sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank))
-    .map((t) => {
+  const sorted = [...d.teamRecords].sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank));
+  const rows = sorted
+    .map((t, i) => {
       const home = t.records?.splitRecords?.find((s) => s.type === "home");
       const away = t.records?.splitRecords?.find((s) => s.type === "away");
       const l10 = t.records?.splitRecords?.find((s) => s.type === "lastTen");
@@ -425,7 +425,15 @@ export function renderDivisionTable(
       // Clinch letter sits outside the link, agate-style ("y-Rays").
       const ind = clinchLetter(t);
       const namePrefix = ind ? `${ind}-` : "";
-      const magicCell = showMagic ? `<td class="mn-col">${esc(magicFor(t) ?? "—")}</td>` : "";
+      const rivalMinLosses = Math.min(...sorted.filter((_, j) => j !== i).map((x) => x.losses));
+      const magicCell = showMagic ? `<td class="mn-col">${divisionMagicDisplay({
+        wins: t.wins,
+        isDivisionLeader: Number(t.divisionRank) === 1,
+        feedMagic: t.magicNumber && t.magicNumber !== "-" ? Number(t.magicNumber) : null,
+        clinchedDivision: ind === "y" || ind === "z",
+        eliminatedFromDivision: t.eliminationNumber === "E",
+        rivalMinLosses,
+      })}</td>` : "";
       return `<tr>
         <td class="team-col">${namePrefix}${teamCell}</td>
         <td class="w-col">${t.wins}</td>

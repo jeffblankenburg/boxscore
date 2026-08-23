@@ -30,7 +30,7 @@ import { EMAIL_LINK_BASE } from "./site";
 import { lastName, boxSurname, collidingSurnames } from "./names";
 import { lastNameLinkEmail } from "./player-links";
 import {
-  showMagicNumbers, magicFor, clinchLetter, clinchKeyLine,
+  showMagicNumbers, divisionMagicDisplay, clinchLetter, clinchKeyLine,
 } from "./standings-format";
 
 // Re-exported for the basketball renderer, which imports lastName from here.
@@ -379,9 +379,9 @@ export function renderDivisionStandings(
 ): string {
   // MN column only from September on; only the division leader carries one.
   const showMagic = opts?.date ? showMagicNumbers(opts.date) : false;
-  const rows = [...d.teamRecords]
-    .sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank))
-    .map((t) => {
+  const sorted = [...d.teamRecords].sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank));
+  const rows = sorted
+    .map((t, i) => {
       const home = t.records?.splitRecords?.find((s) => s.type === "home");
       const away = t.records?.splitRecords?.find((s) => s.type === "away");
       const l10 = t.records?.splitRecords?.find((s) => s.type === "lastTen");
@@ -395,10 +395,18 @@ export function renderDivisionStandings(
         ? `${EMAIL_LINK_BASE}/${opts.sport}/${slug}/${opts.date}`
         : undefined;
       const ind = clinchLetter(t);
+      const rivalMinLosses = Math.min(...sorted.filter((_, j) => j !== i).map((x) => x.losses));
       return standingsRow({
         nickname: nickname(t.team.name),
         namePrefix: ind ? `${ind}-` : "",
-        mn: showMagic ? (magicFor(t) ?? "—") : undefined,
+        mn: showMagic ? divisionMagicDisplay({
+          wins: t.wins,
+          isDivisionLeader: Number(t.divisionRank) === 1,
+          feedMagic: t.magicNumber && t.magicNumber !== "-" ? Number(t.magicNumber) : null,
+          clinchedDivision: ind === "y" || ind === "z",
+          eliminatedFromDivision: t.eliminationNumber === "E",
+          rivalMinLosses,
+        }) : undefined,
         wins: t.wins, losses: t.losses,
         pct: t.leagueRecord.pct.replace(/^0/, ""),
         gb: t.gamesBack,

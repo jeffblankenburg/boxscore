@@ -45,7 +45,7 @@ import { EMAIL_LINK_BASE } from "@/lib/site";
 import {
   esc, pad, fmtAvg, fmtOps, fmtEra, sectionH,
 } from "@/lib/render-email";
-import { showMagicNumbers, clinchKeyLine } from "@/lib/standings-format";
+import { showMagicNumbers, divisionMagicDisplay, clinchKeyLine } from "@/lib/standings-format";
 import { renderMasthead, type NavSport } from "@/lib/masthead";
 import { sortTransactionsByTeam } from "../transactions";
 
@@ -265,15 +265,23 @@ function renderDivisionTable(
   showMagic = false,
 ): string {
   const sorted = [...d.teams].sort((a, b) => a.divisionRank - b.divisionRank);
-  const rows = sorted.map((t) => {
+  const rows = sorted.map((t, i) => {
     const team = findTeam("mlb", t.team.id);
     const teamHref = team
       ? `${EMAIL_LINK_BASE}/mlb/${team.slug}/${editionDate}`
       : undefined;
+    const rivalMinLosses = Math.min(...sorted.filter((_, j) => j !== i).map((x) => x.losses));
     return standingsRowCells({
       nickname: nickname(t.team.name),
       namePrefix: t.clinchIndicator ? `${t.clinchIndicator}-` : "",
-      mn: showMagic ? (t.magicNumber != null ? String(t.magicNumber) : "—") : undefined,
+      mn: showMagic ? divisionMagicDisplay({
+        wins: t.wins,
+        isDivisionLeader: t.divisionRank === 1,
+        feedMagic: t.magicNumber,
+        clinchedDivision: t.clinchedDivision,
+        eliminatedFromDivision: t.eliminatedFromPlayoffs,
+        rivalMinLosses,
+      }) : undefined,
       wins: t.wins, losses: t.losses,
       pct: fmtPct(t.leagueRecord.pct),
       gb: fmtGb(t.gamesBehind),
