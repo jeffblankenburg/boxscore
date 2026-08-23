@@ -224,19 +224,28 @@ function teamShort(data: CanonicalFootballDailyData, t: FootballTeamRef, web: bo
   return rankBadge(t.rank) + teamLink(data.league, t, escapeHtml(name), web);
 }
 
-// The week these games belong to, for section titles ("Week 14 Scores").
+// The week these games belong to, for section titles ("Week 14 Scores"). Read
+// the week and season type off the SAME game so the "Pre-Season" qualifier and
+// the number can't disagree.
 function gameWeek(games: FootballGame[]): number | null {
   return games.find((g) => g.week != null)?.week ?? null;
 }
+// Preseason games need the "Pre-Season" qualifier so "Week 3" isn't mistaken
+// for the regular season (Jeff, 2026-08-23). Regular/post/unknown stay bare —
+// NCAAF has no preseason, so this only ever fires for the NFL.
+function seasonPrefix(games: FootballGame[]): string {
+  return games.find((g) => g.week != null)?.seasonType === "pre" ? "Pre-Season " : "";
+}
 function weekPrefix(games: FootballGame[]): string {
   const w = gameWeek(games);
-  return w != null ? `Week ${w} ` : "";
+  return w != null ? `${seasonPrefix(games)}Week ${w} ` : "";
 }
 
-// Email subject: "NFL Week 5, Thursday Digest" — the week plus the RECAPPED
-// games' weekday (per the games'-day convention, not the send day). Returns
-// null when there's no week (bowls / non-week games) or no recapped games, so
-// the send cron falls back to the generic "{SPORT} - {date}" subject.
+// Email subject: "NFL Pre-Season Week 3, Thursday Digest" — the (qualified)
+// week plus the RECAPPED games' weekday (per the games'-day convention, not the
+// send day). Returns null when there's no week (bowls / non-week games) or no
+// recapped games, so the send cron falls back to the generic "{SPORT} - {date}"
+// subject.
 export function footballEmailSubject(data: CanonicalFootballDailyData): string | null {
   const games = playedGames(data);
   const week = gameWeek(games);
@@ -246,7 +255,7 @@ export function footballEmailSubject(data: CanonicalFootballDailyData): string |
     timeZone: "America/New_York",
     weekday: "long",
   }).format(new Date(first.startTime));
-  return `${data.league.toUpperCase()} Week ${week}, ${day} Digest`;
+  return `${data.league.toUpperCase()} ${seasonPrefix(games)}Week ${week}, ${day} Digest`;
 }
 
 function renderGameScores(data: CanonicalFootballDailyData, web: boolean): string {
@@ -300,11 +309,10 @@ function recapDayET(iso: string): number {
 }
 
 function matchupSectionTitle(g: FootballGame, verb: "Upcoming" | "Remaining"): string {
-  return g.seasonType === "post"
-    ? `${verb} Playoff Matchups`
-    : g.week != null
-      ? `${verb} Week ${g.week} Matchups`
-      : `${verb} Matchups`;
+  if (g.seasonType === "post") return `${verb} Playoff Matchups`;
+  if (g.week == null) return `${verb} Matchups`;
+  const pre = g.seasonType === "pre" ? "Pre-Season " : "";
+  return `${verb} ${pre}Week ${g.week} Matchups`;
 }
 
 // The next week's games — but only on the Sunday/Monday recap editions (recap
