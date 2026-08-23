@@ -12,9 +12,11 @@ const WC_MAX_GB = 3;     // "within 3 games of the cutoff"
 const MIN_CHASERS = 3;   // always show at least this many teams outside the picture
 
 export function wildCardVisibleTeams(wc: MlbWildCardStandings): MlbStandingRow[] {
-  const sorted = [...wc.teams].sort(
-    (a, b) => (a.wildCardRank ?? 99) - (b.wildCardRank ?? 99),
-  );
+  // Drop teams mathematically out of the wild-card race before ranking, so the
+  // chaser list only ever shows live contenders (Jeff, 2026-08-23).
+  const sorted = [...wc.teams]
+    .filter((t) => !t.eliminatedFromWildCard)
+    .sort((a, b) => (a.wildCardRank ?? 99) - (b.wildCardRank ?? 99));
   // wildCardGamesBehind is <= 0 for teams holding a spot, positive = games back.
   const chasers = sorted.slice(WC_SPOTS);
   const withinRange = chasers.filter(

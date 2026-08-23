@@ -310,6 +310,18 @@ export type MlbStandingRow = {
   clinchedDivision: boolean;
   clinchedWildCard: boolean;
   eliminatedFromPlayoffs: boolean;
+  /** Division magic number to clinch. Null unless this is the division leader
+   *  with a live number (statsapi only exposes it for the leader; SDIO doesn't
+   *  expose it at all). Rendered as a column from September on. */
+  magicNumber: number | null;
+  /** Raw agate clinch letter for the standings key: x=playoff berth,
+   *  y=division, z=best record, w=wild card. Null when the team hasn't
+   *  clinched (or the vendor doesn't distinguish, e.g. SDIO has no plain x). */
+  clinchIndicator: string | null;
+  /** Out of the wild-card race. Distinct from eliminatedFromPlayoffs: a team
+   *  can be out of its division but alive in the WC. Drives the WC table's
+   *  "hide dead teams" filter. */
+  eliminatedFromWildCard: boolean;
   // Expanded splits for the mid-season recap's wide standings table. Optional
   // because only the statsapi adapter populates them (SDIO leaves them unset,
   // and the renderer shows "—"). vsEast/Central/West are records vs the team's

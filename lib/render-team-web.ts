@@ -16,6 +16,7 @@ import {
 } from "./render";
 import { lastNameLinkWeb } from "./player-links";
 import { teamPlayedGames, type TeamEmailData } from "./render-team-email";
+import { showMagicNumbers, clinchLetter, clinchKeyLine } from "./standings-format";
 
 const DIVISION_NAMES: Record<number, string> = {
   200: "AL West",
@@ -40,7 +41,13 @@ function teamHeading(data: TeamEmailData): string {
 function renderStandings(data: TeamEmailData): string {
   if (!data.division) return "";
   const label = DIVISION_NAMES[data.division.division.id] ?? "Division";
-  return renderDivisionTable(label, data.division, { date: data.date });
+  const showMagic = showMagicNumbers(data.date);
+  const table = renderDivisionTable(label, data.division, { date: data.date, showMagic });
+  const present = new Set<string>();
+  for (const t of data.division.teamRecords) { const c = clinchLetter(t); if (c) present.add(c); }
+  const keyLine = clinchKeyLine(present);
+  const keyHtml = keyLine ? `<div class="standings-key">${esc(keyLine)}</div>` : "";
+  return `${table}${keyHtml}`;
 }
 
 function renderYesterdayBox(data: TeamEmailData): string {

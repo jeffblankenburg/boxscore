@@ -197,6 +197,7 @@ type SdioStanding = {
   Streak: string;
   RunsScored: number;
   RunsAgainst: number;
+  ClinchedBestLeagueRecord: boolean;
   ClinchedDivision: boolean;
   ClinchedWildCard: boolean;
   EliminatedFromPlayoffContention: boolean;
@@ -949,6 +950,13 @@ function teamRowFromSdio(r: SdioStanding, idx: Map<number, MlbTeamRef>): MlbStan
     leagueRecord:           record(r.Wins, r.Losses),  // SDIO lacks inter-league split
     clinchedDivision:       r.ClinchedDivision,
     clinchedWildCard:       r.ClinchedWildCard,
+    // SDIO exposes no magic number and no plain clinch letter (dictionary
+    // checked 2026-08-23) — derive the letter from its clinch booleans; MN
+    // stays null (the column just shows "—" under SDIO). EliminatedFrom-
+    // PlayoffContention is the closest signal to "out of the wild card."
+    magicNumber:            null,
+    clinchIndicator:        r.ClinchedBestLeagueRecord ? "z" : r.ClinchedDivision ? "y" : r.ClinchedWildCard ? "w" : null,
+    eliminatedFromWildCard: r.EliminatedFromPlayoffContention,
     eliminatedFromPlayoffs: r.EliminatedFromPlayoffContention,
   };
 }

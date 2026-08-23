@@ -29,6 +29,9 @@ import { findTeamByMlbApiId } from "./teams";
 import { EMAIL_LINK_BASE } from "./site";
 import { lastName, boxSurname, collidingSurnames } from "./names";
 import { lastNameLinkEmail } from "./player-links";
+import {
+  showMagicNumbers, magicFor, clinchLetter, clinchKeyLine,
+} from "./standings-format";
 
 // Re-exported for the basketball renderer, which imports lastName from here.
 // New code should import from "./names" directly.
@@ -290,8 +293,17 @@ const gameH = (t: string) => `<h3 class="es-game-h">${esc(t)}</h3>`;
 
 // ─── standings + wildcard ─────────────────────────────────────────────────
 
-function standingsColgroup(): string {
+function standingsColgroup(showMagic = false): string {
   // Pinned column widths so "14-10", "+105" etc. don't push columns around.
+  // When the MN column shows (Sept onward), diff/strk give up a point each to
+  // make room without overflowing the email's fixed table width.
+  if (showMagic) {
+    return `<colgroup>
+      <col width="22%"><col width="5%"><col width="5%"><col width="8%">
+      <col width="7%"><col width="6%"><col width="8%"><col width="10%">
+      <col width="10%"><col width="8%"><col width="8%">
+    </colgroup>`;
+  }
   return `<colgroup>
     <col width="22%"><col width="5%"><col width="5%"><col width="8%">
     <col width="7%"><col width="9%"><col width="10%"><col width="10%">
@@ -299,18 +311,20 @@ function standingsColgroup(): string {
   </colgroup>`;
 }
 
-function standingsTableHead(label: string = "GB"): string {
+function standingsTableHead(label: string = "GB", showMagic = false): string {
   // Inline white-space:nowrap on every cell because Gmail Android (especially
   // in dark mode) strips class-based CSS from the <style> block, so the
   // `.es-table th { white-space: nowrap }` rule never reaches the rendered
   // table and headers like "STRK" get broken into "STR\nK".
   const nowrap = `style="white-space:nowrap"`;
+  const mnHead = showMagic ? `<th align="right" ${nowrap}>MN</th>` : "";
   return `<thead><tr>
     <th align="left"  ${nowrap}>Team</th>
     <th align="right" ${nowrap}>W</th>
     <th align="right" ${nowrap}>L</th>
     <th align="right" ${nowrap}>Pct</th>
     <th align="right" ${nowrap}>${label}</th>
+    ${mnHead}
     <th align="right" ${nowrap}>Diff</th>
     <th align="right" ${nowrap}>Home</th>
     <th align="right" ${nowrap}>Away</th>
@@ -323,6 +337,11 @@ function standingsRow(
   r: {
     nickname: string; wins: number; losses: number; pct: string;
     gb: string; diff: string; home: string; away: string; l10: string; strk: string;
+    // Agate clinch letter prefixed to the nickname ("y-"), empty when unclinched.
+    namePrefix?: string;
+    // Magic number cell; when undefined the MN column isn't rendered (must
+    // stay in sync with standingsColgroup/standingsTableHead's showMagic).
+    mn?: string;
     // When provided, the nickname renders as a link to the team's digest.
     // Styled to be invisible — same color and no underline as the parent
     // cell — so subscribers don't see a "click me" cue inside the table.
@@ -337,12 +356,14 @@ function standingsRow(
   // See standingsTableHead — inline the nowrap rule so Gmail Android stops
   // breaking "39" into "3\n9" and "16-16" into "16-\n16".
   const nowrap = `style="white-space:nowrap"`;
+  const mnCell = r.mn !== undefined ? `<td align="right" ${nowrap}>${esc(r.mn)}</td>` : "";
   return `<tr${cls}>
-    <td align="left"  ${nowrap}>${nameCell}</td>
+    <td align="left"  ${nowrap}>${esc(r.namePrefix ?? "")}${nameCell}</td>
     <td align="right" ${nowrap}>${r.wins}</td>
     <td align="right" ${nowrap}>${r.losses}</td>
     <td align="right" ${nowrap}>${esc(r.pct)}</td>
     <td align="right" ${nowrap}>${esc(r.gb)}</td>
+    ${mnCell}
     <td align="right" ${nowrap}>${esc(r.diff)}</td>
     <td align="right" ${nowrap}>${esc(r.home)}</td>
     <td align="right" ${nowrap}>${esc(r.away)}</td>
@@ -356,6 +377,8 @@ export function renderDivisionStandings(
   d: DivisionStandings,
   opts?: { highlightTeamId?: number; sport?: string; date?: string },
 ): string {
+  // MN column only from September on; only the division leader carries one.
+  const showMagic = opts?.date ? showMagicNumbers(opts.date) : false;
   const rows = [...d.teamRecords]
     .sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank))
     .map((t) => {
@@ -371,8 +394,11 @@ export function renderDivisionStandings(
       const teamHref = slug && opts?.sport && opts?.date
         ? `${EMAIL_LINK_BASE}/${opts.sport}/${slug}/${opts.date}`
         : undefined;
+      const ind = clinchLetter(t);
       return standingsRow({
         nickname: nickname(t.team.name),
+        namePrefix: ind ? `${ind}-` : "",
+        mn: showMagic ? (magicFor(t) ?? "—") : undefined,
         wins: t.wins, losses: t.losses,
         pct: t.leagueRecord.pct.replace(/^0/, ""),
         gb: t.gamesBack,
@@ -386,10 +412,24 @@ export function renderDivisionStandings(
     }).join("");
   return `${subH(label + " Division")}
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
-      ${standingsColgroup()}
-      ${standingsTableHead()}
+      ${standingsColgroup(showMagic)}
+      ${standingsTableHead("GB", showMagic)}
       <tbody>${rows}</tbody>
     </table>`;
+}
+
+// Shared clinch-key line for email standings sections. Inline styles because
+// Gmail strips class-based CSS. Empty string when nothing has clinched, so the
+// key stays hidden until September clinches begin.
+export function renderClinchKeyEmail(divisions: DivisionStandings[]): string {
+  const present = new Set<string>();
+  for (const d of divisions) {
+    for (const t of d.teamRecords) { const c = clinchLetter(t); if (c) present.add(c); }
+  }
+  const line = clinchKeyLine(present);
+  return line
+    ? `<div style="font-size:11px;font-style:italic;color:#666;margin:2px 0 10px">${esc(line)}</div>`
+    : "";
 }
 
 function renderWildCard(wc: WildCardLeagueStandings): string {
@@ -438,7 +478,9 @@ function renderLeagueStandings(label: string, key: "AL" | "NL", data: DailyData)
   }).join("");
   // Wild card intentionally omitted in email — keeps the email tighter; the
   // full wild card race is still on the web.
-  return `${sectionH(label)}${standingsHtml}`;
+  const divs3 = divs.map((d) => data.standings.find((r) => r.division.id === d.id))
+    .filter((r): r is NonNullable<typeof r> => r != null);
+  return `${sectionH(label)}${standingsHtml}${renderClinchKeyEmail(divs3)}`;
 }
 
 // ─── leaders (two columns: AL, NL) ────────────────────────────────────────

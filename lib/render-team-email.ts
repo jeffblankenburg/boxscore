@@ -21,7 +21,7 @@ import { nextDay, prettyDate, timeInET } from "./dates";
 import type { Team } from "./teams";
 import type { GameDetail } from "./render";
 import {
-  dateline, sectionH, renderGame, renderDivisionStandings,
+  dateline, sectionH, renderGame, renderDivisionStandings, renderClinchKeyEmail,
   esc, pad, fmtAvg, fmtEra, lastName,
 } from "./render-email";
 import { lastNameLinkEmail } from "./player-links";
@@ -185,7 +185,7 @@ function renderTeamStandings(data: TeamEmailData): string {
     highlightTeamId: data.team.mlbApiId,
     sport: data.team.sport,
     date: nextDay(data.date),
-  })}`;
+  })}${renderClinchKeyEmail([data.division])}`;
 }
 
 // A player is treated as a pitcher (for the pitching table) if their listed

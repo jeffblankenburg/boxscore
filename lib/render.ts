@@ -8,6 +8,9 @@ import { findTeamByMlbApiId } from "./teams";
 import { prevDay, nextDay, prettyDate } from "./dates";
 import { lastName, boxSurname, collidingSurnames } from "./names";
 import { lastNameLinkWeb } from "./player-links";
+import {
+  showMagicNumbers, magicFor, clinchLetter, eliminatedFromWildCard, clinchKeyLine,
+} from "./standings-format";
 
 // Re-exported for backwards compatibility with any caller that imports
 // lastName from "./render". New code should import from "./names" directly.
@@ -280,20 +283,38 @@ export function renderDateline(pretty: string): string {
 function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leaderLimit = 5): string {
   const key: "AL" | "NL" = leagueId === 103 ? "AL" : "NL";
   const divs = DIVISIONS[key];
+  const showMagic = showMagicNumbers(data.date);
   const standingsHtml = divs.map((d) => {
     const rec = data.standings.find((r) => r.division.id === d.id);
     // Team-name links in standings go to /mlb/{slug}/{editionDate};
     // data.date is games_date so shift +1 for the URL.
-    return rec ? renderDivisionTable(d.name, rec, { date: nextDay(data.date) }) : "";
+    return rec ? renderDivisionTable(d.name, rec, { date: nextDay(data.date), showMagic }) : "";
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league.id === leagueId);
   const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord, { date: nextDay(data.date) }) : "";
+  // Clinch key: only the letters that actually appear in this league's
+  // standings (division rows + surviving wild-card rows), so the legend stays
+  // hidden until something clinches. wildCardEliminationNumber="E" teams are
+  // dropped from the WC table, so a letter only on a dead team won't show —
+  // matching what the reader sees.
+  const present = new Set<string>();
+  for (const d of divs) {
+    const rec = data.standings.find((r) => r.division.id === d.id);
+    for (const t of rec?.teamRecords ?? []) { const c = clinchLetter(t); if (c) present.add(c); }
+  }
+  for (const t of wcRecord?.teamRecords ?? []) {
+    if (eliminatedFromWildCard(t)) continue;
+    const c = clinchLetter(t); if (c) present.add(c);
+  }
+  const keyLine = clinchKeyLine(present);
+  const keyHtml = keyLine ? `<div class="standings-key">${esc(keyLine)}</div>` : "";
   const leadersHtml = renderLeagueLeaders(data.leaders[key], data.teamAbbrev, leaderLimit);
   return `<div class="league-layout">
   <div class="col-standings">
     <div class="boxscores-title">${esc(label)} Standings</div>
     ${standingsHtml}
     ${wildCardHtml}
+    ${keyHtml}
   </div>
   <div class="col-leaders">
     <div class="boxscores-title">${esc(label)} Leaders</div>
@@ -302,11 +323,15 @@ function renderLeague(label: string, leagueId: 103 | 104, data: DailyData, leade
 </div>`;
 }
 
-function renderWildCardTable(
+export function renderWildCardTable(
   wc: WildCardLeagueStandings,
   opts: { date?: string } = {},
 ): string {
+  // Drop teams mathematically out of the wild-card race
+  // (wildCardEliminationNumber="E"). Early season this filters nothing; late
+  // season it trims the dead weight so the table shows only live contenders.
   const sorted = [...wc.teamRecords]
+    .filter((t) => !eliminatedFromWildCard(t))
     .sort((a, b) => Number(a.wildCardRank ?? 99) - Number(b.wildCardRank ?? 99));
   const minTeams = 6;
   let cutoff = Math.min(minTeams, sorted.length);
@@ -336,8 +361,10 @@ function renderWildCardTable(
     const teamCell = teamHref
       ? `<a class="team-link" href="${teamHref}">${name}</a>`
       : name;
+    const ind = clinchLetter(t);
+    const namePrefix = ind ? `${ind}-` : "";
     return `<tr class="${cutoffClass.trim()}">
-      <td class="team-col">${teamCell}</td>
+      <td class="team-col">${namePrefix}${teamCell}</td>
       <td class="w-col">${t.wins}</td>
       <td class="l-col">${t.losses}</td>
       <td class="pct-col">${esc(t.leagueRecord.pct).replace(/^0/, "")}</td>
@@ -372,8 +399,11 @@ function renderWildCardTable(
 export function renderDivisionTable(
   label: string,
   d: DivisionStandings,
-  opts: { date?: string } = {},
+  opts: { date?: string; showMagic?: boolean } = {},
 ): string {
+  // MN column appears only from September on (see showMagicNumbers). Only the
+  // division leader carries a magic number, so all other rows render blank.
+  const showMagic = opts.showMagic ?? false;
   const rows = [...d.teamRecords]
     .sort((a, b) => Number(a.divisionRank) - Number(b.divisionRank))
     .map((t) => {
@@ -392,12 +422,17 @@ export function renderDivisionTable(
       const teamCell = teamHref
         ? `<a class="team-link" href="${teamHref}">${name}</a>`
         : name;
+      // Clinch letter sits outside the link, agate-style ("y-Rays").
+      const ind = clinchLetter(t);
+      const namePrefix = ind ? `${ind}-` : "";
+      const magicCell = showMagic ? `<td class="mn-col">${esc(magicFor(t) ?? "—")}</td>` : "";
       return `<tr>
-        <td class="team-col">${teamCell}</td>
+        <td class="team-col">${namePrefix}${teamCell}</td>
         <td class="w-col">${t.wins}</td>
         <td class="l-col">${t.losses}</td>
         <td class="pct-col">${esc(t.leagueRecord.pct).replace(/^0/, "")}</td>
         <td class="gb-col">${esc(t.gamesBack)}</td>
+        ${magicCell}
         <td class="diff-col">${fmtDiff(t.runsScored, t.runsAllowed)}</td>
         <td class="rec-col">${home ? home.wins + "-" + home.losses : "—"}</td>
         <td class="rec-col">${away ? away.wins + "-" + away.losses : "—"}</td>
@@ -405,6 +440,7 @@ export function renderDivisionTable(
         <td class="strk-col">${esc(t.streak?.streakCode ?? "—")}</td>
       </tr>`;
     }).join("");
+  const magicHead = showMagic ? `<th class="mn-col">MN</th>` : "";
   return `<div class="stats-subheader">${esc(label)}</div>
 <div class="standings-wrap"><table class="standings-table">
   <thead>
@@ -414,6 +450,7 @@ export function renderDivisionTable(
       <th class="l-col">L</th>
       <th class="pct-col">Pct</th>
       <th class="gb-col">GB</th>
+      ${magicHead}
       <th class="diff-col">Diff</th>
       <th class="rec-col">Home</th>
       <th class="rec-col">Away</th>

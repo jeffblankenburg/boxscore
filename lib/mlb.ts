@@ -218,6 +218,18 @@ export type TeamRecord = {
   divisionRank: string;
   wildCardRank?: string;
   wildCardGamesBack?: string;
+  // Clinch/magic fields the statsapi standings feed already returns; we just
+  // surface them. magicNumber is present only on the current division leader
+  // (a string number, or "-" once clinched). clinchIndicator is MLB's agate
+  // letter on a clinched team: x=playoff berth, y=division, z=best record,
+  // w=wild card. wildCardEliminationNumber is "E" once a team is out of the
+  // wild-card race — distinct from the division eliminationNumber (a team can
+  // be out of its division but alive in the WC).
+  magicNumber?: string;
+  clinchIndicator?: string;
+  clinched?: boolean;
+  eliminationNumber?: string;
+  wildCardEliminationNumber?: string;
   streak?: { streakCode: string };
   records?: {
     splitRecords?: Array<{ type: string; wins: number; losses: number; pct: string }>;

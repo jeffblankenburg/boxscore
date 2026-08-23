@@ -35,6 +35,7 @@ import type {
 
 import type { DigestMode } from "@/lib/digest-mode";
 import { wildCardVisibleTeams } from "./wild-card";
+import { showMagicNumbers, clinchKeyLine } from "@/lib/standings-format";
 import { findTeam } from "@/lib/teams";
 import { nextDay, prettyDate } from "@/lib/dates";
 import { renderMasthead, type NavSport } from "@/lib/masthead";
@@ -531,18 +532,28 @@ function renderTransactions(txs: MlbTransaction[], hl?: HighlightMap): string {
 // ─── League block (standings + wild card + leaders) ─────────────────────
 
 function renderLeague(label: string, league: MlbLeague, data: CanonicalDailyData, hl?: HighlightMap, leaderLimit = 5): string {
-  const standingsHtml = DIVISION_ORDER[league].map((d) => {
-    const rec = data.standings.find((r) => r.league === league && r.division === d);
-    return rec ? renderDivisionTable(`${d} Division`, rec, { date: nextDay(data.date) }, hl) : "";
+  const showMagic = showMagicNumbers(data.date);
+  const divRecs = DIVISION_ORDER[league].map((d) =>
+    data.standings.find((r) => r.league === league && r.division === d));
+  const standingsHtml = DIVISION_ORDER[league].map((d, i) => {
+    const rec = divRecs[i];
+    return rec ? renderDivisionTable(`${d} Division`, rec, { date: nextDay(data.date), showMagic }, hl) : "";
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league === league);
   const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord, { date: nextDay(data.date) }, hl) : "";
+  // Clinch key: only letters actually shown (division rows + surviving WC rows).
+  const present = new Set<string>();
+  for (const rec of divRecs) for (const t of rec?.teams ?? []) if (t.clinchIndicator) present.add(t.clinchIndicator);
+  for (const t of wildCardVisibleTeams(wcRecord ?? { league, teams: [] })) if (t.clinchIndicator) present.add(t.clinchIndicator);
+  const keyLine = clinchKeyLine(present);
+  const keyHtml = keyLine ? `<div class="standings-key">${esc(keyLine)}</div>` : "";
   const leadersHtml = renderLeagueLeaders(data.leaderboards.filter((b) => b.league === league), leaderLimit, hl);
   return `<div class="league-layout">
   <div class="col-standings">
     <div class="boxscores-title">${esc(label)} Standings</div>
     ${standingsHtml}
     ${wildCardHtml}
+    ${keyHtml}
   </div>
   <div class="col-leaders">
     <div class="boxscores-title">${esc(label)} Leaders</div>
@@ -554,13 +565,15 @@ function renderLeague(label: string, league: MlbLeague, data: CanonicalDailyData
 function renderDivisionTable(
   label: string,
   d: MlbDivisionStandings,
-  opts: { date?: string } = {},
+  opts: { date?: string; showMagic?: boolean } = {},
   hl?: HighlightMap,
 ): string {
+  const showMagic = opts.showMagic ?? false;
   const rows = [...d.teams]
     .sort((a, b) => a.divisionRank - b.divisionRank)
-    .map((t) => standingsRow(t, { date: opts.date, league: d.league, division: d.division }, hl))
+    .map((t) => standingsRow(t, { date: opts.date, league: d.league, division: d.division, showMagic }, hl))
     .join("");
+  const magicHead = showMagic ? `<th class="mn-col">MN</th>` : "";
   return `<div class="stats-subheader">${esc(label)}</div>
 <div class="standings-wrap"><table class="standings-table">
   <thead>
@@ -570,6 +583,7 @@ function renderDivisionTable(
       <th class="l-col">L</th>
       <th class="pct-col">Pct</th>
       <th class="gb-col">GB</th>
+      ${magicHead}
       <th class="diff-col">Diff</th>
       <th class="rec-col">Home</th>
       <th class="rec-col">Away</th>
@@ -595,9 +609,10 @@ function renderWildCardTable(
     const teamCell = teamHref
       ? `<a class="team-link" href="${teamHref}">${name}</a>`
       : name;
+    const namePrefix = t.clinchIndicator ? `${t.clinchIndicator}-` : "";
     const attrs = diffAttrs(hl, `wc:${wc.league}/${t.team.id}`, cutoffClass.trim());
     return `<tr${attrs}>
-      <td class="team-col">${teamCell}</td>
+      <td class="team-col">${namePrefix}${teamCell}</td>
       <td class="w-col">${t.wins}</td>
       <td class="l-col">${t.losses}</td>
       <td class="pct-col">${fmtPct(t.leagueRecord.pct)}</td>
@@ -631,7 +646,7 @@ function renderWildCardTable(
 
 function standingsRow(
   t: MlbStandingRow,
-  opts: { date?: string; league?: MlbLeague; division?: MlbDivision },
+  opts: { date?: string; league?: MlbLeague; division?: MlbDivision; showMagic?: boolean },
   hl?: HighlightMap,
 ): string {
   const slug = findTeam("mlb", t.team.id)?.slug;
@@ -648,12 +663,17 @@ function standingsRow(
   const attrs = opts.league && opts.division
     ? diffAttrs(hl, `standings:${opts.league}/${opts.division}/${t.team.id}`)
     : "";
+  // Clinch letter sits outside the link, agate-style ("y-Rays"); MN column
+  // (leader-only, September on) mirrors the header from renderDivisionTable.
+  const namePrefix = t.clinchIndicator ? `${t.clinchIndicator}-` : "";
+  const magicCell = opts.showMagic ? `<td class="mn-col">${t.magicNumber ?? "—"}</td>` : "";
   return `<tr${attrs}>
-        <td class="team-col">${teamCell}</td>
+        <td class="team-col">${namePrefix}${teamCell}</td>
         <td class="w-col">${t.wins}</td>
         <td class="l-col">${t.losses}</td>
         <td class="pct-col">${fmtPct(t.leagueRecord.pct)}</td>
         <td class="gb-col">${fmtGb(t.gamesBehind)}</td>
+        ${magicCell}
         <td class="diff-col">${fmtDiff(t.runsScored, t.runsAllowed)}</td>
         <td class="rec-col">${t.homeRecord.wins}-${t.homeRecord.losses}</td>
         <td class="rec-col">${t.awayRecord.wins}-${t.awayRecord.losses}</td>

@@ -249,10 +249,18 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .standings-table .l-col { width: 5%; }
 .standings-table .pct-col { width: 8%; }
 .standings-table .gb-col { width: 7%; }
-.standings-table .diff-col { width: 9%; }
+/* MN (magic number) column only renders Sept onward; when absent, table-layout
+   fixed just redistributes the freed width to the remaining columns. diff/strk
+   trimmed a point each to make room without overflowing the mobile 400px view. */
+.standings-table .mn-col { width: 6%; }
+.standings-table .diff-col { width: 8%; }
 .standings-table .rec-col { width: 10%; }
-.standings-table .strk-col { width: 9%; }
+.standings-table .strk-col { width: 8%; }
 .standings-table tr.wc-cutoff td { border-top: 2px dashed var(--border-strong); }
+/* Brief clinch-letter legend under the standings; only the letters actually
+   present are listed (see clinchKeyLine). Muted + small so it doesn't compete
+   with the tables. */
+.standings-key { font-size: 11px; font-style: italic; color: var(--text-muted); margin: 2px 0 10px; }
 
 .leaders-section { margin-bottom: 10px; }
 .leaders-table { font-size: 13px; }

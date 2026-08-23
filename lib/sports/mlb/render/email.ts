@@ -45,6 +45,7 @@ import { EMAIL_LINK_BASE } from "@/lib/site";
 import {
   esc, pad, fmtAvg, fmtOps, fmtEra, sectionH,
 } from "@/lib/render-email";
+import { showMagicNumbers, clinchKeyLine } from "@/lib/standings-format";
 import { renderMasthead, type NavSport } from "@/lib/masthead";
 import { sortTransactionsByTeam } from "../transactions";
 
@@ -186,7 +187,16 @@ const gameH = (t: string) => `<h3 class="es-game-h">${esc(t)}</h3>`;
 
 // ─── Standings + wild card ──────────────────────────────────────────────
 
-function standingsColgroup(): string {
+function standingsColgroup(showMagic = false): string {
+  // With the MN column (Sept onward), diff/strk give up a point each to keep
+  // the fixed email table from overflowing — mirrors the legacy render-email.
+  if (showMagic) {
+    return `<colgroup>
+      <col width="22%"><col width="5%"><col width="5%"><col width="8%">
+      <col width="7%"><col width="6%"><col width="8%"><col width="10%">
+      <col width="10%"><col width="8%"><col width="8%">
+    </colgroup>`;
+  }
   return `<colgroup>
     <col width="22%"><col width="5%"><col width="5%"><col width="8%">
     <col width="7%"><col width="9%"><col width="10%"><col width="10%">
@@ -194,14 +204,16 @@ function standingsColgroup(): string {
   </colgroup>`;
 }
 
-function standingsTableHead(label: string = "GB"): string {
+function standingsTableHead(label: string = "GB", showMagic = false): string {
   const nowrap = `style="white-space:nowrap"`;
+  const mnHead = showMagic ? `<th align="right" ${nowrap}>MN</th>` : "";
   return `<thead><tr>
     <th align="left"  ${nowrap}>Team</th>
     <th align="right" ${nowrap}>W</th>
     <th align="right" ${nowrap}>L</th>
     <th align="right" ${nowrap}>Pct</th>
     <th align="right" ${nowrap}>${label}</th>
+    ${mnHead}
     <th align="right" ${nowrap}>Diff</th>
     <th align="right" ${nowrap}>Home</th>
     <th align="right" ${nowrap}>Away</th>
@@ -214,6 +226,11 @@ function standingsRowCells(
   r: {
     nickname: string; wins: number; losses: number; pct: string;
     gb: string; diff: string; home: string; away: string; l10: string; strk: string;
+    // Agate clinch letter prefixed to the nickname ("y-"), empty when unclinched.
+    namePrefix?: string;
+    // Magic number cell; undefined means the MN column isn't rendered (must
+    // match standingsColgroup/standingsTableHead's showMagic).
+    mn?: string;
     teamHref?: string;
   },
   // Raw attributes spliced onto the <tr> — pass `class="..."`,
@@ -225,12 +242,14 @@ function standingsRowCells(
     ? `<a href="${r.teamHref}" class="es-team-link" style="color:inherit;text-decoration:none">${esc(r.nickname)}</a>`
     : esc(r.nickname);
   const nowrap = `style="white-space:nowrap"`;
+  const mnCell = r.mn !== undefined ? `<td align="right" ${nowrap}>${esc(r.mn)}</td>` : "";
   return `<tr${attrs}>
-    <td align="left"  ${nowrap}>${nameCell}</td>
+    <td align="left"  ${nowrap}>${esc(r.namePrefix ?? "")}${nameCell}</td>
     <td align="right" ${nowrap}>${r.wins}</td>
     <td align="right" ${nowrap}>${r.losses}</td>
     <td align="right" ${nowrap}>${esc(r.pct)}</td>
     <td align="right" ${nowrap}>${esc(r.gb)}</td>
+    ${mnCell}
     <td align="right" ${nowrap}>${esc(r.diff)}</td>
     <td align="right" ${nowrap}>${esc(r.home)}</td>
     <td align="right" ${nowrap}>${esc(r.away)}</td>
@@ -243,6 +262,7 @@ function renderDivisionTable(
   label: string,
   d: MlbDivisionStandings,
   editionDate: string,
+  showMagic = false,
 ): string {
   const sorted = [...d.teams].sort((a, b) => a.divisionRank - b.divisionRank);
   const rows = sorted.map((t) => {
@@ -252,6 +272,8 @@ function renderDivisionTable(
       : undefined;
     return standingsRowCells({
       nickname: nickname(t.team.name),
+      namePrefix: t.clinchIndicator ? `${t.clinchIndicator}-` : "",
+      mn: showMagic ? (t.magicNumber != null ? String(t.magicNumber) : "—") : undefined,
       wins: t.wins, losses: t.losses,
       pct: fmtPct(t.leagueRecord.pct),
       gb: fmtGb(t.gamesBehind),
@@ -265,8 +287,8 @@ function renderDivisionTable(
   }).join("");
   return `${subH(label + " Division")}
     <table class="es-table es-fixed" cellpadding="0" cellspacing="0" border="0">
-      ${standingsColgroup()}
-      ${standingsTableHead()}
+      ${standingsColgroup(showMagic)}
+      ${standingsTableHead("GB", showMagic)}
       <tbody>${rows}</tbody>
     </table>`;
 }
@@ -284,6 +306,7 @@ function renderWildCardTable(wc: MlbWildCardStandings, editionDate: string): str
     const teamHref = team ? `${EMAIL_LINK_BASE}/mlb/${team.slug}/${editionDate}` : undefined;
     return standingsRowCells({
       nickname: nickname(t.team.name),
+      namePrefix: t.clinchIndicator ? `${t.clinchIndicator}-` : "",
       wins: t.wins, losses: t.losses,
       pct: fmtPct(t.leagueRecord.pct),
       gb: fmtWcgb(t.wildCardGamesBehind),
@@ -304,14 +327,25 @@ function renderWildCardTable(wc: MlbWildCardStandings, editionDate: string): str
 }
 
 function renderLeague(label: string, league: MlbLeague, data: CanonicalDailyData, editionDate: string): string {
+  const showMagic = showMagicNumbers(data.date);
   const order = DIVISION_ORDER[league];
-  const standingsHtml = order.map((divName) => {
-    const div = data.standings.find((d) => d.league === league && d.division === divName);
-    return div ? renderDivisionTable(divName, div, editionDate) : "";
+  const divRecs = order.map((divName) =>
+    data.standings.find((d) => d.league === league && d.division === divName));
+  const standingsHtml = order.map((divName, i) => {
+    const div = divRecs[i];
+    return div ? renderDivisionTable(divName, div, editionDate, showMagic) : "";
   }).join("");
   const wcRecord = data.wildCard.find((r) => r.league === league);
   const wildCardHtml = wcRecord ? renderWildCardTable(wcRecord, editionDate) : "";
-  return `${sectionH(label + " Standings")}${standingsHtml}${wildCardHtml}`;
+  // Clinch key: only letters actually shown (division rows + surviving WC rows).
+  const present = new Set<string>();
+  for (const div of divRecs) for (const t of div?.teams ?? []) if (t.clinchIndicator) present.add(t.clinchIndicator);
+  for (const t of wildCardVisibleTeams(wcRecord ?? { league, teams: [] })) if (t.clinchIndicator) present.add(t.clinchIndicator);
+  const keyLine = clinchKeyLine(present);
+  const keyHtml = keyLine
+    ? `<div style="font-size:11px;font-style:italic;color:#6a6354;margin:2px 0 10px">${esc(keyLine)}</div>`
+    : "";
+  return `${sectionH(label + " Standings")}${standingsHtml}${wildCardHtml}${keyHtml}`;
 }
 
 // ─── Leaders ────────────────────────────────────────────────────────────

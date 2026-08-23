@@ -113,6 +113,8 @@ type StatsapiTeamRecord = {
   divisionChamp?: boolean;
   hasWildcard?: boolean;
   eliminationNumber?: string;
+  magicNumber?: string;
+  wildCardEliminationNumber?: string;
 };
 
 type StatsapiLeader = {
@@ -555,6 +557,11 @@ function teamRowFromStatsapi(tr: StatsapiTeamRecord, idx: Map<number, MlbTeamRef
     clinchedDivision:       Boolean(tr.divisionChamp) || tr.clinchIndicator === "z",
     clinchedWildCard:       Boolean(tr.hasWildcard),
     eliminatedFromPlayoffs: tr.eliminationNumber === "E",
+    // magicNumber is a string number for the leader, "-" once clinched. Only
+    // keep a live positive number; parseFiniteNumber turns "-"/undefined to null.
+    magicNumber:            parseFiniteNumber(tr.magicNumber) ?? null,
+    clinchIndicator:        tr.clinchIndicator && "xyzw".includes(tr.clinchIndicator) ? tr.clinchIndicator : null,
+    eliminatedFromWildCard: tr.wildCardEliminationNumber === "E",
     // Expanded splits for the mid-season recap.
     extraInning:            findSplit(tr, "extraInning"),
     oneRun:                 findSplit(tr, "oneRun"),
