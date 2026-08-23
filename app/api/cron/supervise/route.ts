@@ -6,12 +6,20 @@
 //      Most common cause: hitting Vercel's maxDuration ceiling; the runtime
 //      kills the process without giving cleanup blocks a chance to run.
 //
-// Runs once per morning, after every other scheduled cron has had a chance to
-// complete. For each (sport, route) pair we know is scheduled, queries
-// cron_runs for today's digest date. If there's no ok row, the supervisor
-// classifies the most recent attempt and invokes the route to fill the gap.
-// Stale-running rows are marked failed before re-invoking so the dashboard
-// reflects reality immediately.
+// Runs twice each morning (10:00 and 11:00 UTC; see vercel.json), after every
+// other scheduled cron has had a chance to complete. For each (sport, route)
+// pair we know is scheduled, queries cron_runs for today's digest date. If
+// there's no ok row, the supervisor classifies the most recent attempt and
+// invokes the route to fill the gap. Stale-running rows are marked failed
+// before re-invoking so the dashboard reflects reality immediately.
+//
+// Why two passes: a run that dies just before the 10:00 pass is still under the
+// STALE_THRESHOLD_MINUTES gate then (looks "in flight") and gets skipped. With
+// a single pass it would sit unhealed until the next day. The MLB team send
+// died at ~09:50 on 2026-08-22 and the 10:00 pass saw a 14-min-old row — under
+// threshold, skipped — so five teams stayed unsent until a manual re-run. The
+// 11:00 pass re-checks; by then any dead morning run is well past 30 min. A
+// pass that finds everything healthy is a no-op (hasOk short-circuits).
 //
 // The SUPERVISED list mirrors vercel.json. Adding a new scheduled cron means
 // updating both.

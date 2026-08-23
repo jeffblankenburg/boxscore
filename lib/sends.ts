@@ -77,3 +77,43 @@ export async function recordSend(args: {
     .upsert(row, { onConflict: "subscriber_id,digest_sport,digest_date,team_id" });
   if (error) throw new Error(`recordSend: ${error.message}`);
 }
+
+// Bulk version of recordSend: one upsert for a whole batch of subscribers.
+// PostgREST accepts an array body and emits a single INSERT ... ON CONFLICT,
+// so N rows cost one round-trip instead of N. The send crons write one row per
+// recipient (6k+ for a full MLB team run); the previous per-subscriber
+// recordSend loop multiplied round-trip latency by the recipient count and
+// pushed the team send past Vercel's maxDuration on 2026-08-22 (function died
+// at ~283s partway through team "sf"; see cron_runs stale-running row). Callers
+// pass the same shape as recordSend; each row may carry a distinct open_token.
+export async function recordSends(
+  rows: Array<{
+    subscriberId: string;
+    sport: string;
+    date: string;
+    resendId: string | null;
+    error: string | null;
+    teamId?: string | null;
+    openToken?: string | null;
+  }>,
+): Promise<void> {
+  if (rows.length === 0) return;
+  const now = new Date().toISOString();
+  const payload = rows.map((r) => {
+    const row: Record<string, unknown> = {
+      subscriber_id: r.subscriberId,
+      digest_sport: r.sport,
+      digest_date: r.date,
+      team_id: r.teamId ?? null,
+      resend_id: r.resendId,
+      error: r.error,
+      sent_at: now,
+    };
+    if (r.openToken !== undefined) row.open_token = r.openToken;
+    return row;
+  });
+  const { error } = await supabaseAdmin()
+    .from("sends")
+    .upsert(payload, { onConflict: "subscriber_id,digest_sport,digest_date,team_id" });
+  if (error) throw new Error(`recordSends: ${error.message}`);
+}

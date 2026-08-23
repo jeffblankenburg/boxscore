@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSportRow } from "@/lib/sports";
 import { getActiveTeamIds } from "@/lib/email-subscriptions";
 import { getActiveSubscribers, getTeamOptInSubscriberIds, type Subscriber } from "@/lib/subscribers";
-import { getSentSubscriberIds, recordSend } from "@/lib/sends";
+import { getSentSubscriberIds, recordSends } from "@/lib/sends";
 import { sendEmailBatch } from "@/lib/email";
 import { paceBatch } from "@/lib/send-pacing";
 import { teamDailyEmail } from "@/lib/emails/templates";
@@ -25,10 +25,14 @@ import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 // to a digest that has nothing in it.
 
 export const runtime = "nodejs";
-// Worst-case shape: 30 MLB teams × up to ~5k subscribers / 100 per batch =
-// ~1500 Resend calls. Each is sub-second, total well under 300s. Same
-// budget as the league send cron for parity.
-export const maxDuration = 300;
+// 800s to match the league send cron (send-email) and vercel.json's function
+// config for this route — the route-segment export takes precedence over
+// vercel.json, so leaving it at 300 silently capped the run there. That cap
+// killed the MLB team send at ~283s on 2026-08-22 (partway through team "sf"),
+// leaving the last five teams unsent. Bulk sends-inserts (recordSends) now keep
+// a healthy full run to ~2 min; the 800s ceiling is headroom for Resend or
+// Supabase latency spikes. The supervisor still catches a stuck run at 30 min.
+export const maxDuration = 800;
 
 const BATCH_SIZE = 100;
 
@@ -243,36 +247,37 @@ export async function GET(req: Request) {
             results = await sendEmailBatch(payload);
           } catch (err) {
             // Whole-batch transport failure (rare). Mark every row in this
-            // batch failed so we can retry from /admin/mlb — hasAlreadySent
-            // will skip the ones that did go through.
+            // batch failed so we can retry from /admin/mlb — getSentSubscriberIds
+            // will skip the ones that did go through. One bulk insert, not one
+            // per subscriber (see recordSends).
             const msg = (err as Error).message;
-            for (let i = 0; i < group.length; i++) {
-              const sub = group[i]!;
-              await recordSend({
-                subscriberId: sub.id, sport, date,
-                resendId: null, error: msg, teamId,
-                openToken: openTokens[i]!,
-              });
-              failed++;
-            }
+            await recordSends(group.map((sub, i) => ({
+              subscriberId: sub.id, sport, date,
+              resendId: null, error: msg, teamId,
+              openToken: openTokens[i]!,
+            })));
+            failed += group.length;
             continue;
           }
 
-          for (let i = 0; i < group.length; i++) {
-            const sub = group[i]!;
+          // One bulk upsert for the whole batch instead of a serial
+          // recordSend per subscriber — the per-subscriber loop's round-trip
+          // latency × recipient count is what pushed this cron past its
+          // maxDuration on 2026-08-22. Counters are tallied in the same pass.
+          await recordSends(group.map((sub, i) => {
             const r = results[i] ?? { id: null, error: "missing result" };
-            await recordSend({
-              subscriberId: sub.id, sport, date,
-              resendId: r.id, error: r.error, teamId,
-              openToken: openTokens[i]!,
-            });
             if (r.error) {
               failed++;
               console.error(`team-send failed ${team.abbreviation}/${sub.email}: ${r.error}`);
             } else {
               sent++;
             }
-          }
+            return {
+              subscriberId: sub.id, sport, date,
+              resendId: r.id, error: r.error, teamId,
+              openToken: openTokens[i]!,
+            };
+          }));
           await paceBatch(); // flatten the delivery burst
         }
 
