@@ -313,6 +313,6 @@ function copyShare(puzzle: ClubhousePuzzle, guesses: number[][], status: string)
   const header = `Clubhouse ${puzzle.date} (${puzzle.difficulty})`;
   const grid = guesses.map((g) => g.map((gi) => SQUARES[gi % 4]).join("")).join("\n");
   const result = status === "won" ? "" : "\nX/4";
-  const text = `${header}${result}\n${grid}\nboxscore.email/games/clubhouse`;
+  const text = `${header}${result}\n${grid}\nhttps://boxscore.email/games/clubhouse`;
   navigator.clipboard?.writeText(text).catch(() => {});
 }

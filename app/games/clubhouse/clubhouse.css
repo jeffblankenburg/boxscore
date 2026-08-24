@@ -72,8 +72,10 @@
   justify-content: center;
   text-align: center;
   overflow: hidden;
-  word-break: break-word;
-  hyphens: auto;
+  /* Wrap between first/last name at the space; never hyphenate mid-name. */
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
   transition: transform 0.06s ease, background 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
