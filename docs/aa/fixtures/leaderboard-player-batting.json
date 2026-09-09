@@ -1,0 +1,5 @@
+{
+  "path": "/api/leaderboard/player/batting",
+  "statusCode": 500,
+  "errorMessage": "An unexpected error occurred. Please try again later."
+}

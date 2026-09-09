@@ -1,0 +1,36 @@
+{
+  "guid": "0a749a77-36c3-492c-a21d-bcc7c4d62c89",
+  "firstName": "Abel",
+  "lastName": "Brito",
+  "phone": "",
+  "email": "",
+  "dateOfBirth": "2001-03-04",
+  "city": "Nagua, DR",
+  "gender": "Male",
+  "height": "6'4",
+  "weight": "190",
+  "throwsHand": "R",
+  "bats": "R",
+  "positionGroupGuid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+  "notes": "2001-03-04",
+  "isTemp": null,
+  "reach": null,
+  "isDeleted": null,
+  "active": 0,
+  "lastSyncDt": null,
+  "playerNumber": 0,
+  "isStarter": 1,
+  "battingOrder": 0,
+  "teams": [
+    {
+      "guid": "14230442-426c-49ed-8006-2ac020d14637",
+      "name": "Milwaukee Milkmen"
+    }
+  ],
+  "leagues": [
+    {
+      "guid": "661d9b4b-0e17-412a-bb93-981ca40f021a",
+      "name": "American Association Professional Baseball"
+    }
+  ]
+}

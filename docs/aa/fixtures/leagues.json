@@ -1,0 +1,321 @@
+[
+  {
+    "guid": "08bc7a55-4fb7-47c2-9abf-b865091eb2a0",
+    "name": "QA LeagueQA 21",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "1a1bc71c-51fe-4b0f-bc39-5328da664448",
+    "name": "Test League QA",
+    "logoUrl": null,
+    "teamCount": 3,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "1e909dc0-2136-47c3-b4a5-df7eccaa504e",
+    "name": "Frontier League",
+    "logoUrl": null,
+    "teamCount": 20,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "23dae2c7-1b58-43ed-af58-31b964332d16",
+    "name": "Test",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "240eeb67-8464-4ebb-b6aa-cd9154f69604",
+    "name": "QA LeagueQA 30",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "28084ea7-e969-4616-8798-ce35064cc422",
+    "name": "QA LeagueQA 23",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "3a9f8787-82db-4941-96b4-9b055c63b323",
+    "name": "League Creation",
+    "logoUrl": "https://iscore-images-prod.iscoresports.com/league-logo/62a5_1776720788.jpeg",
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "3aaab60f-d81b-4620-bf05-0213b07c29ce",
+    "name": "QA LeagueQA 15",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "43f44a78-8df2-44c9-b2f4-5b22bec7b067",
+    "name": "QA LeagueQA 48",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "541ef447-c3d8-497d-811e-54bf6d5d9478",
+    "name": "SFCBL 2026",
+    "logoUrl": null,
+    "teamCount": 16,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "56ad3960-a1d3-427c-a390-50546bd17f91",
+    "name": "QA LeagueQA 16",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "61a894f0-7e75-4e5f-a717-f755efac0cfb",
+    "name": "CPL 2026",
+    "logoUrl": "https://iscore-images-prod.iscoresports.com/league-logo/3b93_1780005948.png",
+    "teamCount": 42,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "661d9b4b-0e17-412a-bb93-981ca40f021a",
+    "name": "American Association Professional Baseball",
+    "logoUrl": "https://iscore-images-prod.iscoresports.com/league-logo/36fa_1783524422.jpg",
+    "teamCount": 14,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "67bdb4ba-3e1d-4324-91cf-83299669465b",
+    "name": "QA LeagueQA 41",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "67d2ce88-0593-4477-aa16-8c85cb0ec5b3",
+    "name": "Prospect league",
+    "logoUrl": null,
+    "teamCount": 0,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "75b496db-6cbb-497d-99b7-494281046b8d",
+    "name": "Miami North conference",
+    "logoUrl": "https://iscore-images-prod.iscoresports.com/league-logo/6a63_1778161412.png",
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "7f8ae094-46ea-4790-ba5e-ee0d9d6122b2",
+    "name": "USPBL 2026",
+    "logoUrl": null,
+    "teamCount": 6,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "84bf1d0e-b723-4344-b5a3-89b5cc128e9b",
+    "name": "QA LeagueQA 34",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "a17e262d-db93-403b-bc42-d7ec8fdff10d",
+    "name": "QA LeagueQA 7",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "aee2072d-909c-405a-9ef0-ed65e236f896",
+    "name": "DBL 2026",
+    "logoUrl": "https://iscore-images-prod.iscoresports.com/league-logo/2e25_1779852950.png",
+    "teamCount": 11,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "b0620f29-ba3e-40ac-a4d8-fd0c118ccfa8",
+    "name": "Test League QA Playwright 20260611_093903",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "b76435a0-b8cd-49ec-a66f-5d659eeb3ab4",
+    "name": "QA LeagueQA 31",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "b7d68b74-b996-442d-9846-76c5f1a3c0cc",
+    "name": "Test League",
+    "logoUrl": null,
+    "teamCount": 1,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "cb55a863-f0c7-43b3-a05c-6446aa748eb3",
+    "name": "QA LeagueQA 14",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "df9fb9cc-0fdb-4b79-8a3c-ad5d7b415a56",
+    "name": "ALPB",
+    "logoUrl": null,
+    "teamCount": 10,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "e99eaf27-ef7f-42d1-9dce-40975371f695",
+    "name": "QA LeagueQA 29",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "f8cebae7-96ac-46a1-a65c-b18baffbfa23",
+    "name": "QA LeagueQA 4",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "fafb1827-730d-40da-9a8f-b486c8246cfe",
+    "name": "Frontier League",
+    "logoUrl": "https://iscore-images-prod.iscoresports.com/league-logo/6a63_1777386604.png",
+    "teamCount": 3,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  },
+  {
+    "guid": "ffc69b65-c539-4d94-b0c3-98bceaadd29e",
+    "name": "QA LeagueQA 49",
+    "logoUrl": null,
+    "teamCount": 2,
+    "sport": {
+      "id": 1,
+      "name": "Baseball"
+    },
+    "featured": null
+  }
+]

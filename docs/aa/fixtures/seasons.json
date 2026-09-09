@@ -1,0 +1,24 @@
+[
+  {
+    "guid": "23fc21cb-8096-4558-86fd-7fa2f5555b3d",
+    "name": "American Association All-Star Game",
+    "seasonTypeGuid": "d9ff3467-2e4a-11f1-b025-0e96d43b30b9",
+    "seasonTypeName": "Exhibition",
+    "startDate": "2026-07-15",
+    "alignmentGuid": "da534f61-2e4a-11f1-b025-0e96d43b30b9",
+    "alignmentName": "None",
+    "gameSettingId": "5a42efbe-93bb-4c8a-85e8-4ff3629352be",
+    "active": true
+  },
+  {
+    "guid": "aeba1d47-af95-4818-b69a-1943bd18800f",
+    "name": "AAPB- 2026",
+    "seasonTypeGuid": "d9ff32f4-2e4a-11f1-b025-0e96d43b30b9",
+    "seasonTypeName": "Regular Season",
+    "startDate": "2026-05-14",
+    "alignmentGuid": "da535141-2e4a-11f1-b025-0e96d43b30b9",
+    "alignmentName": "Divisions",
+    "gameSettingId": "236b3844-28fe-4ae8-a36d-b63165220e3c",
+    "active": true
+  }
+]

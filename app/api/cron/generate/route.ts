@@ -5,7 +5,7 @@ import {
   renderCanonicalContentWithAds,
   renderCanonicalEmailContentWithAds,
 } from "@/lib/ad-placements";
-import { upsertDigest } from "@/lib/digests";
+import { upsertDigest, getLatestDigest } from "@/lib/digests";
 import { upsertTeamDigest } from "@/lib/team-digests";
 import { loadTeamEmailData, renderTeamEmailContent, teamPlayedGames } from "@/lib/render-team-email";
 import { renderTeamWebContent } from "@/lib/render-team-web";
@@ -204,7 +204,35 @@ export async function GET(req: Request) {
     if (sport === "nfl" || sport === "ncaaf") {
       const fb = await loadFootballData(sport, date, { refetch });
       if (!hasPlayedGames(fb)) {
-        const result = { sport, date, game_count: 0, skipped_reason: "no_games" as const };
+        // No game today, so there's no new edition to publish — but the
+        // /[sport] landing page serves the LATEST edition's baked HTML, and
+        // its rankings + standings are current-state that ESPN keeps moving
+        // between game days: the AP / Coaches polls drop Sunday afternoon,
+        // days after the Saturday games the last edition recapped. Without a
+        // refresh the landing page would freeze on last game day's poll (all
+        // 0-0 the week after the preseason poll, then a week stale forever
+        // after). So re-bake the latest edition with a fresh fetch — ESPN's
+        // rankings/standings endpoints are date-less, so refetching that old
+        // date returns the current polls alongside that date's final scores.
+        // We still record the no_games skip for the requested date and do NOT
+        // persist a digest for it, so send-email/social find nothing and skip.
+        const latest = await getLatestDigest(sport);
+        let refreshed: { date: string; ranking_polls: number } | null = null;
+        if (latest) {
+          const fresh = await loadFootballData(sport, latest.date, { refetch: true });
+          await upsertDigest({
+            sport, date: latest.date,
+            html: renderFootballContent(fresh, navSports),
+            email_html: renderFootballEmailContent(fresh, navSports),
+            game_count: fresh.games.length, mode: "regular",
+          });
+          revalidatePath("/sitemap.xml");
+          refreshed = { date: latest.date, ranking_polls: fresh.rankings.length };
+        }
+        const result = {
+          sport, date, game_count: 0, skipped_reason: "no_games" as const,
+          ...(refreshed ? { refreshed_edition: refreshed.date, ranking_polls: refreshed.ranking_polls } : {}),
+        };
         await finishCronRun(runId, { status: "ok", result });
         return NextResponse.json({ ok: true, ...result });
       }

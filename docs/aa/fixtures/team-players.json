@@ -1,0 +1,945 @@
+[
+  {
+    "guid": "0a749a77-36c3-492c-a21d-bcc7c4d62c89",
+    "name": "Abel Brito",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "0",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'4",
+    "weight": "190",
+    "active": false,
+    "dateOfBirth": "2001-03-04",
+    "city": "Nagua, DR",
+    "notes": "2001-03-04"
+  },
+  {
+    "guid": "0e14b318-0546-4055-adb2-21274d781759",
+    "name": "Micky Scheetz",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "23",
+    "bats": "L",
+    "throwsHand": "L",
+    "height": "6'1",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "2003-04-15",
+    "city": "Flower Mound, TX",
+    "notes": ""
+  },
+  {
+    "guid": "0fd753ce-e6bb-4ade-b21f-76e71995d3d1",
+    "name": "Andy Blake",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "5",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'4",
+    "weight": "215",
+    "active": true,
+    "dateOfBirth": "2000-08-15",
+    "city": "Titusville, NJ",
+    "notes": "2000-08-15"
+  },
+  {
+    "guid": "121eb99f-6508-4a0a-8de5-3f078c0d561d",
+    "name": "Edrick Felix",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "9",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'0",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "2002-01-14",
+    "city": "Kissimmee, FL",
+    "notes": ""
+  },
+  {
+    "guid": "1492965e-b52d-49d0-b262-24ef1138f3cf",
+    "name": "Diego Hernandez",
+    "positionGroup": {
+      "guid": "da5b3bf5-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Outfielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "0",
+    "bats": "L",
+    "throwsHand": "L",
+    "height": "6'0",
+    "weight": "185",
+    "active": false,
+    "dateOfBirth": "2000-11-21",
+    "city": "Santo Domingo Este, DR",
+    "notes": "2000-11-21"
+  },
+  {
+    "guid": "188162e9-a188-4b28-bbca-884f2d556047",
+    "name": "Hunter Bryan",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "6",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'0",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "2001-04-22",
+    "city": "Visalia, CA",
+    "notes": "2001-04-22"
+  },
+  {
+    "guid": "2257c559-91a8-4197-9a46-11b9585c7d2b",
+    "name": "Carlos Linarez",
+    "positionGroup": {
+      "guid": "da5ac317-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Catcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "25",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'1",
+    "weight": "210",
+    "active": true,
+    "dateOfBirth": "2001-10-24",
+    "city": "Barquisimeto, VZ",
+    "notes": ""
+  },
+  {
+    "guid": "25281fa6-f878-4c58-8498-c2bc48cd100e",
+    "name": "Henderson Alvarez III",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "21",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6-0",
+    "weight": "205",
+    "active": false,
+    "dateOfBirth": "1990-04-18",
+    "city": "Orlando, FL",
+    "notes": ""
+  },
+  {
+    "guid": "280fbf8a-26f9-4bb4-b22a-d82f2c636781",
+    "name": "Drew Ward",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "17",
+    "bats": "L",
+    "throwsHand": "R",
+    "height": "6'3",
+    "weight": "220",
+    "active": false,
+    "dateOfBirth": "1994-11-25",
+    "city": "Leedey, OK",
+    "notes": ""
+  },
+  {
+    "guid": "33504f96-a9eb-4c9b-9cef-094677552241",
+    "name": "Ronaiker Palma",
+    "positionGroup": {
+      "guid": "da5ac317-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Catcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "0",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "5'9",
+    "weight": "180",
+    "active": false,
+    "dateOfBirth": "2000-01-02",
+    "city": "Guitare, VEN",
+    "notes": "2000-01-02"
+  },
+  {
+    "guid": "3fec5929-2be9-4884-8236-346772fe9ff8",
+    "name": "Sam Staerker",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "11",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'0",
+    "weight": "185",
+    "active": true,
+    "dateOfBirth": "2004-06-11",
+    "city": "Panama City Beach, FL",
+    "notes": ""
+  },
+  {
+    "guid": "44d0b27d-6263-4046-8a64-e302f0f7af5d",
+    "name": "Packy Bradley-Cooney",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "93",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'2",
+    "weight": "210",
+    "active": true,
+    "dateOfBirth": "2000-06-08",
+    "city": "Woburn, MA",
+    "notes": ""
+  },
+  {
+    "guid": "48f270e4-54ee-461c-b103-7649a1807605",
+    "name": "Solomon Bates",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "21",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'2",
+    "weight": "215",
+    "active": false,
+    "dateOfBirth": "1997-03-16",
+    "city": "Victorville, CA",
+    "notes": "1997-03-16"
+  },
+  {
+    "guid": "495f7aa8-26fb-4b27-9610-36b8d624541d",
+    "name": "Michael Hallquist",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "9",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "5'11",
+    "weight": "190",
+    "active": false,
+    "dateOfBirth": "2001-11-28",
+    "city": "Fargo, ND",
+    "notes": "2001-11-28"
+  },
+  {
+    "guid": "50458be1-20b3-46ab-8bdc-015d3790f3b6",
+    "name": "Justin Kelly",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "27",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'1",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "1998-12-01",
+    "city": "South Jordan, UT",
+    "notes": "1998-12-01"
+  },
+  {
+    "guid": "591a457b-afbd-484c-b4f4-46429d8af30e",
+    "name": "Justin Janas",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "35",
+    "bats": "L",
+    "throwsHand": "R",
+    "height": "6'3",
+    "weight": "205",
+    "active": false,
+    "dateOfBirth": "2000-09-18",
+    "city": "Homer Glen, IL",
+    "notes": "2000-09-18"
+  },
+  {
+    "guid": "5f06319b-a500-4ee1-86b8-d888f0618a01",
+    "name": "Davis Welch",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "24",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'1",
+    "weight": "215",
+    "active": false,
+    "dateOfBirth": "2001-07-10",
+    "city": "Searcy, AR",
+    "notes": "2001-07-10"
+  },
+  {
+    "guid": "76e43ef9-413a-4ee1-a623-6c08dcd589ec",
+    "name": "Brady Puckett",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "32",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'9",
+    "weight": "250",
+    "active": true,
+    "dateOfBirth": "1995-07-31",
+    "city": "Murfreesboro, TN",
+    "notes": "1995-07-31"
+  },
+  {
+    "guid": "7d0c50c7-2a53-4218-978b-849d3ebbb1cb",
+    "name": "Juan Diaz",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "29",
+    "bats": "L",
+    "throwsHand": "L",
+    "height": "6'0",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "1998-06-19",
+    "city": "Bronx, NY",
+    "notes": "1998-06-19"
+  },
+  {
+    "guid": "7d5406c7-3fbf-418d-b830-3259340b2994",
+    "name": "Ryan Boyer",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "34",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'2",
+    "weight": "225",
+    "active": true,
+    "dateOfBirth": "1997-05-04",
+    "city": "Palmetto, FL",
+    "notes": "1997-05-04"
+  },
+  {
+    "guid": "8316144c-0df9-4e2b-a0be-6a87a19a53d8",
+    "name": "Eli Hoyt",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "12",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'0",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "2002-12-22",
+    "city": "Waukesha, WI",
+    "notes": ""
+  },
+  {
+    "guid": "93d4e308-4a1f-45ac-afbc-030d53e68765",
+    "name": "Andrew Sundean",
+    "positionGroup": {
+      "guid": "da5ac317-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Catcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "26",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'5",
+    "weight": "235",
+    "active": false,
+    "dateOfBirth": "2002-09-22",
+    "city": "Lakeland, FL",
+    "notes": "2002-09-22"
+  },
+  {
+    "guid": "96b3feef-2022-4b81-8140-009e61f0504e",
+    "name": "Chase Waddell",
+    "positionGroup": {
+      "guid": "da5ac317-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Catcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "20",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'2",
+    "weight": "205",
+    "active": true,
+    "dateOfBirth": "2002-11-19",
+    "city": "Lucama, NC",
+    "notes": ""
+  },
+  {
+    "guid": "a0eeaeb1-d9f2-478c-8972-a8717f09a26b",
+    "name": "Yordys Valdés",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "3",
+    "bats": "B",
+    "throwsHand": "R",
+    "height": "5'11",
+    "weight": "160",
+    "active": true,
+    "dateOfBirth": "2001-08-16",
+    "city": "Hollywood, FL",
+    "notes": "2001-08-16"
+  },
+  {
+    "guid": "adcf766b-d085-48ae-a3e1-8d47f882b056",
+    "name": "Griffin Doersching",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "15",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'4",
+    "weight": "250",
+    "active": true,
+    "dateOfBirth": "1998-08-12",
+    "city": "Greendale, WI",
+    "notes": "1998-08-12"
+  },
+  {
+    "guid": "ae058459-92e6-4cfd-991e-d948eeb2a9f3",
+    "name": "Jasseel De La Cruz",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "18",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'1",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "1997-06-26",
+    "city": "Scottsdale, AZ",
+    "notes": "1997-06-26"
+  },
+  {
+    "guid": "b11d8f7c-e2c7-4847-a7f1-909b98fae282",
+    "name": "Alec Olund",
+    "positionGroup": {
+      "guid": "da5b3bf5-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Outfielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "13",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'2",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "1996-04-17",
+    "city": "Crown Point, IN",
+    "notes": "1996-04-17"
+  },
+  {
+    "guid": "b63f2352-044e-4930-9092-88e1ce9d4809",
+    "name": "Jasier Herrera",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "0",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'5",
+    "weight": "190",
+    "active": false,
+    "dateOfBirth": "1998-01-01",
+    "city": "Cartagena, COL",
+    "notes": "1998-01-01"
+  },
+  {
+    "guid": "b65d24de-6559-47e3-96c6-b6efa2bd15de",
+    "name": "Jeremy Rivas",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "36",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'0",
+    "weight": "200",
+    "active": true,
+    "dateOfBirth": "2003-03-04",
+    "city": "Valencia, VZ",
+    "notes": ""
+  },
+  {
+    "guid": "b8a471dd-5e3a-4b09-9d89-4b2a87bbc828",
+    "name": "Christian Young",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "33",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'4",
+    "weight": "210",
+    "active": true,
+    "dateOfBirth": "1996-05-19",
+    "city": "Hamburg, NY",
+    "notes": "1996-05-19"
+  },
+  {
+    "guid": "bc4052da-a6af-4b61-9608-bdee4c8b3b62",
+    "name": "Wendell Marrero",
+    "positionGroup": {
+      "guid": "da5b3bf5-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Outfielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "22",
+    "bats": "L",
+    "throwsHand": "L",
+    "height": "5'11",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "2000-11-28",
+    "city": "Manati, PR",
+    "notes": "2000-11-28"
+  },
+  {
+    "guid": "c44be0cc-bab2-46eb-8228-1a94fb5d4085",
+    "name": "Jhordany Mezquita",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "30",
+    "bats": "L",
+    "throwsHand": "L",
+    "height": "6'1",
+    "weight": "195",
+    "active": true,
+    "dateOfBirth": "1998-01-30",
+    "city": "Paterson, NJ",
+    "notes": "1998-01-30"
+  },
+  {
+    "guid": "cbbd4201-de1c-4628-9160-56f06259a0ef",
+    "name": "Cody Templeton",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "7",
+    "bats": "R",
+    "throwsHand": "L",
+    "height": "6-0",
+    "weight": "197",
+    "active": true,
+    "dateOfBirth": "2003-12-05",
+    "city": "Buda, TX",
+    "notes": ""
+  },
+  {
+    "guid": "cea8a2ce-84ad-4516-9d1f-c949bce80f92",
+    "name": "Matt Givin",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "18",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'3",
+    "weight": "200",
+    "active": true,
+    "dateOfBirth": "1999-06-17",
+    "city": "Castle Pines, CO",
+    "notes": ""
+  },
+  {
+    "guid": "d4e25936-5dce-4afe-b849-ccc2199ee21d",
+    "name": "Delvin Pérez",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "1",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'3",
+    "weight": "210",
+    "active": true,
+    "dateOfBirth": "1998-11-24",
+    "city": "Kissimmee, FL",
+    "notes": "1998-11-24"
+  },
+  {
+    "guid": "d8308c06-1888-4f66-8d57-232f41cd77b7",
+    "name": "Parker Lester",
+    "positionGroup": {
+      "guid": "da5b099f-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Infielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "4",
+    "bats": "L",
+    "throwsHand": "R",
+    "height": "6'4",
+    "weight": "215",
+    "active": false,
+    "dateOfBirth": "2003-05-16",
+    "city": "Calhoun, GA",
+    "notes": "2003-05-16"
+  },
+  {
+    "guid": "d9c216c7-5721-4f7f-b561-537fd30b4af7",
+    "name": "Baron Radcliff",
+    "positionGroup": {
+      "guid": "da5b3bf5-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Outfielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "7",
+    "bats": "L",
+    "throwsHand": "R",
+    "height": "6'4",
+    "weight": "238",
+    "active": false,
+    "dateOfBirth": "1999-02-09",
+    "city": "Tucker, GA",
+    "notes": "1999-02-09"
+  },
+  {
+    "guid": "e6e4be79-3660-4c5f-a5a1-e9e640f47383",
+    "name": "Raul Alcantara",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "0",
+    "bats": "L",
+    "throwsHand": "L",
+    "height": "6'0",
+    "weight": "187",
+    "active": false,
+    "dateOfBirth": "2001-01-22",
+    "city": "Santo Domingo, DR",
+    "notes": "2001-01-22"
+  },
+  {
+    "guid": "eaa6cd15-1b2b-4054-b7f7-c5ff424184f3",
+    "name": "Angelo Cabral",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "91",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'3",
+    "weight": "210",
+    "active": true,
+    "dateOfBirth": "2001-01-10",
+    "city": "Edinburg, TX",
+    "notes": "2001-01-10"
+  },
+  {
+    "guid": "f1e69270-f3ff-47dc-8c0a-a0907c372303",
+    "name": "Charlie Marion",
+    "positionGroup": {
+      "guid": "da5b3bf5-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Outfielder"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "10",
+    "bats": "L",
+    "throwsHand": "R",
+    "height": "6'0",
+    "weight": "190",
+    "active": true,
+    "dateOfBirth": "2004-02-27",
+    "city": "Franklin, WI",
+    "notes": ""
+  },
+  {
+    "guid": "fcd26ff4-ea99-47e0-a149-267d792677c3",
+    "name": "Bryce Leedle",
+    "positionGroup": {
+      "guid": "da5a8ee0-2e4a-11f1-b025-0e96d43b30b9",
+      "name": "Pitcher"
+    },
+    "teams": [
+      {
+        "guid": "14230442-426c-49ed-8006-2ac020d14637",
+        "name": "Milwaukee Milkmen"
+      }
+    ],
+    "number": "12",
+    "bats": "R",
+    "throwsHand": "R",
+    "height": "6'0",
+    "weight": "200",
+    "active": false,
+    "dateOfBirth": "2003-01-29",
+    "city": "Markesan, WI",
+    "notes": ""
+  }
+]

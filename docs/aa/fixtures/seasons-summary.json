@@ -1,0 +1,14 @@
+[
+  {
+    "guid": "23fc21cb-8096-4558-86fd-7fa2f5555b3d",
+    "name": "American Association All-Star Game",
+    "startDate": "2026-07-15",
+    "active": true
+  },
+  {
+    "guid": "aeba1d47-af95-4818-b69a-1943bd18800f",
+    "name": "AAPB- 2026",
+    "startDate": "2026-05-14",
+    "active": true
+  }
+]

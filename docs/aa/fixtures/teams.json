@@ -1,0 +1,114 @@
+[
+  {
+    "guid": "14230442-426c-49ed-8006-2ac020d14637",
+    "name": "Milwaukee Milkmen",
+    "color": "#000000ff",
+    "shortName": "MKE",
+    "managerName": "Anthony Barone",
+    "playerCount": 41
+  },
+  {
+    "guid": "15783daa-053b-49bc-a693-99ec8b75c71e",
+    "name": "Winnipeg Goldeyes",
+    "color": "#ff0000ff",
+    "shortName": "WPG",
+    "managerName": "Logan Watkins",
+    "playerCount": 32
+  },
+  {
+    "guid": "170ce92e-e375-4b54-930e-06ef90de6776",
+    "name": "Sioux City Explorers",
+    "color": "#000000ff",
+    "shortName": "SC",
+    "managerName": "Steve Montgomery",
+    "playerCount": 43
+  },
+  {
+    "guid": "17c95a93-139a-4baa-ad36-9c9e5d9f8ed5",
+    "name": "Lake Country DockHounds",
+    "color": "#27b2f2ff",
+    "shortName": "LC",
+    "managerName": "Ken Huckaby",
+    "playerCount": 44
+  },
+  {
+    "guid": "351d0e78-db4f-473c-8eae-d8f6728a993e",
+    "name": "Chicago Dogs",
+    "color": "#2ca4e6ff",
+    "shortName": "CHI",
+    "managerName": "Stan Cliburn",
+    "playerCount": 44
+  },
+  {
+    "guid": "49665445-c8ee-46ce-a916-519c0905d825",
+    "name": "Cleburne Railroaders",
+    "color": "#110063ff",
+    "shortName": "CLE",
+    "managerName": "Pete Incaviglia",
+    "playerCount": 39
+  },
+  {
+    "guid": "4f8e798f-8a8d-4915-9e97-03599297d3e0",
+    "name": "Kansas City Monarchs",
+    "color": "#451003ff",
+    "shortName": "KC",
+    "managerName": "Joe Calfapietra",
+    "playerCount": 44
+  },
+  {
+    "guid": "61d8b870-7314-4df9-845c-dd3da08d87f3",
+    "name": "Fargo-Moorhead RedHawks",
+    "color": "#ff0000ff",
+    "shortName": "F-M",
+    "managerName": "Chris Coste",
+    "playerCount": 40
+  },
+  {
+    "guid": "69d37fe0-99bf-4364-a4a4-37aaf51f3930",
+    "name": "East Division",
+    "color": "#ff0000ff",
+    "shortName": "EST",
+    "managerName": "David Holmberg",
+    "playerCount": 0
+  },
+  {
+    "guid": "7ba30766-3ba6-4cd2-91b6-ef8447eacdd9",
+    "name": "West Division",
+    "color": "#0000ffff",
+    "shortName": "WST",
+    "managerName": "Mike Meyer",
+    "playerCount": 0
+  },
+  {
+    "guid": "b7f8d0dc-579a-467e-bf3d-fcbef3308e17",
+    "name": "Sioux Falls Canaries",
+    "color": "#ebdd1aff",
+    "shortName": "SF",
+    "managerName": "Mike Meyer",
+    "playerCount": 36
+  },
+  {
+    "guid": "e199431d-b719-4346-859c-3c3e0a5b01c5",
+    "name": "Lincoln Saltdogs",
+    "color": "#010057ff",
+    "shortName": "LIN",
+    "managerName": "James Frisbie",
+    "playerCount": 38
+  },
+  {
+    "guid": "e43038d9-36c4-408f-92bd-b725c1250a40",
+    "name": "Kane County Cougars",
+    "color": "#03ff1cff",
+    "shortName": "KCO",
+    "managerName": "George Tsamis",
+    "playerCount": 30
+  },
+  {
+    "guid": "f148bb50-25dd-4a71-a779-2da05523e1ad",
+    "name": "Gary SouthShore RailCats",
+    "color": "#006112ff",
+    "shortName": "GAR",
+    "managerName": "Jeff Isom",
+    "playerCount": 47
+  }
+]

@@ -1,0 +1,5 @@
+{
+  "path": "/api/leagues/661d9b4b-0e17-412a-bb93-981ca40f021a/standings",
+  "statusCode": 500,
+  "errorMessage": "An unexpected error occurred. Please try again later."
+}

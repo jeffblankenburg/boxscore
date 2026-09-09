@@ -1,0 +1,73 @@
+{
+  "leagueGuid": "661d9b4b-0e17-412a-bb93-981ca40f021a",
+  "name": "AAPB- 2026",
+  "seasonTypeGuid": "d9ff32f4-2e4a-11f1-b025-0e96d43b30b9",
+  "startDate": "2026-05-14",
+  "alignmentGuid": "da535141-2e4a-11f1-b025-0e96d43b30b9",
+  "conferences": [
+    {
+      "guid": "dce311a6-a246-4ce8-996b-e7eec747ce2b",
+      "name": "None",
+      "divisions": [
+        {
+          "guid": "1b536fdb-db7a-4821-9136-d93ae62f7fd5",
+          "name": "East",
+          "teamGuids": [
+            "14230442-426c-49ed-8006-2ac020d14637",
+            "17c95a93-139a-4baa-ad36-9c9e5d9f8ed5",
+            "351d0e78-db4f-473c-8eae-d8f6728a993e",
+            "49665445-c8ee-46ce-a916-519c0905d825",
+            "e43038d9-36c4-408f-92bd-b725c1250a40",
+            "f148bb50-25dd-4a71-a779-2da05523e1ad"
+          ]
+        },
+        {
+          "guid": "84167f0e-7785-4c3b-8431-e2e1e573fc95",
+          "name": "West",
+          "teamGuids": [
+            "15783daa-053b-49bc-a693-99ec8b75c71e",
+            "170ce92e-e375-4b54-930e-06ef90de6776",
+            "4f8e798f-8a8d-4915-9e97-03599297d3e0",
+            "61d8b870-7314-4df9-845c-dd3da08d87f3",
+            "b7f8d0dc-579a-467e-bf3d-fcbef3308e17",
+            "e199431d-b719-4346-859c-3c3e0a5b01c5"
+          ]
+        }
+      ]
+    }
+  ],
+  "gameSettings": {
+    "innings": 9,
+    "fielders": 9,
+    "scorekeeperLevel": "BASIC",
+    "ballsForWalk": 4,
+    "strikesForOut": 3,
+    "outPerInning": 3,
+    "simultaneousSubstitutions": "NO",
+    "startingBalls": 0,
+    "startingStrikes": 0,
+    "pitchCountWarning1": 0,
+    "pitchCountWarning2": 0,
+    "moundVisitLimit": 5,
+    "moundDistance": 60.6,
+    "coachPitchOnWalk": 0,
+    "sportId": 1,
+    "rosterLimit": 0,
+    "maxActiveRoster": 26,
+    "maxPlayers": 32,
+    "playExtraInnings": 1,
+    "allowTieGames": 0,
+    "tieBreakerType": "INTERNATIONAL",
+    "runnerStartsOn": "2BASE",
+    "runnerIs": "LAST",
+    "tieBreakerStartInning": 1,
+    "earnedRunForPitcher": 0,
+    "countsAsARunForTheRunner": 0,
+    "countsAsAnRiForTheBattler": 0,
+    "suddenDeathEnabled": 0,
+    "suddenDeathAfterTieBreakerInnings": 1,
+    "suddenDeathStartBase": "2BASE",
+    "courtesyRunnerEnabled": null,
+    "courtesyRunnerAllowedPositions": []
+  }
+}
