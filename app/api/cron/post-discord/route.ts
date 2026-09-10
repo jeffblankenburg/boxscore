@@ -64,12 +64,12 @@ export async function GET(req: Request) {
     // Re-use the same share-image rendering path as post-bluesky. Images
     // are rendered in-memory by Puppeteer, then uploaded to Supabase
     // Storage so the embed URLs are stable public links Discord can fetch.
-    // NCAAF ships scoreboards only (Top 25 + per-conference) to its league
-    // channel; per-game box posting to team channels would be dozens of games.
-    const scoreboardsOnly = sport === "ncaaf";
+    // NCAAF leads with Top 25 + per-conference boards, then per-game box scores.
+    // The page only renders box scores for AP-ranked matchups (~15 on a big
+    // Saturday, not one per FBS game), so this stays a sane post count.
     let images: Awaited<ReturnType<typeof renderShareImages>>;
     try {
-      images = await renderShareImages({ date, baseUrl: origin, sport, scoreboardsOnly });
+      images = await renderShareImages({ date, baseUrl: origin, sport });
     } catch (err) {
       throw new Error(`render failed: ${(err as Error).message}`);
     }

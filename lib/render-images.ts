@@ -520,12 +520,8 @@ export async function renderShareImages(args: {
   date: string;
   baseUrl: string; // e.g. "https://boxscore.email" or "http://localhost:3001"
   sport?: string;  // defaults to "mlb"
-  // Scoreboard(s) only — skip the full digest, standings/leaders, and per-game
-  // box scores. Used by the NCAAF posting path, which ships Top 25 + per-
-  // conference boards rather than one image per (often 40+) game.
-  scoreboardsOnly?: boolean;
 }): Promise<RenderedImage[]> {
-  const { date, baseUrl, scoreboardsOnly } = args;
+  const { date, baseUrl } = args;
   const spec = shareSpecFor(args.sport ?? "mlb");
   // Caller passes games_date; the public page now lives at edition_date.
   const url = `${baseUrl}/${spec.sport}/${nextDay(date)}`;
@@ -573,11 +569,6 @@ export async function renderShareImages(args: {
       } catch (err) {
         console.error(`scoreboard capture failed (${board.subId}): ${(err as Error).message}`);
       }
-    }
-
-    // Scoreboard-only sports (NCAAF) stop here — no digest page walk.
-    if (scoreboardsOnly) {
-      return results;
     }
 
     const page = await browser.newPage();

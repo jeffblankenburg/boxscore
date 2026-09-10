@@ -85,12 +85,12 @@ export async function GET(req: Request) {
       games: prettyDate(date),
     };
 
-    // NCAAF ships scoreboards only (Top 25 + per-conference); posting one image
-    // per FBS game would be dozens of tweets.
-    const scoreboardsOnly = sport === "ncaaf";
+    // NCAAF leads with Top 25 + per-conference boards, then per-game box scores.
+    // The page only renders box scores for AP-ranked matchups (~15 on a big
+    // Saturday, not one per FBS game), so this stays a sane post count.
     let images: Awaited<ReturnType<typeof renderShareImages>>;
     try {
-      images = await renderShareImages({ date, baseUrl: origin, sport, scoreboardsOnly });
+      images = await renderShareImages({ date, baseUrl: origin, sport });
     } catch (err) {
       throw new Error(`render failed: ${(err as Error).message}`);
     }
