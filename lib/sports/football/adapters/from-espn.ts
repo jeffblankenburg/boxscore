@@ -399,24 +399,32 @@ export function adaptBoxScore(cfg: FootballLeagueConfig, gameId: string, summary
 
 // ─── Rankings (NCAAF) ─────────────────────────────────────────────────────
 
-function adaptRankings(raw: FootballRaw): FootballRanking[] {
+function adaptRankings(raw: FootballRaw, recordByTeamId: Map<string, string>): FootballRanking[] {
   const lists = arr(rec(raw.rankings).rankings).map(rec);
   return lists
     // Keep the polls that matter to an FBS recap; drop FCS / Div II / III.
     .filter((l) => /AP Top 25|Coaches Poll|College Football Playoff|CFP/i.test(str(l.name)) && !/FCS|Division/i.test(str(l.name)))
     .map((l): FootballRanking => ({
       poll: str(l.name),
-      entries: arr(l.ranks).map(rec).map((r): FootballRankingEntry => ({
-        rank: num(r.current),
-        team: teamRef(r.team),
-        record: (() => {
-          const summary = str(rec(arr(r.stats).map(rec).find((st) => str(st.name) === "overall")).displayValue);
-          return summary || str(r.recordSummary) || null;
-        })(),
-        points: numOrNull(r.points),
-        firstPlaceVotes: numOrNull(r.firstPlaceVotes),
-        previousRank: (() => { const p = num(r.previous); return p > 0 ? p : null; })(),
-      })),
+      entries: arr(l.ranks).map(rec).map((r): FootballRankingEntry => {
+        const team = teamRef(r.team);
+        // ESPN's poll record (`overall` stat / recordSummary) only refreshes
+        // when the poll is re-published — weekly — so after a Thu/Sat game it
+        // lags a win behind. Prefer the per-game standings record (same feed the
+        // conference standings tables render from) so the Top 25 and the
+        // conference boards never disagree on a team's W-L. Fall back to the poll
+        // record only when a ranked team is missing from standings (rare).
+        const pollRecord = str(rec(arr(r.stats).map(rec).find((st) => str(st.name) === "overall")).displayValue)
+          || str(r.recordSummary) || null;
+        return {
+          rank: num(r.current),
+          team,
+          record: recordByTeamId.get(team.id) ?? pollRecord,
+          points: numOrNull(r.points),
+          firstPlaceVotes: numOrNull(r.firstPlaceVotes),
+          previousRank: (() => { const p = num(r.previous); return p > 0 ? p : null; })(),
+        };
+      }),
     }));
 }
 
@@ -587,15 +595,29 @@ export function adaptEspnFootball(
     if (box) boxScores.set(id, box);
   }
 
+  const standings = adaptStandings(raw);
+  // team.id → "W-L" (or "W-L-T") from the per-game standings feed, so the Top 25
+  // record column stays in lockstep with the conference standings tables that
+  // render from this same data.
+  const recordByTeamId = new Map<string, string>();
+  for (const group of standings) {
+    for (const row of group.rows) {
+      recordByTeamId.set(
+        row.team.id,
+        row.ties > 0 ? `${row.wins}-${row.losses}-${row.ties}` : `${row.wins}-${row.losses}`,
+      );
+    }
+  }
+
   return {
     date: raw.date,
     league: cfg.league,
     games,
     boxScores,
     nextGames,
-    rankings: cfg.hasRankings ? adaptRankings(raw) : [],
+    rankings: cfg.hasRankings ? adaptRankings(raw, recordByTeamId) : [],
     leaders: raw.leaders ? adaptLeaders(raw) : [],
-    standings: adaptStandings(raw),
+    standings,
     transactions: raw.transactions ? adaptTransactions(raw) : [],
   };
 }
