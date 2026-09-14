@@ -90,6 +90,7 @@ export function EmailSearch() {
                 <th>Email</th>
                 <th>Status</th>
                 <th>Signed up</th>
+                <th>Subscribed to</th>
                 <th>Notes</th>
               </tr>
             </thead>
@@ -99,6 +100,7 @@ export function EmailSearch() {
                   <td className="email-search-to"><code>{s.email}</code></td>
                   <td><SubscriberStatusPill status={s.status} /></td>
                   <td className="admin-meta">{relativeTime(s.createdAt)}</td>
+                  <td className="admin-meta"><Subscriptions subs={s.subscriptions} /></td>
                   <td className="admin-meta"><SubscriberNotes s={s} /></td>
                 </tr>
               ))}
@@ -151,6 +153,29 @@ function SubscriberStatusPill({ status }: { status: SubscriberStatus }) {
     <span className={`sub-status sub-status-${status}`}>
       {SUBSCRIBER_STATUS_LABEL[status]}
     </span>
+  );
+}
+
+// Currently-active subscriptions only, grouped. Each group is skipped when
+// empty; a subscriber with nothing active reads "—". The server has already
+// resolved slugs to readable names (team nicknames, conference short names).
+function Subscriptions({ subs }: { subs: SubscriberSearchRow["subscriptions"] }) {
+  const groups: Array<[string, string[]]> = [
+    ["Leagues", subs.leagues],
+    ["Teams", subs.teams],
+    ["Conferences", subs.conferences],
+    ["Predictions", subs.predictions],
+  ];
+  const shown = groups.filter(([, items]) => items.length > 0);
+  if (shown.length === 0) return <>—</>;
+  return (
+    <>
+      {shown.map(([label, items]) => (
+        <div key={label}>
+          <strong>{label}:</strong> {items.join(", ")}
+        </div>
+      ))}
+    </>
   );
 }
 

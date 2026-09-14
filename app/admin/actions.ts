@@ -5,13 +5,14 @@ import { revalidatePath } from "next/cache";
 import { getDigest } from "@/lib/digests";
 import { sendEmail } from "@/lib/email";
 import { dailyEmail, teamDailyEmail } from "@/lib/emails/templates";
-import { nextDay, prettyDate, isValidIsoDate, yesterdayInET } from "@/lib/dates";
+import { nextDay, prettyDate, isValidIsoDate, yesterdayInET, todayInET } from "@/lib/dates";
 import { renderScoreboardShareImage, renderShareImages } from "@/lib/render-images";
 import { uploadScoreboardShareImage, uploadShareImages } from "@/lib/share-storage";
 import { EMAIL_LINK_BASE, siteOrigin } from "@/lib/site";
 import { BRAND } from "@/lib/brand";
 import { supabaseAdmin } from "@/lib/supabase";
 import { findTeam, type Sport } from "@/lib/teams";
+import { findConferenceBySlug } from "@/lib/sports/football/conferences";
 import { loadTeamEmailData, renderTeamEmailContent } from "@/lib/render-team-email";
 import { saveTeamHashtag, resetTeamHashtag } from "@/lib/team-hashtags";
 import { normalizeHashtagKey } from "@/lib/social-content";
@@ -548,6 +549,17 @@ export type SendSearchRow = {
   clicked: boolean;
 };
 
+// A subscriber's currently-active subscriptions, resolved to display labels.
+// Each group is empty when the subscriber has nothing active in it. Predictions
+// entries read like "MLB month — through Sep 30, 2026" (with " (comp)" for
+// admin grants).
+export type SubscriberSubscriptions = {
+  leagues: string[];       // ["MLB", "NFL"]
+  teams: string[];         // ["Browns", "Guardians"]
+  conferences: string[];   // ["SEC"]
+  predictions: string[];
+};
+
 export type SubscriberSearchRow = {
   id: string;
   email: string;
@@ -557,6 +569,7 @@ export type SubscriberSearchRow = {
   unsubscribedAt: string | null;
   unsubscribeReason: string | null;
   isAdmin: boolean;
+  subscriptions: SubscriberSubscriptions;
 };
 
 export type SearchResults = {
@@ -594,18 +607,77 @@ export async function searchSends(query: string): Promise<SearchResults> {
     .limit(50);
   if (subsErr) throw new Error(`searchSends subs: ${subsErr.message}`);
   const subRows = (subs ?? []) as SubRow[];
-  const subscribers: SubscriberSearchRow[] = subRows.map((s) => ({
-    id: s.id,
-    email: s.email,
-    status: s.status,
-    createdAt: s.created_at,
-    confirmedAt: s.confirmed_at,
-    unsubscribedAt: s.unsubscribed_at,
-    unsubscribeReason: s.unsubscribe_reason,
-    isAdmin: s.is_admin,
-  }));
   if (subRows.length === 0) return empty;
   const emailById = new Map(subRows.map((s) => [s.id, s.email]));
+  const ids = subRows.map((s) => s.id);
+
+  // 1b. Currently-active subscriptions per matched subscriber, resolved to
+  // display labels. One batched query for the opt-ins (league/team/conference)
+  // and one for live predictions access, grouped in memory — avoids a per-row
+  // fan-out. Only active=true / non-revoked-in-window rows are surfaced.
+  const subsById = new Map<string, SubscriberSubscriptions>();
+  const bucketFor = (id: string): SubscriberSubscriptions => {
+    let b = subsById.get(id);
+    if (!b) { b = { leagues: [], teams: [], conferences: [], predictions: [] }; subsById.set(id, b); }
+    return b;
+  };
+
+  type EsRow = { subscriber_id: string; sport: string; scope: string; team_id: string | null };
+  // Paginate: 50 subscribers × many team rows could top Supabase's 1000-row cap.
+  for (let from = 0; ; from += 1000) {
+    const { data: es, error: esErr } = await db
+      .from("email_subscriptions")
+      .select("subscriber_id, sport, scope, team_id")
+      .in("subscriber_id", ids)
+      .eq("active", true)
+      .range(from, from + 999);
+    if (esErr) throw new Error(`searchSends email_subscriptions: ${esErr.message}`);
+    const rows = (es ?? []) as EsRow[];
+    for (const r of rows) {
+      const b = bucketFor(r.subscriber_id);
+      if (r.scope === "league") b.leagues.push(r.sport.toUpperCase());
+      else if (r.scope === "team" && r.team_id) b.teams.push(findTeam(r.sport as Sport, r.team_id)?.nickname ?? r.team_id.toUpperCase());
+      else if (r.scope === "conference" && r.team_id) b.conferences.push(findConferenceBySlug(r.team_id)?.short ?? r.team_id);
+    }
+    if (rows.length < 1000) break;
+  }
+
+  type EntRow = { subscriber_id: string; sport: string; product: string; access_end: string; source: string };
+  const today = todayInET();
+  const { data: ents, error: entErr } = await db
+    .from("predictions_entitlements")
+    .select("subscriber_id, sport, product, access_end, source")
+    .in("subscriber_id", ids)
+    .is("revoked_at", null)
+    .lte("access_start", today)
+    .gte("access_end", today);
+  if (entErr) throw new Error(`searchSends entitlements: ${entErr.message}`);
+  for (const e of (ents ?? []) as EntRow[]) {
+    bucketFor(e.subscriber_id).predictions.push(
+      `${e.sport.toUpperCase()} ${e.product} — through ${prettyDate(e.access_end)}${e.source === "comp" ? " (comp)" : ""}`,
+    );
+  }
+
+  const emptySubs: SubscriberSubscriptions = { leagues: [], teams: [], conferences: [], predictions: [] };
+  const subscribers: SubscriberSearchRow[] = subRows.map((s) => {
+    const b = subsById.get(s.id) ?? emptySubs;
+    return {
+      id: s.id,
+      email: s.email,
+      status: s.status,
+      createdAt: s.created_at,
+      confirmedAt: s.confirmed_at,
+      unsubscribedAt: s.unsubscribed_at,
+      unsubscribeReason: s.unsubscribe_reason,
+      isAdmin: s.is_admin,
+      subscriptions: {
+        leagues: [...b.leagues].sort(),
+        teams: [...b.teams].sort(),
+        conferences: [...b.conferences].sort(),
+        predictions: [...b.predictions].sort(),
+      },
+    };
+  });
 
   // 2. Their sends, most recent first.
   type SendRow = {
