@@ -144,11 +144,14 @@ async function fetchBasketballRaw(
   date: string,
   season: number,
 ): Promise<BasketballRaw> {
-  // Five league-wide pulls in parallel. Three are required (a failure should
-  // 500 the cron so we retry): scoreboard, upcoming window, standings.
-  // Two are best-effort (leaders + transactions): wrap in .catch so an ESPN
-  // endpoint hiccup doesn't take down the whole digest — the renderer just
-  // hides the affected section.
+  // Five league-wide pulls in parallel. Two are required (a failure should
+  // 500 the cron so we retry): scoreboard, standings.
+  // Three are best-effort (upcoming window + leaders + transactions): wrap in
+  // .catch so an ESPN endpoint hiccup doesn't take down the whole digest — the
+  // renderer just hides the affected section. The upcoming-window RANGE endpoint
+  // 400s in the offseason (a date range with zero scheduled events is rejected,
+  // unlike the single-date scoreboard which returns an empty list), so it can't
+  // be required or every offseason tick fails and pages oncall.
   const upcomingStart = addDays(date, 1);
   const upcomingEnd = addDays(date, UPCOMING_WINDOW_DAYS);
   // Seasontype 2 = regular season; the leaders endpoint requires it for
@@ -162,7 +165,12 @@ async function fetchBasketballRaw(
     transactionsRaw,
   ] = await Promise.all([
     fetchScoreboardRaw(sport, date),
-    fetchScoreboardRangeRaw(sport, upcomingStart, upcomingEnd),
+    fetchScoreboardRangeRaw(sport, upcomingStart, upcomingEnd).catch((e: unknown) => {
+      console.error(
+        `[basketball] upcoming-window fetch failed for ${sport}/${date}: ${(e as Error).message}`,
+      );
+      return null;
+    }),
     fetchStandingsRaw(sport, season),
     // limit=600 covers every player who's logged minutes (NBA ~500, WNBA ~180)
     // so the same payload feeds both the top-5 league leaders AND full per-team
@@ -197,7 +205,7 @@ async function fetchBasketballRaw(
 
   return {
     scoreboard: scoreboardRaw,
-    upcomingScoreboard: upcomingScoreboardRaw,
+    upcomingScoreboard: upcomingScoreboardRaw ?? undefined,
     standings: standingsRaw,
     athleteStats: athleteStatsRaw ?? undefined,
     transactions: transactionsRaw ?? undefined,
