@@ -12,7 +12,14 @@
 
 import type { DailyRaw } from "@/lib/daily-raw";
 import { canonicalTeamRefForRef } from "@/lib/teams";
-import { sortGamesCanonically, type CanonicalDailyData } from "../canonical";
+import {
+  sortGamesCanonically,
+  type CanonicalDailyData,
+  type PostseasonBracket,
+  type PostseasonRound,
+  type PostseasonSeries,
+  type PostseasonEntrant,
+} from "../canonical";
 import { playerRef } from "../player-ref";
 import { dedupeTransactions } from "../../../dedupe-transactions";
 import type {
@@ -701,6 +708,140 @@ function scoringPlaysFromRaw(rawGames: DailyRaw["games"]): Map<number, MlbScorin
   return out;
 }
 
+// ─── Postseason bracket ──────────────────────────────────────────────────
+
+type StatsapiPostseasonEnvelope = {
+  series?: Array<{
+    series?: { gameType?: string; sortNumber?: number };
+    games?: Array<{
+      gameType?: string;
+      seriesDescription?: string;
+      gamesInSeries?: number;
+      officialDate?: string;
+      status?: { abstractGameState?: string };
+      teams?: {
+        away?: { team?: { id?: number; name?: string }; isWinner?: boolean };
+        home?: { team?: { id?: number; name?: string }; isWinner?: boolean };
+      };
+    }>;
+  }>;
+};
+
+const POSTSEASON_ROUND: Record<string, PostseasonRound> = {
+  F: "wild-card",
+  D: "division-series",
+  L: "lcs",
+  W: "world-series",
+};
+
+// MLB's official seeding: the three division winners are seeded 1-3 by record,
+// the three wild cards 4-6 by record. Derived from final regular-season
+// standings (reusing StatsapiStandingsEnvelope) because the postseason series
+// feed carries no seeds. Returns a teamId → seed map.
+function deriveSeeds(finalStandingsRaw: unknown): Map<number, number> {
+  const env = finalStandingsRaw as StatsapiStandingsEnvelope | null;
+  const seeds = new Map<number, number>();
+  type Row = { id: number; champ: boolean; pct: number };
+  const byLeague = new Map<number, Row[]>();
+  for (const rec of env?.records ?? []) {
+    const lg = rec.league?.id;
+    if (lg !== 103 && lg !== 104) continue;
+    const rows = byLeague.get(lg) ?? [];
+    for (const tr of rec.teamRecords ?? []) {
+      const id = tr.team?.id;
+      if (typeof id !== "number") continue;
+      const gp = tr.wins + tr.losses;
+      rows.push({ id, champ: tr.divisionChamp === true, pct: gp > 0 ? tr.wins / gp : 0 });
+    }
+    byLeague.set(lg, rows);
+  }
+  for (const rows of byLeague.values()) {
+    const champs = rows.filter((r) => r.champ).sort((a, b) => b.pct - a.pct);
+    const wilds = rows.filter((r) => !r.champ).sort((a, b) => b.pct - a.pct).slice(0, 3);
+    [...champs, ...wilds].forEach((r, i) => seeds.set(r.id, i + 1));
+  }
+  return seeds;
+}
+
+// League comes from the series description prefix ("AL Wild Card Series", "NL
+// Division Series"); the cross-league World Series has no prefix → null.
+function postseasonLeague(desc: string | undefined): MlbLeague | null {
+  if (!desc) return null;
+  if (desc.startsWith("AL")) return "AL";
+  if (desc.startsWith("NL")) return "NL";
+  return null;
+}
+
+// Reduce the /schedule/postseason/series envelope to a bracket, as of `date`.
+// statsapi gives per-game winners, not a series summary, so we tally isWinner
+// across each series' games. The higher seed hosts game 1, so game-1 home =
+// `top`.
+//
+// Point-in-time: the feed has no as-of query — it always returns the fully
+// completed bracket. So we only count games with officialDate <= date, and a
+// series that hasn't played a game by then is dropped (renders as TBD). This
+// makes a historical/preview date show the bracket as it stood that day rather
+// than the finished result; live days are unaffected (future games don't exist
+// yet, and today's unfinished games carry no isWinner).
+function postseasonBracketFromRaw(
+  raw: unknown,
+  season: number,
+  date: string,
+  idx: Map<number, MlbTeamRef>,
+  seeds: Map<number, number>,
+): PostseasonBracket | null {
+  const env = raw as StatsapiPostseasonEnvelope | null;
+  const rawSeries = env?.series;
+  if (!Array.isArray(rawSeries) || rawSeries.length === 0) return null;
+
+  const series: PostseasonSeries[] = [];
+  for (const s of rawSeries) {
+    // Only games played on or before the digest date count toward this view.
+    const games = (s.games ?? []).filter((g) => (g.officialDate ?? "9999") <= date);
+    if (games.length === 0) continue; // series not started yet as of `date`
+    const round = POSTSEASON_ROUND[s.series?.gameType ?? ""];
+    if (!round) continue;
+
+    const g1 = games[0]!;
+    const topId = g1.teams?.home?.team?.id;
+    const botId = g1.teams?.away?.team?.id;
+    if (typeof topId !== "number" || typeof botId !== "number") continue;
+
+    // Tally games won per side across the in-range games.
+    let topWins = 0;
+    let botWins = 0;
+    for (const g of games) {
+      const home = g.teams?.home;
+      const away = g.teams?.away;
+      if (home?.team?.id === topId && home?.isWinner) topWins++;
+      else if (away?.team?.id === topId && away?.isWinner) topWins++;
+      if (home?.team?.id === botId && home?.isWinner) botWins++;
+      else if (away?.team?.id === botId && away?.isWinner) botWins++;
+    }
+
+    const entrant = (id: number, name: string | undefined, wins: number): PostseasonEntrant => {
+      const ref = teamRefById(idx, id, name);
+      return { teamId: id, abbr: ref.abbr, name: ref.name, wins, seed: seeds.get(id) ?? null };
+    };
+
+    const bestOf = g1.gamesInSeries ?? (round === "wild-card" ? 3 : round === "division-series" ? 5 : 7);
+    const winsNeeded = Math.floor(bestOf / 2) + 1;
+    const winnerTeamId = topWins >= winsNeeded ? topId : botWins >= winsNeeded ? botId : null;
+
+    series.push({
+      round,
+      league: postseasonLeague(g1.seriesDescription),
+      bestOf,
+      top: entrant(topId, g1.teams?.home?.team?.name, topWins),
+      bottom: entrant(botId, g1.teams?.away?.team?.name, botWins),
+      winnerTeamId,
+    });
+  }
+
+  if (series.length === 0) return null;
+  return { season, series };
+}
+
 // ─── Public adapter ──────────────────────────────────────────────────────
 
 export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDailyData {
@@ -723,5 +864,12 @@ export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDai
     // Already display-ready (built in fetchDailyRaw); pass straight through.
     allStarRosters: raw.allStarRosters ?? null,
     allStarMvp: raw.allStarMvp ?? null,
+    postseason: postseasonBracketFromRaw(
+      raw.postseasonSeries,
+      Number(date.slice(0, 4)),
+      date,
+      teamIdx,
+      deriveSeeds(raw.finalStandings),
+    ),
   };
 }

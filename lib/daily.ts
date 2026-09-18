@@ -10,6 +10,7 @@ import {
   fetchPersonSeasonStatsRaw, parsePersonSeasonStat,
   fetchAllStarMvpRaw, parseAllStarMvp,
   fetchTransactionsRaw, parseTransactions,
+  fetchPostseasonSeriesRaw, fetchFinalStandingsRaw,
   type Leader, type PlayerStats,
 } from "./mlb";
 import type { AsgRosters, AsgSide, AsgHitter, AsgPitcher } from "./sports/mlb/canonical";
@@ -288,6 +289,21 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
     .filter((g) => g.status.codedGameState === "F")
     .map((g) => g.gamePk);
 
+  // The postseason runs early October to early November. Fetch the bracket
+  // across that whole window — not just days with playoff games — so the many
+  // travel/off-days between series, and the day after the World Series clinches,
+  // still carry the bracket. The endpoint returns empty before the Wild Card
+  // round, so an early-October regular-season day just yields no bracket.
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+  const inPostseasonWindow = month === 10 || (month === 11 && day <= 15);
+  const [postseasonSeries, finalStandings] = inPostseasonWindow
+    ? await Promise.all([
+        fetchPostseasonSeriesRaw(season).catch(() => undefined),
+        fetchFinalStandingsRaw(season).catch(() => undefined),
+      ])
+    : [undefined, undefined];
+
   const pitcherIds = probablePitcherIds(nextDayScheduleRaw);
 
   const [gameResults, pitcherResults] = await Promise.all([
@@ -336,6 +352,8 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
     transactions: transactionsRaw,
     ...(allStarRosters ? { allStarRosters } : {}),
     ...(isAsgDay ? { allStarMvp: allStarMvp ?? null } : {}),
+    ...(postseasonSeries ? { postseasonSeries } : {}),
+    ...(finalStandings ? { finalStandings } : {}),
   };
 }
 

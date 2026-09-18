@@ -42,6 +42,7 @@ import { renderMasthead, type NavSport } from "@/lib/masthead";
 import { lastName, boxSurname, collidingSurnames } from "@/lib/names";
 import { lastNameLinkWeb, fullNameLinkWeb } from "@/lib/player-links";
 import { sortTransactionsByTeam } from "../transactions";
+import { renderPostseasonBracketWeb } from "./postseason";
 
 // ─── Display tables (name-keyed) ─────────────────────────────────────────
 // Kept local rather than imported from lib/render.ts so this file stands
@@ -320,6 +321,28 @@ export function renderCanonicalWeb(
   const masthead = renderMasthead({ date: data.date, sport: "mlb", surface: "web", navSports });
   const teamRecords = buildTeamRecordMap(data.standings);
   const mode = classifyMode(data.games, data.date, data.nextDayGames);
+
+  // Postseason takes precedence over the games-based mode: on the many playoff
+  // off-days (and the day after the World Series clinches) there are no games,
+  // but the bracket is still the headline. Presence of a bracket = we're in the
+  // postseason window (see fetchDailyRaw).
+  // Five sections: bracket, Yesterday's Results (scores only), Today's Games,
+  // Yesterday's Box Scores (full), Transactions. Results/box-scores drop out on
+  // playoff off-days (no games that date).
+  if (data.postseason) {
+    return `${masthead}
+
+${renderPostseasonBracketWeb(data.postseason)}
+
+${data.games.length ? renderSchedule(data.games, hl) : ""}
+
+${renderTodaysGames(data.nextDayGames, teamRecords, hl)}
+
+${data.games.length ? `<div class="boxscores-title">Yesterday's Box Scores</div>
+${renderGames(data, hl)}` : ""}
+
+${renderTransactions(data.transactions, hl)}`;
+  }
 
   if (mode === "no-games") {
     return `${masthead}

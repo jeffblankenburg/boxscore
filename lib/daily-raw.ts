@@ -92,6 +92,14 @@ export type DailyRaw = {
   // Set on the ASG day (recap edition) once the MVP is recorded; null if not
   // yet available at fetch time.
   allStarMvp?: AsgMvp | null;
+  // Raw /v1/schedule/postseason/series envelope. Present only on postseason
+  // days (schedule has a postseason gameType F/D/L/W). The bracket replaces
+  // standings in the postseason digest — statsapi's /standings goes empty once
+  // the regular season ends. The canonical adapter reduces this to a bracket.
+  postseasonSeries?: unknown;
+  // Raw final regular-season standings, fetched alongside postseasonSeries.
+  // The adapter derives 1-6 playoff seeds from it (the series feed has none).
+  finalStandings?: unknown;
 };
 
 export async function getDailyRaw(sport: string, date: string): Promise<DailyRaw | null> {

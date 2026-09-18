@@ -48,6 +48,7 @@ import {
 import { showMagicNumbers, divisionMagicDisplay, clinchKeyLine } from "@/lib/standings-format";
 import { renderMasthead, type NavSport } from "@/lib/masthead";
 import { sortTransactionsByTeam } from "../transactions";
+import { renderPostseasonBracketEmail } from "./postseason";
 
 // ─── Display tables (name-keyed) ─────────────────────────────────────────
 // Mirrors the canonical web renderer's maps so this file stands on its
@@ -747,6 +748,24 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
   </div>`;
 }
 
+// Compact "Yesterday's Results" scoreboard — just final scores, winner bold.
+// The web digest has this via renderSchedule; email had no equivalent, so it's
+// built here (inline-styled, since Gmail strips the <style> block). Used by the
+// postseason edition between the bracket and Today's Games.
+function renderResults(data: CanonicalDailyData): string {
+  if (data.games.length === 0) return "";
+  const lines = data.games.map((g) => {
+    const a = g.awayScore ?? 0;
+    const h = g.homeScore ?? 0;
+    const away = `<span style="font-weight:${a > h ? 700 : 400}">${esc(nickname(g.awayTeam.name))} ${a}</span>`;
+    const home = `<span style="font-weight:${h > a ? 700 : 400}">${esc(nickname(g.homeTeam.name))} ${h}</span>`;
+    const status = g.statusDetail && g.statusDetail !== "Final"
+      ? ` <span style="color:#999999">(${esc(g.statusDetail)})</span>` : "";
+    return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5">${away}, ${home}${status}</div>`;
+  }).join("");
+  return `${sectionH("Yesterday's Results")}<div style="margin:0 0 6px">${lines}</div>`;
+}
+
 function renderBoxScores(data: CanonicalDailyData): string {
   const completed = data.games.filter((g) => g.status === "final" && data.boxScores.has(g.id));
   if (completed.length === 0) return "";
@@ -931,6 +950,23 @@ export function renderCanonicalEmail(data: CanonicalDailyData, navSports: NavSpo
   const masthead = renderMasthead({ date: data.date, sport: "mlb", surface: "email", navSports });
   const teamRecords = buildTeamRecordMap(data.standings);
   const mode = classifyMode(data.games, data.date, data.nextDayGames);
+
+  // Postseason takes precedence over the games-based mode — see web.ts. Presence
+  // of a bracket means we're in the postseason window, including off-days with
+  // no games and the day after the World Series clinches.
+  // Five sections mirroring web: Bracket, Yesterday's Results (scores), Today's
+  // Games, Yesterday's Box Scores (full), Transactions. Results/box scores drop
+  // out on playoff off-days (no games that date).
+  if (data.postseason) {
+    return `<div class="es">
+${masthead}
+${renderPostseasonBracketEmail(data.postseason)}
+${renderResults(data)}
+${renderTodaysGames(data.nextDayGames, teamRecords)}
+${data.games.length ? renderBoxScores(data) : ""}
+${renderTransactions(data.transactions)}
+</div>`;
+  }
 
   if (mode === "no-games") {
     return `<div class="es">

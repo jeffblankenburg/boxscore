@@ -210,6 +210,114 @@ a { color: inherit; }
   padding-bottom: 4px;
 }
 .boxscores-title-left { text-align: left; }
+/* Postseason bracket — a symmetric two-sided bracket printed like a newspaper
+   sports page: grayscale only, hairline rules, no logos. AL flows right, NL
+   flows left, the World Series sits in the center. Replaces standings/leaders
+   on postseason editions. Wider than a phone, so it scrolls horizontally
+   rather than clipping. */
+.ps-bracket-title {
+  text-align: center; font-size: 22px; font-weight: 700;
+  margin: 10px 0; border-bottom: 2px solid var(--border-strong);
+  padding-bottom: 4px;
+}
+.psb {
+  display: flex; align-items: stretch; justify-content: center;
+  gap: 0; overflow-x: auto; padding: 6px 0 10px;
+  font-size: 13px; color: var(--text-primary);
+}
+.psb-side { display: flex; align-items: stretch; }
+.psb-round { display: flex; flex-direction: column; min-width: 86px; }
+.psb-round-label {
+  text-align: center; font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-secondary);
+  padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px solid var(--border-strong);
+}
+.psb-round-body {
+  flex: 1; display: flex; flex-direction: column; justify-content: space-around;
+}
+.psb-match { position: relative; display: flex; flex-direction: column; justify-content: center; padding: 3px 0; }
+/* Black-and-white to match the email bracket: white box fills, not the site's
+   paper tan. The bracket is the one surface that reads as newsprint. */
+.psb-team {
+  display: flex; align-items: center; gap: 5px;
+  border: 1px solid var(--border-strong); border-bottom: 0;
+  padding: 3px 6px; white-space: nowrap; background: #ffffff;
+}
+.psb-match .psb-team:last-child { border-bottom: 1px solid var(--border-strong); }
+.psb-team.psb-r { flex-direction: row-reverse; text-align: right; }
+.psb-won { font-weight: 700; }
+.psb-lost { color: var(--text-muted); }
+.psb-tbd { color: var(--text-muted); font-style: italic; }
+.psb-seed {
+  min-width: 12px; text-align: center; font-size: 11px;
+  font-weight: 700; color: var(--text-muted);
+}
+.psb-nm { flex: 1; font-weight: inherit; }
+.psb-w { font-variant-numeric: tabular-nums; min-width: 10px; text-align: center; }
+/* Connector lines, drawn with hairline borders on pseudo-elements — no images.
+   A 14px gap between columns holds the connectors. Wild Card → Division is a
+   1-to-1 horizontal link (the boxes sit at the same height). Division →
+   Championship is a bracket that merges the two series into the CS box — one
+   ]-shaped element anchored to the DS body at exact 25%/75%, so nothing drifts. */
+.psb-side-l .psb-round { margin-right: 14px; }
+.psb-side-r .psb-round { margin-left: 14px; }
+.psb-round-cs.psb-round-l { margin-right: 0; }
+.psb-round-cs.psb-round-r { margin-left: 0; }
+
+/* Wild Card → Division: horizontal link out of each WC match. */
+.psb-side-l .psb-round-wc .psb-match::after {
+  content: ""; position: absolute; top: 50%; left: 100%; width: 14px;
+  border-top: 1px solid var(--border-strong);
+}
+.psb-side-r .psb-round-wc .psb-match::after {
+  content: ""; position: absolute; top: 50%; right: 100%; width: 14px;
+  border-top: 1px solid var(--border-strong);
+}
+
+/* Division → Championship: a ] (left) / [ (right) bracket. Its top & bottom
+   arms meet the two DS boxes at 25%/75%; its spine lands on the CS box edge. */
+.psb-round-ds .psb-round-body { position: relative; }
+.psb-side-l .psb-round-ds .psb-round-body::after {
+  content: ""; position: absolute; left: 100%; top: 25%; bottom: 25%; width: 14px;
+  border: 1px solid var(--border-strong); border-left: 0;
+}
+.psb-side-r .psb-round-ds .psb-round-body::after {
+  content: ""; position: absolute; right: 100%; top: 25%; bottom: 25%; width: 14px;
+  border: 1px solid var(--border-strong); border-right: 0;
+}
+.psb-center { position: relative; }
+.psb-center {
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  min-width: 150px; padding: 0 10px;
+}
+.psb-ws-title {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  text-align: center; margin-bottom: 6px;
+}
+.psb-ws-box { border: 2px solid var(--border-strong); width: 100%; background: #ffffff; }
+.psb-ws-team {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 8px;
+}
+.psb-ws-box .psb-ws-team + .psb-ws-team { border-top: 1px solid var(--border-strong); }
+
+/* Responsive: the symmetric bracket is ~950px, so below that we stack the two
+   leagues as separate one-sided brackets (AL, then NL, then the World Series),
+   each of which fits a phone. Wide/stack visibility flips at the breakpoint. */
+.psb-stack { display: none; }
+.psb-half { margin: 6px 0 14px; }
+.psb-half-title {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border-strong); padding-bottom: 3px; margin-bottom: 8px;
+}
+.psb-oneside { justify-content: flex-start; overflow-x: auto; }
+.psb-stack .psb-center { align-items: flex-start; min-width: 0; padding: 0; }
+.psb-stack .psb-ws-title { text-align: left; }
+.psb-stack .psb-ws-box { max-width: 320px; }
+@media (max-width: 900px) {
+  .psb-wide { display: none; }
+  .psb-stack { display: block; }
+}
 /* Team-page header sits right under the dateline. Pull it up with a negative
    margin so the gap above the text (dateline border → text) matches the gap
    below (text → its own border-bottom). Same visual weight as boxscores-title

@@ -10,6 +10,7 @@ import type {
   MlbBoxScore,
   MlbDivisionStandings,
   MlbLeaderboard,
+  MlbLeague,
   MlbScoringPlay,
   MlbTransaction,
   MlbWildCardStandings,
@@ -51,6 +52,40 @@ export type AsgRosters = { AL: AsgSide; NL: AsgSide };
 // statsapi records the recipient.
 export type AsgMvp = { name: string; mlbId: number | null };
 
+// ─── Postseason bracket ──────────────────────────────────────────────────
+// Replaces standings on postseason digests. Built from statsapi's
+// /schedule/postseason/series feed (see postseasonBracketFromRaw). One
+// PostseasonSeries per matchup; the renderer links rounds by shared team to
+// draw the advancement tree.
+
+export type PostseasonRound = "wild-card" | "division-series" | "lcs" | "world-series";
+
+// One team's side of a series. `wins` is games won in THIS series; the
+// higher-seeded/host team is `top` and the other `bottom`, per statsapi's
+// home/away on the series' games.
+export type PostseasonEntrant = {
+  teamId: number;
+  abbr: string;        // "NYY"
+  name: string;        // full club name "New York Yankees" (renderer trims to taste)
+  wins: number;        // games won in this series
+  seed: number | null; // 1-6 playoff seed (null if not derivable)
+};
+
+export type PostseasonSeries = {
+  round:   PostseasonRound;
+  league:  MlbLeague | null;  // null = World Series (cross-league)
+  bestOf:  number;            // 3 (WC), 5 (DS), 7 (LCS/WS)
+  top:     PostseasonEntrant;
+  bottom:  PostseasonEntrant;
+  // Winner's teamId once the series is clinched; null while it's live/unplayed.
+  winnerTeamId: number | null;
+};
+
+export type PostseasonBracket = {
+  season: number;
+  series: PostseasonSeries[];
+};
+
 export type CanonicalDailyData = {
   date:         string;                       // ISO YYYY-MM-DD
   games:        MlbGame[];
@@ -65,4 +100,7 @@ export type CanonicalDailyData = {
   allStarRosters?: AsgRosters | null;
   // Present on the All-Star recap edition once the MVP is recorded.
   allStarMvp?: AsgMvp | null;
+  // Present only on postseason days. Drives the bracket that replaces
+  // standings + leaders in the postseason digest.
+  postseason?: PostseasonBracket | null;
 };

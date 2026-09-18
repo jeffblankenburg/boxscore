@@ -134,6 +134,26 @@ export async function fetchScheduleSeasonRaw(season: number): Promise<unknown> {
   );
 }
 
+// Every postseason series for a season, one object per matchup (Wild Card,
+// Division Series, LCS, World Series). Each carries its full game list with
+// per-game winners — enough to reconstruct the bracket (series scores +
+// advancement) without any per-game fetch. Only fetched on postseason days
+// (see fetchDailyRaw); replaces standings, which statsapi returns empty once
+// the regular season ends.
+export async function fetchPostseasonSeriesRaw(season: number): Promise<unknown> {
+  return getRaw(`/v1/schedule/postseason/series?sportId=1&season=${season}`);
+}
+
+// Final regular-season standings for a season (no date → end-of-season state).
+// Postseason seeds aren't in the series feed, so we derive them from here:
+// division winners seeded 1-3 by record, the three wild cards 4-6 by record
+// (MLB's official seeding). Fetched alongside the bracket in the postseason
+// window (see fetchDailyRaw). `divisionChamp` + `winningPercentage` on each
+// teamRecord are all the adapter needs.
+export async function fetchFinalStandingsRaw(season: number): Promise<unknown> {
+  return getRaw(`/v1/standings?leagueId=103,104&season=${season}&standingsTypes=regularSeason`);
+}
+
 export type ScoringPlay = {
   inning: number;
   halfInning: "top" | "bottom";
