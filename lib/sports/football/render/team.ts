@@ -247,8 +247,10 @@ function renderScheduleSection(data: FootballTeamPageData, web: boolean): string
 }
 
 // Full roster stat tables (Passing/Rushing/Receiving/Defense/Kicking), season
-// totals through the page's as-of date. Web-only (live loader aggregates the
-// box scores). Player names link to their player pages.
+// totals through the page's as-of date, aggregated from the team's box scores.
+// Present in both the web page and the emailed team digest — the morning cron
+// aggregates and persists it, like the MLB team digest. Names link to player
+// pages.
 function renderRosterSection(data: FootballTeamPageData, web: boolean): string {
   if (!data.roster || data.roster.length === 0) return "";
   const blocks = data.roster

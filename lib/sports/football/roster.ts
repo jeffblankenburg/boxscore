@@ -44,6 +44,14 @@ export function aggregateRosterTables(
   teamAbbr: string,
 ): FootballRosterTable[] {
   const sides = boxes.map((b) => teamSide(b, teamAbbr)).filter((s): s is FootballTeamBox => s != null);
+  return aggregateSides(sides);
+}
+
+// Aggregate a team's per-game stat sides (one FootballTeamBox per game) into
+// season roster tables. Split from aggregateRosterTables so the incremental
+// store (which persists sides directly, see season-stats.ts) can reuse the exact
+// same math without reconstructing full box scores.
+export function aggregateSides(sides: FootballTeamBox[]): FootballRosterTable[] {
   if (sides.length === 0) return [];
 
   const tables: FootballRosterTable[] = [];
@@ -60,10 +68,12 @@ export function aggregateRosterTables(
   if (passing.length) {
     tables.push({
       label: "Passing",
-      columns: ["Player", "CMP", "ATT", "YDS", "TD", "INT"],
+      // C/ATT as a single column (box-score convention), not separate CMP+ATT —
+      // the ratio already carries both, so a standalone ATT column just repeats it.
+      columns: ["Player", "C/ATT", "YDS", "TD", "INT"],
       rows: passing.map((r) => ({
         player: rosterPlayer(r.player),
-        values: [`${r.acc.c}/${r.acc.a}`, r.acc.a, r.acc.yds, r.acc.td, r.acc.int],
+        values: [`${r.acc.c}/${r.acc.a}`, r.acc.yds, r.acc.td, r.acc.int],
       })),
     });
   }

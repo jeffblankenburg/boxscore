@@ -15,7 +15,7 @@ import {
   renderBasketballTeamContent,
   renderBasketballTeamEmailContent,
 } from "@/lib/render-basketball-team";
-import { teamsBySport, findTeam } from "@/lib/teams";
+import { teamsBySport } from "@/lib/teams";
 import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
 import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
 import { loadNbaData } from "@/lib/nba";
@@ -25,7 +25,8 @@ import {
   renderBasketballEmailContent,
 } from "@/lib/render-basketball";
 import { loadFootballData, hasPlayedGames } from "@/lib/sports/football/data";
-import { assembleFootballTeamPage } from "@/lib/sports/football/team-data";
+import { loadFootballTeamData } from "@/lib/sports/football/team-data";
+import { recordTeamGameStats } from "@/lib/sports/football/season-stats";
 import {
   renderFootballContent,
   renderFootballEmailContent,
@@ -247,27 +248,39 @@ export async function GET(req: Request) {
         mode: "regular",
       });
 
+      // Fold today's finished box scores into the incremental per-team season
+      // stat store BEFORE building team digests, so each team's Roster
+      // Statistics include today's game. Reuses the box scores already in `fb`
+      // (no extra ESPN calls); runs even when team digests are skipped so the
+      // store stays complete for the web pages. See season-stats.ts.
+      const team_stat_errors: string[] = [];
+      const stats_rows = await recordTeamGameStats(sport, fb).catch((e) => {
+        team_stat_errors.push((e as Error).message);
+        return 0;
+      });
+
       // Per-team recap digests. Weekly cadence (Jeff, 2026-07-20): a team's
-      // subscribers only get an email the morning after THEIR game, so we
-      // write a team_digest only for teams with a final today. NCAAF is
-      // included now that it has team pages + a full FBS registry — the cron
-      // path skips the heavy roster fetch (web-only), so each write is cheap.
+      // subscribers only get an email the morning after THEIR game, so we write
+      // a team_digest only for teams with a final today. The full digest —
+      // including season Roster Statistics (Passing/Rushing/Receiving/Defense/
+      // Kicking) — is built the same way the MLB cron does: from persisted data,
+      // no live per-game fetching. loadFootballTeamData reads the aggregated
+      // roster from the store in a single query.
       let team_digests_written = 0;
       const team_fails: string[] = [];
       if ((sport === "nfl" || sport === "ncaaf") && !skipTeams) {
-        const gameByTeam = new Map<string, string>(); // canonical slug → game id
+        const teamsPlayed = new Set<string>();
         for (const g of fb.games) {
           if (g.status !== "final") continue;
-          gameByTeam.set(g.awayTeam.id, g.id);
-          gameByTeam.set(g.homeTeam.id, g.id);
+          teamsPlayed.add(g.awayTeam.id);
+          teamsPlayed.add(g.homeTeam.id);
         }
-        for (const [slug, gameId] of gameByTeam) {
-          const team = findTeam(sport, slug);
-          if (!team) continue;
+        for (const slug of teamsPlayed) {
           try {
-            const tp = assembleFootballTeamPage(sport, team, fb, gameId);
+            const tp = await loadFootballTeamData(sport, slug, date);
+            if (!tp) continue;
             await upsertTeamDigest({
-              sport, team_slug: team.slug, date,
+              sport, team_slug: tp.slug, date,
               has_game: true, mode: null,
               html: renderFootballTeamContent(tp),
               email_html: renderFootballTeamEmailContent(tp),
@@ -284,7 +297,9 @@ export async function GET(req: Request) {
         game_count: fb.games.length,
         ranking_polls: fb.rankings.length,
         standings_groups: fb.standings.length,
+        team_stat_rows: stats_rows,
         team_digests_written,
+        ...(team_stat_errors.length ? { team_stat_errors } : {}),
         ...(team_fails.length ? { team_fails } : {}),
         html_bytes: html.length,
         email_bytes: email_html.length,

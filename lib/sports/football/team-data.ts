@@ -4,14 +4,13 @@
 // standings, leaders, and the box — all from the read-through daily_raw cache
 // the daily digest already populates. Everything is filtered to this team.
 
-import { footballLeagueConfig, seasonForDate, type FootballLeagueConfig } from "./leagues";
+import { footballLeagueConfig, seasonForDate } from "./leagues";
 import { loadFootballData } from "./data";
-import { fetchTeamSchedule, fetchGameSummary, type TeamScheduleEvent } from "./sources/espn-team";
-import { adaptBoxScore } from "./adapters/from-espn";
-import { aggregateRosterTables } from "./roster";
+import { fetchTeamSchedule, type TeamScheduleEvent } from "./sources/espn-team";
+import { loadTeamSeasonRosterTables } from "./season-stats";
 import { findTeam, type Sport } from "../../teams";
 import { yesterdayInET, nextDay } from "../../dates";
-import type { FootballLeague, FootballTeamRef, FootballGame, FootballBoxScore } from "./types";
+import type { FootballLeague, FootballTeamRef, FootballGame } from "./types";
 import type { CanonicalFootballDailyData } from "./canonical";
 import type {
   FootballTeamPageData,
@@ -21,9 +20,6 @@ import type {
 } from "./team-canonical";
 
 const UPCOMING_LIMIT = 5;
-// Cap concurrent box-summary fetches for the roster — a season is ~12–14 games;
-// firing them all at once invites ESPN rate-limiting.
-const ROSTER_FETCH_CONCURRENCY = 6;
 
 type AsOfRecord = { wins: number; losses: number; ties: number; streak: string };
 
@@ -49,28 +45,6 @@ function recordThrough(played: TeamScheduleEvent[]): AsOfRecord {
   return { wins, losses, ties, streak };
 }
 
-// Season-to-date roster tables from the played games' box scores. Fetches each
-// game's summary (capped concurrency), parses the box, and aggregates. Any
-// game that fails to fetch/parse is simply skipped.
-async function fetchRosterTables(
-  cfg: FootballLeagueConfig,
-  eventIds: string[],
-  teamAbbr: string,
-): Promise<FootballRosterTable[]> {
-  const boxes: FootballBoxScore[] = [];
-  for (let i = 0; i < eventIds.length; i += ROSTER_FETCH_CONCURRENCY) {
-    const batch = eventIds.slice(i, i + ROSTER_FETCH_CONCURRENCY);
-    const summaries = await Promise.all(
-      batch.map((id) => fetchGameSummary(cfg, id).then((s) => [id, s] as const).catch(() => [id, null] as const)),
-    );
-    for (const [id, summary] of summaries) {
-      if (summary == null) continue;
-      const box = adaptBoxScore(cfg, id, summary);
-      if (box) boxes.push(box);
-    }
-  }
-  return aggregateRosterTables(boxes, teamAbbr);
-}
 
 // ESPN kickoff timestamps are UTC; the daily bundle is keyed by the game's ET
 // date. Convert so an 8pm ET game (which is next-day UTC) resolves to the
@@ -129,7 +103,9 @@ export async function loadFootballTeamData(
 
   const [bundle, roster] = await Promise.all([
     loadFootballData(league, gamesDate),
-    fetchRosterTables(cfg, played.map((e) => e.eventId), team.abbreviation).catch(() => undefined),
+    // Season roster stats come from the incremental store (season-stats.ts),
+    // written each game day by the cron — one DB read, no per-game ESPN fetches.
+    loadTeamSeasonRosterTables(league, season, team.abbreviation, gamesDate).catch(() => undefined),
   ]);
 
   return assembleFootballTeamPage(league, team, bundle, last?.eventId ?? null, {
