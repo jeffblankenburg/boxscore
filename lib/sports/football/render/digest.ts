@@ -762,26 +762,32 @@ function renderTeamStatsTable(box: FootballBoxScore): string {
 
 function renderTeamBox(t: FootballTeamBox, league: FootballLeague, web: boolean): string {
   const nm = (p: { player: FootballPlayerRef }) => playerNameCell(league, p.player, web);
+  // Offensive groups share one column grid so YDS and TD line up across
+  // Passing, Rushing and Receiving. The shared slots are [volume, YDS, TD,
+  // secondary]; Passing's extra rate stat (RTG) takes the leftmost slot — the
+  // ragged-left side — so every group's counting stats right-align to a clean
+  // right edge with YDS/TD (and the volume + secondary columns) in the same
+  // place. Rushing/Receiving leave that leftmost slot blank.
   const passing = statTable(
-    ["C/ATT", "YDS", "TD", "INT", "RTG"],
+    ["RTG", "C/ATT", "YDS", "TD", "INT"],
     t.passing.map((p) => [
       nm(p),
+      p.rating ?? "",
       `${p.completions}/${p.attempts}`,
       p.yards,
       p.touchdowns,
       p.interceptions,
-      p.rating ?? "",
     ]),
     "Passing",
   );
   const rushing = statTable(
-    ["CAR", "YDS", "TD", "LG"],
-    t.rushing.map((p) => [nm(p), p.carries, p.yards, p.touchdowns, p.long]),
+    ["", "CAR", "YDS", "TD", "LG"],
+    t.rushing.map((p) => [nm(p), "", p.carries, p.yards, p.touchdowns, p.long]),
     "Rushing",
   );
   const receiving = statTable(
-    ["REC", "YDS", "TD", "LG"],
-    t.receiving.map((p) => [nm(p), p.receptions, p.yards, p.touchdowns, p.long]),
+    ["", "REC", "YDS", "TD", "LG"],
+    t.receiving.map((p) => [nm(p), "", p.receptions, p.yards, p.touchdowns, p.long]),
     "Receiving",
   );
   const defense = statTable(
@@ -820,19 +826,38 @@ function renderTeamBox(t: FootballTeamBox, league: FootballLeague, web: boolean)
 // Generic compact stat table. `rows` cells are pre-formatted; the first cell
 // is the (already-HTML) player-name cell, the rest are stat values. Returns
 // "" when there are no rows so empty groups don't leave a stray header.
+// The box-score stat groups (Passing/Rushing/Receiving/Defense/Kicking) have
+// different column counts (3–5). A shared fixed grid — name column + STAT_COLS
+// equal-width stat columns — keeps the columns aligned down the page across all
+// groups instead of each table splitting its own width. Fewer-stat tables leave
+// the trailing columns empty; cells fill left-to-right, so YDS/TD land in the
+// same place in Passing, Rushing and Receiving.
+const STAT_COLS = 5;
+const STAT_COLGROUP =
+  `<colgroup><col style="width:34%" />` +
+  `${Array.from({ length: STAT_COLS }, () => `<col style="width:${(66 / STAT_COLS).toFixed(1)}%" />`).join("")}` +
+  `</colgroup>`;
+
 function statTable(cols: string[], rows: Array<Array<string | number>>, label: string): string {
   if (rows.length === 0) return "";
+  // Right-anchor: pad shorter groups with empty leading cells so every group's
+  // rightmost column lands on the same right edge (clean right margin, ragged
+  // left). Kicking's PTS aligns under Passing's RTG, etc.
+  const pad = Math.max(0, STAT_COLS - cols.length);
+  const padTh = `<th class="fb-st-cell"></th>`.repeat(pad);
+  const padTd = `<td class="fb-st-cell"></td>`.repeat(pad);
   const head = cols.map((c) => `<th class="fb-st-cell">${escapeHtml(c)}</th>`).join("");
   const body = rows
     .map((r) => {
       const [name, ...stats] = r;
       const cells = stats.map((s) => `<td class="fb-st-cell">${escapeHtml(String(s))}</td>`).join("");
-      return `<tr><td class="fb-st-name">${name}</td>${cells}</tr>`;
+      return `<tr><td class="fb-st-name">${name}</td>${padTd}${cells}</tr>`;
     })
     .join("");
   return `
 <table class="fb-stat-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-  <thead><tr><th class="fb-st-name">${escapeHtml(label)}</th>${head}</tr></thead>
+  ${STAT_COLGROUP}
+  <thead><tr><th class="fb-st-name">${escapeHtml(label)}</th>${padTh}${head}</tr></thead>
   <tbody>${body}</tbody>
 </table>`.trim();
 }
