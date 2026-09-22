@@ -17,7 +17,7 @@ type ConferenceRow = { slug: string; name: string };
 // the stored team digest). NHL has a registry but no team page yet. Preview
 // links only make sense here — and only when the page is loadable by the
 // viewer, so we AND this with `available` below.
-const TEAM_PAGE_SPORTS = new Set(["mlb", "nfl", "ncaaf", "nba", "wnba"]);
+const TEAM_PAGE_SPORTS = new Set(["mlb", "nfl", "ncaaf", "nba", "wnba", "nhl"]);
 
 export function SportPanel({
   sportId,

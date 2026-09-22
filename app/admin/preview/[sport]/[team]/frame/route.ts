@@ -16,6 +16,8 @@ import {
   renderBasketballTeamContent,
   renderBasketballTeamEmailContent,
 } from "@/lib/render-basketball-team";
+import { loadHockeyTeamData } from "@/lib/hockey-team";
+import { renderHockeyTeamContent, renderHockeyTeamEmailContent } from "@/lib/render-hockey-team";
 import { teamDailyEmail } from "@/lib/emails/templates";
 import { getAnnouncement } from "@/lib/announcements";
 import { siteOrigin } from "@/lib/site";
@@ -23,7 +25,7 @@ import { BRAND } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-const VALID_SPORTS = new Set(["mlb", "nba", "wnba"]);
+const VALID_SPORTS = new Set(["mlb", "nba", "wnba", "nhl"]);
 
 export async function GET(
   req: Request,
@@ -41,11 +43,14 @@ export async function GET(
   const date = dateParam && isValidIsoDate(dateParam) ? dateParam : yesterdayInET();
   const surface = url.searchParams.get("surface") === "web" ? "web" : "email";
   const isBasketball = sport === "nba" || sport === "wnba";
+  const isHockey = sport === "nhl";
 
   if (surface === "web") {
-    const webBody = isBasketball
-      ? renderBasketballTeamContent(await loadBasketballTeamData(sport, slug, date))
-      : renderTeamWebContent(await loadTeamEmailData(team, date));
+    const webBody = isHockey
+      ? renderHockeyTeamContent(await loadHockeyTeamData(slug, date))
+      : isBasketball
+        ? renderBasketballTeamContent(await loadBasketballTeamData(sport, slug, date))
+        : renderTeamWebContent(await loadTeamEmailData(team, date));
     const globalsCss = await readFile(join(process.cwd(), "app", "globals.css"), "utf-8");
     // Show the day's announcement inline (email-only in production) so the
     // operator can verify it here too — sport-specific or the global banner.
@@ -70,9 +75,11 @@ export async function GET(
   }
 
   const origin = await siteOrigin();
-  const body = isBasketball
-    ? renderBasketballTeamEmailContent(await loadBasketballTeamData(sport, slug, date))
-    : renderTeamEmailContent(await loadTeamEmailData(team, date));
+  const body = isHockey
+    ? renderHockeyTeamEmailContent(await loadHockeyTeamData(slug, date))
+    : isBasketball
+      ? renderBasketballTeamEmailContent(await loadBasketballTeamData(sport, slug, date))
+      : renderTeamEmailContent(await loadTeamEmailData(team, date));
   const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
 
   const { html } = teamDailyEmail({

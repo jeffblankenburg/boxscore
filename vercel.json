@@ -113,6 +113,18 @@
       "schedule": "47 9 * * *"
     },
     {
+      "path": "/api/cron/generate?sport=nhl&refetch=true",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-email?sport=nhl",
+      "schedule": "44 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-team-email?sport=nhl",
+      "schedule": "49 9 * * *"
+    },
+    {
       "path": "/api/cron/send-team-email?sport=mlb",
       "schedule": "45 9 * * *"
     },

@@ -18,11 +18,12 @@ import {
   NFL_PREVIEW_FIXTURES,
   NFL_PREVIEW_MODES,
 } from "@/lib/sports/football/preview-fixtures";
+import { HOCKEY_PREVIEW_MODES, hockeyFixtureDate } from "@/lib/hockey-preview-fixtures";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Preview · admin · boxscore", robots: { index: false } };
 
-const VALID_SPORTS = new Set(["mlb", "nba", "wnba", "nfl", "ncaaf"]);
+const VALID_SPORTS = new Set(["mlb", "nba", "wnba", "nfl", "ncaaf", "nhl"]);
 
 // Preset preview widths. "full" means no constraint (fills the available column).
 const WIDTH_PRESETS: Array<{ key: string; label: string; px: number | null }> = [
@@ -72,6 +73,13 @@ function modeOptionsFor(sport: string): ModeOptions {
       modes: ["Regular Season - Saturday"],
       fixtures: { "Regular Season - Saturday": d },
       defaultDate: d,
+    };
+  }
+  if (sport === "nhl") {
+    return {
+      modes: HOCKEY_PREVIEW_MODES,
+      fixtures: Object.fromEntries(HOCKEY_PREVIEW_MODES.map((m) => [m, hockeyFixtureDate(m)])),
+      defaultDate: hockeyFixtureDate("current"),
     };
   }
   const sportTyped = sport as "nba" | "wnba";

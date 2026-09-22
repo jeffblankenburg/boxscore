@@ -76,7 +76,7 @@ export async function GET(req: Request) {
   // Sports whose generate loop writes per-team digests (html + email_html) to
   // team_digests. The send below is otherwise sport-agnostic — it just reads
   // the pre-rendered email_html. Anything else fails loudly rather than no-op.
-  const TEAM_EMAIL_SPORTS = new Set(["mlb", "nfl", "nba", "wnba", "ncaaf"]);
+  const TEAM_EMAIL_SPORTS = new Set(["mlb", "nfl", "nba", "wnba", "ncaaf", "nhl"]);
   if (!TEAM_EMAIL_SPORTS.has(sport)) {
     return NextResponse.json(
       { error: `no team-digest renderer for sport=${sport}` },

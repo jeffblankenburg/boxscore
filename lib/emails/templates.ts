@@ -9,6 +9,7 @@
 
 import { EMAIL_STYLES } from "../render-email";
 import { BASKETBALL_EMAIL_STYLES } from "../render-basketball";
+import { HOCKEY_EMAIL_STYLES } from "../render-hockey";
 import { FOOTBALL_EMAIL_STYLES } from "../sports/football/render/digest";
 
 // Each sport's digest email carries ONLY its own stylesheet (disjoint class
@@ -16,6 +17,10 @@ import { FOOTBALL_EMAIL_STYLES } from "../sports/football/render/digest";
 // into one block — that bloats the shared <style> past the size Gmail silently
 // drops it, which broke the MLB email. See lib/render-email.ts.
 function stylesForSport(sport: string): string {
+  // NHL reuses basketball's generic bb-* table/section classes (see
+  // render-hockey.ts), plus a small hockey-only override block that makes its
+  // denser standings fit a 400px email.
+  if (sport === "nhl") return BASKETBALL_EMAIL_STYLES + HOCKEY_EMAIL_STYLES;
   if (sport === "nba" || sport === "wnba") return BASKETBALL_EMAIL_STYLES;
   if (sport === "nfl" || sport === "ncaaf") return FOOTBALL_EMAIL_STYLES;
   return EMAIL_STYLES; // mlb + safe default

@@ -20,6 +20,11 @@ import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
 import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
 import { loadNbaData } from "@/lib/nba";
 import { loadWnbaData } from "@/lib/wnba";
+import { loadNhlData } from "@/lib/nhl";
+import { renderHockeyContent, renderHockeyEmailContent } from "@/lib/render-hockey";
+import { loadHockeyTeamData } from "@/lib/hockey-team";
+import { renderHockeyTeamContent, renderHockeyTeamEmailContent } from "@/lib/render-hockey-team";
+import { teamSlugForEspn as hockeyTeamSlugForEspn } from "@/lib/hockey-links";
 import {
   renderBasketballContent,
   renderBasketballEmailContent,
@@ -75,7 +80,7 @@ export async function GET(req: Request) {
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
-  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba" && sport !== "nfl" && sport !== "ncaaf") {
+  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba" && sport !== "nfl" && sport !== "ncaaf" && sport !== "nhl") {
     return NextResponse.json(
       { error: `no generator implemented for sport=${sport}` },
       { status: 501 },
@@ -303,6 +308,58 @@ export async function GET(req: Request) {
         ...(team_fails.length ? { team_fails } : {}),
         html_bytes: html.length,
         email_bytes: email_html.length,
+      };
+      revalidatePath("/sitemap.xml");
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    // Hockey (nhl): load → render → upsert, same cadence as basketball — a
+    // daily league digest (offseason-tagged when empty) plus per-team digests
+    // only for teams that played a final today.
+    if (sport === "nhl") {
+      const hc = await loadNhlData(date, { refetch });
+      const html = renderHockeyContent(hc, navSports);
+      const email_html = renderHockeyEmailContent(hc, navSports);
+      await upsertDigest({
+        sport, date, html, email_html, game_count: hc.games.length,
+        mode: hc.games.length > 0 ? "regular" : "offseason",
+      });
+      const playedSlugs = skipTeams
+        ? []
+        : [...new Set(
+            hc.games
+              .filter((g) => g.event.status === "final")
+              .flatMap((g) => [g.event.away.team, g.event.home.team])
+              .map((t) => hockeyTeamSlugForEspn({ displayName: t.displayName, nickname: t.name }))
+              .filter((s): s is string => s != null),
+          )];
+      let teamOk = 0;
+      const teamFails: string[] = [];
+      for (const slug of playedSlugs) {
+        try {
+          const td = await loadHockeyTeamData(slug, date);
+          await upsertTeamDigest({
+            sport, team_slug: slug, date,
+            has_game: true, mode: td.mode,
+            html: renderHockeyTeamContent(td),
+            email_html: renderHockeyTeamEmailContent(td),
+          });
+          teamOk++;
+        } catch (err) {
+          const msg = (err as Error).message;
+          console.error(`[generate] nhl team ${slug} failed: ${msg}`);
+          teamFails.push(`${slug}: ${msg}`);
+        }
+      }
+      const result = {
+        sport, date,
+        game_count: hc.games.length,
+        final_count: hc.games.filter((g) => g.event.status === "final").length,
+        conference_count: hc.standings.conferences.length,
+        season: hc.season,
+        html_bytes: html.length, email_bytes: email_html.length,
+        team_ok: teamOk, team_fails: teamFails,
       };
       revalidatePath("/sitemap.xml");
       await finishCronRun(runId, { status: "ok", result });

@@ -22,6 +22,9 @@ import { SOCIAL_ICON_DATA_BY_SLUG } from "@/lib/brand-icon-data";
 import { isValidIsoDate, prettyDate } from "@/lib/dates";
 import { MLB_PREVIEW_FIXTURES } from "@/lib/mlb-preview-fixtures";
 import { basketballFixtureDate } from "@/lib/basketball-preview-fixtures";
+import { loadNhlData } from "@/lib/nhl";
+import { renderHockeyContent, renderHockeyEmailContent } from "@/lib/render-hockey";
+import { hockeyFixtureDate } from "@/lib/hockey-preview-fixtures";
 import { loadFootballData } from "@/lib/sports/football/data";
 import {
   renderFootballContent,
@@ -94,7 +97,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
   }
 
   const { sport } = await params;
-  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba" && sport !== "nfl" && sport !== "ncaaf") {
+  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba" && sport !== "nfl" && sport !== "ncaaf" && sport !== "nhl") {
     return NextResponse.json({ error: `unknown sport: ${sport}` }, { status: 404 });
   }
 
@@ -113,7 +116,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
         ? FOOTBALL_PREVIEW_FIXTURES.nfl
         : sport === "ncaaf"
           ? FOOTBALL_PREVIEW_FIXTURES.ncaaf
-          : basketballFixtureDate(sport, "current");
+          : sport === "nhl"
+            ? hockeyFixtureDate("current")
+            : basketballFixtureDate(sport as "nba" | "wnba", "current");
   const targetDate = dateParam && isValidIsoDate(dateParam) ? dateParam : fallbackDate;
 
   // Load + render per sport. Both paths produce a { digestDate, digestPrettyDate,
@@ -152,6 +157,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ sport: s
       webBody = renderFootballContent(fb, navSports);
       emailBody = renderFootballEmailContent(fb, navSports);
     }
+  } else if (sport === "nhl") {
+    const data = await loadNhlData(targetDate);
+    digestDate = data.date;
+    digestPrettyDate = data.prettyDate;
+    webBody = renderHockeyContent(data, navSports);
+    emailBody = renderHockeyEmailContent(data, navSports);
   } else {
     const data = sport === "nba"
       ? await loadNbaData(targetDate)

@@ -66,6 +66,10 @@ export const SPORT_FEATURES: Record<string, SportFeatures> = {
   // is the flag that encodes "no daily send on game-less days".
   nfl:   { hasPreview: true, hasShareImages: false, hasTeamDigests: true,  hasRegenAll: false, expectedRoutes: ["generate", "send-email", "send-team-email"], sendsOnGameDaysOnly: true },
   ncaaf: { hasPreview: true, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"], sendsOnGameDaysOnly: true },
+  // NHL: league digest + per-team digests, daily-cadence pro league. Sends only
+  // on game days (no empty offseason/preseason-gap emails). No share images or
+  // social posts yet.
+  nhl:   { hasPreview: true, hasShareImages: false, hasTeamDigests: true,  hasRegenAll: false, expectedRoutes: ["generate", "send-email", "send-team-email"], sendsOnGameDaysOnly: true },
 };
 
 export function featuresFor(sport: string): SportFeatures {

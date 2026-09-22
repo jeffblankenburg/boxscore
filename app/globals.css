@@ -1274,6 +1274,16 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   .bb-leaders-cols { column-count: 1; }
 }
 
+/* Hockey-only overrides (scoped to .hk; NHL reuses the bb-* classes). Its
+   standings carry more columns than basketball (GP/W/L/OTL/PTS/DIFF/L10/STRK),
+   so a fixed layout + tight cells keep the table inside a 400px email/phone
+   instead of scrolling. Keep in sync with HOCKEY_EMAIL_STYLES (render-hockey.ts). */
+.hk .bb-standings-table { table-layout: fixed; width: 100%; }
+.hk .bb-standings-table th, .hk .bb-standings-table td {
+  padding: 2px 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 .bb-section { margin: 18px 0 24px; }
 .bb-section-title {
   font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
