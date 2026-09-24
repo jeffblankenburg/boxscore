@@ -62,12 +62,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap"
         />
-        {/* TEMP: Impact.com site-ownership verification — remove after Impact confirms.
-            Placed here (not via the Metadata API) so the non-standard `value=`
-            attribute renders verbatim; Metadata would rewrite it to `content=`.
-            Spread cast because React's <meta> types omit `value` — it still
-            renders as a literal attribute at runtime. */}
-        <meta {...({ name: "impact-site-verification", value: "8ed0f84c-57ef-40f0-aeef-969c476af283" } as Record<string, string>)} />
       </head>
       <body>
         <AttributionCapture />
