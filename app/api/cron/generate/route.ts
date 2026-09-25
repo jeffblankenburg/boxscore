@@ -6,8 +6,8 @@ import {
   renderCanonicalEmailContentWithAds,
 } from "@/lib/ad-placements";
 import { upsertDigest, getLatestDigest } from "@/lib/digests";
-import { upsertTeamDigest } from "@/lib/team-digests";
-import { loadTeamEmailData, renderTeamEmailContent, teamPlayedGames } from "@/lib/render-team-email";
+import { upsertTeamDigest, hasSignoffForSeason } from "@/lib/team-digests";
+import { loadTeamEmailData, renderTeamEmailContent, teamPlayedGames, classifyTeamMode } from "@/lib/render-team-email";
 import { renderTeamWebContent } from "@/lib/render-team-web";
 import { loadBasketballTeamData } from "@/lib/basketball-team";
 import { teamSlugForEspn } from "@/lib/basketball-links";
@@ -135,12 +135,21 @@ export async function GET(req: Request) {
       for (const team of teams) {
         try {
           const td = await loadTeamEmailData(team, date);
+          // Fire-once: if this team already signed off earlier this season,
+          // drop the season-end flag so today renders the silent offseason
+          // shell instead of a second farewell.
+          if (td.seasonEnd && await hasSignoffForSeason(sport, team.slug, Number(date.slice(0, 4)), date)) {
+            td.seasonEnd = null;
+          }
           const teamHtml = renderTeamWebContent(td);
           const teamEmailHtml = renderTeamEmailContent(td);
           const hasGame = teamPlayedGames(td).length > 0;
+          // The signoff day stamps mode='signoff' (its dedupe marker); every
+          // other team day keeps the league mode for pagination/sitemap.
+          const teamMode = classifyTeamMode(td) === "signoff" ? "signoff" : data.mode;
           await upsertTeamDigest({
             sport, team_slug: team.slug, date,
-            has_game: hasGame, mode: data.mode,
+            has_game: hasGame, mode: teamMode,
             html: teamHtml, email_html: teamEmailHtml,
           });
           teamOk++;

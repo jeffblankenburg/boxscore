@@ -51,6 +51,12 @@ function asWidth(s: string | undefined, surface: "web" | "email"): string {
 const TEAM_PREVIEW_DAYS: Array<{ label: string; games: string }> = [
   { label: "Game day", games: "2025-09-24" },
   { label: "No games (All-Star break)", games: "2025-07-14" },
+  // Postseason anchors (2024, rendered live). The exact layout is team-relative:
+  // on the LCS day a team that played shows the framed playoff box; on the
+  // postseason-end day each team shows its own farewell variant (champion /
+  // eliminated / missed) since the preview skips the once-per-season dedupe.
+  { label: "Playoff game (2024 LCS)", games: "2024-10-17" },
+  { label: "Season signoff (2024 end)", games: "2024-10-31" },
   { label: "Offseason", games: "2026-01-08" },
 ];
 
@@ -80,18 +86,14 @@ export default async function TeamPreviewPage({
   const widthPx = WIDTH_PRESETS.find((p) => p.key === width)?.px ?? null;
 
   // Football renders live at its dated URL (point-in-time as of that date's
-  // games). Email always uses the frame route. For web: MLB points at its dated
-  // public page (public sport, cached digest), but NBA/WNBA render live through
-  // the frame — their public page is 404 while the sport is admin_only and
-  // before the generate cron has run.
-  const isBasketball = sport === "nba" || sport === "wnba";
+  // games). Everything else renders live through the frame route — MLB included,
+  // so historical/postseason dates that were never cached to team_digests (and
+  // NBA/WNBA, whose public page 404s pre-launch) still preview on both surfaces.
   const frameSrc = webOnly
     ? `/${sport}/${team.slug}/${date}`
     : surface === "email"
       ? `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}`
-      : isBasketball
-        ? `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}&surface=web`
-        : `/${sport}/${team.slug}/${date}`;
+      : `/admin/preview/${sport}/${team.slug}/frame?date=${gamesDate}&surface=web`;
 
   const link = (overrides: { date?: string; surface?: "web" | "email"; width?: string }) => {
     const d = overrides.date ?? date;

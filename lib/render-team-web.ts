@@ -15,7 +15,12 @@ import {
   renderGame, renderDateline, renderTransactions, renderDivisionTable,
 } from "./render";
 import { lastNameLinkWeb } from "./player-links";
-import { teamPlayedGames, type TeamEmailData } from "./render-team-email";
+import {
+  teamPlayedGames, classifyTeamMode,
+  seriesRoundName, seriesState, seriesGameNumber, signoffStatusLine, leagueListText,
+  type TeamEmailData,
+} from "./render-team-email";
+import { renderPostseasonBracketWeb } from "./sports/mlb/render/postseason";
 import { showMagicNumbers, clinchLetter, clinchKeyLine } from "./standings-format";
 
 const DIVISION_NAMES: Record<number, string> = {
@@ -39,6 +44,11 @@ function teamHeading(data: TeamEmailData): string {
 }
 
 function renderStandings(data: TeamEmailData): string {
+  // October: standings feed is empty; show the full bracket (same as the league
+  // digest) in the standings slot.
+  if (data.postseasonBracket) {
+    return renderPostseasonBracketWeb(data.postseasonBracket);
+  }
   if (!data.division) return "";
   const label = DIVISION_NAMES[data.division.division.id] ?? "Division";
   const showMagic = showMagicNumbers(data.date);
@@ -55,8 +65,12 @@ function renderYesterdayBox(data: TeamEmailData): string {
   if (played.length === 0) {
     return `<div class="no-games-note">No game played on ${esc(data.prettyDate)}.</div>`;
   }
-  // Both halves of a doubleheader, in schedule order.
-  return played
+  // Postseason framing: round + game number + series state above the box.
+  const label = data.teamSeries
+    ? `<div style="font-weight:700;margin:0 0 4px;">${esc(seriesRoundName(data.teamSeries))} — Game ${seriesGameNumber(data.teamSeries)} <span style="font-weight:400;opacity:.7;">(${esc(seriesState(data.teamSeries))})</span></div>`
+    : "";
+  // Both halves of a doubleheader, in schedule order (postseason has none).
+  return label + played
     .map((g) => renderGame(g as Parameters<typeof renderGame>[0], data.liveAbbrev))
     .join("");
 }
@@ -295,20 +309,34 @@ function renderUpcoming(data: TeamEmailData): string {
     <div class="upcoming-list">${rows}</div>`;
 }
 
-// Team-digest day-state mirrors render-team-email's TeamDigestMode — same
-// classifier, same section ordering. Kept in sync by hand so the email and
-// web views show the same content layout.
-type TeamDigestMode = "game" | "no-game" | "offseason";
-
-function classifyMode(data: TeamEmailData): TeamDigestMode {
-  const hasGame = teamPlayedGames(data).length > 0;
-  if (hasGame) return "game";
-  if (data.upcoming.length > 0) return "no-game";
-  return "offseason";
+// Season farewell — mirrors renderTeamSignoff in the email renderer: sincere
+// thank-you, the retention line (emails stop on their own until spring), then a
+// CTA to the leagues that are live now. Relative links since this is the web page.
+function renderSignoff(data: TeamEmailData): string {
+  // The whole farewell reads as a centered article column so it doesn't hug the
+  // left edge under a full-width masthead. Prose stays left-aligned within the
+  // column; the CTA is centered. NOT .no-games-note (centered italic, wrong here).
+  const para = "font-size:15px;line-height:1.55;color:var(--text-secondary);text-align:left;margin:0 0 14px;";
+  const status = `<div style="font-size:18px;font-weight:700;line-height:1.35;margin:4px 0 16px;">${esc(signoffStatusLine(data))}</div>`;
+  const thanks = `<p style="${para}">Thank you for being a subscriber this season. A morning box score in your inbox only works because readers like you keep showing up for it, and we're genuinely grateful you spent part of your mornings with us.</p>`;
+  const farewell = `<p style="${para}">This is your last scheduled ${esc(data.team.name)} email until next season. We won't email you over the winter. Your subscription stays active, and your daily digest will pick right back up on its own when spring training begins. There's nothing you need to do to keep it.</p>`;
+  let cta = "";
+  if (data.otherLeagues.length > 0) {
+    const list = leagueListText(data.otherLeagues.map((l) => l.name));
+    const verb = data.otherLeagues.length === 1 ? "season is" : "seasons are";
+    const btnLabel = data.otherLeagues.length === 1
+      ? `Subscribe to the ${data.otherLeagues[0]!.name} digest`
+      : "Subscribe to another league";
+    cta = `<div style="border-top:1px solid #c4baa5;margin-top:24px;padding-top:20px;text-align:center;">
+      <p style="font-size:15px;line-height:1.55;color:var(--text-secondary);margin:0 0 16px;">The ${esc(list)} ${verb} underway. Keep the box scores coming all winter.</p>
+      <a href="/settings" style="display:inline-block;background:#161410;color:#f9f7f1;font-weight:700;font-size:15px;text-decoration:none;padding:13px 28px;border-radius:6px;">${esc(btnLabel)}</a>
+    </div>`;
+  }
+  return `<div style="max-width:560px;margin:8px auto 0;">${status}${thanks}${farewell}${cta}</div>`;
 }
 
 export function renderTeamWebContent(data: TeamEmailData): string {
-  const mode = classifyMode(data);
+  const mode = classifyTeamMode(data);
   // Team digests live at /{sport}/{slug}/{edition_date}. data.date is the
   // games_date the digest was built from; editionDate = games_date + 1.
   const editionDate = nextDay(data.date);
@@ -321,8 +349,12 @@ export function renderTeamWebContent(data: TeamEmailData): string {
     parts.push(
       renderStandings(data),
       renderYesterdayBox(data),
-      renderStatSheet(data),
-      renderAdvancedStats(data),
+    );
+    // Skip the regular-season stat sheets in the playoffs (see email renderer).
+    if (!data.postseasonBracket) {
+      parts.push(renderStatSheet(data), renderAdvancedStats(data));
+    }
+    parts.push(
       renderUpcoming(data),
       renderTransactions(data.transactions),
     );
@@ -332,6 +364,8 @@ export function renderTeamWebContent(data: TeamEmailData): string {
       renderUpcoming(data),
       renderTransactions(data.transactions),
     );
+  } else if (mode === "signoff") {
+    parts.push(renderSignoff(data));
   } else {
     parts.push(renderTransactions(data.transactions));
   }

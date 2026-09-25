@@ -8,7 +8,7 @@
 // Reuses CSS classes and helpers from render-email.ts. Loader function
 // (loadTeamEmailData) orchestrates the MLB-API fetches.
 
-import { loadDailyData } from "./daily";
+import { loadDailyRaw, rawToDailyData } from "./daily";
 import {
   getTeamRoster, getTeamScheduleRange,
   fetchPersonSeasonPitchingRaw, parsePersonWL,
@@ -26,8 +26,22 @@ import {
 } from "./render-email";
 import { lastNameLinkEmail } from "./player-links";
 import { dedupeTransactions } from "./dedupe-transactions";
+import { postseasonBracketForDate, finalRecordForTeam } from "./sports/mlb/adapters/from-statsapi";
+import type { PostseasonSeries, PostseasonBracket } from "./sports/mlb/canonical";
+import { renderPostseasonBracketEmail } from "./sports/mlb/render/postseason";
+import { getVisibleSports } from "./sports";
+import { EMAIL_LINK_BASE } from "./site";
 
 type ProbableStats = { wins: number; losses: number; era: string | null };
+
+// How a team's season ended — drives the one-time signoff (farewell) digest.
+// `missed`     — never made the postseason (done after game 162).
+// `eliminated` — lost a postseason series; `roundLabel` names the round.
+// `champion`   — won the World Series.
+export type SeasonEnd = {
+  variant: "missed" | "eliminated" | "champion";
+  roundLabel: string | null;
+};
 
 export type TeamEmailData = {
   team: Team;
@@ -43,6 +57,20 @@ export type TeamEmailData = {
   record: { wins: number; losses: number; gamesBack: string } | null;
   transactions: Transaction[];
   probables: Map<number, ProbableStats>;
+  // The team's live/most-recent postseason series as of `date` (null outside
+  // the postseason or if the team isn't in the bracket). Frames playoff box
+  // scores with the round + series state.
+  teamSeries: PostseasonSeries | null;
+  // The full postseason bracket as of `date` (null outside October). Rendered
+  // where the standings table would be — the same bracket the league digest
+  // shows, so a playoff team's subscribers see the whole field.
+  postseasonBracket: PostseasonBracket | null;
+  // Set only on the first day the team's season is over; drives the signoff
+  // digest. The generate cron enforces fire-once via the team_digests mode.
+  seasonEnd: SeasonEnd | null;
+  // Other publicly-launched leagues to point signoff subscribers toward
+  // (MLB excluded). Empty when nothing else is public yet.
+  otherLeagues: { id: string; name: string }[];
 };
 
 /** The team's games on `date` that were actually played (final, with box +
@@ -69,13 +97,24 @@ export async function loadTeamEmailData(team: Team, date: string): Promise<TeamE
   const start = nextDay(date);
   const end = addDaysIso(start, 6);
 
-  // Wave 1: parallel reads. loadDailyData covers yesterday's box scores,
-  // standings, and transactions; the other two are team-scoped.
-  const [daily, roster, upcoming] = await Promise.all([
-    loadDailyData(date),
+  // Wave 1: parallel reads. The maintained raw payload covers yesterday's box
+  // scores, standings, transactions, AND the postseason bracket; the other two
+  // are team-scoped. Loading raw once (rather than loadDailyData) lets us reuse
+  // it for the bracket without a second DB read of the ~1MB daily_raw row.
+  const [raw, roster, upcoming, visibleSports] = await Promise.all([
+    loadDailyRaw(date),
     getTeamRoster(teamId, season),
     getTeamScheduleRange(teamId, start, end),
+    getVisibleSports(),
   ]);
+  const daily = rawToDailyData(raw, date);
+  // Only point signoff readers at leagues that are actually playing when their
+  // MLB season ends (Sept–Nov) — claiming a league is "in season now" when it
+  // isn't would be spin. Coarse month windows are enough here.
+  const endMonth = Number(date.slice(5, 7));
+  const otherLeagues = visibleSports
+    .filter((s) => s.id !== "mlb" && sportInSeason(s.id, endMonth))
+    .map((s) => ({ id: s.id, name: s.name }));
 
   // filter, not find — both halves of a doubleheader are the team's games.
   // Sorted by gameNumber so game 1 always renders before game 2.
@@ -91,9 +130,27 @@ export async function loadTeamEmailData(team: Team, date: string): Promise<TeamE
     d.teamRecords.some((tr) => tr.team.id === teamId),
   ) ?? null;
   const teamRec = division?.teamRecords.find((tr) => tr.team.id === teamId);
-  const record = teamRec
+  // Clinched a playoff berth per the (late-September) standings feed. Guards the
+  // gap where a bye team's Division Series games aren't in the 7-day schedule
+  // yet — without it we'd misread their empty upcoming as "missed the playoffs".
+  const clinchedPlayoffs = !!teamRec && (teamRec.clinched === true || !!teamRec.clinchIndicator);
+  let record = teamRec
     ? { wins: teamRec.wins, losses: teamRec.losses, gamesBack: teamRec.gamesBack }
     : null;
+  // statsapi's live /standings goes empty once the regular season ends, so in
+  // October `division`/`record` are null. Backfill the W-L from the final
+  // standings snapshot so the postseason heading keeps its "(W-L)".
+  if (!record) {
+    const finalRec = finalRecordForTeam(raw.finalStandings, teamId);
+    if (finalRec) record = { wins: finalRec.wins, losses: finalRec.losses, gamesBack: "" };
+  }
+
+  // Postseason bracket → this team's live/most-recent series (null outside the
+  // postseason or if the team missed it). Frames playoff box scores and the
+  // standings-replacement status block; also feeds season-end detection.
+  const bracket = postseasonBracketForDate(raw, date);
+  const teamSeries = teamLatestSeries(bracket?.series ?? [], teamId);
+  const seasonEnd = detectSeasonEnd({ date, upcoming, teamId, teamSeries, clinchedPlayoffs });
 
   // A multi-player trade lists the team once per player (same description) —
   // and a trade between two teams the team is on both sides of doubles again;
@@ -117,7 +174,124 @@ export async function loadTeamEmailData(team: Team, date: string): Promise<TeamE
     record,
     transactions,
     probables,
+    teamSeries,
+    postseasonBracket: bracket,
+    seasonEnd,
+    otherLeagues,
   };
+}
+
+// Coarse "which months is this league playing" windows, for the signoff's
+// in-season cross-sell. Regular season through playoffs; approximate month
+// boundaries are fine for a "what else is on right now" pointer.
+const SPORT_SEASON_MONTHS: Record<string, number[]> = {
+  nfl:   [9, 10, 11, 12, 1, 2],
+  ncaaf: [8, 9, 10, 11, 12, 1],
+  nhl:   [10, 11, 12, 1, 2, 3, 4, 5, 6],
+  nba:   [10, 11, 12, 1, 2, 3, 4, 5, 6],
+  wnba:  [5, 6, 7, 8, 9, 10],
+};
+function sportInSeason(id: string, month: number): boolean {
+  return SPORT_SEASON_MONTHS[id]?.includes(month) ?? true;
+}
+
+// ─── postseason helpers ─────────────────────────────────────────────────────
+
+// Rounds in advancement order; used to pick a team's *latest* series (the one
+// that frames yesterday's game and decides elimination).
+const ROUND_ORDER: Record<PostseasonSeries["round"], number> = {
+  "wild-card": 0, "division-series": 1, "lcs": 2, "world-series": 3,
+};
+
+const ROUND_LABEL: Record<PostseasonSeries["round"], string> = {
+  "wild-card": "Wild Card Series",
+  "division-series": "Division Series",
+  "lcs": "Championship Series",
+  "world-series": "World Series",
+};
+
+// Full round label with league prefix ("AL Division Series"); the World Series
+// is cross-league so it carries no prefix. Exported for the web renderer.
+export function seriesRoundName(s: PostseasonSeries): string {
+  const base = ROUND_LABEL[s.round];
+  if (s.round === "world-series" || !s.league) return base;
+  return `${s.league} ${base}`;
+}
+
+function teamInSeries(s: PostseasonSeries, teamId: number): boolean {
+  return s.top.teamId === teamId || s.bottom.teamId === teamId;
+}
+
+// The team's deepest series as of the digest date — the live one if a round is
+// in progress, otherwise the most recent completed one.
+function teamLatestSeries(series: PostseasonSeries[], teamId: number): PostseasonSeries | null {
+  let latest: PostseasonSeries | null = null;
+  for (const s of series) {
+    if (!teamInSeries(s, teamId)) continue;
+    if (!latest || ROUND_ORDER[s.round] > ROUND_ORDER[latest.round]) latest = s;
+  }
+  return latest;
+}
+
+// Human series state as of the date: "series tied 1-1", "NYY lead 2-1", or the
+// clinched "NYY win 3-1". Uses abbreviations. Exported for the web renderer.
+export function seriesState(s: PostseasonSeries): string {
+  const { top, bottom } = s;
+  const hi = Math.max(top.wins, bottom.wins);
+  const lo = Math.min(top.wins, bottom.wins);
+  if (s.winnerTeamId != null) {
+    const w = s.winnerTeamId === top.teamId ? top : bottom;
+    return `${w.abbr} win ${hi}-${lo}`;
+  }
+  if (top.wins === bottom.wins) return `series tied ${top.wins}-${bottom.wins}`;
+  const lead = top.wins > bottom.wins ? top : bottom;
+  return `${lead.abbr} lead ${hi}-${lo}`;
+}
+
+// Games played in the series through the digest date = the game number of the
+// most recent (yesterday's) game. Exported for the web renderer.
+export function seriesGameNumber(s: PostseasonSeries): number {
+  return s.top.wins + s.bottom.wins;
+}
+
+// Detect whether the team's season is over as of `date`. Only fires in the
+// Sept–Nov window with no games scheduled ahead — teams play near-daily, so an
+// empty 7-day forward schedule in that window means "done", not a mid-season
+// gap. The variant is derived from the bracket: absent → missed the playoffs;
+// present + lost their latest (clinched) series → eliminated; won the World
+// Series → champion. A team still alive (latest series live, or won a
+// non-final round) returns null.
+function detectSeasonEnd(args: {
+  date: string;
+  upcoming: ScheduleGame[];
+  teamId: number;
+  teamSeries: PostseasonSeries | null;
+  clinchedPlayoffs: boolean;
+}): SeasonEnd | null {
+  const { date, upcoming, teamId, teamSeries, clinchedPlayoffs } = args;
+  if (upcoming.length > 0) return null;
+  const month = Number(date.slice(5, 7));
+  if (month < 9 || month > 11) return null;
+
+  // Not in the bracket at all. Normally that means they missed the playoffs —
+  // UNLESS they clinched a berth but their next postseason series just isn't on
+  // the 7-day schedule yet (a bye team in the gap before its Division Series).
+  if (!teamSeries) {
+    if (clinchedPlayoffs) return null;
+    return { variant: "missed", roundLabel: null };
+  }
+
+  // In the bracket. Only "done" if their deepest series has clinched — a live
+  // series (winnerTeamId null) means they're still playing.
+  if (teamSeries.winnerTeamId == null) return null;
+  if (teamSeries.winnerTeamId === teamId) {
+    // Won their latest series. That's the end only if it's the World Series;
+    // otherwise they're advancing (next round just isn't scheduled yet).
+    if (teamSeries.round === "world-series") return { variant: "champion", roundLabel: null };
+    return null;
+  }
+  // Lost their latest clinched series → eliminated.
+  return { variant: "eliminated", roundLabel: seriesRoundName(teamSeries) };
 }
 
 async function fetchProbables(games: ScheduleGame[], season: number): Promise<Map<number, ProbableStats>> {
@@ -158,8 +332,14 @@ function renderTeamYesterdayBox(data: TeamEmailData): string {
   if (played.length === 0) {
     return `<p class="es-info">No game played on ${esc(data.prettyDate)}.</p>`;
   }
-  // Both halves of a doubleheader, in schedule order.
-  return played.map((g) => renderGame(g as Required<GameDetail>, data.liveAbbrev)).join("");
+  // Postseason framing: box scores are game-type agnostic, so during October
+  // we prepend the round + game number + series state ("AL Division Series —
+  // Game 2 (series tied 1-1)") that a reader can't otherwise infer from the box.
+  const label = data.teamSeries
+    ? `<div style="font-size:13px;font-weight:700;margin:0 0 4px;">${esc(seriesRoundName(data.teamSeries))} — Game ${seriesGameNumber(data.teamSeries)} <span style="font-weight:400;color:#6a6354;">(${esc(seriesState(data.teamSeries))})</span></div>`
+    : "";
+  // Both halves of a doubleheader, in schedule order (postseason has none).
+  return label + played.map((g) => renderGame(g as Required<GameDetail>, data.liveAbbrev)).join("");
 }
 
 // ─── standings ────────────────────────────────────────────────────────────
@@ -174,6 +354,11 @@ const DIVISION_NAMES: Record<number, string> = {
 };
 
 function renderTeamStandings(data: TeamEmailData): string {
+  // In October, statsapi's /standings goes empty and the bracket takes over —
+  // the same full bracket the league digest shows, in the standings slot.
+  if (data.postseasonBracket) {
+    return renderPostseasonBracketEmail(data.postseasonBracket);
+  }
   if (!data.division || !data.team.mlbApiId) return "";
   const label = DIVISION_NAMES[data.division.division.id] ?? "Division";
   // Pass sport + games_date so every team name becomes an invisible link
@@ -499,16 +684,24 @@ function renderTeamTransactions(data: TeamEmailData): string {
 //   "game"      — yesterday had a final game; the full game-day layout
 //   "no-game"   — season is active but the team didn't play; surface
 //                 standings + upcoming + transactions instead of placeholder
+//   "signoff"   — the first no-game day after the team's season ended; a
+//                 one-time farewell that sets the "no more emails until spring"
+//                 expectation (retention) and points at other active leagues
 //   "offseason" — no game yesterday AND no upcoming games this week; show
 //                 transactions only (hot stove still happens). Final regular-
 //                 season standings are intentionally suppressed here to keep
 //                 the spec literal — revisit if subscribers ask for them
-type TeamDigestMode = "game" | "no-game" | "offseason";
+export type TeamDigestMode = "game" | "no-game" | "signoff" | "offseason";
 
-function classifyTeamMode(data: TeamEmailData): TeamDigestMode {
+// Exported so the generate cron and web renderer classify identically.
+export function classifyTeamMode(data: TeamEmailData): TeamDigestMode {
   const hasGame = teamPlayedGames(data).length > 0;
+  // A game recap always wins the day — the final game (incl. an elimination
+  // loss, framed by teamSeries) gets its own digest; the farewell follows on
+  // the first quiet day after.
   if (hasGame) return "game";
   if (data.upcoming.length > 0) return "no-game";
+  if (data.seasonEnd) return "signoff";
   return "offseason";
 }
 
@@ -527,8 +720,13 @@ export function renderTeamEmailContent(data: TeamEmailData): string {
       teamSectionHeading(data),
       renderTeamStandings(data),
       renderTeamYesterdayBox(data),
-      renderTeamStatSheet(data),
-      renderAdvancedStats(data),
+    );
+    // In the playoffs the season stat sheets are noise — a team's regular-season
+    // totals aren't what a postseason reader wants. The bracket + box carry it.
+    if (!data.postseasonBracket) {
+      parts.push(renderTeamStatSheet(data), renderAdvancedStats(data));
+    }
+    parts.push(
       renderTeamUpcoming(data),
       renderTeamTransactions(data),
     );
@@ -543,6 +741,8 @@ export function renderTeamEmailContent(data: TeamEmailData): string {
       renderTeamUpcoming(data),
       renderTeamTransactions(data),
     );
+  } else if (mode === "signoff") {
+    parts.push(renderTeamSignoff(data));
   } else {
     // Offseason. Transactions are the only structured signal worth a
     // morning email here; if there aren't any, the cron should choose to
@@ -555,4 +755,57 @@ export function renderTeamEmailContent(data: TeamEmailData): string {
 
   parts.push(`</div>`);
   return parts.join("\n");
+}
+
+// One-line season outcome for the farewell heading. No em dashes (house pref);
+// full sentences. Exported so the web renderer builds the same copy.
+export function signoffStatusLine(data: TeamEmailData): string {
+  const e = data.seasonEnd;
+  if (!e) return "";
+  const season = data.date.slice(0, 4);
+  if (e.variant === "champion") return `The ${data.team.name} are your ${season} World Series champions.`;
+  if (e.variant === "eliminated") return `The ${data.team.name} were eliminated in the ${e.roundLabel}.`;
+  return `That's a wrap on the ${season} ${data.team.name} season.`;
+}
+
+// "NFL, College Football and NHL" from a list of league names. Exported for the
+// web renderer so both surfaces phrase the cross-sell identically.
+export function leagueListText(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+// The one-time season farewell. First job is retention (subscribers churn at
+// season's end because they don't know the emails stop on their own), so the
+// thank-you + return-expectation lead. Then a real CTA to the leagues that are
+// live right now, so a reader who's done with baseball has somewhere to go.
+function renderTeamSignoff(data: TeamEmailData): string {
+  const rec = data.record ? ` ${formatRecord(data.record)}` : "";
+  const heading = `<h2 class="es-section-h" style="font-size:20px;letter-spacing:0;margin:0 0 6px;">${esc(data.team.name)}${esc(rec)}</h2>`;
+  const status = `<p style="font-size:16px;font-weight:700;margin:0 0 16px;line-height:1.35;">${esc(signoffStatusLine(data))}</p>`;
+
+  const thanks = `<p class="es-info" style="margin:0 0 12px;">Thank you for being a subscriber this season. A morning box score in your inbox only works because readers like you keep showing up for it, and we're genuinely grateful you spent part of your mornings with us.</p>`;
+
+  // The retention lever — plain, no dates (the schedule isn't out yet), no ask.
+  const farewell = `<p class="es-info" style="margin:0 0 4px;">This is your last scheduled ${esc(data.team.name)} email until next season. We won't email you over the winter. Your subscription stays active, and your daily digest will pick right back up on its own when spring training begins. There's nothing you need to do to keep it.</p>`;
+
+  // CTA to the leagues that are actually playing right now.
+  let cta = "";
+  if (data.otherLeagues.length > 0) {
+    const list = leagueListText(data.otherLeagues.map((l) => l.name));
+    const settingsUrl = `${EMAIL_LINK_BASE}/settings`;
+    const verb = data.otherLeagues.length === 1 ? "season is" : "seasons are";
+    const btnLabel = data.otherLeagues.length === 1
+      ? `Subscribe to the ${data.otherLeagues[0]!.name} digest`
+      : "Subscribe to another league";
+    cta = `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:22px 0 4px;border-top:1px solid #c4baa5;">
+      <tr><td style="padding:18px 0 0;text-align:center;">
+        <p class="es-info" style="margin:0 0 14px;">The ${esc(list)} ${verb} underway. Keep the box scores coming all winter.</p>
+        <a href="${settingsUrl}" style="display:inline-block;background:#161410;color:#f9f7f1;font-family:'Source Sans 3',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:13px 28px;border-radius:6px;">${esc(btnLabel)}</a>
+      </td></tr>
+    </table>`;
+  }
+
+  return `${heading}${status}${thanks}${farewell}${cta}`;
 }

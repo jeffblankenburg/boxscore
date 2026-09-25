@@ -842,6 +842,38 @@ function postseasonBracketFromRaw(
   return { season, series };
 }
 
+// Convenience wrapper for consumers that only need the postseason bracket
+// (the per-team digest, for series framing + season-end detection) without
+// paying for a full canonical adaptation. Builds the same teamIdx + seeds the
+// full adapter uses. Returns null outside the postseason (no series feed).
+export function postseasonBracketForDate(raw: DailyRaw, date: string): PostseasonBracket | null {
+  if (!raw.postseasonSeries) return null;
+  return postseasonBracketFromRaw(
+    raw.postseasonSeries,
+    Number(date.slice(0, 4)),
+    date,
+    teamRefIndex(raw.teams),
+    deriveSeeds(raw.finalStandings),
+  );
+}
+
+// Final regular-season W-L for one team, pulled from the standings snapshot
+// fetched alongside the postseason bracket. statsapi's live /standings goes
+// empty once the regular season ends, so the team digest reads this instead to
+// keep the record on the heading during October. Null if the team isn't found.
+export function finalRecordForTeam(
+  finalStandingsRaw: unknown,
+  teamId: number,
+): { wins: number; losses: number } | null {
+  const env = finalStandingsRaw as StatsapiStandingsEnvelope | null;
+  for (const rec of env?.records ?? []) {
+    for (const tr of rec.teamRecords ?? []) {
+      if (tr.team?.id === teamId) return { wins: tr.wins, losses: tr.losses };
+    }
+  }
+  return null;
+}
+
 // ─── Public adapter ──────────────────────────────────────────────────────
 
 export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDailyData {

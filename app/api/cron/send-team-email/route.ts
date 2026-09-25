@@ -164,7 +164,11 @@ export async function GET(req: Request) {
         // upcoming + no transactions. Cheap shortcut here looks at the
         // cached HTML length — the offseason shell is ~500 bytes after
         // dateline + heading; real digests are 10x+.
-        if (!cached.has_game && cached.html.length < 1500) {
+        //
+        // The season-farewell (mode='signoff') is the deliberate exception: it
+        // has no game and can be short, but it MUST go out (it's the one email
+        // that tells subscribers the season's over and the digest pauses).
+        if (cached.mode !== "signoff" && !cached.has_game && cached.html.length < 1500) {
           totalEmpty++;
           perTeam.push({ team: teamId, sent: 0, skipped: 0, failed: 0, empty: true });
           continue;

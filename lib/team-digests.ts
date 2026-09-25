@@ -82,6 +82,32 @@ export async function listAllTeamDigestKeys(
   return keys;
 }
 
+/**
+ * True if a season-farewell (mode='signoff') digest already went out for this
+ * team earlier in the same season. The generate cron calls this to fire the
+ * signoff exactly once — every subsequent quiet day falls back to the silent
+ * offseason shell. Scoped to dates strictly before `beforeDate` so regenerating
+ * the signoff day itself doesn't see its own row and downgrade it.
+ */
+export async function hasSignoffForSeason(
+  sport: string,
+  teamSlug: string,
+  season: number,
+  beforeDate: string,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin()
+    .from("team_digests")
+    .select("date")
+    .eq("sport", sport)
+    .eq("team_slug", teamSlug)
+    .eq("mode", "signoff")
+    .gte("date", `${season}-01-01`)
+    .lt("date", beforeDate)
+    .limit(1);
+  if (error) throw new Error(`hasSignoffForSeason: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
 export async function upsertTeamDigest(args: {
   sport: string;
   team_slug: string;
