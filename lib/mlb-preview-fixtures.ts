@@ -17,7 +17,8 @@ export const MLB_PREVIEW_FIXTURES: Record<DigestMode, string> = {
   "all-star": "2025-07-15",         // the All-Star Game itself
   "mid-season": "2025-07-17",       // empty post-ASG day; next day (07-18) resumes → Today's Games shows
   "no-games": "2025-07-14",         // unreachable for MLB (see note above)
-  postseason: "2024-10-30",
+  postseason: "2024-10-30",         // WS clinch recap (LAD won game 5); edition 10-31, the morning after
+  "season-signoff": "2024-10-31",   // day after the clinch (no games); edition 11-01, the farewell
   preseason: "2026-03-04",
   offseason: "2026-01-08",
 };
@@ -29,6 +30,7 @@ export const MLB_PREVIEW_MODES: DigestMode[] = [
   "all-star",
   "mid-season",
   "postseason",
+  "season-signoff",
   "preseason",
   "offseason",
 ];

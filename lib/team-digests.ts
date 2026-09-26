@@ -100,7 +100,7 @@ export async function hasSignoffForSeason(
     .select("date")
     .eq("sport", sport)
     .eq("team_slug", teamSlug)
-    .eq("mode", "signoff")
+    .like("mode", "signoff%")
     .gte("date", `${season}-01-01`)
     .lt("date", beforeDate)
     .limit(1);

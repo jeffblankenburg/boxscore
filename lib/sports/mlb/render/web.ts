@@ -10,7 +10,7 @@
 // /admin/preview/canonical/[date]?source=statsapi&surface=web is the
 // validation surface for that contract.
 
-import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher } from "../canonical";
+import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher, SeasonSignoff } from "../canonical";
 import type {
   MlbBoxPlayer,
   MlbBoxScore,
@@ -311,6 +311,22 @@ function leadersThroughTies<T extends { rank: number }>(rows: T[], limit: number
   return rows.slice(0, cutoff);
 }
 
+// The league season farewell, the day after the World Series clinch (the clinch
+// recap went out the morning before). Champion headline + final bracket +
+// thank-you + winter-quiet note. Prose sits in a centered column; the bracket
+// keeps full width. Mirrors the email farewell.
+function seasonFinaleIntroWeb(s: SeasonSignoff): string {
+  return `<div style="text-align:center;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:6px 0 8px;">${s.season} Season Finale</div>
+<div style="font-size:20px;font-weight:700;text-align:center;line-height:1.3;margin:0 0 18px;">The ${esc(s.championName)} are your ${s.season} World Series champions.</div>`;
+}
+function seasonFinaleOutroWeb(s: SeasonSignoff): string {
+  const para = "font-size:15px;line-height:1.55;color:var(--text-secondary);text-align:left;margin:0 0 14px;";
+  return `<div style="max-width:620px;margin:24px auto 0;">
+  <p style="${para}">That's a wrap on the ${s.season} season. Thank you for spending it with boxscore. Whether you opened every morning or just checked in on the big nights, we're grateful you made us part of your baseball routine.</p>
+  <p style="${para}">The daily digest now goes quiet for the winter. We won't fill your inbox with empty offseason mornings. It picks back up on its own when spring training begins, with a full slate to recap. There's nothing you need to do to stay subscribed.</p>
+</div>`;
+}
+
 // ─── Public entry ────────────────────────────────────────────────────────
 
 export function renderCanonicalWeb(
@@ -321,6 +337,19 @@ export function renderCanonicalWeb(
   const masthead = renderMasthead({ date: data.date, sport: "mlb", surface: "web", navSports });
   const teamRecords = buildTeamRecordMap(data.standings);
   const mode = classifyMode(data.games, data.date, data.nextDayGames);
+
+  // Season farewell: the day after the World Series (no games that day; the
+  // clinch recap already went out). Champion + final bracket + the farewell.
+  // Takes precedence over the bracket branch below.
+  if (data.seasonSignoff) {
+    return `${masthead}
+
+${seasonFinaleIntroWeb(data.seasonSignoff)}
+
+${data.postseason ? renderPostseasonBracketWeb(data.postseason) : ""}
+
+${seasonFinaleOutroWeb(data.seasonSignoff)}`;
+  }
 
   // Postseason takes precedence over the games-based mode: on the many playoff
   // off-days (and the day after the World Series clinches) there are no games,

@@ -14,5 +14,6 @@ export type DigestMode =
   | "all-star"         // the All-Star Game / midseason event itself (recap)
   | "mid-season"       // day after the ASG: first-half recap — standings + extended leaders + Today's Games
   | "postseason"       // playoff game
+  | "season-signoff"   // one-time farewell edition the morning after the WS clinches
   | "preseason"        // spring training (MLB) / preseason (NFL/NBA/NHL)
   | "offseason";       // gap between seasons

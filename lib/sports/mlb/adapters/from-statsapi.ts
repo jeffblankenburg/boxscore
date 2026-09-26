@@ -19,7 +19,9 @@ import {
   type PostseasonRound,
   type PostseasonSeries,
   type PostseasonEntrant,
+  type SeasonSignoff,
 } from "../canonical";
+import { prevDay } from "@/lib/dates";
 import { playerRef } from "../player-ref";
 import { dedupeTransactions } from "../../../dedupe-transactions";
 import type {
@@ -842,6 +844,35 @@ function postseasonBracketFromRaw(
   return { season, series };
 }
 
+// The season farewell fires on the first quiet day after the World Series: the
+// WS has a winner and the last postseason game was `date`'s previous day (so the
+// clinch recap already went out as its own postseason edition the morning
+// before). Its edition (game_date + 1) is two mornings after the clinch game.
+// Mirrors the team signoff: recap first, farewell the next day. Deterministic
+// from the feed (one clinch per season), so no dedupe is needed.
+function seasonSignoffFromRaw(
+  raw: unknown,
+  bracket: PostseasonBracket | null,
+  season: number,
+  date: string,
+): SeasonSignoff | null {
+  const ws = bracket?.series.find((s) => s.round === "world-series");
+  if (!ws || ws.winnerTeamId == null) return null; // WS not decided yet
+  // Latest postseason game on or before `date`. It must be the previous day —
+  // i.e. the World Series clinched yesterday and today is the first quiet day.
+  const env = raw as StatsapiPostseasonEnvelope | null;
+  let last = "";
+  for (const s of env?.series ?? []) {
+    for (const g of s.games ?? []) {
+      const d = g.officialDate ?? "";
+      if (d && d <= date && d > last) last = d;
+    }
+  }
+  if (last !== prevDay(date)) return null;
+  const champ = ws.winnerTeamId === ws.top.teamId ? ws.top : ws.bottom;
+  return { season, championName: champ.name, championAbbr: champ.abbr };
+}
+
 // Convenience wrapper for consumers that only need the postseason bracket
 // (the per-team digest, for series framing + season-end detection) without
 // paying for a full canonical adaptation. Builds the same teamIdx + seeds the
@@ -883,6 +914,14 @@ export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDai
   // Next-day schedule re-uses the same teamIdx so abbreviations resolve
   // even though those games haven't been played yet.
   const nextDayGames = sortGamesCanonically(gamesFromSchedule(raw.nextDaySchedule ?? null, teamIdx, pitcherIdx));
+  const season = Number(date.slice(0, 4));
+  const postseason = postseasonBracketFromRaw(
+    raw.postseasonSeries,
+    season,
+    date,
+    teamIdx,
+    deriveSeeds(raw.finalStandings),
+  );
   return {
     date,
     games,
@@ -896,12 +935,7 @@ export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDai
     // Already display-ready (built in fetchDailyRaw); pass straight through.
     allStarRosters: raw.allStarRosters ?? null,
     allStarMvp: raw.allStarMvp ?? null,
-    postseason: postseasonBracketFromRaw(
-      raw.postseasonSeries,
-      Number(date.slice(0, 4)),
-      date,
-      teamIdx,
-      deriveSeeds(raw.finalStandings),
-    ),
+    postseason,
+    seasonSignoff: seasonSignoffFromRaw(raw.postseasonSeries, postseason, season, date),
   };
 }

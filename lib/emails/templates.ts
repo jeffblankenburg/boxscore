@@ -545,13 +545,19 @@ export function teamDailyEmail(opts: {
   digestEmailHtml: string;
   announcementBanner?: string;
   openToken?: string | null;
+  // Replaces the dated subject for special editions (e.g. the season signoff),
+  // where "{Team} - {date}" would bury the one email we most want opened.
+  subjectOverride?: string;
 }): { subject: string; html: string; text: string } {
   // Sender name already shows "boxscore", so the subject leads with the
   // distinguishing label ({team name} or {sport}) — keeps the inbox preview
   // free of redundant brand text. Subject + preview text use the EDITION
   // date (digestDate + 1) so they match the masthead inside the body.
   const editionDateIso = nextDay(opts.digestDate);
-  const subject = `${opts.teamName} - ${shortPrettyDate(editionDateIso)}`;
+  const subject = opts.subjectOverride ?? `${opts.teamName} - ${shortPrettyDate(editionDateIso)}`;
+  const previewText = opts.subjectOverride
+    ? `Your last ${opts.teamName} email until spring training.`
+    : `${prettyDate(editionDateIso)} · ${opts.teamName} digest from boxscore.`;
   const html = wrapWithDigest({
     styles: stylesForSport(opts.sport),
     digestEmailHtml: opts.digestEmailHtml,
@@ -562,7 +568,7 @@ export function teamDailyEmail(opts: {
     tipJarUrl: opts.tipJarUrl,
     announcementBanner: opts.announcementBanner,
     openToken: opts.openToken,
-    previewText: `${prettyDate(editionDateIso)} · ${opts.teamName} digest from boxscore.`,
+    previewText,
   });
   const text = `${subject}\n\nRead online: ${opts.digestUrl}\nManage subscriptions: ${opts.manageUrl}\nUnsubscribe: ${opts.unsubscribeUrl}`;
   return { subject, html, text };

@@ -113,10 +113,23 @@ export async function GET(req: Request) {
       // safety comments in lib/ad-placements.ts.
       const html = await renderCanonicalContentWithAds(canonical, sport, navSports);
       const email_html = await renderCanonicalEmailContentWithAds(canonical, sport, navSports);
+      // Mode drives the send: the clinch edition is 'season-signoff' (sends the
+      // farewell once); every quiet day after the World Series is 'offseason'
+      // (send cron skips it). Because the bracket keeps being fetched through
+      // mid-November, those post-WS empty days would otherwise classify as
+      // 'no-games' and send an empty shell — so force 'offseason' here.
+      const wsOver = canonical.postseason?.series.some(
+        (s) => s.round === "world-series" && s.winnerTeamId != null,
+      ) ?? false;
+      const leagueMode = canonical.seasonSignoff
+        ? "season-signoff"
+        : wsOver && canonical.games.length === 0
+          ? "offseason"
+          : data.mode;
       await upsertDigest({
         sport, date, html, email_html,
         game_count: canonical.games.length,
-        mode: data.mode,
+        mode: leagueMode,
       });
 
       // Per-team digests cached alongside the league digest. Running them
@@ -144,9 +157,13 @@ export async function GET(req: Request) {
           const teamHtml = renderTeamWebContent(td);
           const teamEmailHtml = renderTeamEmailContent(td);
           const hasGame = teamPlayedGames(td).length > 0;
-          // The signoff day stamps mode='signoff' (its dedupe marker); every
-          // other team day keeps the league mode for pagination/sitemap.
-          const teamMode = classifyTeamMode(td) === "signoff" ? "signoff" : data.mode;
+          // The signoff day stamps mode='signoff-<variant>' (its dedupe marker
+          // AND the subject-line selector for the send cron); every other team
+          // day keeps the league mode for pagination/sitemap. td.seasonEnd is
+          // non-null whenever classifyTeamMode reports "signoff".
+          const teamMode = classifyTeamMode(td) === "signoff"
+            ? `signoff-${td.seasonEnd!.variant}`
+            : data.mode;
           await upsertTeamDigest({
             sport, team_slug: team.slug, date,
             has_game: hasGame, mode: teamMode,

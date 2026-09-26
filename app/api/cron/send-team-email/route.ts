@@ -165,10 +165,12 @@ export async function GET(req: Request) {
         // cached HTML length — the offseason shell is ~500 bytes after
         // dateline + heading; real digests are 10x+.
         //
-        // The season-farewell (mode='signoff') is the deliberate exception: it
-        // has no game and can be short, but it MUST go out (it's the one email
-        // that tells subscribers the season's over and the digest pauses).
-        if (cached.mode !== "signoff" && !cached.has_game && cached.html.length < 1500) {
+        // The season-farewell (mode='signoff-<variant>') is the deliberate
+        // exception: it has no game and can be short, but it MUST go out (it's
+        // the one email that tells subscribers the season's over and the digest
+        // pauses).
+        const isSignoff = cached.mode?.startsWith("signoff") ?? false;
+        if (!isSignoff && !cached.has_game && cached.html.length < 1500) {
           totalEmpty++;
           perTeam.push({ team: teamId, sent: 0, skipped: 0, failed: 0, empty: true });
           continue;
@@ -209,6 +211,15 @@ export async function GET(req: Request) {
           trackedEmailLink("team-email-header-tip",    tipJarUrl),
         ]);
 
+        // The season-farewell edition gets its own subject line so it doesn't
+        // hide behind the routine dated one; every other edition keeps the date.
+        // Celebrate the champion; everyone else gets the warm see-you-next-year.
+        const subjectOverride = !isSignoff
+          ? undefined
+          : cached.mode === "signoff-champion"
+            ? `${team.name} - World Series champions!`
+            : `${team.name} - See you next season!`;
+
         for (const group of chunk(toSend, BATCH_SIZE)) {
           // Pre-generate per-send open tokens so the URL in each email
           // matches the sends row written via recordSend. Same approach as
@@ -233,6 +244,7 @@ export async function GET(req: Request) {
               announcementBanner,
               digestEmailHtml: body,
               openToken: openTokens[i]!,
+              subjectOverride,
             });
             return {
               to: sub.email,

@@ -86,6 +86,14 @@ export type PostseasonBracket = {
   series: PostseasonSeries[];
 };
 
+// The one-time season farewell edition, rendered the morning after the World
+// Series clinches. Present on exactly one date per season (see the adapter).
+export type SeasonSignoff = {
+  season: number;
+  championName: string;  // full club name, "Los Angeles Dodgers"
+  championAbbr: string;  // "LAD"
+};
+
 export type CanonicalDailyData = {
   date:         string;                       // ISO YYYY-MM-DD
   games:        MlbGame[];
@@ -103,4 +111,7 @@ export type CanonicalDailyData = {
   // Present only on postseason days. Drives the bracket that replaces
   // standings + leaders in the postseason digest.
   postseason?: PostseasonBracket | null;
+  // Present on exactly one date per season — the morning after the World Series
+  // clinches. Turns that edition into the league season farewell.
+  seasonSignoff?: SeasonSignoff | null;
 };

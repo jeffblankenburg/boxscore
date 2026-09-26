@@ -15,7 +15,7 @@
 // markup against the same class names so the wrapping templates don't
 // have to know which renderer produced the body.
 
-import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher } from "../canonical";
+import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher, SeasonSignoff } from "../canonical";
 import type {
   MlbBoxPlayer,
   MlbBoxScore,
@@ -943,6 +943,19 @@ function asgRosters(data: CanonicalDailyData): string {
   return `${asgRosterCard("American League", r.AL)}${asgRosterCard("National League", r.NL)}`;
 }
 
+// The league season farewell, rendered the day after the World Series clinch
+// (the clinch recap went out the morning before). Structure: banner + champion
+// headline, then the final bracket, then the thank-you + winter-quiet note.
+// Monochrome, no em dashes — same voice as the team signoff.
+function seasonFinaleIntroEmail(s: SeasonSignoff): string {
+  return `<div class="es-asg-edition">${s.season} Season Finale</div>
+<p style="font-size:17px;font-weight:700;margin:2px 0 16px;line-height:1.35;">The ${esc(s.championName)} are your ${s.season} World Series champions.</p>`;
+}
+function seasonFinaleOutroEmail(s: SeasonSignoff): string {
+  return `<p class="es-info" style="margin:16px 0 12px;">That's a wrap on the ${s.season} season. Thank you for spending it with boxscore. Whether you opened every morning or just checked in on the big nights, we're grateful you made us part of your baseball routine.</p>
+<p class="es-info" style="margin:0 0 4px;">The daily digest now goes quiet for the winter. We won't fill your inbox with empty offseason mornings. It picks back up on its own when spring training begins, with a full slate to recap. There's nothing you need to do to stay subscribed.</p>`;
+}
+
 // ─── Entry ──────────────────────────────────────────────────────────────
 
 export function renderCanonicalEmail(data: CanonicalDailyData, navSports: NavSport[] = []): string {
@@ -950,6 +963,18 @@ export function renderCanonicalEmail(data: CanonicalDailyData, navSports: NavSpo
   const masthead = renderMasthead({ date: data.date, sport: "mlb", surface: "email", navSports });
   const teamRecords = buildTeamRecordMap(data.standings);
   const mode = classifyMode(data.games, data.date, data.nextDayGames);
+
+  // Season farewell: the day after the World Series (no games that day; the
+  // clinch recap already went out). Champion + final bracket + the farewell.
+  // Takes precedence over the bracket branch below.
+  if (data.seasonSignoff) {
+    return `<div class="es">
+${masthead}
+${seasonFinaleIntroEmail(data.seasonSignoff)}
+${data.postseason ? renderPostseasonBracketEmail(data.postseason) : ""}
+${seasonFinaleOutroEmail(data.seasonSignoff)}
+</div>`;
+  }
 
   // Postseason takes precedence over the games-based mode — see web.ts. Presence
   // of a bracket means we're in the postseason window, including off-days with

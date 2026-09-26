@@ -95,6 +95,23 @@ export async function GET(req: Request) {
       throw new Error(`no digest for ${sport} ${date}`);
     }
 
+    // Winter quiet period: once the season is over, the daily league digest is
+    // an empty shell (no games, no standings, no leaders). Don't wake the whole
+    // list every morning for nothing. The one-time farewell edition the morning
+    // after the World Series is stamped mode='season-signoff' (not 'offseason'),
+    // so it still sends; preseason (spring training) resumes the daily cadence.
+    if (digest.mode === "offseason") {
+      const result = {
+        sport, date,
+        total_active_subscribers: 0,
+        sent: 0, skipped: 0, failed: 0,
+        skipped_reason: "offseason",
+      };
+      console.log(`[send-email] sport=${sport} date=${date} status=skipped reason=offseason`);
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
     // Email links bake to https://boxscore.email/… regardless of where the
     // cron ran. A dev send to a real inbox must never embed a localhost URL,
     // and a preview-deployment cron must never embed a vercel.app URL.
@@ -144,6 +161,10 @@ export async function GET(req: Request) {
       const { loadFootballData } = await import("@/lib/sports/football/data");
       const { footballEmailSubject } = await import("@/lib/sports/football/render/digest");
       subjectOverride = footballEmailSubject(await loadFootballData(sport, date)) ?? undefined;
+    } else if (digest.mode === "season-signoff") {
+      // The season finale gets its own subject so it doesn't read like just
+      // another dated edition. Edition date is the year we're wrapping.
+      subjectOverride = `${sport.toUpperCase()} - That's a wrap on the ${date.slice(0, 4)} season`;
     }
 
     const groups = chunk(toSend, BATCH_SIZE);
