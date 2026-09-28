@@ -5,6 +5,7 @@ import { listAllDigestDates } from "@/lib/digests";
 import { listAllTeamDigestKeys } from "@/lib/team-digests";
 import { teamsBySport, type Sport } from "@/lib/teams";
 import { nextDay } from "@/lib/dates";
+import { leadersProvider } from "@/lib/sports/leaders";
 
 // Regenerated lazily then cached for 24h. The daily generate cron calls
 // revalidatePath('/sitemap.xml') after new content lands, so the sitemap
@@ -52,6 +53,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })),
     );
 
+    // One leaderboard URL per (visible sport, stat category) — only for sports
+    // that have a leaders provider wired.
+    const leaderUrls: MetadataRoute.Sitemap = sports.flatMap((s) => {
+      const provider = leadersProvider(s.id);
+      if (!provider) return [];
+      return provider.categories.map((c) => ({
+        url: `${base}/${s.id}/leaders/${c.slug}`,
+        changeFrequency: "daily" as const,
+        priority: 0.6,
+      }));
+    });
+
     // URL date segment is the EDITION date; daily_digests/team_digests rows
     // are keyed by games_date. Translate via nextDay() so the sitemap URLs
     // match what the page routes expect.
@@ -79,7 +92,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })),
     );
 
-    return [...STATIC_URLS(base), ...sportLanding, ...teamHubUrls, ...dailyUrls, ...teamDayUrls];
+    return [...STATIC_URLS(base), ...sportLanding, ...teamHubUrls, ...leaderUrls, ...dailyUrls, ...teamDayUrls];
   } catch (e) {
     console.warn(`[sitemap] db unavailable, returning static-only: ${(e as Error).message}`);
     return STATIC_URLS(base);

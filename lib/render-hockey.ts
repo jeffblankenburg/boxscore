@@ -29,7 +29,8 @@ import type {
 import { lastName } from "./render-email";
 import { timeInET, etDateFromISO } from "./dates";
 import { renderMasthead, type NavSport } from "./masthead";
-import { teamLinkByNickname, playerLink, slugifyName, escText } from "./hockey-links";
+import { teamLinkByNickname, playerLink, slugifyName, escText, linkAnchor } from "./hockey-links";
+import { NHL_LEADER_CATEGORY_SLUG } from "./hockey-leaders";
 
 export function teamNameLink(name: string, web: boolean): string {
   return teamLinkByNickname(name, name, web);
@@ -525,9 +526,14 @@ function renderLeaderCategory(cat: LeaderCategory, web: boolean): string {
       <td class="bb-ldr-value">${escapeHtml(e.displayValue)}</td>
     </tr>`,
   ).join("");
+  // The category heading links to the full-season leaderboard for that stat.
+  const slug = NHL_LEADER_CATEGORY_SLUG[cat.key];
+  const captionLabel = slug
+    ? linkAnchor(`/nhl/leaders/${slug}`, cat.label, web, "leader-cat-link", "es-leader-cat-link")
+    : escapeHtml(cat.label);
   return `
 <div class="bb-ldr-cat">
-<h3 class="bb-ldr-caption">${escapeHtml(cat.label)}${cat.abbrev ? ` <span class="bb-ldr-abbrev">${escapeHtml(cat.abbrev)}</span>` : ""}</h3>
+<h3 class="bb-ldr-caption">${captionLabel}${cat.abbrev ? ` <span class="bb-ldr-abbrev">${escapeHtml(cat.abbrev)}</span>` : ""}</h3>
 <table class="bb-leader-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
   <tbody>${rows}</tbody>
 </table>

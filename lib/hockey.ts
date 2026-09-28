@@ -393,7 +393,7 @@ function extractStandingsEntry(entry: Record<string, unknown>): HockeyStandingsE
 
 // ---- Leaders / roster stats -----------------------------------------------
 
-type AthleteRecord = {
+export type AthleteRecord = {
   id: string;
   name: string;
   teamAbbr: string;
@@ -401,7 +401,7 @@ type AthleteRecord = {
   stats: Record<string, number>;
 };
 
-function extractAthletes(raw: unknown): AthleteRecord[] {
+export function extractAthletes(raw: unknown): AthleteRecord[] {
   const data = raw as {
     categories?: Array<{ name?: string; names?: string[] }>;
     athletes?: Array<Record<string, unknown>>;

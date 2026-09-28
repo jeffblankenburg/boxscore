@@ -45,11 +45,16 @@
   margin: 0 0 18px;
 }
 
-/* AL left, NL right; stack on a phone. */
+/* AL left, NL right; stack on a phone. Single-column sports (NHL) get one
+   centered, narrower column so a lone list doesn't stretch the full width. */
 .lb-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 28px;
+}
+.lb-cols-single {
+  grid-template-columns: 1fr;
+  max-width: 460px;
 }
 @media (max-width: 620px) {
   .lb-cols { grid-template-columns: 1fr; gap: 8px; }
