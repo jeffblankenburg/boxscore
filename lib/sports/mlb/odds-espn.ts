@@ -48,6 +48,15 @@ export type EspnOddsRow = {
   homeMlOpen: number | null;
   awayMlClose: number | null;
   homeMlClose: number | null;
+  // Run line (both sides) + total. ESPN's per-team `current` node carries the
+  // run-line as pointSpread ("+1.5"/"-1.5") plus its juice in spread.american
+  // ("-208"/"+170"); overUnder is the game total. Used by the lineup card; the
+  // predictions capture ignores these.
+  awayRlLine: string | null;   // "+1.5" / "-1.5"
+  awayRlOdds: number | null;   // -208
+  homeRlLine: string | null;
+  homeRlOdds: number | null;
+  total: number | null;
   book: string;            // "DraftKings"
   raw: Record<string, unknown>;
 };
@@ -77,14 +86,23 @@ type EventOddsProvider = {
 type MoneyLineNode = number | { american?: string; value?: number } | undefined;
 type TeamOdds = {
   moneyLine?: number;
+  favorite?: boolean;
   open?:  { moneyLine?: MoneyLineNode };
   close?: { moneyLine?: MoneyLineNode };
+  current?: { pointSpread?: { american?: string }; spread?: { american?: string } };
 };
 type EventOddsItem = {
   provider?: EventOddsProvider;
   awayTeamOdds?: TeamOdds;
   homeTeamOdds?: TeamOdds;
+  overUnder?: number;
 };
+
+function parseAmerican(s: string | undefined): number | null {
+  if (typeof s !== "string") return null;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) ? n : null;
+}
 
 /** Parse an ESPN moneyLine node to an American integer. Accepts a bare
  *  number (top-level current line) or the nested `{ american: "+119" }`
@@ -162,6 +180,11 @@ export async function fetchEspnOddsForDate(
         homeMlOpen:  parseMoneyLine(dk?.homeTeamOdds?.open?.moneyLine),
         awayMlClose: parseMoneyLine(dk?.awayTeamOdds?.close?.moneyLine),
         homeMlClose: parseMoneyLine(dk?.homeTeamOdds?.close?.moneyLine),
+        awayRlLine: dk?.awayTeamOdds?.current?.pointSpread?.american ?? null,
+        awayRlOdds: parseAmerican(dk?.awayTeamOdds?.current?.spread?.american),
+        homeRlLine: dk?.homeTeamOdds?.current?.pointSpread?.american ?? null,
+        homeRlOdds: parseAmerican(dk?.homeTeamOdds?.current?.spread?.american),
+        total: typeof dk?.overUnder === "number" ? dk.overUnder : null,
         book: dk?.provider?.name ?? "DraftKings",
         raw: (dk ?? {}) as Record<string, unknown>,
       };
@@ -180,6 +203,11 @@ export async function fetchEspnOddsForDate(
       homeMlOpen: null,
       awayMlClose: null,
       homeMlClose: null,
+      awayRlLine: null,
+      awayRlOdds: null,
+      homeRlLine: null,
+      homeRlOdds: null,
+      total: null,
       book: "DraftKings",
       raw: { error: (s.reason as Error).message },
     };

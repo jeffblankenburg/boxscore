@@ -37,6 +37,10 @@
       "schedule": "27 9 * * *"
     },
     {
+      "path": "/api/cron/post-lineups?sport=mlb",
+      "schedule": "*/20 15-23,0-3 * * *"
+    },
+    {
       "path": "/api/cron/post-twitter?sport=nfl",
       "schedule": "45 8 * * *"
     },

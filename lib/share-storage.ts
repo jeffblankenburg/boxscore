@@ -30,6 +30,19 @@ function pathFor(sport: string, name: string): string {
   return sport === "mlb" ? name : `${sport}/${name}`;
 }
 
+// One-off upload for a per-game lineup card PNG (issue #140). Lives under a
+// `lineup/` subfolder keyed by date + gamePk; upsert so a re-post overwrites.
+// Returns the public URL for the social post.
+export async function uploadLineupCardImage(gamePk: number, date: string, png: Uint8Array): Promise<string> {
+  const supa = supabaseAdmin();
+  const path = `lineup/${date}_${gamePk}.png`;
+  const { error } = await supa.storage.from(BUCKET).upload(path, png, {
+    contentType: "image/png", upsert: true,
+  });
+  if (error) throw new Error(`lineup card upload ${path}: ${error.message}`);
+  return supa.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
 export type StoredImage = {
   file: string;        // e.g. "al-standings.png" (without the date_ prefix)
   url: string;
