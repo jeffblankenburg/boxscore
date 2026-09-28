@@ -83,6 +83,7 @@ export type LineupCardData = {
   date: string;         // games date (YYYY-MM-DD)
   startUtc: string;     // ISO
   venue: string;
+  weather: string;      // "62°, Rain, Wind 14 mph L To R"; "" if not posted yet
   away: LineupCardTeam;
   home: LineupCardTeam;
   national: string[];   // national TV, if any
@@ -127,6 +128,20 @@ async function batterStats(batterId: number, pitcherId: number | null, season: n
   } catch {
     return empty;
   }
+}
+
+// statsapi weather is a forecast until ~a few hours pre-game, then game-time
+// conditions. Empty ({}) far out; posts by the time a card fires. "" if absent.
+function formatWeather(game: Record<string, unknown>): string {
+  const w = rec(game.weather);
+  const cond = str(w.condition);
+  const temp = str(w.temp);
+  const wind = str(w.wind);
+  const parts: string[] = [];
+  if (temp) parts.push(`${temp}°`);
+  if (cond) parts.push(cond);
+  if (wind) parts.push(`Wind ${wind.replace(/,\s*/, " ")}`);   // "14 mph, L To R" -> "14 mph L To R"
+  return parts.join(", ");
 }
 
 function broadcastsFor(game: Record<string, unknown>): { away: LineupCardBroadcasts; home: LineupCardBroadcasts; national: string[] } {
@@ -253,7 +268,7 @@ export async function loadSlate(date: string): Promise<SlateGame[]> {
 // One game's full pregame card data. Returns null if the game isn't found or the
 // lineups aren't posted yet (both sides must have a 9-man lineup).
 export async function loadLineupCard(gamePk: number): Promise<LineupCardData | null> {
-  const sched = await getJson(`/v1/schedule?sportId=1&gamePk=${gamePk}&hydrate=lineups,probablePitcher,broadcasts(all),team,venue`);
+  const sched = await getJson(`/v1/schedule?sportId=1&gamePk=${gamePk}&hydrate=lineups,probablePitcher,broadcasts(all),team,venue,weather`);
   const game = rec(arr(rec(arr(rec(sched).dates)[0]).games)[0]);
   if (!game.gamePk) return null;
 
@@ -282,6 +297,7 @@ export async function loadLineupCard(gamePk: number): Promise<LineupCardData | n
     date: gameDate,
     startUtc: str(game.gameDate),
     venue: str(rec(game.venue).name),
+    weather: formatWeather(game),
     away,
     home,
     national: bc.national,

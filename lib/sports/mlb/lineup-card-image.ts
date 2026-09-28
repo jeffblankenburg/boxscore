@@ -168,6 +168,7 @@ export function renderLineupCardHtml(data: LineupCardData, logoSrc = "/icon.png"
   .teams { font-size: 92px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.95; }
   .meta { text-align: right; font-size: 28px; font-weight: 700; line-height: 1.3; }
   .meta .venue { color: #6a6354; font-size: 21px; font-weight: 400; }
+  .meta .wx { color: #9b937f; font-size: 19px; font-weight: 400; }
   .nat { margin-top: 16px; font-size: 19px; font-weight: 700; }
   /* Teams stacked vertically (one per row) for mobile legibility. */
   .cols { display: grid; grid-template-columns: 1fr; gap: 34px; margin-top: 30px; }
@@ -226,7 +227,7 @@ export function renderLineupCardHtml(data: LineupCardData, logoSrc = "/icon.png"
   </div>
   <div class="match">
     <div class="teams">${esc(data.away.abbr)} @ ${esc(data.home.abbr)}</div>
-    <div class="meta"><div>${esc(dateET(data.startUtc))}</div><div>${esc(startTimeET(data.startUtc))}</div><div class="venue">${esc(data.venue)}</div></div>
+    <div class="meta"><div>${esc(dateET(data.startUtc))}</div><div>${esc(startTimeET(data.startUtc))}</div><div class="venue">${esc(data.venue)}</div>${data.weather ? `<div class="wx">${esc(data.weather)}</div>` : ""}</div>
   </div>
   ${nat}
   <div class="cols">
