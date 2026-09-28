@@ -26,6 +26,7 @@ export type LineupCardBatter = {
   pos: string;        // "SS"
   name: string;
   id: number;
+  bats: string;       // "L" | "R" | "S" (switch); "" if unknown
   // Season line — the classic hitting stats.
   ba: string;         // ".285"
   ops: string;        // ".812"
@@ -189,6 +190,20 @@ async function pitcherFrom(side: Record<string, unknown>, season: number): Promi
   };
 }
 
+// Bat side (L/R/S) for a set of players in one batched call — the lineup nodes
+// don't carry it, so we hydrate it from /people?personIds=.
+async function batSidesFor(ids: number[]): Promise<Map<number, string>> {
+  const out = new Map<number, string>();
+  if (ids.length === 0) return out;
+  try {
+    const raw = await getJson(`/v1/people?personIds=${ids.join(",")}`);
+    for (const p of arr(rec(raw).people).map(rec)) {
+      out.set(num(p.id), str(rec(p.batSide).code));
+    }
+  } catch { /* bat side optional */ }
+  return out;
+}
+
 async function teamFrom(
   side: Record<string, unknown>,
   players: unknown[],
@@ -199,8 +214,11 @@ async function teamFrom(
   const team = rec(side.team);
   const lr = rec(side.leagueRecord);
   const record = lr.wins != null && lr.losses != null ? `${num(lr.wins)}-${num(lr.losses)}` : "";
-  const probable = await pitcherFrom(side, season);
   const lineup = arr(players).map(rec);
+  const [probable, bats] = await Promise.all([
+    pitcherFrom(side, season),
+    batSidesFor(lineup.map((pl) => num(pl.id))),
+  ]);
   const batters = await Promise.all(lineup.map(async (pl, i): Promise<LineupCardBatter> => {
     const id = num(pl.id);
     const s = await batterStats(id, opposingPitcherId, season);
@@ -209,6 +227,7 @@ async function teamFrom(
       pos: str(rec(pl.primaryPosition).abbreviation),
       name: str(pl.fullName),
       id,
+      bats: bats.get(id) ?? "",
       ba: s.ba, ops: s.ops, r: s.r, hr: s.hr, rbi: s.rbi, sb: s.sb, vsLine: s.vsLine,
     };
   }));

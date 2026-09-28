@@ -117,7 +117,7 @@ function teamColumn(t: LineupCardTeam, opposing: LineupCardData["home"]["probabl
     <tr>
       <td class="ord">${b.order}</td>
       <td class="pos">${esc(b.pos)}</td>
-      <td class="bat">${esc(b.name)}</td>
+      <td class="bat">${esc(b.name)}${b.bats ? ` <span class="bats">${esc(b.bats)}</span>` : ""}</td>
       <td class="s">${esc(b.ba)}</td>
       <td class="s">${esc(b.ops)}</td>
       <td class="s">${b.r}</td>
@@ -186,6 +186,8 @@ export function renderLineupCardHtml(data: LineupCardData, logoSrc = "/icon.png"
   .lineup .ord { width: 30px; color: #9b937f; font-weight: 800; }
   .lineup .pos { width: 54px; color: #6a6354; font-weight: 700; font-size: 20px; }
   .lineup .bat { font-weight: 700; white-space: nowrap; }
+  /* Bat side (L/R/S) as a small muted cap after the name, echoing the SP hand. */
+  .lineup .bats { color: #9b937f; font-weight: 800; font-size: 17px; }
   /* Right-aligned, auto width, equal left gap → uniform spacing between the five
      stat columns; the SB right pad + the divider's left pad use that same gap. */
   .lineup .s { text-align: right; font-variant-numeric: tabular-nums; padding-left: 30px; padding-right: 0; }
