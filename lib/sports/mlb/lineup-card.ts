@@ -7,7 +7,8 @@
 // total + FanDuel NRFI from daily_odds) — loadLineupCard itself leaves `odds` null.
 
 import { fetchEspnOddsForDate, indexOddsByMatchup } from "./odds-espn";
-import { loadOddsForDate } from "./predictions-history";
+import { fetchFanDuelNrfiForDate } from "./odds-fanduel";
+import { TEAMS } from "@/lib/teams";
 
 const BASE = "https://statsapi.mlb.com/api";
 
@@ -288,25 +289,51 @@ export async function loadLineupCard(gamePk: number): Promise<LineupCardData | n
   };
 }
 
-// A resolver for a whole slate's odds, so the poll cron fetches ESPN once and
-// reuses it across every card it renders. ML/run-line/total come fresh from
-// ESPN (DraftKings); NRFI from the FanDuel capture already in daily_odds.
-export type CardOddsResolver = (gamePk: number, awayAbbr: string, homeAbbr: string) => LineupCardOdds;
+// Canonical MLB team name → abbreviation, so FanDuel's full names ("Boston Red
+// Sox") key into the same abbr-pair index the ESPN lines use. The `.`-stripped
+// variant tolerates the "St. Louis" vs "St Louis" trap.
+const MLB_NAME_TO_ABBR: Map<string, string> = (() => {
+  const m = new Map<string, string>();
+  for (const t of TEAMS) {
+    if (t.sport !== "mlb") continue;
+    m.set(t.name.toLowerCase(), t.abbreviation);
+    m.set(t.name.toLowerCase().replace(/\./g, ""), t.abbreviation);
+  }
+  return m;
+})();
+function abbrForFanDuelName(name: string): string | null {
+  const k = name.toLowerCase();
+  return MLB_NAME_TO_ABBR.get(k) ?? MLB_NAME_TO_ABBR.get(k.replace(/\./g, "")) ?? null;
+}
+
+// A resolver for a whole slate's odds, so the poll cron fetches the books once
+// and reuses the result across every card it renders. ML/run-line/total come
+// live from ESPN (DraftKings); NRFI/YRFI come live from FanDuel's "1st Inning
+// 0.5 Runs" market. Both fetched fresh here — no dependency on the odds-poll
+// cron or daily_odds, so the card's first-inning line is always current.
+export type CardOddsResolver = (awayAbbr: string, homeAbbr: string) => LineupCardOdds;
 
 export async function loadCardOdds(date: string): Promise<CardOddsResolver> {
-  const [espnRows, dayOdds] = await Promise.all([
+  const [espnRows, fdRows] = await Promise.all([
     fetchEspnOddsForDate(date).catch(() => []),
-    loadOddsForDate(date).catch(() => ({ mlByGamePk: new Map(), nrfiByGamePk: new Map() })),
+    fetchFanDuelNrfiForDate(date).catch(() => []),
   ]);
   const espn = indexOddsByMatchup(espnRows);
-  // Stamp the pull time once for the whole slate — these are live ESPN lines,
-  // so "captured at" is when this resolver was built (render/poll time).
+  // Index FanDuel first-inning lines by canonical abbr pair (matches ESPN key).
+  const firstInn = new Map<string, { nrfi: number | null; yrfi: number | null }>();
+  for (const r of fdRows) {
+    const a = abbrForFanDuelName(r.awayTeamName);
+    const h = abbrForFanDuelName(r.homeTeamName);
+    if (a && h) firstInn.set(`${a}|${h}`, { nrfi: r.nrfiOdds, yrfi: r.yrfiOdds });
+  }
+  // Stamp the pull time once for the whole slate — these are live lines, so
+  // "captured at" is when this resolver was built (render/poll time).
   const capturedAt = new Date().toISOString();
-  return (gamePk, awayAbbr, homeAbbr) => {
+  return (awayAbbr, homeAbbr) => {
     const row = espn.get(`${awayAbbr}|${homeAbbr}`);
-    const firstInn = dayOdds.nrfiByGamePk.get(gamePk);
-    const nrfi = firstInn?.nrfi ?? null;
-    const yrfi = firstInn?.yrfi ?? null;
+    const fi = firstInn.get(`${awayAbbr}|${homeAbbr}`);
+    const nrfi = fi?.nrfi ?? null;
+    const yrfi = fi?.yrfi ?? null;
     if (!row && nrfi == null && yrfi == null) return null;
     return {
       awayMl: row?.awayMl ?? null,

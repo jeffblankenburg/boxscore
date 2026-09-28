@@ -233,7 +233,7 @@ export async function GET(req: Request) {
 
       const data = await loadLineupCard(gamePk);
       if (!data) { notReady++; games.push({ gamePk, note: "lineups not posted yet" }); continue; }
-      if (oddsFor) data.odds = oddsFor(data.gamePk, data.away.abbr, data.home.abbr);
+      if (oddsFor) data.odds = oddsFor(data.away.abbr, data.home.abbr);
 
       const subId = `lineup-${gamePk}`;
       // If every platform already has this game, don't even render.

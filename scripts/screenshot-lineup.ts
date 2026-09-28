@@ -20,7 +20,7 @@ async function main() {
   if (!data) throw new Error(`no card for ${gamePk} (lineups not posted?)`);
   try {
     const odds = await loadCardOdds(data.date);
-    data.odds = odds(data.gamePk, data.away.abbr, data.home.abbr);
+    data.odds = odds(data.away.abbr, data.home.abbr);
   } catch (e) {
     console.warn(`odds skipped: ${(e as Error).message}`);
   }

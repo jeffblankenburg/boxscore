@@ -31,7 +31,7 @@ export async function GET(
 
   // Real odds: ML/run-line/total fresh from ESPN + NRFI from daily_odds.
   const odds = await loadCardOdds(data.date);
-  data.odds = odds(data.gamePk, data.away.abbr, data.home.abbr);
+  data.odds = odds(data.away.abbr, data.home.abbr);
 
   return new NextResponse(renderLineupCardHtml(data, "/icon.png"), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
