@@ -56,6 +56,7 @@ export type LineupCardTeam = {
   abbr: string;
   name: string;
   teamName: string;    // nickname ("Mets") — the social hashtag lookup key
+  record: string;      // "74-88" (leagueRecord); "" if unavailable
   probable: LineupCardPitcher | null;
   batters: LineupCardBatter[];
   broadcasts: LineupCardBroadcasts;
@@ -67,7 +68,12 @@ export type LineupCardOdds = {
   // Run line, both sides: line is "+1.5"/"-1.5", odds the American juice.
   runLine: { away: { line: string; odds: number | null }; home: { line: string; odds: number | null } } | null;
   total: number | null;
+  overOdds: number | null;    // juice on the over
+  underOdds: number | null;   // juice on the under
   nrfi: number | null;   // No Runs First Inning (FanDuel), American odds
+  yrfi: number | null;   // Yes Runs First Inning (FanDuel), American odds
+  book: string;          // "DraftKings" — source of the game lines
+  capturedAt: string;    // ISO — when we pulled the lines (render time)
 } | null;
 
 export type LineupCardData = {
@@ -191,6 +197,8 @@ async function teamFrom(
   season: number,
 ): Promise<LineupCardTeam> {
   const team = rec(side.team);
+  const lr = rec(side.leagueRecord);
+  const record = lr.wins != null && lr.losses != null ? `${num(lr.wins)}-${num(lr.losses)}` : "";
   const probable = await pitcherFrom(side, season);
   const lineup = arr(players).map(rec);
   const batters = await Promise.all(lineup.map(async (pl, i): Promise<LineupCardBatter> => {
@@ -204,7 +212,7 @@ async function teamFrom(
       ba: s.ba, ops: s.ops, r: s.r, hr: s.hr, rbi: s.rbi, sb: s.sb, vsLine: s.vsLine,
     };
   }));
-  return { abbr: str(team.abbreviation), name: str(team.name), teamName: str(team.teamName), probable, batters, broadcasts };
+  return { abbr: str(team.abbreviation), name: str(team.name), teamName: str(team.teamName), record, probable, batters, broadcasts };
 }
 
 export type SlateGame = { gamePk: number; startUtc: string; state: string };
@@ -272,10 +280,15 @@ export async function loadCardOdds(date: string): Promise<CardOddsResolver> {
     loadOddsForDate(date).catch(() => ({ mlByGamePk: new Map(), nrfiByGamePk: new Map() })),
   ]);
   const espn = indexOddsByMatchup(espnRows);
+  // Stamp the pull time once for the whole slate — these are live ESPN lines,
+  // so "captured at" is when this resolver was built (render/poll time).
+  const capturedAt = new Date().toISOString();
   return (gamePk, awayAbbr, homeAbbr) => {
     const row = espn.get(`${awayAbbr}|${homeAbbr}`);
-    const nrfi = dayOdds.nrfiByGamePk.get(gamePk)?.nrfi ?? null;
-    if (!row && nrfi == null) return null;
+    const firstInn = dayOdds.nrfiByGamePk.get(gamePk);
+    const nrfi = firstInn?.nrfi ?? null;
+    const yrfi = firstInn?.yrfi ?? null;
+    if (!row && nrfi == null && yrfi == null) return null;
     return {
       awayMl: row?.awayMl ?? null,
       homeMl: row?.homeMl ?? null,
@@ -286,7 +299,12 @@ export async function loadCardOdds(date: string): Promise<CardOddsResolver> {
           }
         : null,
       total: row?.total ?? null,
+      overOdds: row?.overOdds ?? null,
+      underOdds: row?.underOdds ?? null,
       nrfi,
+      yrfi,
+      book: row?.book ?? "DraftKings",
+      capturedAt,
     };
   };
 }

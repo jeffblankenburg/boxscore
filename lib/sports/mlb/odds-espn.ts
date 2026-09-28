@@ -57,6 +57,8 @@ export type EspnOddsRow = {
   homeRlLine: string | null;
   homeRlOdds: number | null;
   total: number | null;
+  overOdds: number | null;     // juice on the over, -103
+  underOdds: number | null;    // juice on the under, -117
   book: string;            // "DraftKings"
   raw: Record<string, unknown>;
 };
@@ -96,6 +98,8 @@ type EventOddsItem = {
   awayTeamOdds?: TeamOdds;
   homeTeamOdds?: TeamOdds;
   overUnder?: number;
+  overOdds?: number;
+  underOdds?: number;
 };
 
 function parseAmerican(s: string | undefined): number | null {
@@ -185,6 +189,8 @@ export async function fetchEspnOddsForDate(
         homeRlLine: dk?.homeTeamOdds?.current?.pointSpread?.american ?? null,
         homeRlOdds: parseAmerican(dk?.homeTeamOdds?.current?.spread?.american),
         total: typeof dk?.overUnder === "number" ? dk.overUnder : null,
+        overOdds: typeof dk?.overOdds === "number" ? dk.overOdds : null,
+        underOdds: typeof dk?.underOdds === "number" ? dk.underOdds : null,
         book: dk?.provider?.name ?? "DraftKings",
         raw: (dk ?? {}) as Record<string, unknown>,
       };
@@ -208,6 +214,8 @@ export async function fetchEspnOddsForDate(
       homeRlLine: null,
       homeRlOdds: null,
       total: null,
+      overOdds: null,
+      underOdds: null,
       book: "DraftKings",
       raw: { error: (s.reason as Error).message },
     };

@@ -38,24 +38,51 @@ function lastName(full: string): string {
   return parts.length > 1 ? parts.slice(1).join(" ") : full;
 }
 
+// Capture-time line under the odds grid — the book for each market is labeled
+// on the market itself (see oddsStrip), so this is just the "as of" stamp.
+function oddsAsOf(o: NonNullable<LineupCardData["odds"]>): string {
+  if (!o.capturedAt) return "";
+  return `Lines as of ${dateET(o.capturedAt)} ${startTimeET(o.capturedAt)}`;
+}
+
 function oddsStrip(data: LineupCardData): string {
   const o = data.odds;
   if (!o) return "";
-  // A two-line "TEAM  value" block (away over home) for the moneyline + run line.
+  // A labeled row ("LABEL  value"); two of them stack into a cell (away/home,
+  // over/under, NRFI/YRFI).
+  const row = (label: string, val: string) =>
+    `<span class="odds-row"><span class="odds-t">${esc(label)}</span>${val}</span>`;
   const twoLine = (awayVal: string, homeVal: string) =>
-    `<span class="odds-row"><span class="odds-t">${esc(data.away.abbr)}</span>${awayVal}</span>` +
-    `<span class="odds-row"><span class="odds-t">${esc(data.home.abbr)}</span>${homeVal}</span>`;
+    row(data.away.abbr, awayVal) + row(data.home.abbr, homeVal);
   const ml = twoLine(fmtOdds(o.awayMl), fmtOdds(o.homeMl));
   const rlVal = (s: { line: string; odds: number | null }) =>
     `${esc(s.line)}${s.odds != null ? ` (${fmtOdds(s.odds)})` : ""}`;
   const rl = o.runLine ? twoLine(rlVal(o.runLine.away), rlVal(o.runLine.home)) : "—";
-  const ou = o.total != null ? `O/U ${o.total}` : "—";
+  // Total as two lines (over/under) so each side's juice shows, mirroring ML.
+  const withJuice = (juice: number | null) => (juice != null ? ` (${fmtOdds(juice)})` : "");
+  const total = o.total != null
+    ? row("O", `${o.total}${withJuice(o.overOdds)}`) + row("U", `${o.total}${withJuice(o.underOdds)}`)
+    : "—";
+  // NRFI (no runs) over YRFI (yes runs), mirroring the ML/run-line two-line rows.
+  const firstInning = o.nrfi != null || o.yrfi != null
+    ? row("NRFI", fmtOdds(o.nrfi)) + row("YRFI", fmtOdds(o.yrfi))
+    : "—";
+  const book = o.book.toUpperCase();
+  // Each market carries its own source label: game lines come from DraftKings
+  // (via ESPN), the first-inning market from FanDuel. Only label a market that
+  // actually has a price.
+  const cell = (k: string, v: string, src: string | null) =>
+    `<div class="odds-cell"><span class="odds-k">${k}</span><span class="odds-v">${v}</span>` +
+    `${src ? `<span class="odds-src">${esc(src)}</span>` : ""}</div>`;
+  const hasMl = o.awayMl != null || o.homeMl != null;
+  const hasFirst = o.nrfi != null || o.yrfi != null;
   return `<div class="odds">
-      <div class="odds-cell"><span class="odds-k">Moneyline</span><span class="odds-v">${ml}</span></div>
-      <div class="odds-cell"><span class="odds-k">Run line</span><span class="odds-v">${rl}</span></div>
-      <div class="odds-cell"><span class="odds-k">Total</span><span class="odds-v">${esc(ou)}</span></div>
-      <div class="odds-cell"><span class="odds-k">NRFI</span><span class="odds-v">${fmtOdds(o.nrfi)}</span></div>
+      ${cell("Moneyline", ml, hasMl ? book : null)}
+      ${cell("Run line", rl, o.runLine ? book : null)}
+      ${cell("Total", total, o.total != null ? book : null)}
+      ${cell("1st Inning", firstInning, hasFirst ? "FANDUEL" : null)}
     </div>
+    <div class="src">${esc(oddsAsOf(o))}</div>
     <div class="rg">Odds for entertainment. Must be 21+. Gambling problem? Call 1-800-GAMBLER.</div>`;
 }
 
@@ -100,7 +127,7 @@ function teamColumn(t: LineupCardTeam, opposing: LineupCardData["home"]["probabl
       <td class="vs">${b.vsLine === "first meeting" ? `<span class="dim">first meeting</span>` : esc(b.vsLine)}</td>
     </tr>`).join("");
   return `<div class="col">
-    <div class="col-head"><div class="col-team">${esc(t.name)}</div></div>
+    <div class="col-head"><div class="col-team">${esc(t.name)}${t.record ? ` <span class="rec">(${esc(t.record)})</span>` : ""}</div></div>
     ${t.probable ? pitcherTable(t.probable) : ""}
     <table class="lineup">
       <thead><tr>
@@ -147,6 +174,7 @@ export function renderLineupCardHtml(data: LineupCardData, logoSrc = "/icon.png"
   .col:first-child { border-bottom: 1px solid #d8d1c0; padding-bottom: 34px; }
   .col-head { border-bottom: 2px solid #161410; padding-bottom: 6px; margin-bottom: 8px; }
   .col-team { font-size: 40px; font-weight: 800; letter-spacing: -0.01em; }
+  .col-team .rec { color: #6a6354; font-weight: 700; font-size: 27px; }
   /* Starting-pitcher table sits above the lineup, its own compact table. */
   .pt { margin-bottom: 20px; }
   .pt .hand { color: #6a6354; font-weight: 700; font-size: 19px; }
@@ -179,7 +207,10 @@ export function renderLineupCardHtml(data: LineupCardData, logoSrc = "/icon.png"
     display: flex; flex-direction: column; gap: 2px; }
   .odds-row { display: flex; gap: 12px; }
   .odds-t { color: #6a6354; font-weight: 700; min-width: 56px; }
-  .rg { margin-top: 14px; font-size: 15px; color: #8a8270; }
+  .odds-src { margin-top: 6px; font-size: 14px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #9b937f; }
+  .src { margin-top: 14px; font-size: 16px; color: #6a6354; font-weight: 700; }
+  .rg { margin-top: 6px; font-size: 15px; color: #8a8270; }
   /* Footer — tagline + URL, mirrors scoreboard-image.tsx */
   .foot { display: flex; justify-content: space-between; align-items: baseline;
     margin-top: 26px; padding-top: 12px; border-top: 1px solid #161410; font-size: 20px; }
