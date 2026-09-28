@@ -6,11 +6,14 @@
 import type { LeaderColumn, SportLeadersProvider } from "./leaders-types";
 import { mlbLeadersProvider } from "./mlb/leaders-full";
 import { nhlLeadersProvider } from "@/lib/hockey-leaders";
+import { nbaLeadersProvider, wnbaLeadersProvider } from "@/lib/basketball-leaders";
 
 export function leadersProvider(sport: string): SportLeadersProvider | null {
   switch (sport) {
     case "mlb": return mlbLeadersProvider;
     case "nhl": return nhlLeadersProvider;
+    case "nba": return nbaLeadersProvider;
+    case "wnba": return wnbaLeadersProvider;
     default: return null;
   }
 }

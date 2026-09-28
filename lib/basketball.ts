@@ -495,7 +495,7 @@ function extractStandingsEntry(entry: Record<string, unknown>): BasketballStandi
 // offensive (PTS, AST) and defensive (REB, STL, BLK) buckets and merge by
 // athlete id so each player carries every stat we need.
 
-type AthleteRecord = {
+export type AthleteRecord = {
   id: string;
   name: string;
   teamAbbr: string;
@@ -508,7 +508,7 @@ type AthleteRecord = {
 // Index N in the per-athlete values corresponds to names[N]. Rebounds live
 // in the "general" bucket, points/assists in "offensive", steals/blocks in
 // "defensive" — so we have to walk all three to populate every stat we need.
-function extractAthletes(raw: unknown): AthleteRecord[] {
+export function extractAthletes(raw: unknown): AthleteRecord[] {
   const data = raw as {
     categories?: Array<{ name?: string; names?: string[] }>;
     athletes?: Array<Record<string, unknown>>;

@@ -33,8 +33,10 @@ import {
   playerLink,
   slugifyName,
   escText,
+  linkAnchor,
   type BasketballLeague,
 } from "./basketball-links";
+import { BASKETBALL_LEADER_CATEGORY_SLUG } from "./basketball-leaders";
 
 // Link a team by its ESPN nickname ("Cavaliers") to its team page; a player by
 // ESPN athlete id to their player page. `web` picks relative vs absolute href +
@@ -601,11 +603,16 @@ function renderLeaderCategory(cat: LeaderCategory, web: boolean, league: Basketb
       <td class="bb-ldr-value">${escapeHtml(e.displayValue)}</td>
     </tr>`,
   ).join("");
+  // The category heading links to the full-season leaderboard for that stat.
+  const slug = BASKETBALL_LEADER_CATEGORY_SLUG[cat.key];
+  const captionLabel = slug
+    ? linkAnchor(`/${league}/leaders/${slug}`, cat.label, web, "leader-cat-link", "es-leader-cat-link")
+    : escapeHtml(cat.label);
   // Wrapped so caption + table stay together as one unit when the parent
   // flows into columns (bb-leaders-cols sets break-inside: avoid on this).
   return `
 <div class="bb-ldr-cat">
-<h3 class="bb-ldr-caption">${escapeHtml(cat.label)}${cat.abbrev ? ` <span class="bb-ldr-abbrev">${escapeHtml(cat.abbrev)}</span>` : ""}</h3>
+<h3 class="bb-ldr-caption">${captionLabel}${cat.abbrev ? ` <span class="bb-ldr-abbrev">${escapeHtml(cat.abbrev)}</span>` : ""}</h3>
 <table class="bb-leader-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
   <tbody>${rows}</tbody>
 </table>
