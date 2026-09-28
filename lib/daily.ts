@@ -289,15 +289,25 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
     .filter((g) => g.status.codedGameState === "F")
     .map((g) => g.gamePk);
 
-  // The postseason runs early October to early November. Fetch the bracket
-  // across that whole window — not just days with playoff games — so the many
-  // travel/off-days between series, and the day after the World Series clinches,
-  // still carry the bracket. The endpoint returns empty before the Wild Card
-  // round, so an early-October regular-season day just yields no bracket.
+  // The postseason runs early October to early November. Fetch the bracket +
+  // final-standings snapshot across that whole window — not just days with
+  // playoff games — so the many travel/off-days between series, and the day
+  // after the World Series clinches, still carry the bracket. The postseason
+  // series endpoint returns empty before the Wild Card round, so an early day
+  // just yields no bracket.
+  //
+  // The window also covers ALL of September so finalStandings is available on
+  // the season-end off-days (the gap between game 162 and the Wild Card round).
+  // The team digest needs it there to tell a playoff-bound team apart from an
+  // eliminated one: statsapi's LIVE /standings goes empty the moment the
+  // regular season ends, taking its clinch flags with it, so a clinched team on
+  // that off-day would otherwise look like it missed the playoffs and get a
+  // wrongful season-farewell. finalStandings (standingsType=regularSeason)
+  // keeps returning the final table and gives us the authoritative seed/field.
   const month = Number(date.slice(5, 7));
   const day = Number(date.slice(8, 10));
-  const inPostseasonWindow = month === 10 || (month === 11 && day <= 15);
-  const [postseasonSeries, finalStandings] = inPostseasonWindow
+  const inSeasonEndWindow = month === 9 || month === 10 || (month === 11 && day <= 15);
+  const [postseasonSeries, finalStandings] = inSeasonEndWindow
     ? await Promise.all([
         fetchPostseasonSeriesRaw(season).catch(() => undefined),
         fetchFinalStandingsRaw(season).catch(() => undefined),

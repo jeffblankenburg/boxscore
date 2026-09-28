@@ -212,7 +212,7 @@ type StatsapiBoxscoreEnvelope = {
 // used to translate envelope refs into canonical team refs. The values
 // carry the canonical slug as their `id` per the canonical contract;
 // vendor ids never escape this file.
-function teamRefIndex(teamsRaw: unknown): Map<number, MlbTeamRef> {
+export function teamRefIndex(teamsRaw: unknown): Map<number, MlbTeamRef> {
   const map = new Map<number, MlbTeamRef>();
   const env = teamsRaw as StatsapiTeamsEnvelope | null;
   for (const t of env?.teams ?? []) {
@@ -739,30 +739,144 @@ const POSTSEASON_ROUND: Record<string, PostseasonRound> = {
 // MLB's official seeding: the three division winners are seeded 1-3 by record,
 // the three wild cards 4-6 by record. Derived from final regular-season
 // standings (reusing StatsapiStandingsEnvelope) because the postseason series
-// feed carries no seeds. Returns a teamId → seed map.
-function deriveSeeds(finalStandingsRaw: unknown): Map<number, number> {
+// feed carries no seeds.
+//
+// Division winners are computed as the top team in each division RECORD — not
+// from the `divisionChamp` flag, which we've seen set on two teams in one
+// division in a data feed (co-leaders before a tiebreaker resolves). Trusting
+// the flag then yields four "champs" in a league and a phantom 7th seed. One
+// winner per division record is immune to that and is the official rule anyway.
+// Each record in this envelope is exactly one division (see standingsFromRaw).
+type SeededTeam = {
+  id: number; name: string; wins: number; losses: number;
+  league: MlbLeague; seed: number; divisionChamp: boolean;
+};
+
+function seededPlayoffTeams(finalStandingsRaw: unknown): SeededTeam[] {
   const env = finalStandingsRaw as StatsapiStandingsEnvelope | null;
-  const seeds = new Map<number, number>();
-  type Row = { id: number; champ: boolean; pct: number };
-  const byLeague = new Map<number, Row[]>();
+  type Row = { id: number; name: string; wins: number; losses: number; pct: number };
+  // Per league: the division winners (one per division record) and every team.
+  const byLeague = new Map<MlbLeague, { champs: Row[]; all: Row[] }>();
   for (const rec of env?.records ?? []) {
-    const lg = rec.league?.id;
-    if (lg !== 103 && lg !== 104) continue;
-    const rows = byLeague.get(lg) ?? [];
+    const league = mapLeague(rec.league?.id);
+    if (!league) continue;
+    const rows: Row[] = [];
     for (const tr of rec.teamRecords ?? []) {
       const id = tr.team?.id;
       if (typeof id !== "number") continue;
       const gp = tr.wins + tr.losses;
-      rows.push({ id, champ: tr.divisionChamp === true, pct: gp > 0 ? tr.wins / gp : 0 });
+      rows.push({ id, name: tr.team.name, wins: tr.wins, losses: tr.losses, pct: gp > 0 ? tr.wins / gp : 0 });
     }
-    byLeague.set(lg, rows);
+    if (rows.length === 0) continue;
+    const entry = byLeague.get(league) ?? { champs: [], all: [] };
+    const winner = [...rows].sort((a, b) => b.pct - a.pct)[0]!; // this division's winner
+    entry.champs.push(winner);
+    entry.all.push(...rows);
+    byLeague.set(league, entry);
   }
-  for (const rows of byLeague.values()) {
-    const champs = rows.filter((r) => r.champ).sort((a, b) => b.pct - a.pct);
-    const wilds = rows.filter((r) => !r.champ).sort((a, b) => b.pct - a.pct).slice(0, 3);
-    [...champs, ...wilds].forEach((r, i) => seeds.set(r.id, i + 1));
+  const out: SeededTeam[] = [];
+  for (const [league, { champs, all }] of byLeague) {
+    const champIds = new Set(champs.map((c) => c.id));
+    const seededChamps = [...champs].sort((a, b) => b.pct - a.pct);
+    const wilds = all.filter((r) => !champIds.has(r.id)).sort((a, b) => b.pct - a.pct).slice(0, 3);
+    [...seededChamps, ...wilds].forEach((r, i) => {
+      out.push({
+        id: r.id, name: r.name, wins: r.wins, losses: r.losses,
+        league, seed: i + 1, divisionChamp: champIds.has(r.id),
+      });
+    });
   }
+  return out;
+}
+
+// teamId → seed map, for annotating the real postseason bracket.
+function deriveSeeds(finalStandingsRaw: unknown): Map<number, number> {
+  const seeds = new Map<number, number>();
+  for (const t of seededPlayoffTeams(finalStandingsRaw)) seeds.set(t.id, t.seed);
   return seeds;
+}
+
+// One team's postseason seed (1-6 within its league) from the final-standings
+// snapshot, or null if it missed the field. This is the stable "did they make
+// the playoffs" signal the team digest falls back to once the LIVE /standings
+// feed empties at season's end (its clinch flags vanish then; the regularSeason
+// standingsType keeps returning the final table). See render-team-email.ts.
+export function playoffSeedForTeam(finalStandingsRaw: unknown, teamId: number): number | null {
+  return seededPlayoffTeams(finalStandingsRaw).find((t) => t.id === teamId)?.seed ?? null;
+}
+
+// The full 12-team postseason field derived from the final regular-season
+// standings. This is the "bracket" a clinched team's preview digest shows in
+// the gap between game 162 and the first Wild Card game, when the real bracket
+// (postseasonBracketForDate) is still empty because no postseason game has been
+// played.
+export type PlayoffFieldTeam = {
+  teamId: number;
+  seed: number;           // 1-6 within the league
+  slug: string;           // canonical team slug
+  name: string;
+  abbr: string;
+  wins: number;
+  losses: number;
+  league: MlbLeague;      // "AL" | "NL"
+  divisionChamp: boolean; // seeds 1-3
+};
+
+export function playoffFieldFromFinalStandings(
+  finalStandingsRaw: unknown,
+  idx: Map<number, MlbTeamRef>,
+): PlayoffFieldTeam[] {
+  return seededPlayoffTeams(finalStandingsRaw).map((t) => {
+    const ref = teamRefById(idx, t.id, t.name);
+    return {
+      teamId: t.id, seed: t.seed, slug: ref.id, name: ref.name, abbr: ref.abbr,
+      wins: t.wins, losses: t.losses, league: t.league, divisionChamp: t.divisionChamp,
+    };
+  });
+}
+
+// A TBD slot in a not-yet-set matchup. The bracket renderers treat any entrant
+// with a negative teamId as TBD (same as a missing entrant), so a bye team can
+// sit in the Division Series opposite the (still-unknown) Wild Card winner.
+const TBD_ENTRANT: PostseasonEntrant = { teamId: -1, abbr: "TBD", name: "TBD", wins: 0, seed: null };
+
+// The initial (pre-Wild-Card) bracket, built from the seeded field so a clinched
+// team's preview digest shows the real bracket SHAPE before any postseason game
+// is played. The live-bracket path (postseasonBracketForDate) can't do this: it
+// derives series from played games and drops any that haven't started, so on the
+// off-day gap it would be entirely empty. Here the Wild Card matchups are set
+// (3v6, 4v5 per league), the two byes (seeds 1-2) sit in the Division Series
+// opposite a TBD, and the CS/WS are omitted (the renderer draws them as TBD).
+// Fed to the same renderPostseasonBracket{Email,Web} the live postseason uses.
+// Returns null unless the field is a full 12 — nothing coherent to draw.
+export function preWildCardBracket(
+  finalStandingsRaw: unknown,
+  idx: Map<number, MlbTeamRef>,
+  season: number,
+): PostseasonBracket | null {
+  const field = playoffFieldFromFinalStandings(finalStandingsRaw, idx);
+  if (field.length < 12) return null;
+  const entrant = (t: PlayoffFieldTeam): PostseasonEntrant => ({
+    teamId: t.teamId, abbr: t.abbr, name: t.name, wins: 0, seed: t.seed,
+  });
+  const series: PostseasonSeries[] = [];
+  for (const league of ["AL", "NL"] as const) {
+    const bySeed = new Map(field.filter((t) => t.league === league).map((t) => [t.seed, t]));
+    const wc = (topSeed: number, botSeed: number): PostseasonSeries | null => {
+      const top = bySeed.get(topSeed), bottom = bySeed.get(botSeed);
+      return top && bottom
+        ? { round: "wild-card", league, bestOf: 3, top: entrant(top), bottom: entrant(bottom), winnerTeamId: null }
+        : null;
+    };
+    const ds = (byeSeed: number): PostseasonSeries | null => {
+      const bye = bySeed.get(byeSeed);
+      return bye
+        ? { round: "division-series", league, bestOf: 5, top: entrant(bye), bottom: TBD_ENTRANT, winnerTeamId: null }
+        : null;
+    };
+    for (const s of [wc(3, 6), wc(4, 5), ds(1), ds(2)]) if (s) series.push(s);
+  }
+  return { season, series };
 }
 
 // League comes from the series description prefix ("AL Wild Card Series", "NL

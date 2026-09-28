@@ -18,6 +18,7 @@ import { lastNameLinkWeb } from "./player-links";
 import {
   teamPlayedGames, classifyTeamMode,
   seriesRoundName, seriesState, seriesGameNumber, signoffStatusLine, leagueListText,
+  playoffStatusLine,
   type TeamEmailData,
 } from "./render-team-email";
 import { renderPostseasonBracketWeb } from "./sports/mlb/render/postseason";
@@ -47,7 +48,7 @@ function renderStandings(data: TeamEmailData): string {
   // October: standings feed is empty; show the full bracket (same as the league
   // digest) in the standings slot.
   if (data.postseasonBracket) {
-    return renderPostseasonBracketWeb(data.postseasonBracket);
+    return renderPostseasonBracketWeb(data.postseasonBracket, data.team.mlbApiId ?? undefined);
   }
   if (!data.division) return "";
   const label = DIVISION_NAMES[data.division.division.id] ?? "Division";
@@ -366,9 +367,24 @@ export function renderTeamWebContent(data: TeamEmailData): string {
     );
   } else if (mode === "signoff") {
     parts.push(renderSignoff(data));
+  } else if (mode === "playoff-preview") {
+    parts.push(
+      renderPlayoffStatusWeb(data),
+      data.playoffPreviewBracket ? renderPostseasonBracketWeb(data.playoffPreviewBracket, data.team.mlbApiId ?? undefined) : "",
+      renderUpcoming(data),
+      renderTransactions(data.transactions),
+    );
   } else {
     parts.push(renderTransactions(data.transactions));
   }
 
   return parts.join("\n");
+}
+
+// ─── playoff preview ────────────────────────────────────────────────────────
+// Mirrors the email renderer's playoff-preview: the "you're in" status line,
+// then the pre-Wild-Card bracket (the same renderer the live postseason uses).
+
+function renderPlayoffStatusWeb(data: TeamEmailData): string {
+  return `<div style="font-size:17px;font-weight:700;line-height:1.35;margin:4px 0 16px;">${esc(playoffStatusLine(data))}</div>`;
 }

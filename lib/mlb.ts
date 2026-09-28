@@ -312,6 +312,28 @@ export async function getLeaders(
   return parseLeaders(await fetchLeadersRaw(category, season, leagueId, limit));
 }
 
+// Full season stat lines for every player in a league — the source for the
+// complete leaderboard pages (/mlb/leaders/[category]), which list every player
+// top to bottom, not just the ~top-100 the /stats/leaders endpoint caps at.
+// playerPool=all so bench/September-callup lines are included.
+export async function fetchSeasonStatsRaw(
+  group: "hitting" | "pitching", season: number, leagueId: 103 | 104, limit = 2000,
+): Promise<unknown> {
+  return getRaw(
+    `/v1/stats?stats=season&group=${group}&season=${season}&sportId=1&leagueId=${leagueId}&limit=${limit}&playerPool=all`,
+  );
+}
+
+export type SeasonStatSplit = {
+  player: { id: number; fullName: string };
+  team?: { id: number; name: string };
+  stat: Record<string, unknown>;
+};
+export function parseSeasonStats(raw: unknown): SeasonStatSplit[] {
+  const data = raw as { stats?: Array<{ splits?: SeasonStatSplit[] }> };
+  return data.stats?.[0]?.splits ?? [];
+}
+
 function guessStatGroup(category: string): "hitting" | "pitching" {
   const pitching = new Set([
     "wins", "earnedRunAverage", "strikeouts", "saves", "whip", "inningsPitched",

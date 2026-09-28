@@ -60,15 +60,23 @@ function teamRow(
   s: PostseasonSeries | undefined,
   e: PostseasonEntrant | undefined,
   align: "l" | "r",
+  hi?: number,
 ): string {
-  if (!s || !e) {
+  // Negative teamId is a TBD slot (e.g. a bye's not-yet-known opponent in a
+  // pre-Wild-Card preview bracket), rendered the same as a missing entrant.
+  if (!s || !e || e.teamId < 0) {
     return `<div class="psb-team psb-tbd psb-${align}"><span class="psb-nm">TBD</span></div>`;
   }
+  const decided = s.winnerTeamId != null;
   const won = s.winnerTeamId === e.teamId;
+  const self = hi != null && e.teamId === hi;
   const seed = e.seed != null ? `<span class="psb-seed">${e.seed}</span>` : "";
   const nm = `<span class="psb-nm">${esc(e.abbr)}</span>`;
   const w = `<span class="psb-w">${e.wins}</span>`;
-  const cls = `psb-team psb-${align}${won ? " psb-won" : " psb-lost"}`;
+  // Only the loser of a DECIDED series is muted; an unplayed/in-progress series
+  // stays in normal ink. psb-won bolds the winner, psb-self the subscriber's team.
+  const state = won ? " psb-won" : decided ? " psb-lost" : "";
+  const cls = `psb-team psb-${align}${state}${self ? " psb-self" : ""}`;
   // Seed + name on the outer edge, wins on the inner edge (toward the center),
   // so the numbers line up along the connector side.
   return align === "l"
@@ -76,11 +84,11 @@ function teamRow(
     : `<div class="${cls}">${w}${nm}${seed}</div>`;
 }
 
-function matchBox(s: PostseasonSeries | undefined, align: "l" | "r"): string {
+function matchBox(s: PostseasonSeries | undefined, align: "l" | "r", hi?: number): string {
   const top = s?.top, bottom = s?.bottom;
   return `<div class="psb-match">
-    ${teamRow(s, top, align)}
-    ${teamRow(s, bottom, align)}
+    ${teamRow(s, top, align, hi)}
+    ${teamRow(s, bottom, align, hi)}
   </div>`;
 }
 
@@ -95,12 +103,15 @@ function roundCol(label: string, boxes: string[], side: "l" | "r", key: string):
 
 // ─── the World Series center block ─────────────────────────────────────────
 
-function centerBlock(bracket: PostseasonBracket): string {
+function centerBlock(bracket: PostseasonBracket, hi?: number): string {
   const ws = bracket.series.find((s) => s.round === "world-series");
   const champLine = (e: PostseasonEntrant | undefined) => {
-    if (!ws || !e) return `<div class="psb-ws-team psb-tbd">TBD</div>`;
+    if (!ws || !e || e.teamId < 0) return `<div class="psb-ws-team psb-tbd">TBD</div>`;
+    const decided = ws.winnerTeamId != null;
     const won = ws.winnerTeamId === e.teamId;
-    return `<div class="psb-ws-team${won ? " psb-won" : " psb-lost"}">
+    const self = hi != null && e.teamId === hi;
+    const state = won ? " psb-won" : decided ? " psb-lost" : "";
+    return `<div class="psb-ws-team${state}${self ? " psb-self" : ""}">
       <span class="psb-nm">${esc(e.name)}</span> <span class="psb-w">${e.wins}</span>
     </div>`;
   };
@@ -115,32 +126,32 @@ function centerBlock(bracket: PostseasonBracket): string {
 
 // ─── assemble both sides ───────────────────────────────────────────────────
 
-function sideCols(bracket: PostseasonBracket, league: MlbLeague, side: "l" | "r"): string[] {
+function sideCols(bracket: PostseasonBracket, league: MlbLeague, side: "l" | "r", hi?: number): string[] {
   const s = sideFor(bracket, league);
   const wcLabel = `${league} Wild Card`;
   const dsLabel = league === "AL" ? "ALDS" : "NLDS";
   const csLabel = league === "AL" ? "ALCS" : "NLCS";
-  const wcCol = roundCol(wcLabel, s.wc.map((m) => matchBox(m, side)), side, "wc");
-  const dsCol = roundCol(dsLabel, s.ds.map((m) => matchBox(m, side)), side, "ds");
-  const csCol = roundCol(csLabel, [matchBox(s.cs, side)], side, "cs");
+  const wcCol = roundCol(wcLabel, s.wc.map((m) => matchBox(m, side, hi)), side, "wc");
+  const dsCol = roundCol(dsLabel, s.ds.map((m) => matchBox(m, side, hi)), side, "ds");
+  const csCol = roundCol(csLabel, [matchBox(s.cs, side, hi)], side, "cs");
   // Left side reads WC→DS→CS toward the center; right side mirrors CS→DS→WC.
   return side === "l" ? [wcCol, dsCol, csCol] : [csCol, dsCol, wcCol];
 }
 
 // Wide (desktop) layout: AL flows right, NL flows left, World Series centered.
-function wideHtml(bracket: PostseasonBracket): string {
-  const left = sideCols(bracket, "AL", "l");
-  const right = sideCols(bracket, "NL", "r");
+function wideHtml(bracket: PostseasonBracket, hi?: number): string {
+  const left = sideCols(bracket, "AL", "l", hi);
+  const right = sideCols(bracket, "NL", "r", hi);
   return `<div class="psb psb-wide">
   <div class="psb-side psb-side-l">${left.join("\n")}</div>
-  ${centerBlock(bracket)}
+  ${centerBlock(bracket, hi)}
   <div class="psb-side psb-side-r">${right.join("\n")}</div>
 </div>`;
 }
 
 // One league as a left-flowing bracket (WC→DS→CS), for the stacked layout.
-function oneSide(bracket: PostseasonBracket, league: MlbLeague, title: string): string {
-  const cols = sideCols(bracket, league, "l");
+function oneSide(bracket: PostseasonBracket, league: MlbLeague, title: string, hi?: number): string {
+  const cols = sideCols(bracket, league, "l", hi);
   return `<div class="psb-half">
     <div class="psb-half-title">${esc(title)}</div>
     <div class="psb psb-oneside"><div class="psb-side psb-side-l">${cols.join("\n")}</div></div>
@@ -149,25 +160,27 @@ function oneSide(bracket: PostseasonBracket, league: MlbLeague, title: string): 
 
 // Stacked (narrow/phone) layout: AL bracket, then NL bracket, then the World
 // Series — each half fits a phone without horizontal scroll.
-function stackHtml(bracket: PostseasonBracket): string {
+function stackHtml(bracket: PostseasonBracket, hi?: number): string {
   return `<div class="psb-stack">
-  ${oneSide(bracket, "AL", "American League")}
-  ${oneSide(bracket, "NL", "National League")}
-  ${centerBlock(bracket)}
+  ${oneSide(bracket, "AL", "American League", hi)}
+  ${oneSide(bracket, "NL", "National League", hi)}
+  ${centerBlock(bracket, hi)}
 </div>`;
 }
 
 // Both layouts ship; CSS shows one per viewport width (see .psb-wide/.psb-stack).
-function bracketHtml(bracket: PostseasonBracket): string {
-  return `${wideHtml(bracket)}\n${stackHtml(bracket)}`;
+function bracketHtml(bracket: PostseasonBracket, hi?: number): string {
+  return `${wideHtml(bracket, hi)}\n${stackHtml(bracket, hi)}`;
 }
 
 // ─── surface wrappers ──────────────────────────────────────────────────────
 
-export function renderPostseasonBracketWeb(bracket: PostseasonBracket): string {
+// highlightTeamId bolds one team throughout the bracket (the subscriber's team
+// in a team digest). Omitted by the league digest, which has no "self" team.
+export function renderPostseasonBracketWeb(bracket: PostseasonBracket, highlightTeamId?: number): string {
   return `<div class="section">
   <div class="ps-bracket-title">Postseason</div>
-  ${bracketHtml(bracket)}
+  ${bracketHtml(bracket, highlightTeamId)}
 </div>`;
 }
 
@@ -195,11 +208,17 @@ const EM_LINE = "#333333";
 const EM_WON = "#000000";
 const EM_LOST = "#999999";
 
-function emTeam(s: PostseasonSeries | undefined, e: PostseasonEntrant | undefined): string {
-  if (!s || !e) return `<i style="color:${EM_LOST}">TBD</i>`;
+function emTeam(s: PostseasonSeries | undefined, e: PostseasonEntrant | undefined, highlightId?: number): string {
+  // Negative teamId is a TBD slot (see teamRow), rendered as TBD.
+  if (!s || !e || e.teamId < 0) return `<i style="color:${EM_LOST}">TBD</i>`;
+  const decided = s.winnerTeamId != null;
   const won = s.winnerTeamId === e.teamId;
-  const color = won ? EM_WON : EM_LOST;
-  const weight = won ? 700 : 400;
+  const self = highlightId != null && e.teamId === highlightId;
+  // A placed team is black; only the LOSER of a decided series is muted (an
+  // unplayed/in-progress series stays black, not greyed out). Bold the series
+  // winner and the subscriber's own team.
+  const color = decided && !won ? EM_LOST : EM_WON;
+  const weight = won || self ? 700 : 400;
   const seed = e.seed != null ? `<span style="color:${EM_LOST};font-weight:700">${e.seed}</span> ` : "";
   return `${seed}<span style="color:${color};font-weight:${weight}">${esc(e.abbr)}</span>` +
     ` <span style="color:${color};font-weight:${weight}">${e.wins}</span>`;
@@ -223,7 +242,7 @@ function emRow(cells: string[]): string {
   return `<tr>${cells.join("")}</tr>`;
 }
 
-function emSideTable(bracket: PostseasonBracket, league: MlbLeague): string {
+function emSideTable(bracket: PostseasonBracket, league: MlbLeague, hi?: number): string {
   const s = sideFor(bracket, league);
   const wcT = s.wc[0], wcB = s.wc[1], dsT = s.ds[0], dsB = s.ds[1], cs = s.cs;
   const dsLabel = league === "AL" ? "ALDS" : "NLDS";
@@ -237,37 +256,39 @@ function emSideTable(bracket: PostseasonBracket, league: MlbLeague): string {
   // header, and "AL WILD CARD" wraps in the narrow email column.
   const header = emRow([lbl("Wild Card"), `<td></td>`, lbl(dsLabel), `<td></td>`, lbl(csLabel)]);
   const rows = [
-    emRow([emBox(emTeam(wcT, wcT?.top)),    emConn(true, false),  emBox(emTeam(dsT, dsT?.top)),    emConn(true, false),  emEmpty(74)]),
-    emRow([emBox(emTeam(wcT, wcT?.bottom)), emConn(false, false), emBox(emTeam(dsT, dsT?.bottom)), emConn(false, true),  emEmpty(74)]),
-    emRow([emEmpty(74),                     emConn(false, false), emEmpty(74),                     emConn(false, true),  emBox(emTeam(cs, cs?.top))]),
-    emRow([emEmpty(74),                     emConn(false, false), emEmpty(74),                     emConn(false, true),  emBox(emTeam(cs, cs?.bottom))]),
-    emRow([emBox(emTeam(wcB, wcB?.top)),    emConn(true, false),  emBox(emTeam(dsB, dsB?.top)),    emConn(true, true),   emEmpty(74)]),
-    emRow([emBox(emTeam(wcB, wcB?.bottom)), emConn(false, false), emBox(emTeam(dsB, dsB?.bottom)), emConn(false, false), emEmpty(74)]),
+    emRow([emBox(emTeam(wcT, wcT?.top, hi)),    emConn(true, false),  emBox(emTeam(dsT, dsT?.top, hi)),    emConn(true, false),  emEmpty(74)]),
+    emRow([emBox(emTeam(wcT, wcT?.bottom, hi)), emConn(false, false), emBox(emTeam(dsT, dsT?.bottom, hi)), emConn(false, true),  emEmpty(74)]),
+    emRow([emEmpty(74),                         emConn(false, false), emEmpty(74),                         emConn(false, true),  emBox(emTeam(cs, cs?.top, hi))]),
+    emRow([emEmpty(74),                         emConn(false, false), emEmpty(74),                         emConn(false, true),  emBox(emTeam(cs, cs?.bottom, hi))]),
+    emRow([emBox(emTeam(wcB, wcB?.top, hi)),    emConn(true, false),  emBox(emTeam(dsB, dsB?.top, hi)),    emConn(true, true),   emEmpty(74)]),
+    emRow([emBox(emTeam(wcB, wcB?.bottom, hi)), emConn(false, false), emBox(emTeam(dsB, dsB?.bottom, hi)), emConn(false, false), emEmpty(74)]),
   ];
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" ` +
     `style="border-collapse:collapse;margin:0 0 6px">${header}${rows.join("")}</table>`;
 }
 
-function emLeagueBlock(bracket: PostseasonBracket, league: MlbLeague, title: string): string {
+function emLeagueBlock(bracket: PostseasonBracket, league: MlbLeague, title: string, hi?: number): string {
   return `<div style="margin:6px 0 14px">
     <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;` +
     `letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid ${EM_LINE};` +
     `padding-bottom:3px;margin-bottom:8px">${esc(title)}</div>
-    ${emSideTable(bracket, league)}
+    ${emSideTable(bracket, league, hi)}
   </div>`;
 }
 
-function emWorldSeries(bracket: PostseasonBracket): string {
+function emWorldSeries(bracket: PostseasonBracket, hi?: number): string {
   const ws = bracket.series.find((s) => s.round === "world-series");
   const line = (e: PostseasonEntrant | undefined, top: boolean) => {
     const border = top ? "" : `border-top:1px solid ${EM_LINE};`;
-    if (!ws || !e) {
+    if (!ws || !e || e.teamId < 0) {
       return `<tr><td style="${border}padding:5px 8px;font-family:Arial,Helvetica,sans-serif;` +
         `font-size:13px;color:${EM_LOST}"><i>TBD</i></td><td style="${border}"></td></tr>`;
     }
+    const decided = ws.winnerTeamId != null;
     const won = ws.winnerTeamId === e.teamId;
-    const color = won ? EM_WON : EM_LOST;
-    const weight = won ? 700 : 400;
+    const self = hi != null && e.teamId === hi;
+    const color = decided && !won ? EM_LOST : EM_WON;
+    const weight = won || self ? 700 : 400;
     const star = won ? " ★" : "";
     return `<tr>` +
       `<td style="${border}padding:5px 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;` +
@@ -284,11 +305,13 @@ function emWorldSeries(bracket: PostseasonBracket): string {
   </div>`;
 }
 
-export function renderPostseasonBracketEmail(bracket: PostseasonBracket): string {
+// highlightTeamId bolds one team throughout the bracket (the subscriber's team
+// in a team digest). Omitted by the league digest, which has no "self" team.
+export function renderPostseasonBracketEmail(bracket: PostseasonBracket, highlightTeamId?: number): string {
   return `<div class="es-section">
   ${sectionH("Postseason")}
-  ${emLeagueBlock(bracket, "AL", "American League")}
-  ${emLeagueBlock(bracket, "NL", "National League")}
-  ${emWorldSeries(bracket)}
+  ${emLeagueBlock(bracket, "AL", "American League", highlightTeamId)}
+  ${emLeagueBlock(bracket, "NL", "National League", highlightTeamId)}
+  ${emWorldSeries(bracket, highlightTeamId)}
 </div>`;
 }

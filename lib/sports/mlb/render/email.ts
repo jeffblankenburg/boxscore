@@ -49,6 +49,7 @@ import { showMagicNumbers, divisionMagicDisplay, clinchKeyLine } from "@/lib/sta
 import { renderMasthead, type NavSport } from "@/lib/masthead";
 import { sortTransactionsByTeam } from "../transactions";
 import { renderPostseasonBracketEmail } from "./postseason";
+import { LEADER_CATEGORY_SLUG } from "../leaders-full";
 
 // ─── Display tables (name-keyed) ─────────────────────────────────────────
 // Mirrors the canonical web renderer's maps so this file stands on its
@@ -414,7 +415,14 @@ function renderLeaderCategory(board: MlbLeaderboard, limit = 5): string {
     </tr>`;
   }).join("");
   const meta = LEADER_LABELS[board.category];
-  return `${subH(meta?.label ?? board.category)}
+  const label = meta?.label ?? board.category;
+  // Category heading links to the full-season leaderboard for that stat. Absolute
+  // URL (email) + inline styling so it survives Gmail stripping the <style> block.
+  const slug = LEADER_CATEGORY_SLUG[board.category];
+  const heading = slug
+    ? `<h3 class="es-sub-h"><a href="${EMAIL_LINK_BASE}/mlb/leaders/${slug}" style="color:inherit;text-decoration:none;">${esc(label)}</a></h3>`
+    : subH(label);
+  return `${heading}
     <table class="es-table" cellpadding="0" cellspacing="0" border="0">
       <tbody>${rows}</tbody>
     </table>`;

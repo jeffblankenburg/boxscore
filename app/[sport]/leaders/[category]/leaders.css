@@ -1,0 +1,65 @@
+/* Full-season leaderboard page. Reuses the digest's .leaders-table / .player-col
+   / .player-link (globals.css); this file only adds the page frame and the
+   two-up newspaper column layout. */
+
+/* The stat sub-nav reuses the masthead's .masthead-nav / .masthead-nav-link
+   classes (see the page) for identical spacing/type. The dateline already draws
+   a rule beneath the date, so drop masthead-nav's own top rule (which would make
+   a second, redundant line) and draw only a bottom rule — the links then sit
+   between the dateline's rule and this one. The negative top margin cancels the
+   dateline's margin-bottom so the links tuck directly under its rule. */
+.lb-statnav {
+  border-top: none;
+  border-bottom: 2px solid var(--border-strong);
+  margin-top: -18px;
+  margin-bottom: 16px;
+}
+
+.lb-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+.lb-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 2px;
+}
+.lb-subtitle {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+.lb-qualifier {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  padding: 8px 0;
+  margin: 0 0 18px;
+}
+
+/* AL left, NL right; stack on a phone. */
+.lb-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+@media (max-width: 620px) {
+  .lb-cols { grid-template-columns: 1fr; gap: 8px; }
+}
+
+.lb-table { width: 100%; }
+/* Full player names need more room than the digest's last-name column. */
+.lb-table .player-col { width: 82%; }
+.lb-col .stats-subheader {
+  font-size: 14px;
+  font-weight: 800;
+  padding: 6px 0 4px;
+}

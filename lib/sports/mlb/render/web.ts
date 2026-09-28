@@ -43,6 +43,7 @@ import { lastName, boxSurname, collidingSurnames } from "@/lib/names";
 import { lastNameLinkWeb, fullNameLinkWeb } from "@/lib/player-links";
 import { sortTransactionsByTeam } from "../transactions";
 import { renderPostseasonBracketWeb } from "./postseason";
+import { LEADER_CATEGORY_SLUG } from "../leaders-full";
 
 // ─── Display tables (name-keyed) ─────────────────────────────────────────
 // Kept local rather than imported from lib/render.ts so this file stands
@@ -284,6 +285,16 @@ const LEADER_ORDER: MlbLeaderCategory[] = [
   "battingAverage", "homeRuns", "runsBattedIn", "stolenBases",
   "wins", "earnedRunAverage", "strikeoutsPitching", "saves",
 ];
+
+// The category heading links to the full-season leaderboard for that stat
+// (/mlb/leaders/[slug]) — every ranked player, AL + NL. Plain text if the
+// category has no page (shouldn't happen for the eight the digest shows).
+function leaderCategoryLink(cat: MlbLeaderCategory, label: string): string {
+  const slug = LEADER_CATEGORY_SLUG[cat];
+  return slug
+    ? `<a class="leader-cat-link" href="/mlb/leaders/${slug}">${esc(label)}</a>`
+    : esc(label);
+}
 
 function formatLeaderValue(category: MlbLeaderCategory, v: number): string {
   switch (category) {
@@ -824,7 +835,7 @@ function renderLeagueLeaders(boards: MlbLeaderboard[], limit = 5, hl?: Highlight
       </tr>`;
     }).join("");
     return `<div class="leaders-section">
-<div class="stats-subheader">${esc(meta.label)}</div>
+<div class="stats-subheader">${leaderCategoryLink(cat, meta.label)}</div>
 <table class="leaders-table">
   <thead><tr><th class="player-col">Player</th><th>${esc(meta.valueLabel)}</th></tr></thead>
   <tbody>${rows}</tbody>
@@ -848,7 +859,7 @@ function renderAllStarLeaders(boards: MlbLeaderboard[], hl?: HighlightMap): stri
       </tr>`;
     }).join("");
     return `<div class="leaders-section">
-<div class="stats-subheader">${esc(meta.label)}</div>
+<div class="stats-subheader">${leaderCategoryLink(cat, meta.label)}</div>
 <table class="leaders-table">
   <thead><tr><th class="player-col">Player</th><th>${esc(meta.valueLabel)}</th></tr></thead>
   <tbody>${rows}</tbody>

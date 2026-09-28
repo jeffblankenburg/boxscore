@@ -160,10 +160,16 @@ export async function GET(req: Request) {
           // The signoff day stamps mode='signoff-<variant>' (its dedupe marker
           // AND the subject-line selector for the send cron); every other team
           // day keeps the league mode for pagination/sitemap. td.seasonEnd is
-          // non-null whenever classifyTeamMode reports "signoff".
-          const teamMode = classifyTeamMode(td) === "signoff"
+          // non-null whenever classifyTeamMode reports "signoff". The
+          // playoff-preview day stamps its own mode so the send cron always
+          // ships it (it's short but must go out) and gives it a distinct
+          // subject line.
+          const teamClass = classifyTeamMode(td);
+          const teamMode = teamClass === "signoff"
             ? `signoff-${td.seasonEnd!.variant}`
-            : data.mode;
+            : teamClass === "playoff-preview"
+              ? "playoff-preview"
+              : data.mode;
           await upsertTeamDigest({
             sport, team_slug: team.slug, date,
             has_game: hasGame, mode: teamMode,

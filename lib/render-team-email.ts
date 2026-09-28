@@ -26,7 +26,10 @@ import {
 } from "./render-email";
 import { lastNameLinkEmail } from "./player-links";
 import { dedupeTransactions } from "./dedupe-transactions";
-import { postseasonBracketForDate, finalRecordForTeam } from "./sports/mlb/adapters/from-statsapi";
+import {
+  postseasonBracketForDate, finalRecordForTeam,
+  playoffSeedForTeam, preWildCardBracket, teamRefIndex,
+} from "./sports/mlb/adapters/from-statsapi";
 import type { PostseasonSeries, PostseasonBracket } from "./sports/mlb/canonical";
 import { renderPostseasonBracketEmail } from "./sports/mlb/render/postseason";
 import { getVisibleSports } from "./sports";
@@ -68,6 +71,19 @@ export type TeamEmailData = {
   // Set only on the first day the team's season is over; drives the signoff
   // digest. The generate cron enforces fire-once via the team_digests mode.
   seasonEnd: SeasonEnd | null;
+  // True if the team made the postseason. Derived from the live /standings
+  // clinch flags while the season is on, and from the final-standings seed once
+  // that feed empties at season's end (see loadTeamEmailData). Guards a clinched
+  // team against a wrongful "missed the playoffs" farewell and gates the
+  // playoff-preview digest.
+  clinchedPlayoffs: boolean;
+  // The team's postseason seed (1-6 within its league), null if it missed.
+  playoffSeed: number | null;
+  // The pre-Wild-Card bracket (Wild Card matchups set, byes vs TBD in the DS),
+  // built from the seeded field. Rendered in the playoff-preview digest before
+  // any postseason game is played and the real bracket exists. Null outside the
+  // window or when the field isn't a full 12.
+  playoffPreviewBracket: PostseasonBracket | null;
   // Other publicly-launched leagues to point signoff subscribers toward
   // (MLB excluded). Empty when nothing else is public yet.
   otherLeagues: { id: string; name: string }[];
@@ -130,10 +146,19 @@ export async function loadTeamEmailData(team: Team, date: string): Promise<TeamE
     d.teamRecords.some((tr) => tr.team.id === teamId),
   ) ?? null;
   const teamRec = division?.teamRecords.find((tr) => tr.team.id === teamId);
-  // Clinched a playoff berth per the (late-September) standings feed. Guards the
-  // gap where a bye team's Division Series games aren't in the 7-day schedule
-  // yet — without it we'd misread their empty upcoming as "missed the playoffs".
-  const clinchedPlayoffs = !!teamRec && (teamRec.clinched === true || !!teamRec.clinchIndicator);
+  // Did the team make the postseason? While the regular season is live, the
+  // /standings feed's clinch flags are authoritative. But that feed goes empty
+  // the moment the season ends (see the finalStandings comment below) — exactly
+  // when we need the answer, on the off-day gap before the Wild Card round. So
+  // once `teamRec` is gone, fall back to the postseason seed derived from the
+  // final-standings snapshot, which stays populated and is stable. Without this
+  // a clinched team on that off-day reads as "missed the playoffs" and gets a
+  // wrongful season-farewell.
+  const playoffSeed = playoffSeedForTeam(raw.finalStandings, teamId);
+  const clinchedPlayoffs = teamRec
+    ? teamRec.clinched === true || !!teamRec.clinchIndicator
+    : playoffSeed != null;
+  const playoffPreviewBracket = preWildCardBracket(raw.finalStandings, teamRefIndex(raw.teams), season);
   let record = teamRec
     ? { wins: teamRec.wins, losses: teamRec.losses, gamesBack: teamRec.gamesBack }
     : null;
@@ -177,6 +202,9 @@ export async function loadTeamEmailData(team: Team, date: string): Promise<TeamE
     teamSeries,
     postseasonBracket: bracket,
     seasonEnd,
+    clinchedPlayoffs,
+    playoffSeed,
+    playoffPreviewBracket,
     otherLeagues,
   };
 }
@@ -357,7 +385,7 @@ function renderTeamStandings(data: TeamEmailData): string {
   // In October, statsapi's /standings goes empty and the bracket takes over —
   // the same full bracket the league digest shows, in the standings slot.
   if (data.postseasonBracket) {
-    return renderPostseasonBracketEmail(data.postseasonBracket);
+    return renderPostseasonBracketEmail(data.postseasonBracket, data.team.mlbApiId ?? undefined);
   }
   if (!data.division || !data.team.mlbApiId) return "";
   const label = DIVISION_NAMES[data.division.division.id] ?? "Division";
@@ -687,21 +715,39 @@ function renderTeamTransactions(data: TeamEmailData): string {
 //   "signoff"   — the first no-game day after the team's season ended; a
 //                 one-time farewell that sets the "no more emails until spring"
 //                 expectation (retention) and points at other active leagues
+//   "playoff-preview" — a clinched team in the gap between game 162 and its
+//                 first Wild Card game: no game to recap, no real bracket yet,
+//                 but they're alive. Shows the playoff field + their upcoming
+//                 postseason games instead of the offseason shell (which would
+//                 skip-as-empty) or a stale regular-season standings table.
 //   "offseason" — no game yesterday AND no upcoming games this week; show
 //                 transactions only (hot stove still happens). Final regular-
 //                 season standings are intentionally suppressed here to keep
 //                 the spec literal — revisit if subscribers ask for them
-export type TeamDigestMode = "game" | "no-game" | "signoff" | "offseason";
+export type TeamDigestMode = "game" | "no-game" | "signoff" | "playoff-preview" | "offseason";
+
+// A clinched team whose regular season is over but whose postseason hasn't
+// started yet (no bracket, because no postseason game has been played). The
+// !postseasonBracket guard bounds this to the pre-Wild-Card gap: once the WC
+// round plays, the real bracket exists and game/no-game/signoff take over — so
+// an eliminated team on a later quiet day can't fall back into a preview.
+export function isPlayoffPreview(data: TeamEmailData): boolean {
+  const regularSeasonOver = !data.upcoming.some((g) => (g.gameType ?? "R") === "R");
+  return data.clinchedPlayoffs && !data.postseasonBracket && regularSeasonOver;
+}
 
 // Exported so the generate cron and web renderer classify identically.
 export function classifyTeamMode(data: TeamEmailData): TeamDigestMode {
   const hasGame = teamPlayedGames(data).length > 0;
   // A game recap always wins the day — the final game (incl. an elimination
   // loss, framed by teamSeries) gets its own digest; the farewell follows on
-  // the first quiet day after.
+  // the first quiet day after. seasonEnd is only ever set when upcoming is
+  // empty (detectSeasonEnd bails otherwise), so signoff safely precedes the
+  // upcoming-driven modes.
   if (hasGame) return "game";
-  if (data.upcoming.length > 0) return "no-game";
   if (data.seasonEnd) return "signoff";
+  if (isPlayoffPreview(data)) return "playoff-preview";
+  if (data.upcoming.length > 0) return "no-game";
   return "offseason";
 }
 
@@ -743,6 +789,18 @@ export function renderTeamEmailContent(data: TeamEmailData): string {
     );
   } else if (mode === "signoff") {
     parts.push(renderTeamSignoff(data));
+  } else if (mode === "playoff-preview") {
+    // Clinched, regular season done, first postseason game not yet played.
+    // Lead with the "you're in" status, show the whole field as the bracket
+    // (Wild Card matchups set, byes vs TBD), then any postseason games already
+    // on the schedule.
+    parts.push(
+      teamSectionHeading(data),
+      renderTeamPlayoffStatus(data),
+      data.playoffPreviewBracket ? renderPostseasonBracketEmail(data.playoffPreviewBracket, data.team.mlbApiId ?? undefined) : "",
+      renderTeamUpcoming(data),
+      renderTeamTransactions(data),
+    );
   } else {
     // Offseason. Transactions are the only structured signal worth a
     // morning email here; if there aren't any, the cron should choose to
@@ -808,4 +866,21 @@ function renderTeamSignoff(data: TeamEmailData): string {
   }
 
   return `${heading}${status}${thanks}${farewell}${cta}`;
+}
+
+// ─── playoff preview ────────────────────────────────────────────────────────
+
+// Factual one-liner for a clinched team's preview, mirroring signoffStatusLine.
+// Division champs are seeds 1-3, wild cards 4-6 (deriveSeeds' rule). Exported so
+// the web renderer phrases it identically.
+export function playoffStatusLine(data: TeamEmailData): string {
+  const name = data.team.name;
+  const seed = data.playoffSeed;
+  if (seed == null) return `The ${name} are headed to the postseason.`;
+  if (seed <= 3) return `The ${name} won their division and enter the postseason as the #${seed} seed.`;
+  return `The ${name} clinched a Wild Card berth as the #${seed} seed.`;
+}
+
+function renderTeamPlayoffStatus(data: TeamEmailData): string {
+  return `<p style="font-size:16px;font-weight:700;margin:0 0 16px;line-height:1.35;">${esc(playoffStatusLine(data))}</p>`;
 }
