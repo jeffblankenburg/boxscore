@@ -126,10 +126,11 @@ export function nextScoreboardUrl(cfg: FootballLeagueConfig, date: string, windo
 // byathlete sorted by a specific stat — the endpoint's default (unsorted) blob
 // is QB-heavy and misses the rushing/receiving/sack leaders, so we ask for each
 // stat's own top-6 via `sort=category.stat:desc`.
-export function leaderStatUrl(cfg: FootballLeagueConfig, season: number, category: string, stat: string): string {
-  // limit=20 (not 6) leaves headroom for "top 5 through ties" — TD and sack
-  // leaders routinely have many players tied at the 5th-place value.
-  return `${FOOTBALL_LEADERS_BASE}/${cfg.espnSlug}/statistics/byathlete?season=${season}&seasontype=2&limit=20&sort=${category}.${stat}:desc`;
+export function leaderStatUrl(cfg: FootballLeagueConfig, season: number, category: string, stat: string, limit = 20): string {
+  // Digest default limit=20 (not 6) leaves headroom for "top 5 through ties" —
+  // TD and sack leaders routinely have many players tied at the 5th-place value.
+  // The full-season leaderboard pages pass a high limit to get every player.
+  return `${FOOTBALL_LEADERS_BASE}/${cfg.espnSlug}/statistics/byathlete?season=${season}&seasontype=2&limit=${limit}&sort=${category}.${stat}:desc`;
 }
 
 export function transactionsUrl(cfg: FootballLeagueConfig): string {

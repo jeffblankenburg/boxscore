@@ -35,6 +35,7 @@ import { renderMasthead, type NavSport } from "../../../masthead";
 import { findTeam, findTeamByAbbr } from "../../../teams";
 import { EMAIL_LINK_BASE } from "../../../site";
 import { footballPlayerPath } from "../player-links";
+import { FOOTBALL_LEADER_CATEGORY_SLUG } from "../leaders-full";
 import { scopeToConference, findConferenceByAnyName, type NcaafConference } from "../conferences";
 
 // Anchor for a player/team page. Web uses a relative href + the site's
@@ -428,9 +429,16 @@ function renderLeaders(data: CanonicalFootballDailyData, web: boolean): string {
         </tr>`;
         })
         .join("");
+      // NFL captions link to the full-season leaderboard for that stat. NCAAF
+      // has no leaderboard pages yet (deferred, see #118), so its captions stay
+      // plain text.
+      const slug = FOOTBALL_LEADER_CATEGORY_SLUG[b.category];
+      const caption = slug && data.league === "nfl"
+        ? linkAnchor(`/${data.league}/leaders/${slug}`, b.label, web, "leader-cat-link", "es-leader-cat-link")
+        : escapeHtml(b.label);
       return `
 <div class="fb-ldr-card">
-  <h3 class="fb-ldr-caption">${escapeHtml(b.label)}</h3>
+  <h3 class="fb-ldr-caption">${caption}</h3>
   <table class="fb-ldr-table" role="presentation" cellpadding="0" cellspacing="0" border="0">
     <thead><tr><th class="fb-ldr-player">Player</th><th class="fb-ldr-val">${escapeHtml(leaderUnit(b.label))}</th></tr></thead>
     <tbody>${rows}</tbody>
