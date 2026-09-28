@@ -22,7 +22,7 @@ function dateET(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("en-US", {
-    weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York",
+    weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York",
   }).format(d);
 }
 
@@ -227,7 +227,7 @@ export function renderLineupCardHtml(data: LineupCardData, logoSrc = "/icon.png"
   </div>
   <div class="match">
     <div class="teams">${esc(data.away.abbr)} @ ${esc(data.home.abbr)}</div>
-    <div class="meta"><div>${esc(dateET(data.startUtc))}</div><div>${esc(startTimeET(data.startUtc))}</div><div class="venue">${esc(data.venue)}</div>${data.weather ? `<div class="wx">${esc(data.weather)}</div>` : ""}</div>
+    <div class="meta"><div>${esc(dateET(data.startUtc))}</div><div>${esc(startTimeET(data.startUtc))}</div><div class="venue">${esc(data.venue)}</div>${data.weather.summary ? `<div class="wx">${esc(data.weather.summary)}</div>` : ""}${data.weather.wind ? `<div class="wx">${esc(data.weather.wind)}</div>` : ""}</div>
   </div>
   ${nat}
   <div class="cols">

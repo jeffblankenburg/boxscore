@@ -83,7 +83,8 @@ export type LineupCardData = {
   date: string;         // games date (YYYY-MM-DD)
   startUtc: string;     // ISO
   venue: string;
-  weather: string;      // "62°, Rain, Wind 14 mph L To R"; "" if not posted yet
+  // Split so wind renders on its own line. "" fields when not posted yet.
+  weather: { summary: string; wind: string };   // summary "62°, Rain"; wind "Wind 14 mph L To R"
   away: LineupCardTeam;
   home: LineupCardTeam;
   national: string[];   // national TV, if any
@@ -132,16 +133,16 @@ async function batterStats(batterId: number, pitcherId: number | null, season: n
 
 // statsapi weather is a forecast until ~a few hours pre-game, then game-time
 // conditions. Empty ({}) far out; posts by the time a card fires. "" if absent.
-function formatWeather(game: Record<string, unknown>): string {
+function formatWeather(game: Record<string, unknown>): { summary: string; wind: string } {
   const w = rec(game.weather);
   const cond = str(w.condition);
   const temp = str(w.temp);
   const wind = str(w.wind);
-  const parts: string[] = [];
-  if (temp) parts.push(`${temp}°`);
-  if (cond) parts.push(cond);
-  if (wind) parts.push(`Wind ${wind.replace(/,\s*/, " ")}`);   // "14 mph, L To R" -> "14 mph L To R"
-  return parts.join(", ");
+  const summary = [temp ? `${temp}°` : "", cond].filter(Boolean).join(", ");
+  return {
+    summary,
+    wind: wind ? `Wind ${wind.replace(/,\s*/, " ")}` : "",   // "14 mph, L To R" -> "14 mph L To R"
+  };
 }
 
 function broadcastsFor(game: Record<string, unknown>): { away: LineupCardBroadcasts; home: LineupCardBroadcasts; national: string[] } {
