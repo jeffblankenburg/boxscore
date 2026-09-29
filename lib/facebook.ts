@@ -9,6 +9,13 @@
 //      → publishes the album as one feed item.
 //   3. Optional cleanup: DELETE /{post-id} via deleteFacebookPost.
 
+// Kill switch for all Facebook page posting. The long-lived page token expired
+// 2026-05-20; every post fails token validation, which spammed cron-failure
+// alerts from post-lineups (it retried FB every 20 min on game days). Disabled
+// until FACEBOOK_PAGE_ACCESS_TOKEN is refreshed in Vercel — flip back to true
+// then. Kept as a code flag, not just an env unset, so the reason is visible.
+export const FACEBOOK_POSTING_ENABLED: boolean = false;
+
 const GRAPH = "https://graph.facebook.com/v21.0";
 
 function creds(): { pageId: string; token: string } {

@@ -322,6 +322,22 @@
   border-bottom: 1px solid var(--a-border);
   background: var(--a-bg-sidebar);
 }
+/* Numeric headers must sit over their right-aligned values, or the label
+   and the number drift to opposite ends of a wide column. */
+.a-table thead th.a-num { text-align: right; }
+/* Expand-to-detail control + nested detail rows (all-sports team breakdown). */
+.a-expand {
+  background: none; border: none; padding: 0; margin: 0; font: inherit;
+  color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+.a-expand-caret { color: var(--a-text-muted); font-size: 10px; width: 12px; text-align: center; }
+.a-table tbody tr.a-subrow td {
+  background: var(--a-bg-sidebar);
+  font-size: 12px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  color: var(--a-text-muted);
+}
 .a-table tbody td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--a-border);

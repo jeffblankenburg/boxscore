@@ -12,6 +12,7 @@
 
 import { useState, useTransition } from "react";
 import { triggerCron } from "../actions";
+import type { CronRoute } from "@/lib/sport-features";
 
 function prevDayIso(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
@@ -20,32 +21,24 @@ function prevDayIso(iso: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
-type Route =
-  | "generate"
-  | "generate-sdio"
-  | "send-email"
-  | "send-team-email"
-  | "post-bluesky"
-  | "post-twitter"
-  | "post-discord"
-  | "post-facebook"
-  | "ad-stats-snapshot"
-  | "supervise";
+// Reuse the watchwall's CronRoute so the trigger panel and the wall can't
+// drift. generate-sdio / post-facebook were retired from both.
+type Route = CronRoute;
 
-const GUARDED: ReadonlySet<Route> = new Set(["send-email", "send-team-email"]);
-const RESETTABLE: ReadonlySet<Route> = new Set(["post-bluesky", "post-twitter", "post-discord", "post-facebook"]);
+const GUARDED: ReadonlySet<Route> = new Set(["send-email", "send-team-email", "send-conference-email"]);
+const RESETTABLE: ReadonlySet<Route> = new Set(["post-bluesky", "post-twitter", "post-discord"]);
 
 const ROUTE_LABELS: Record<Route, string> = {
-  "generate":          "Generate digest",
-  "generate-sdio":     "Generate SDIO snapshot",
-  "send-email":        "Send email to subscribers",
-  "send-team-email":   "Send team digests to subscribers",
-  "post-bluesky":      "Post to BlueSky",
-  "post-twitter":      "Post to Twitter",
-  "post-discord":      "Post to Discord",
-  "post-facebook":     "Post to Facebook",
-  "ad-stats-snapshot": "Snapshot ad stats",
-  "supervise":         "Run supervisor",
+  "generate":              "Generate digest",
+  "send-email":            "Send email to subscribers",
+  "send-team-email":       "Send team digests to subscribers",
+  "send-conference-email": "Send conference digests to subscribers",
+  "post-lineups":          "Post lineup cards",
+  "post-bluesky":          "Post to BlueSky",
+  "post-twitter":          "Post to Twitter",
+  "post-discord":          "Post to Discord",
+  "ad-stats-snapshot":     "Snapshot ad stats",
+  "supervise":             "Run supervisor",
 };
 
 export function CronPanel({

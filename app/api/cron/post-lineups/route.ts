@@ -16,7 +16,7 @@ import { isValidIsoDate, timeInET, todayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost, type Platform } from "@/lib/social-posts";
 import { deleteTweet, postTweetWithImage, twitterAccountConfigured } from "@/lib/twitter";
 import { blueskyTargetsForSport, deleteBlueskyPost, postToBlueskyWithImage } from "@/lib/bluesky";
-import { deleteFacebookPost, publishAlbum, uploadUnpublishedPhoto } from "@/lib/facebook";
+import { deleteFacebookPost, publishAlbum, uploadUnpublishedPhoto, FACEBOOK_POSTING_ENABLED } from "@/lib/facebook";
 import { loadLeagueWebhook, postToWebhook } from "@/lib/discord";
 import { siteOrigin } from "@/lib/site";
 import { socialSendsAllowed } from "@/lib/sports";
@@ -109,6 +109,9 @@ async function postToBluesky(data: LineupCardData, subId: string, text: string, 
 }
 
 async function postToFacebook(data: LineupCardData, subId: string, text: string, imageUrl: string): Promise<PostResult> {
+  // Skipped (not failed) so a disabled FB integration can't flip the run to
+  // "failed" and re-trigger alerts. See FACEBOOK_POSTING_ENABLED.
+  if (!FACEBOOK_POSTING_ENABLED) return { platform: "facebook", skipped: "posting disabled" };
   if (!facebookConfigured()) return { platform: "facebook", skipped: "not configured" };
   if (await hasAlreadyPosted("facebook", SPORT, data.date, subId)) return { platform: "facebook", skipped: "already posted" };
   try {

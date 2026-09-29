@@ -5,6 +5,7 @@ import {
   deleteFacebookPost,
   publishAlbum,
   uploadUnpublishedPhoto,
+  FACEBOOK_POSTING_ENABLED,
 } from "@/lib/facebook";
 import { EMAIL_LINK_BASE, siteOrigin } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -37,6 +38,12 @@ export async function GET(req: Request) {
   const reset = url.searchParams.get("reset") === "1";
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
+  }
+
+  // Facebook page token expired 2026-05-20 — posting is disabled until it's
+  // refreshed. Return a clean skip so a manual trigger doesn't error.
+  if (!FACEBOOK_POSTING_ENABLED) {
+    return NextResponse.json({ ok: true, skipped: "facebook posting disabled" });
   }
 
   if (reset) {

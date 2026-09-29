@@ -4,22 +4,23 @@
 // it through phases (e.g. NBA gaining send-email when its renderer ships)
 // happens in one place.
 
-// Ordered roughly chronologically by daily fire time so the watchwall reads
-// left-to-right as the morning unfolds (9:00 generate → 10:00 supervise).
-// post-facebook stays at the end as an unscheduled placeholder slot — when
-// Facebook posting goes live it gets added to the daily schedule and starts
-// passing on the wall without further wiring.
+// Ordered roughly by daily fire time so the watchwall reads left-to-right as
+// the morning unfolds (generate → the sends → the posts → snapshot → supervise).
+// This is the set the watchwall MONITORS, trimmed to jobs that actually run:
+// generate-sdio (SDIO vendor not live, fails daily) and post-facebook (never
+// scheduled) were dropped so they stop showing as daily false alarms. The
+// per-sport manual trigger panel (CronPanel) still lists them independently.
 export const ALL_CRON_ROUTES = [
   "generate",
-  "generate-sdio",
   "send-email",
+  "send-team-email",
+  "send-conference-email",
+  "post-lineups",
   "post-twitter",
   "post-bluesky",
   "post-discord",
-  "send-team-email",
   "ad-stats-snapshot",
   "supervise",
-  "post-facebook",
 ] as const;
 export type CronRoute = (typeof ALL_CRON_ROUTES)[number];
 
@@ -46,11 +47,16 @@ export type SportFeatures = {
   sendsOnGameDaysOnly?: boolean;
 };
 
-// MLB expects every per-sport route. supervise is excluded because it has no
-// sport at insert time; it's shown on the synthetic Platform row instead.
-const MLB_EXPECTED = ALL_CRON_ROUTES.filter(
-  (r): r is CronRoute => !SPORTLESS_ROUTES.includes(r),
-);
+// MLB's expected routes, listed explicitly. It runs everything except the
+// NCAAF-specific conference send and supervise (a sportless platform job on
+// the Platform row). Explicit because ALL_CRON_ROUTES now includes a
+// sport-specific route, so "everything minus supervise" would wrongly expect
+// send-conference-email on the MLB row.
+const MLB_EXPECTED: readonly CronRoute[] = [
+  "generate", "send-email", "send-team-email",
+  "post-lineups", "post-twitter", "post-bluesky", "post-discord",
+  "ad-stats-snapshot",
+];
 
 export const SPORT_FEATURES: Record<string, SportFeatures> = {
   mlb:  { hasPreview: true,  hasShareImages: true,  hasTeamDigests: true,  hasRegenAll: true,  expectedRoutes: MLB_EXPECTED },
@@ -65,7 +71,7 @@ export const SPORT_FEATURES: Record<string, SportFeatures> = {
   // what hasPreview actually gates here — so it's true. sendsOnGameDaysOnly
   // is the flag that encodes "no daily send on game-less days".
   nfl:   { hasPreview: true, hasShareImages: false, hasTeamDigests: true,  hasRegenAll: false, expectedRoutes: ["generate", "send-email", "send-team-email"], sendsOnGameDaysOnly: true },
-  ncaaf: { hasPreview: true, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email"], sendsOnGameDaysOnly: true },
+  ncaaf: { hasPreview: true, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email", "send-conference-email"], sendsOnGameDaysOnly: true },
   // NHL: league digest + per-team digests, daily-cadence pro league. Sends only
   // on game days (no empty offseason/preseason-gap emails). No share images or
   // social posts yet.

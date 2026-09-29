@@ -2,14 +2,14 @@ import { Suspense } from "react";
 import { requireAdmin } from "./require-admin";
 import { PageHeader } from "./_components/primitives";
 import {
+  AllSportsStatsBlock,
+  AllSportsStatsSkeleton,
   EmailListsBlock,
   EmailListsSkeleton,
   PulseBlock,
   PulseSkeleton,
   QueueBlock,
   QueueSkeleton,
-  TickerBlock,
-  TickerSkeleton,
   TodaysSendBlock,
   TodaysSendSkeleton,
   WatchwallBlock,
@@ -43,8 +43,8 @@ export default async function AdminDashboard() {
         subtitle="Did everything run last night, and what did it produce?"
       />
 
-      <Suspense fallback={<TickerSkeleton />}>
-        <TickerBlock />
+      <Suspense fallback={<AllSportsStatsSkeleton />}>
+        <AllSportsStatsBlock />
       </Suspense>
 
       <Suspense fallback={<TodaysSendSkeleton />}>

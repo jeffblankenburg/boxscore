@@ -3,7 +3,7 @@ import { yesterdayInET } from "./dates";
 import { getVisibleSports } from "./sports";
 import { featuresFor, SPORTLESS_ROUTES, type CronRoute as SportCronRoute } from "./sport-features";
 import { getActiveSubscriberIdSet, getActiveSubscriberIdSetAt, getActiveSubscribersForSport } from "./subscribers";
-import { findTeam, type Sport } from "./teams";
+import { findTeam, teamsBySport, type Sport } from "./teams";
 
 // Supabase's JS client caps un-paginated `select` at 1000 rows. The `sends`
 // and `subscribers` tables both grow past that, so any aggregation that needs
@@ -1731,6 +1731,151 @@ export async function getTodaysSendSummaries(): Promise<TodaysSendSummary[]> {
   );
 
   return summaries;
+}
+
+// ---- All-sports send + engagement rollup (dashboard headline) ----------
+//
+// One row per sport over the last N days, summing league + team scopes,
+// straight from daily_send_stats (the nightly aggregate). Every sport that
+// sends is in that table — this is the "all sports, all sends" view the
+// MLB-only ticker never gave. Single indexed range read, grouped in JS, so
+// it streams as fast as the other hero blocks.
+
+export type SportSendStat = {
+  sport: string;
+  sportName: string;
+  sends: number;
+  leagueSends: number;
+  teamSends: number;
+  delivered: number;
+  bounced: number;
+  failed: number;
+  opens: number;
+  deliveredRate: number; // delivered / sends
+  openRate: number;      // opens_unique / delivered
+  bounceRate: number;    // bounced / delivered
+};
+
+export type SendStatTotals = {
+  sends: number; delivered: number; bounced: number; failed: number; opens: number;
+  deliveredRate: number; openRate: number; bounceRate: number;
+};
+
+export type AllSportsSendStats = {
+  days: number;
+  rows: SportSendStat[]; // sorted by sends desc
+  totals: SendStatTotals;
+};
+
+// Per-team send counts for one sport over the window — powers the expandable
+// rows on the all-sports table. Not from daily_send_stats (that aggregates the
+// team scope without a team_id), so it scans `sends` directly; loaded lazily
+// on expand so the dashboard's first paint stays cheap.
+export type TeamSendStat = {
+  teamId: string;
+  teamName: string;
+  sends: number;   // error IS NULL
+  failed: number;  // error IS NOT NULL
+};
+
+export async function getTeamSendBreakdown(sport: string, days: number = 7): Promise<TeamSendStat[]> {
+  const db = supabaseAdmin();
+  // Match the parent table's window: daily_send_stats keys on sent_at::date
+  // (UTC), so bound on sent_at from UTC midnight of the start day.
+  const startIso = `${aggregateDateNDaysAgo(days)}T00:00:00.000Z`;
+
+  const teams = teamsBySport(sport as Sport);
+  if (teams.length === 0) return [];
+
+  // Two server-side head counts per team (ok / failed), all in parallel.
+  // Counting on the server avoids transferring the rows — MLB's ~55k team
+  // sends went from an ~8s row scan to well under a second (benchmarked
+  // 2026-09-29). team_id in `sends` is the registry slug the send cron wrote.
+  const counts = await Promise.all(
+    teams.map((tm) =>
+      Promise.all([
+        db.from("sends").select("id", { count: "exact", head: true })
+          .eq("digest_sport", sport).eq("team_id", tm.slug).gte("sent_at", startIso).is("error", null),
+        db.from("sends").select("id", { count: "exact", head: true })
+          .eq("digest_sport", sport).eq("team_id", tm.slug).gte("sent_at", startIso).not("error", "is", null),
+      ]),
+    ),
+  );
+
+  const out: TeamSendStat[] = [];
+  teams.forEach((tm, i) => {
+    const sends = counts[i]![0].count ?? 0;
+    const failed = counts[i]![1].count ?? 0;
+    if (sends === 0 && failed === 0) return; // no sends for this team in the window
+    out.push({ teamId: tm.slug, teamName: tm.name, sends, failed });
+  });
+  out.sort((a, b) => b.sends - a.sends);
+  return out;
+}
+
+// daily_send_stats carries "mlb-predictions" as its own sport id; it isn't in
+// the sport registry, so fall back to a friendly label for anything unmapped.
+function sportLabel(id: string, names: Map<string, string>): string {
+  return names.get(id) ?? (id === "mlb-predictions" ? "MLB Predictions" : id.toUpperCase());
+}
+
+export async function getAllSportsSendStats(days: number = 7): Promise<AllSportsSendStats> {
+  const startDate = aggregateDateNDaysAgo(days);
+  const sports = await getVisibleSports({ includeAdminOnly: true });
+  const names = new Map(sports.map((s) => [s.id, s.name]));
+
+  const { data, error } = await supabaseAdmin()
+    .from("daily_send_stats")
+    .select("sport, scope, sends, failed_send, delivered, bounced, opens_unique")
+    .gte("date", startDate);
+  if (error) throw new Error(`getAllSportsSendStats: ${error.message}`);
+
+  type Acc = {
+    sends: number; leagueSends: number; teamSends: number;
+    delivered: number; bounced: number; failed: number; opens: number;
+  };
+  const bySport = new Map<string, Acc>();
+  for (const r of (data ?? []) as Array<{
+    sport: string; scope: string; sends: number; failed_send: number;
+    delivered: number; bounced: number; opens_unique: number;
+  }>) {
+    const a = bySport.get(r.sport)
+      ?? { sends: 0, leagueSends: 0, teamSends: 0, delivered: 0, bounced: 0, failed: 0, opens: 0 };
+    a.sends += r.sends;
+    if (r.scope === "team") a.teamSends += r.sends; else a.leagueSends += r.sends;
+    a.delivered += r.delivered;
+    a.bounced += r.bounced;
+    a.failed += r.failed_send;
+    a.opens += r.opens_unique;
+    bySport.set(r.sport, a);
+  }
+
+  const rows: SportSendStat[] = [];
+  const t = { sends: 0, delivered: 0, bounced: 0, failed: 0, opens: 0 };
+  for (const [sport, a] of bySport) {
+    t.sends += a.sends; t.delivered += a.delivered; t.bounced += a.bounced;
+    t.failed += a.failed; t.opens += a.opens;
+    rows.push({
+      sport, sportName: sportLabel(sport, names),
+      sends: a.sends, leagueSends: a.leagueSends, teamSends: a.teamSends,
+      delivered: a.delivered, bounced: a.bounced, failed: a.failed, opens: a.opens,
+      deliveredRate: a.sends ? a.delivered / a.sends : 0,
+      openRate: a.delivered ? a.opens / a.delivered : 0,
+      bounceRate: a.delivered ? a.bounced / a.delivered : 0,
+    });
+  }
+  rows.sort((x, y) => y.sends - x.sends);
+
+  return {
+    days,
+    rows,
+    totals: {
+      ...t,
+      deliveredRate: t.sends ? t.delivered / t.sends : 0,
+      openRate: t.delivered ? t.opens / t.delivered : 0,
+      bounceRate: t.delivered ? t.bounced / t.delivered : 0,
+    },
+  };
 }
 
 export type Last24hPulse = {
