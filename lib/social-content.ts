@@ -349,7 +349,11 @@ function ncaafTags(teams: string[], official: Record<string, string | null>): st
   return Array.from(out).join(" ");
 }
 
-function boxscoreTags(sport: string, teams: [string, string], official: Record<string, string | null>): string {
+// Full findability hashtag string for a two-team card: name + abbreviation +
+// official rally tag per team (deduped). Exported so the lineup-card poster
+// emits the same tag set the box-score/scoreboard cards do, not just the
+// single official tag it used to.
+export function boxscoreTags(sport: string, teams: [string, string], official: Record<string, string | null>): string {
   const valid = teams.filter((t) => t.length > 0);
   if (sport === "mlb") return mlbTags(valid, official);
   if (sport === "ncaaf") return ncaafTags(valid, official);

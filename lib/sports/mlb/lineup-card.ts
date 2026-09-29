@@ -81,6 +81,7 @@ export type LineupCardOdds = {
 export type LineupCardData = {
   gamePk: number;
   date: string;         // games date (YYYY-MM-DD)
+  gameType: string;     // statsapi code: R regular; F/D/L/W = wild card/division/LCS/WS
   startUtc: string;     // ISO
   venue: string;
   // Split so wind renders on its own line. "" fields when not posted yet.
@@ -296,6 +297,7 @@ export async function loadLineupCard(gamePk: number): Promise<LineupCardData | n
   return {
     gamePk: num(game.gamePk),
     date: gameDate,
+    gameType: str(game.gameType),
     startUtc: str(game.gameDate),
     venue: str(rec(game.venue).name),
     weather: formatWeather(game),

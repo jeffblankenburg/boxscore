@@ -26,6 +26,7 @@ import { uploadLineupCardImage } from "@/lib/share-storage";
 import { resolvedOfficialMap } from "@/lib/team-hashtags";
 import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 import { loadCardOdds, loadLineupCard, loadSlate, type LineupCardData } from "@/lib/sports/mlb/lineup-card";
+import { boxscoreTags } from "@/lib/social-content";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -50,14 +51,18 @@ function facebookConfigured(): boolean {
   return Boolean(process.env.FACEBOOK_PAGE_ID && process.env.FACEBOOK_PAGE_ACCESS_TOKEN);
 }
 
+// statsapi gameType codes for the postseason rounds (wild card, division
+// series, LCS, world series). Regular season is "R". Used to append the
+// league playoff hashtag only during the postseason.
+const POSTSEASON_GAME_TYPES = new Set(["F", "D", "L", "W", "P"]);
+
 // Caption text + accessibility alt for a card. No em dashes / middots (house
-// style); hashtags are the two clubs' official tags when we have them.
+// style). Hashtags now match the other social cards: each club's name +
+// tricode + official tag (via boxscoreTags), plus #Postseason on playoff games.
 function caption(data: LineupCardData, officialMap: Record<string, string | null>): { text: string; alt: string } {
-  const tags = [data.away.teamName, data.home.teamName]
-    .map((n) => officialMap[n])
-    .filter((h): h is string => Boolean(h))
-    .map((h) => `#${h}`)
-    .join(" ");
+  const teamTags = boxscoreTags("mlb", [data.away.teamName, data.home.teamName], officialMap);
+  const leagueTag = POSTSEASON_GAME_TYPES.has(data.gameType) ? "#Postseason" : "";
+  const tags = [teamTags, leagueTag].filter(Boolean).join(" ");
   const head = `Starting lineups: ${data.away.name} at ${data.home.name}`;
   const when = `First pitch ${timeInET(data.startUtc)}${data.venue ? `, ${data.venue}` : ""}`;
   const text = [head, when, tags].filter(Boolean).join("\n");
