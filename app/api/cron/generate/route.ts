@@ -15,7 +15,7 @@ import {
   renderBasketballTeamContent,
   renderBasketballTeamEmailContent,
 } from "@/lib/render-basketball-team";
-import { teamsBySport } from "@/lib/teams";
+import { teamsBySport, findTeamByAbbr, type Sport } from "@/lib/teams";
 import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
 import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
 import { loadNbaData } from "@/lib/nba";
@@ -306,15 +306,25 @@ export async function GET(req: Request) {
       let team_digests_written = 0;
       const team_fails: string[] = [];
       if ((sport === "nfl" || sport === "ncaaf") && !skipTeams) {
-        const teamsPlayed = new Set<string>();
+        // Canonical game team refs key `id` off ESPN's lowercased abbreviation
+        // ("army", "psu"). loadFootballTeamData wants a REGISTRY SLUG, and for
+        // NFL the slug happens to equal that abbr ("dal") so passing the id
+        // worked — but NCAAF slugs are full names ("army-black-knights"), so
+        // the id never matched and NOT ONE college team digest was ever
+        // written. Resolve abbr -> canonical slug via findTeamByAbbr. FCS
+        // opponents of FBS teams aren't in the registry (all-FBS coverage) and
+        // resolve to nothing — a correct skip, they aren't subscribable.
+        const playedAbbrs = new Set<string>();
         for (const g of fb.games) {
           if (g.status !== "final") continue;
-          teamsPlayed.add(g.awayTeam.id);
-          teamsPlayed.add(g.homeTeam.id);
+          playedAbbrs.add(g.awayTeam.abbr);
+          playedAbbrs.add(g.homeTeam.abbr);
         }
-        for (const slug of teamsPlayed) {
+        for (const abbr of playedAbbrs) {
+          const registryTeam = findTeamByAbbr(sport as Sport, abbr);
+          if (!registryTeam) continue;   // FCS opponent — not a subscribable FBS team
           try {
-            const tp = await loadFootballTeamData(sport, slug, date);
+            const tp = await loadFootballTeamData(sport, registryTeam.slug, date);
             if (!tp) continue;
             await upsertTeamDigest({
               sport, team_slug: tp.slug, date,
@@ -324,7 +334,7 @@ export async function GET(req: Request) {
             });
             team_digests_written++;
           } catch (err) {
-            team_fails.push(`${slug}: ${(err as Error).message}`);
+            team_fails.push(`${abbr}: ${(err as Error).message}`);
           }
         }
       }
