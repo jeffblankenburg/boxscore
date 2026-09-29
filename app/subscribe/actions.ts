@@ -12,8 +12,7 @@ import { isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
 import { findConferenceBySlug } from "@/lib/sports/football/conferences";
 import { checkSubscribeRate, recordSubscribeAttempt } from "@/lib/subscribe-rate-limit";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { validateEmail } from "@/lib/email-validate";
 
 // Per-field caps for attribution. utm_* in the wild rarely exceed 64 chars;
 // referrer (full URL) and landing_path (pathname only) can be longer but we
@@ -67,10 +66,15 @@ function readAttribution(formData: FormData): SubscriberAttribution {
 // a crafted POST can't write opt-in rows for hidden or unknown values.
 export async function subscribe(formData: FormData): Promise<void> {
   const rawEmail = formData.get("email");
-  const email = typeof rawEmail === "string" ? rawEmail.trim() : "";
-  if (!EMAIL_RE.test(email)) {
+  // Authoritative gate — the client field runs the same validateEmail, but a
+  // crafted POST bypasses it. Rejects malformed shapes (foo..com, trailing
+  // punctuation), reserved domains (example.com), and known freemail typos
+  // (gmail.con) that Resend would 422 or bounce. See the 2026-09-29 incident.
+  const check = validateEmail(typeof rawEmail === "string" ? rawEmail : "");
+  if (!check.ok) {
     redirect("/subscribe?error=invalid_email");
   }
+  const email = check.email;
 
   const rawLeagues = formData.getAll("leagues").filter((v): v is string => typeof v === "string");
   const rawTeams = formData.getAll("teams").filter((v): v is string => typeof v === "string");

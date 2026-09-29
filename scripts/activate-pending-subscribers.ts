@@ -8,39 +8,48 @@
 // rows (email_subscriptions) are untouched — a flipped subscriber only receives
 // a digest if they already have an active league/team opt-in.
 //
-// Idempotent: re-running finds zero pending and no-ops.
+// Skips undeliverable addresses: validated through the same validateEmail as
+// the subscribe form, so this job can't flip a typo/malformed address live.
+// Before this guard (added after the 2026-09-29 Resend batch incident) a
+// blanket pending→active would resurrect exactly the bad addresses that poison
+// send batches. Invalid rows are left pending, not activated.
+//
+// Idempotent: re-running finds zero activatable pending and no-ops.
 //
 // Run: npx tsx --env-file=.env.local scripts/activate-pending-subscribers.ts
 
 import { supabaseAdmin } from "../lib/supabase";
+import { validateEmail } from "../lib/email-validate";
 
 async function main() {
   const db = supabaseAdmin();
 
-  const { count: pendingBefore, error: cErr } = await db
+  const { data: pending, error: pErr } = await db
     .from("subscribers")
-    .select("id", { count: "exact", head: true })
+    .select("id, email")
     .eq("status", "pending");
-  if (cErr) throw new Error(`count pending: ${cErr.message}`);
+  if (pErr) throw new Error(`fetch pending: ${pErr.message}`);
 
-  if (!pendingBefore) {
+  if (!pending || pending.length === 0) {
     console.log("No pending subscribers — nothing to do.");
     return;
   }
 
-  // Flip them. .select() returns the affected rows so we get an exact count.
+  const activatable = pending.filter((s) => validateEmail(s.email).ok);
+  const skipped = pending.filter((s) => !validateEmail(s.email).ok);
+
   const { data, error } = await db
     .from("subscribers")
     .update({ status: "active" })
-    .eq("status", "pending")
+    .in("id", activatable.map((s) => s.id))
     .select("id");
   if (error) throw new Error(`activate: ${error.message}`);
 
-  const flipped = data?.length ?? 0;
-
   console.log("--- activate-pending-subscribers ---");
-  console.log(`pending before:    ${pendingBefore}`);
-  console.log(`flipped to active: ${flipped}`);
+  console.log(`pending before:    ${pending.length}`);
+  console.log(`flipped to active: ${data?.length ?? 0}`);
+  console.log(`skipped (invalid): ${skipped.length}`);
+  for (const s of skipped) console.log(`  - ${s.email}`);
 }
 
 main().catch((e) => {

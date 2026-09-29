@@ -790,6 +790,11 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   background: rgba(0,0,0,0.04);
 }
 .subscribe-error { color: #a40000; font-size: 13px; margin: 4px 0 0; }
+/* Clickable "did you mean gmail.com?" correction inside .subscribe-error. */
+.subscribe-suggest {
+  background: none; border: none; padding: 0; font: inherit; color: inherit;
+  font-weight: 600; text-decoration: underline; cursor: pointer;
+}
 .subscribe-fine { font-size: 13px; color: var(--text-muted); margin: 18px 0 0; }
 
 /* Unsubscribe survey — dropdown + free-text on the /u/[token] page. Sits

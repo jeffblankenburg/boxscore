@@ -1,5 +1,6 @@
 import { subscribe } from "./actions";
 import AttributionFields from "./AttributionFields";
+import { EmailField } from "./EmailField";
 import { SubscribeSportPanel } from "./SubscribeSportPanel";
 import { SettingsTabs } from "@/app/settings/SettingsTabs";
 import { getVisibleSports } from "@/lib/sports";
@@ -77,17 +78,9 @@ export default async function SubscribePage({
         scores, league leaders — in your inbox early every morning.
       </p>
 
-      <form action={subscribe} noValidate>
+      <form action={subscribe}>
         <AttributionFields />
-        <input
-          type="email"
-          name="email"
-          required
-          placeholder="you@yourdomain.com"
-          autoComplete="email"
-          className="subscribe-input subscribe-input-block"
-          aria-label="Email address"
-        />
+        <EmailField />
 
         {/* One tab per sport — same layout as /settings. Hidden panels stay
             mounted (SettingsTabs), so checkboxes in inactive tabs still submit. */}
