@@ -893,12 +893,14 @@ function postseasonLeague(desc: string | undefined): MlbLeague | null {
 // across each series' games. The higher seed hosts game 1, so game-1 home =
 // `top`.
 //
-// Point-in-time: the feed has no as-of query — it always returns the fully
-// completed bracket. So we only count games with officialDate <= date, and a
-// series that hasn't played a game by then is dropped (renders as TBD). This
-// makes a historical/preview date show the bracket as it stood that day rather
-// than the finished result; live days are unaffected (future games don't exist
-// yet, and today's unfinished games carry no isWinner).
+// Point-in-time: the matchup comes from the SCHEDULED game 1, so an upcoming
+// series whose teams are already set — e.g. the Division Series in the gap
+// after the Wild Card round clinches but before game 1 — shows its matchup
+// rather than TBD. WIN tallies still count only games with officialDate <=
+// date, so a past/preview date shows the series as it stood that day (0-0 for
+// an unstarted series, the real score for a finished one), never future
+// results. A series whose teams aren't assigned yet carries no team ids in the
+// feed and is skipped, rendering as TBD until the matchup is known.
 function postseasonBracketFromRaw(
   raw: unknown,
   season: number,
@@ -912,21 +914,33 @@ function postseasonBracketFromRaw(
 
   const series: PostseasonSeries[] = [];
   for (const s of rawSeries) {
-    // Only games played on or before the digest date count toward this view.
-    const games = (s.games ?? []).filter((g) => (g.officialDate ?? "9999") <= date);
-    if (games.length === 0) continue; // series not started yet as of `date`
+    const allGames = s.games ?? [];
+    if (allGames.length === 0) continue;
     const round = POSTSEASON_ROUND[s.series?.gameType ?? ""];
     if (!round) continue;
 
-    const g1 = games[0]!;
+    // The earliest scheduled game defines the matchup — the higher seed hosts
+    // game 1, so its home team is `top`. Read from the scheduled game (not a
+    // played one) so an upcoming series still shows its teams; a series with no
+    // teams assigned yet has no ids here and is skipped (renders TBD).
+    const g1 = [...allGames].sort((a, b) =>
+      (a.officialDate ?? "").localeCompare(b.officialDate ?? ""))[0]!;
     const topId = g1.teams?.home?.team?.id;
     const botId = g1.teams?.away?.team?.id;
     if (typeof topId !== "number" || typeof botId !== "number") continue;
+    // Skip placeholder matchups: statsapi lists future rounds (LCS/WS) with
+    // stand-in entrants ("Higher Seed", the league champion) that aren't real
+    // clubs and so aren't in the team index. They should render as TBD until
+    // the real teams are set.
+    if (!idx.has(topId) || !idx.has(botId)) continue;
 
-    // Tally games won per side across the in-range games.
+    // Tally games won per side, counting ONLY games played on or before the
+    // digest date so we never surface future results (an unstarted series stays
+    // 0-0; a historical date shows that day's score).
     let topWins = 0;
     let botWins = 0;
-    for (const g of games) {
+    for (const g of allGames) {
+      if ((g.officialDate ?? "9999") > date) continue;
       const home = g.teams?.home;
       const away = g.teams?.away;
       if (home?.team?.id === topId && home?.isWinner) topWins++;
