@@ -20,7 +20,9 @@ export type ManifestEntry =
   | { file: string; subId: string; type: "full"; gameCount: number }
   // `label` names a specific board when a sport fans out into several
   // (NCAAF: "Top 25", "SEC", …). Absent for single-board sports.
-  | { file: string; subId: string; type: "scoreboard"; gameCount: number; label?: string };
+  | { file: string; subId: string; type: "scoreboard"; gameCount: number; label?: string }
+  // MLB postseason bracket — a standalone landscape card posted daily in October.
+  | { file: string; subId: string; type: "bracket" };
 
 export type ImageMime = "image/png" | "image/jpeg";
 
@@ -568,6 +570,41 @@ export async function renderShareImages(args: {
         }
       } catch (err) {
         console.error(`scoreboard capture failed (${board.subId}): ${(err as Error).message}`);
+      }
+    }
+
+    // Postseason bracket card (MLB only), captured from /share/mlb/bracket/
+    // [edition]. The page 404s off-season (no bracket), so a non-200 or a
+    // missing element is a clean skip — nothing to post.
+    if (spec.sport === "mlb") {
+      try {
+        const bp = await browser.newPage();
+        await bp.evaluateOnNewDocument(
+          "globalThis.__name = globalThis.__name || (function(fn){ return fn; });",
+        );
+        const resp = await bp.goto(`${baseUrl}/share/mlb/bracket/${nextDay(date)}`, {
+          waitUntil: "networkidle0", timeout: 30_000,
+        });
+        if (resp && resp.status() === 200) {
+          await ensureFontsLoaded(bp);
+          await new Promise((r) => setTimeout(r, 200));
+          const el = await bp.$(".bracket-share");
+          const box = el ? await el.boundingBox() : null;
+          if (el && box) {
+            const dpr = await bp.evaluate(() => window.devicePixelRatio);
+            const png = (await el.screenshot({ type: "png" })) as Uint8Array;
+            results.push({
+              entry: { file: "bracket.png", subId: "bracket", type: "bracket" },
+              png,
+              mime: "image/png",
+              width: Math.round(box.width * dpr),
+              height: Math.round(box.height * dpr),
+            });
+          }
+        }
+        await bp.close();
+      } catch (err) {
+        console.error(`bracket capture failed: ${(err as Error).message}`);
       }
     }
 

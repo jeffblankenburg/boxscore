@@ -404,6 +404,12 @@ export function imagePostContent(
       alt: `${heading} scoreboard for ${dates.games}: final scores from ${gamesLabel}.`,
     };
   }
+  if (entry.type === "bracket") {
+    return {
+      text: `${m.emoji} ${m.label} Postseason · ${dates.games}\n\n#Postseason #${m.tag}${tail}`,
+      alt: `The ${m.label} postseason bracket as of ${dates.games}.`,
+    };
+  }
   if (entry.type === "standings") {
     // MLB-only section.
     const name = entry.league === "AL" ? "American League" : "National League";
