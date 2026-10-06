@@ -535,6 +535,9 @@ function adaptGame(g: SdioGame, idx: Map<number, MlbTeamRef>, pitcherStats: Pitc
         }
       : null,
     venueName: g.StadiumName ?? null,
+    // SDIO broadcast mapping is a follow-up (vendor gated on ad revenue); the
+    // live statsapi path populates TV. Empty keeps the canonical shape valid.
+    tv: [],
   };
 }
 

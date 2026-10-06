@@ -839,7 +839,7 @@ function renderTodaysGames(
       <td align="right" style="font-size:13px;color:#6a6354;padding:3px 0 0;white-space:nowrap;">${esc(right)}</td>
     </tr>
     <tr>
-      <td colspan="2" style="font-size:12px;color:#6a6354;padding:0 0 4px;border-bottom:1px dotted #e8e2d4;">${pitchers}</td>
+      <td colspan="2" style="font-size:12px;color:#6a6354;padding:0 0 4px;border-bottom:1px dotted #e8e2d4;">${pitchers}${g.tv.length ? `<br><span style="font-size:11px;">${esc(g.tv.join(" / "))}</span>` : ""}</td>
     </tr>`;
   }).join("");
   return `${sectionH("Today's Games")}

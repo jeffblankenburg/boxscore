@@ -152,7 +152,8 @@ function renderUpcomingSection(data: FootballTeamPageData): string {
     .map(
       (g) =>
         `<div class="fb-next-row"><span class="fb-next-time">${escapeHtml(kickoffLabel(g.startTime))}</span>` +
-        `<span class="fb-next-matchup">${opponentPhrase(data, g)}</span></div>`,
+        `<span class="fb-next-matchup">${opponentPhrase(data, g)}</span>` +
+        `${g.tv && g.tv.length ? `<span class="fb-next-tv">${escapeHtml(g.tv.join(" / "))}</span>` : ""}</div>`,
     )
     .join("");
   return `

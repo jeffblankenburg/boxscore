@@ -85,6 +85,7 @@ type StatsapiScheduleGame = {
     save?: { id: number; fullName: string };
   };
   venue?: { name?: string };
+  broadcasts?: Array<{ name?: string; callSign?: string; type?: string; isNational?: boolean; homeAway?: string }>;
 };
 
 type StatsapiStandingsEnvelope = {
@@ -372,6 +373,27 @@ function adaptProbablePitcher(p: { id: number; fullName: string } | undefined, s
   };
 }
 
+// TV broadcast channels for a game — national first, then local RSNs, deduped.
+// Radio and blackout-only entries are skipped. Fed to the "Today's Games" strip.
+// Exported so the legacy MLB path (lib/daily.ts upcomingFromRaw) shares it.
+export type StatsapiBroadcast = { name?: string; callSign?: string; type?: string; isNational?: boolean; homeAway?: string };
+export function tvFromBroadcasts(broadcasts: StatsapiBroadcast[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const nationalPass of [true, false]) {
+    for (const b of broadcasts ?? []) {
+      if ((b.type ?? "").toUpperCase() !== "TV") continue;
+      if ((b.isNational === true) !== nationalPass) continue;
+      // Trim sponsor suffixes ("Twins.TV Presented by Progressive" → "Twins.TV").
+      const name = (b.name ?? b.callSign ?? "").replace(/\s+Presented by\s+.*$/i, "").trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      out.push(name);
+    }
+  }
+  return out;
+}
+
 function gamesFromSchedule(scheduleRaw: unknown, idx: Map<number, MlbTeamRef>, pitcherStats: PitcherStatsMap): MlbGame[] {
   const env = scheduleRaw as StatsapiScheduleEnvelope | null;
   const games = (env?.dates ?? []).flatMap((d) => d.games ?? []);
@@ -409,6 +431,7 @@ function gamesFromSchedule(scheduleRaw: unknown, idx: Map<number, MlbTeamRef>, p
           }
         : null,
       venueName: g.venue?.name ?? null,
+      tv: tvFromBroadcasts(g.broadcasts),
     };
   });
 }

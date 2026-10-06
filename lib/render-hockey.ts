@@ -464,6 +464,7 @@ function renderTodaysGames(data: HockeyData, web: boolean): string {
     return `<li class="bb-upcoming-row">
       <span class="bb-upcoming-matchup">${matchup}</span>
       <span class="bb-upcoming-time">${escapeHtml(timeInET(e.date))}</span>
+      ${e.tv.length ? `<span class="bb-upcoming-tv">${escapeHtml(e.tv.join(" / "))}</span>` : ""}
     </li>`;
   }).join("");
   return `
@@ -490,6 +491,7 @@ function renderUpcomingGames(data: HockeyData, web: boolean): string {
       return `<li class="bb-upcoming-row">
         <span class="bb-upcoming-matchup">${matchup}</span>
         <span class="bb-upcoming-time">${escapeHtml(timeInET(e.date))}${escapeHtml(round)}</span>
+        ${e.tv.length ? `<span class="bb-upcoming-tv">${escapeHtml(e.tv.join(" / "))}</span>` : ""}
       </li>`;
     }).join("");
     return `<div class="bb-upcoming-day">

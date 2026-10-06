@@ -273,6 +273,8 @@ function slimScoreboard(scoreboard: unknown): Any {
           {
             neutralSite: comp.neutralSite,
             conferenceCompetition: comp.conferenceCompetition,
+            // Kept for the upcoming-matchups TV line (market + channel names).
+            broadcasts: list(comp.broadcasts).map((b) => pick(b, ["market", "names"])),
             venue: { fullName: obj(comp.venue).fullName },
             status: { type: pick(obj(comp.status).type, ["state", "name", "shortDetail", "detail", "description"]) },
             notes: list(comp.notes).map((n) => pick(n, ["headline"])),

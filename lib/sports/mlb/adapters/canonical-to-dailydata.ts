@@ -450,6 +450,7 @@ function todaysGamesFromCanonical(c: CanonicalDailyData): UpcomingGame[] {
     homeProbableEra: null,
     startTime: g.startTime ? timeInET(g.startTime) : "TBD",
     status:    g.statusDetail || g.status,
+    tv:        g.tv,
   }));
 }
 

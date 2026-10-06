@@ -15,6 +15,7 @@ import {
 } from "./mlb";
 import type { AsgRosters, AsgSide, AsgHitter, AsgPitcher } from "./sports/mlb/canonical";
 import type { GameDetail, DailyData, UpcomingGame } from "./render";
+import { tvFromBroadcasts } from "./sports/mlb/adapters/from-statsapi";
 import { classifyDigestMode } from "./mlb-digest-mode";
 import { prettyDate, nextDay, timeInET } from "./dates";
 import {
@@ -401,6 +402,7 @@ function upcomingFromRaw(
       homeProbableEra: hpStats?.era ?? null,
       startTime: timeInET(g.gameDate),
       status: g.status.detailedState,
+      tv: tvFromBroadcasts(g.broadcasts),
     };
   });
 }

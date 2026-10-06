@@ -482,6 +482,8 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
 .game-matchup { font-weight: 700; }
 .game-matchup .game-record { font-weight: 400; }
 .game-pitchers { font-size: 12px; line-height: 1.3; }
+/* TV channels under a Today's Games matchup (national first, then local RSNs). */
+.game-tv { font-size: 11px; line-height: 1.3; color: var(--text-muted); margin-top: 1px; }
 .game-time { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .probable { color: var(--text-muted); font-weight: 400; font-size: 0.92em; }
 
@@ -1397,6 +1399,7 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-upcoming-row:last-child { border-bottom: none; }
 .bb-upcoming-matchup { font-weight: 700; }
 .bb-upcoming-time { color: #6a6354; font-style: italic; }
+.bb-upcoming-tv { flex-basis: 100%; font-size: 11px; color: var(--text-muted); }
 
 .bb-linescore { width: 100%; border-collapse: collapse; margin: 0 0 6px;
                 font-size: 12px; table-layout: fixed; }
@@ -1753,6 +1756,7 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .fb-next-row:last-child { border-bottom: none; }
 .fb-next-matchup { font-weight: 700; }
 .fb-next-time { color: #6a6354; font-style: italic; white-space: nowrap; }
+.fb-next-tv { flex-basis: 100%; font-size: 11px; color: var(--text-muted); }
 
 /* Leaders — two columns of small ranked tables. */
 /* Leaders — MLB template: cards flow into 2 balanced columns (column-count),
@@ -3040,6 +3044,8 @@ body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !impo
 .bracket-share-date { margin-left: auto; font-style: italic; font-size: 17px; color: var(--text-muted); }
 /* The bracket centers itself in the wide canvas. */
 .bracket-share-body .psb-wide { justify-content: center; }
+/* The header already says "… MLB Postseason", so drop the renderer's own title. */
+.bracket-share-body .ps-bracket-title { display: none; }
 
 .advertise-page {
   /* Fill the parent .newspaper container — no inner max-width. */

@@ -115,6 +115,9 @@ export type FootballGame = {
   neutralSite: boolean;
   conferenceGame: boolean;       // divisional (NFL) / in-conference (NCAAF) matchup
   venueName: string | null;
+  // TV channels (national first, then local), for the upcoming-matchups preview.
+  // Empty when ESPN lists no broadcast for the game.
+  tv: string[];
 };
 
 // ─── Box score: per-player stat lines ─────────────────────────────────────

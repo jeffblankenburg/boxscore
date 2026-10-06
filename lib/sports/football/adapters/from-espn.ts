@@ -190,7 +190,29 @@ function adaptGame(cfg: FootballLeagueConfig, event: unknown): FootballGame | nu
     neutralSite: Boolean(comp.neutralSite),
     conferenceGame: Boolean(comp.conferenceCompetition),
     venueName: str(rec(comp.venue).fullName) || null,
+    tv: tvFromEspn(comp),
   };
+}
+
+// TV channels for a game — national first, then local/regional, deduped. ESPN's
+// competition.broadcasts entries carry a `market` ("national" | "home" | "away")
+// and a `names` array. Powers the upcoming-matchups TV line.
+function tvFromEspn(comp: Rec): string[] {
+  const entries = arr(comp.broadcasts).map(rec);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const collect = (wantNational: boolean) => {
+    for (const b of entries) {
+      if ((str(b.market).toLowerCase() === "national") !== wantNational) continue;
+      for (const n of arr(b.names)) {
+        const name = str(n).trim();
+        if (name && !seen.has(name)) { seen.add(name); out.push(name); }
+      }
+    }
+  };
+  collect(true);
+  collect(false);
+  return out;
 }
 
 // ─── Summary → FootballBoxScore ───────────────────────────────────────────

@@ -957,6 +957,7 @@ function renderTodaysGames(
         <span class="game-time">${esc(right)}</span>
       </div>
       <div class="game-pitchers probable">${pitchers}</div>
+      ${g.tv.length ? `<div class="game-tv">${esc(g.tv.join(" / "))}</div>` : ""}
     </div>`;
   }).join("");
   return `<div class="games-section">

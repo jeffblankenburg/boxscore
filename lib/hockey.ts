@@ -59,6 +59,8 @@ export type HockeyScoreboardEvent = {
   away: HockeySideSummary;
   home: HockeySideSummary;
   venue?: string;
+  // TV channels (national first, then local), for the upcoming-games preview.
+  tv: string[];
   roundName?: string;   // "Stanley Cup Final", etc. (postseason only)
   series?: HockeySeriesContext;
 };
@@ -202,10 +204,31 @@ export function parseScoreboard(raw: unknown): HockeyScoreboardEvent[] {
       away,
       home,
       venue: (comp.venue as { fullName?: string } | undefined)?.fullName,
+      tv: tvFromComp(comp),
       roundName: extractRoundName(ev, comp),
       series: seasonType === 3 ? extractSeries(comp, away.team.id, home.team.id) : undefined,
     };
   });
+}
+
+// TV channels for a game — national first, then local, deduped. ESPN's
+// competition.broadcasts entries carry a `market` and a `names` array.
+function tvFromComp(comp: Record<string, unknown>): string[] {
+  const entries = (comp.broadcasts as Array<Record<string, unknown>> | undefined) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const collect = (wantNational: boolean) => {
+    for (const b of entries) {
+      if ((String(b.market ?? "").toLowerCase() === "national") !== wantNational) continue;
+      for (const n of ((b.names as string[] | undefined) ?? [])) {
+        const name = String(n).trim();
+        if (name && !seen.has(name)) { seen.add(name); out.push(name); }
+      }
+    }
+  };
+  collect(true);
+  collect(false);
+  return out;
 }
 
 function classifyStatus(typeId: string): HockeyGameStatus {

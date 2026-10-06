@@ -537,6 +537,7 @@ function renderUpcomingGames(data: BasketballData, web: boolean, league: Basketb
       return `<li class="bb-upcoming-row">
         <span class="bb-upcoming-matchup">${matchup}</span>
         <span class="bb-upcoming-time">${escapeHtml(tipoff)}${escapeHtml(round)}</span>
+        ${e.tv.length ? `<span class="bb-upcoming-tv">${escapeHtml(e.tv.join(" / "))}</span>` : ""}
       </li>`;
     }).join("");
     return `<div class="bb-upcoming-day">
@@ -646,6 +647,7 @@ function renderTodaysGames(data: BasketballData, web: boolean, league: Basketbal
     return `<li class="bb-upcoming-row">
       <span class="bb-upcoming-matchup">${matchup}</span>
       <span class="bb-upcoming-time">${escapeHtml(tipoff)}</span>
+      ${e.tv.length ? `<span class="bb-upcoming-tv">${escapeHtml(e.tv.join(" / "))}</span>` : ""}
     </li>`;
   }).join("");
 
@@ -821,6 +823,7 @@ export const BASKETBALL_EMAIL_STYLES = `
 .bb-upcoming-row:last-child { border-bottom: none; }
 .bb-upcoming-matchup { font-weight: 700; }
 .bb-upcoming-time { color: #6a6354; font-style: italic; }
+.bb-upcoming-tv { flex-basis: 100%; font-size: 11px; color: #6a6354; }
 
 .bb-linescore { width: 100%; border-collapse: collapse; margin: 0 0 6px;
                 font-size: 12px; table-layout: fixed; }

@@ -340,6 +340,7 @@ function matchupSection(data: CanonicalFootballDailyData, title: string, games: 
       (g) => `<li class="fb-next-row">
         <span class="fb-next-matchup">${teamShort(data, g.awayTeam, web)} at ${teamShort(data, g.homeTeam, web)}</span>
         <span class="fb-next-time">${escapeHtml(kickoffET(g.startTime))}</span>
+        ${g.tv.length ? `<span class="fb-next-tv">${escapeHtml(g.tv.join(" / "))}</span>` : ""}
       </li>`,
     )
     .join("");
@@ -1233,6 +1234,7 @@ export const FOOTBALL_EMAIL_STYLES = `
 .fb-next-row:last-child { border-bottom: none; }
 .fb-next-matchup { font-weight: 700; }
 .fb-next-time { color: #6a6354; font-style: italic; white-space: nowrap; }
+.fb-next-tv { flex-basis: 100%; font-size: 11px; color: #6a6354; }
 
 /* Leaders — two columns of small ranked tables. */
 /* Leaders — MLB template: cards flow into 2 balanced columns (column-count),

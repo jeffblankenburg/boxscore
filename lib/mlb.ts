@@ -19,6 +19,7 @@ export type ScheduleGame = {
   // F=Wild Card, D=Division Series, L=LCS, W=World Series, P=postseason.
   gameType?: string;
   status: { abstractGameState: string; detailedState: string; codedGameState: string };
+  broadcasts?: Array<{ name?: string; callSign?: string; type?: string; isNational?: boolean; homeAway?: string }>;
   teams: {
     away: {
       team: { id: number; name: string; abbreviation?: string };
@@ -49,7 +50,7 @@ export type ScheduleGame = {
 };
 
 export async function fetchScheduleRaw(date: string): Promise<unknown> {
-  return getRaw(`/v1/schedule?sportId=1&date=${date}&hydrate=linescore,team,decisions,probablePitcher`);
+  return getRaw(`/v1/schedule?sportId=1&date=${date}&hydrate=linescore,team,decisions,probablePitcher,broadcasts(all)`);
 }
 export function parseSchedule(raw: unknown): ScheduleGame[] {
   const data = raw as { dates: Array<{ games: ScheduleGame[] }> };

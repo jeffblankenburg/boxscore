@@ -45,6 +45,8 @@ export type UpcomingGame = {
   homeProbableEra?: string | null;
   startTime: string;  // already formatted in ET, e.g. "7:05 PM" or "TBD"
   status: string;     // detailedState, e.g. "Scheduled", "Postponed"
+  // TV channels (national first, then local RSNs), for the Today's Games strip.
+  tv: string[];
 };
 
 export type DailyData = {
@@ -648,6 +650,7 @@ function renderTodaysGames(
         <span class="game-time">${esc(right)}</span>
       </div>
       <div class="game-pitchers probable">${pitchers}</div>
+      ${g.tv && g.tv.length ? `<div class="game-tv">${esc(g.tv.join(" / "))}</div>` : ""}
     </div>`;
   }).join("");
   return `<div class="games-section">

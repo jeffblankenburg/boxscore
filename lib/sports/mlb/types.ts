@@ -130,6 +130,11 @@ export type MlbGame = {
   decisions: MlbDecisions | null;
 
   venueName: string | null;
+
+  // TV broadcast channels (national first, then local RSNs), for the Today's
+  // Games preview. Empty when the schedule carries no TV listing. Populated
+  // from the schedule's broadcasts(all) hydrate.
+  tv: string[];
 };
 
 // ─── Box score ────────────────────────────────────────────────────────────
