@@ -793,9 +793,17 @@ function renderTeamBox(t: FootballTeamBox, league: FootballLeague, web: boolean)
     t.rushing.map((p) => [nm(p), "", p.carries, p.yards, p.touchdowns, p.long]),
     "Rushing",
   );
+  // Targets lives in the shared leftmost slot (where Passing shows RTG), so it
+  // adds no width. Shown only when the feed carries it — some college boxes
+  // omit targets, and a blank TGT column would read as missing data.
+  const anyTargets = t.receiving.some((p) => p.targets != null);
   const receiving = statTable(
-    ["", "REC", "YDS", "TD", "LG"],
-    t.receiving.map((p) => [nm(p), "", p.receptions, p.yards, p.touchdowns, p.long]),
+    [anyTargets ? "TGT" : "", "REC", "YDS", "TD", "LG"],
+    t.receiving.map((p) => [
+      nm(p),
+      anyTargets ? (p.targets ?? "") : "",
+      p.receptions, p.yards, p.touchdowns, p.long,
+    ]),
     "Receiving",
   );
   const defense = statTable(

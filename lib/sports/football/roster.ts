@@ -95,19 +95,29 @@ export function aggregateSides(sides: FootballTeamBox[]): FootballRosterTable[] 
     });
   }
 
-  // Receiving
+  // Receiving. Targets is nullable (some college feeds omit it); accumulate it
+  // only when present and add the TGT column only if at least one player had
+  // the data — otherwise the column is hidden entirely.
   const receiving = accumulate(
     sides.map((s) => s.receiving),
-    () => ({ rec: 0, yds: 0, td: 0, lg: 0 }),
-    (acc, l) => { acc.rec += l.receptions; acc.yds += l.yards; acc.td += l.touchdowns; acc.lg = Math.max(acc.lg, l.long); },
+    () => ({ rec: 0, yds: 0, td: 0, lg: 0, tgt: 0, hasTgt: false }),
+    (acc, l) => {
+      acc.rec += l.receptions; acc.yds += l.yards; acc.td += l.touchdowns; acc.lg = Math.max(acc.lg, l.long);
+      if (l.targets != null) { acc.tgt += l.targets; acc.hasTgt = true; }
+    },
   ).filter((r) => r.acc.rec > 0).sort((x, y) => y.acc.yds - x.acc.yds);
   if (receiving.length) {
+    const showTgt = receiving.some((r) => r.acc.hasTgt);
     tables.push({
       label: "Receiving",
-      columns: ["Player", "REC", "YDS", "TD", "LG"],
+      columns: showTgt
+        ? ["Player", "TGT", "REC", "YDS", "TD", "LG"]
+        : ["Player", "REC", "YDS", "TD", "LG"],
       rows: receiving.map((r) => ({
         player: rosterPlayer(r.player),
-        values: [r.acc.rec, r.acc.yds, r.acc.td, r.acc.lg],
+        values: showTgt
+          ? [r.acc.hasTgt ? r.acc.tgt : "", r.acc.rec, r.acc.yds, r.acc.td, r.acc.lg]
+          : [r.acc.rec, r.acc.yds, r.acc.td, r.acc.lg],
       })),
     });
   }

@@ -3017,6 +3017,30 @@ body:has(.share-image-canvas) nextjs-portal,
 body:has(.share-image-canvas) [data-nextjs-toast],
 body:has(.share-image-canvas) [data-nextjs-dialog-overlay] { display: none !important; }
 
+/* /share/mlb/bracket/[date] — the postseason bracket as a landscape social
+   image. Fixed at 1200px so the symmetric .psb-wide layout (needs >950px)
+   renders; height is driven by the bracket content. */
+.bracket-share {
+  width: 1200px;
+  box-sizing: border-box;
+  padding: 28px 36px 36px;
+  background: #fff;
+  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+.bracket-share-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  border-bottom: 2px solid var(--border-strong);
+  padding-bottom: 12px;
+  margin-bottom: 22px;
+}
+.bracket-share-brand { font-weight: 800; font-size: 22px; letter-spacing: -0.01em; }
+.bracket-share-title { font-weight: 700; font-size: 26px; }
+.bracket-share-date { margin-left: auto; font-style: italic; font-size: 17px; color: var(--text-muted); }
+/* The bracket centers itself in the wide canvas. */
+.bracket-share-body .psb-wide { justify-content: center; }
+
 .advertise-page {
   /* Fill the parent .newspaper container — no inner max-width. */
   margin: 24px 0 48px;

@@ -135,7 +135,7 @@ function pickSeasonType(gl: GamelogJson): NonNullable<GamelogJson["seasonTypes"]
 const PLAYER_LOG_COLUMNS: Record<string, string[]> = {
   passing: ["completions", "passingAttempts", "passingYards", "passingTouchdowns", "interceptions", "QBRating"],
   rushing: ["rushingAttempts", "rushingYards", "rushingTouchdowns", "longRushing"],
-  receiving: ["receptions", "receivingYards", "receivingTouchdowns", "longReception"],
+  receiving: ["receivingTargets", "receptions", "receivingYards", "receivingTouchdowns", "longReception"],
   tackles: ["totalTackles", "soloTackles", "sacks", "stuffs"],
   interceptions: ["interceptions", "interceptionYards", "interceptionTouchdowns", "passesDefended"],
   fumbles: ["fumbles", "fumblesLost", "fumblesForced"],
