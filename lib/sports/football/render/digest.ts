@@ -137,18 +137,37 @@ function renderBody(data: CanonicalFootballDailyData, web: boolean, navSports: N
     date: data.date, sport: data.league, surface: web ? "web" : "email", navSports,
   });
   // Section order mirrors the MLB league digest: Standings, Leaders, Game
-  // Scores, Next Matchups, Box Scores, Transactions. (Rankings lead for NCAAF.)
-  const sections = [
-    masthead,
-    renderRankings(data.rankings, web),
-    renderStandings(data, web),
-    renderLeaders(data, web),
-    renderGameScores(data, web),
-    renderThisWeekMatchups(data, web),
-    renderNextWeekMatchups(data, web),
-    renderBoxScores(data, web, data.league === "ncaaf"),
-    renderTransactions(data),
-  ];
+  // Scores, Next Matchups, Box Scores, Transactions.
+  //
+  // NCAAF leads with the day's Scores instead (Jeff, 2026-10-09): a Saturday
+  // slate is 60+ games across every conference, so the recap IS the product
+  // for a college reader — rankings and standings are reference material that
+  // belongs below the scoreboard, not above it. The NFL keeps rankings/
+  // standings on top (shorter slate, standings-driven playoff picture).
+  const scores = renderGameScores(data, web);
+  const sections = data.league === "ncaaf"
+    ? [
+        masthead,
+        scores,
+        renderRankings(data.rankings, web),
+        renderStandings(data, web),
+        renderLeaders(data, web),
+        renderThisWeekMatchups(data, web),
+        renderNextWeekMatchups(data, web),
+        renderBoxScores(data, web, true),
+        renderTransactions(data),
+      ]
+    : [
+        masthead,
+        renderRankings(data.rankings, web),
+        renderStandings(data, web),
+        renderLeaders(data, web),
+        scores,
+        renderThisWeekMatchups(data, web),
+        renderNextWeekMatchups(data, web),
+        renderBoxScores(data, web, false),
+        renderTransactions(data),
+      ];
   return sections.filter((s) => s.length > 0).join("\n");
 }
 
