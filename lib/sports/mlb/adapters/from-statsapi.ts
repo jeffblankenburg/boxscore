@@ -922,8 +922,10 @@ function postseasonLeague(desc: string | undefined): MlbLeague | null {
 // rather than TBD. WIN tallies still count only games with officialDate <=
 // date, so a past/preview date shows the series as it stood that day (0-0 for
 // an unstarted series, the real score for a finished one), never future
-// results. A series whose teams aren't assigned yet carries no team ids in the
-// feed and is skipped, rendering as TBD until the matchup is known.
+// results. Each side resolves independently: statsapi stand-ins for not-yet-
+// decided slots ("CLE/CWS", "AL Champion") render as TBD, so a half-set series
+// shows its known team opposite a TBD. A series with neither side decided is
+// dropped (renders fully TBD).
 function postseasonBracketFromRaw(
   raw: unknown,
   season: number,
@@ -950,26 +952,34 @@ function postseasonBracketFromRaw(
       (a.officialDate ?? "").localeCompare(b.officialDate ?? ""))[0]!;
     const topId = g1.teams?.home?.team?.id;
     const botId = g1.teams?.away?.team?.id;
-    if (typeof topId !== "number" || typeof botId !== "number") continue;
-    // Skip placeholder matchups: statsapi lists future rounds (LCS/WS) with
-    // stand-in entrants ("Higher Seed", the league champion) that aren't real
-    // clubs and so aren't in the team index. They should render as TBD until
-    // the real teams are set.
-    if (!idx.has(topId) || !idx.has(botId)) continue;
+    // A side is "real" only when its id maps to an actual club. statsapi fills
+    // not-yet-decided slots with stand-ins ("CLE/CWS", "AL Champion") whose ids
+    // aren't in the team index — those render as TBD. Keep the series if at
+    // least ONE side is real, so a half-set matchup (e.g. the ALCS once Tampa
+    // Bay advances but its opponent is still pending, or the World Series once
+    // one league champion is crowned) shows the known team opposite a TBD slot.
+    const topReal = typeof topId === "number" && idx.has(topId);
+    const botReal = typeof botId === "number" && idx.has(botId);
+    if (!topReal && !botReal) continue;
 
     // Tally games won per side, counting ONLY games played on or before the
     // digest date so we never surface future results (an unstarted series stays
-    // 0-0; a historical date shows that day's score).
+    // 0-0; a historical date shows that day's score). Placeholder sides never
+    // match a played game, so they stay 0.
     let topWins = 0;
     let botWins = 0;
     for (const g of allGames) {
       if ((g.officialDate ?? "9999") > date) continue;
       const home = g.teams?.home;
       const away = g.teams?.away;
-      if (home?.team?.id === topId && home?.isWinner) topWins++;
-      else if (away?.team?.id === topId && away?.isWinner) topWins++;
-      if (home?.team?.id === botId && home?.isWinner) botWins++;
-      else if (away?.team?.id === botId && away?.isWinner) botWins++;
+      if (topReal) {
+        if (home?.team?.id === topId && home?.isWinner) topWins++;
+        else if (away?.team?.id === topId && away?.isWinner) topWins++;
+      }
+      if (botReal) {
+        if (home?.team?.id === botId && home?.isWinner) botWins++;
+        else if (away?.team?.id === botId && away?.isWinner) botWins++;
+      }
     }
 
     const entrant = (id: number, name: string | undefined, wins: number): PostseasonEntrant => {
@@ -979,14 +989,16 @@ function postseasonBracketFromRaw(
 
     const bestOf = g1.gamesInSeries ?? (round === "wild-card" ? 3 : round === "division-series" ? 5 : 7);
     const winsNeeded = Math.floor(bestOf / 2) + 1;
-    const winnerTeamId = topWins >= winsNeeded ? topId : botWins >= winsNeeded ? botId : null;
+    const winnerTeamId = topReal && topWins >= winsNeeded ? topId!
+      : botReal && botWins >= winsNeeded ? botId!
+      : null;
 
     series.push({
       round,
       league: postseasonLeague(g1.seriesDescription),
       bestOf,
-      top: entrant(topId, g1.teams?.home?.team?.name, topWins),
-      bottom: entrant(botId, g1.teams?.away?.team?.name, botWins),
+      top: topReal ? entrant(topId!, g1.teams?.home?.team?.name, topWins) : TBD_ENTRANT,
+      bottom: botReal ? entrant(botId!, g1.teams?.away?.team?.name, botWins) : TBD_ENTRANT,
       winnerTeamId,
     });
   }
