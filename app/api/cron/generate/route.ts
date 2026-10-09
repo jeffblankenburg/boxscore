@@ -62,6 +62,22 @@ function isAuthorized(req: Request): boolean {
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
+// The public pages (`app/[sport]/[date]/page.tsx`, the `/[sport]` landing, and
+// the dated team page) are `export const revalidate = false` — their baked
+// HTML is held in the full-route cache indefinitely. A regenerated digest
+// updates daily_digests, but the live page keeps serving the stale render
+// until its cache entry is explicitly busted. That's how a regenerated
+// postseason bracket could stay "TBD" on the site even though the stored HTML
+// was correct. Revalidate the route PATTERNS (not just one path) so every
+// dated edition + team page re-renders on its next request — lazy, so the
+// cost is only paid for pages someone actually visits.
+function bustCaches(sport: string) {
+  revalidatePath("/sitemap.xml");
+  revalidatePath(`/${sport}`);                           // landing serves the latest edition
+  revalidatePath("/[sport]/[date]", "page");             // dated league editions + team-latest (Branch B)
+  revalidatePath("/[sport]/[date]/[teamDate]", "page");  // dated per-team pages
+}
+
 export async function GET(req: Request) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -229,7 +245,7 @@ export async function GET(req: Request) {
       // A new edition (or a regenerated one) means the sitemap's dated URL
       // list has changed — bust the 24h ISR cache so crawlers see the new
       // entries immediately instead of waiting for the natural expiry.
-      revalidatePath("/sitemap.xml");
+      bustCaches(sport);
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });
     }
@@ -264,7 +280,7 @@ export async function GET(req: Request) {
             email_html: renderFootballEmailContent(fresh, navSports),
             game_count: fresh.games.length, mode: "regular",
           });
-          revalidatePath("/sitemap.xml");
+          bustCaches(sport);
           refreshed = { date: latest.date, ranking_polls: fresh.rankings.length };
         }
         const result = {
@@ -351,7 +367,7 @@ export async function GET(req: Request) {
         html_bytes: html.length,
         email_bytes: email_html.length,
       };
-      revalidatePath("/sitemap.xml");
+      bustCaches(sport);
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });
     }
@@ -403,7 +419,7 @@ export async function GET(req: Request) {
         html_bytes: html.length, email_bytes: email_html.length,
         team_ok: teamOk, team_fails: teamFails,
       };
-      revalidatePath("/sitemap.xml");
+      bustCaches(sport);
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });
     }
@@ -471,7 +487,7 @@ export async function GET(req: Request) {
       team_ok: bbTeamOk,
       team_fails: bbTeamFails,
     };
-    revalidatePath("/sitemap.xml");
+    bustCaches(sport);
     await finishCronRun(runId, { status: "ok", result });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
