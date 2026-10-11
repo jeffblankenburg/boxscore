@@ -46,6 +46,26 @@ function recordThrough(played: TeamScheduleEvent[]): AsOfRecord {
 }
 
 
+// The team's ESPN numeric id, read from the current standings. Match by
+// abbreviation (standings row ids are ESPN's lowercased abbr like "osu", not
+// our registry slug "ohio-state-buckeyes") OR by that slug, mirroring
+// assembleFootballTeamPage's matcher. Returns null if the team isn't in the
+// standings, so the caller falls back to the abbreviation.
+function findEspnTeamId(
+  bundle: CanonicalFootballDailyData,
+  team: { slug: string; abbreviation: string },
+): string | null {
+  for (const grp of bundle.standings) {
+    const row = grp.rows.find(
+      (r) =>
+        r.team.id === team.slug ||
+        r.team.abbr.toUpperCase() === team.abbreviation.toUpperCase(),
+    );
+    if (row?.team.espnId) return row.team.espnId;
+  }
+  return null;
+}
+
 // ESPN kickoff timestamps are UTC; the daily bundle is keyed by the game's ET
 // date. Convert so an 8pm ET game (which is next-day UTC) resolves to the
 // night it was actually played.
@@ -81,13 +101,26 @@ export async function loadFootballTeamData(
   const cfg = footballLeagueConfig(league);
   const asOf = asOfGamesDate ?? yesterdayInET();
 
+  // Resolve the team's ESPN numeric id from the current standings before
+  // fetching its schedule. ESPN's single-team schedule endpoint fuzzy-matches
+  // its URL segment, so a college abbreviation ("osu") lands on the wrong
+  // school (Ohio State Newark Titans, 0 games) instead of the Buckeyes (194) —
+  // which is why the team header showed "0-0" while the standings below it
+  // read 5-1. The numeric id resolves exactly. Abbreviations in the standings
+  // feed are unique across FBS, so the lookup is unambiguous; if the team isn't
+  // in the standings we fall back to the abbreviation (fine for the NFL, whose
+  // abbreviations ESPN resolves directly).
+  const asOfBundle = await loadFootballData(league, asOf);
+  const espnTeamId = findEspnTeamId(asOfBundle, team);
+  const scheduleKey = espnTeamId ?? team.abbreviation;
+
   // Season with games for this team. If the season hasn't started (no completed
   // games at all), fall back a year — a preseason team page shows last season.
   let season = seasonForDate(asOf);
-  let schedule = await fetchTeamSchedule(cfg, team.abbreviation, season);
+  let schedule = await fetchTeamSchedule(cfg, scheduleKey, season);
   if (!schedule.some((e) => e.completed)) {
     season -= 1;
-    schedule = await fetchTeamSchedule(cfg, team.abbreviation, season);
+    schedule = await fetchTeamSchedule(cfg, scheduleKey, season);
   }
 
   // Point-in-time: a game counts as played only if it finished on/before the
@@ -102,7 +135,11 @@ export async function loadFootballTeamData(
   );
 
   const [bundle, roster] = await Promise.all([
-    loadFootballData(league, gamesDate),
+    // Reuse the standings bundle we already loaded when the as-of date IS the
+    // last game date (the common case: a team page viewed the day after a game,
+    // and every cron-generated team digest). Otherwise reload for the game date
+    // so box scores / leaders reflect that day.
+    gamesDate === asOf ? Promise.resolve(asOfBundle) : loadFootballData(league, gamesDate),
     // Season roster stats come from the incremental store (season-stats.ts),
     // written each game day by the cron — one DB read, no per-game ESPN fetches.
     loadTeamSeasonRosterTables(league, season, team.abbreviation, gamesDate).catch(() => undefined),

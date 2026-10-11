@@ -26,7 +26,7 @@ type Competitor = {
   homeAway?: unknown;
   winner?: unknown;
   score?: unknown | { displayValue?: unknown; value?: unknown };
-  team?: { abbreviation?: unknown; displayName?: unknown; location?: unknown };
+  team?: { id?: unknown; abbreviation?: unknown; displayName?: unknown; location?: unknown };
 };
 type ScheduleJson = {
   events?: Array<{
@@ -70,20 +70,28 @@ export async function fetchGameSummary(cfg: FootballLeagueConfig, eventId: strin
   return getJson(summaryUrl(cfg, eventId));
 }
 
-export function teamScheduleUrl(cfg: FootballLeagueConfig, teamAbbr: string, season: number): string {
-  return `${FOOTBALL_BASE}/${cfg.espnSlug}/teams/${teamAbbr.toLowerCase()}/schedule?season=${season}`;
+// ESPN's single-team endpoint keys the URL segment loosely: the unambiguous
+// numeric team id ("194") resolves exactly, but a college abbreviation ("osu")
+// fuzzy-matches the wrong school (Ohio State Newark Titans, 0 games — not the
+// Buckeyes). Callers pass the numeric id when they have it; the abbreviation is
+// only a fallback for the NFL, whose abbreviations ESPN resolves unambiguously.
+export function teamScheduleUrl(cfg: FootballLeagueConfig, teamKey: string, season: number): string {
+  return `${FOOTBALL_BASE}/${cfg.espnSlug}/teams/${teamKey.toLowerCase()}/schedule?season=${season}`;
 }
 
-/** A team's full season schedule as flat events, oldest first. Empty when
- *  the team/season is unknown (offseason before a schedule is published). */
+/** A team's full season schedule as flat events, oldest first. `teamKey` is the
+ *  ESPN numeric team id (preferred) or abbreviation; the per-game matcher
+ *  accepts either, since ids are numeric and abbreviations are alpha so they
+ *  never collide. Empty when the team/season is unknown (offseason before a
+ *  schedule is published). */
 export async function fetchTeamSchedule(
   cfg: FootballLeagueConfig,
-  teamAbbr: string,
+  teamKey: string,
   season: number,
 ): Promise<TeamScheduleEvent[]> {
-  const json = (await getJson(teamScheduleUrl(cfg, teamAbbr, season))) as ScheduleJson | null;
+  const json = (await getJson(teamScheduleUrl(cfg, teamKey, season))) as ScheduleJson | null;
   const events = json?.events ?? [];
-  const want = teamAbbr.toUpperCase();
+  const want = teamKey.toUpperCase();
   const out: TeamScheduleEvent[] = [];
   for (const e of events) {
     const eventId = typeof e.id === "string" ? e.id : null;
@@ -92,7 +100,9 @@ export async function fetchTeamSchedule(
     const comp = e.competitions?.[0];
     const competitors = comp?.competitors ?? [];
     const mine = competitors.find(
-      (c) => String(c.team?.abbreviation ?? "").toUpperCase() === want,
+      (c) =>
+        String(c.team?.id ?? "") === teamKey ||
+        String(c.team?.abbreviation ?? "").toUpperCase() === want,
     );
     const opp = competitors.find((c) => c !== mine);
     const completed = comp?.status?.type?.completed === true;
