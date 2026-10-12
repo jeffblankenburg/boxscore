@@ -61,6 +61,10 @@ export type BasketballTeamData = {
   conference: BasketballConferenceStandings | null;
   teamRank: number | null;
   record: { wins: number; losses: number } | null;
+  // True when the digest date's game(s) are exhibition (preseason). The record
+  // and standings then carry preseason W-L, and the renderer labels them so the
+  // reader doesn't read an exhibition record as the real season.
+  isPreseason: boolean;
   // Full roster (from ESPN's roster endpoint) with season averages joined in,
   // sorted by scoring; players yet to appear sink to the bottom.
   roster: BasketballTeamPlayer[];
@@ -194,6 +198,7 @@ export async function loadBasketballTeamData(
     conference,
     teamRank: teamIdx >= 0 ? teamIdx + 1 : null,
     record,
+    isPreseason: data.isPreseason,
     roster,
     upcoming,
     transactions,

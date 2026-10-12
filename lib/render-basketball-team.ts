@@ -97,7 +97,10 @@ function renderDateline(pretty: string): string {
 }
 
 function renderHeading(data: BasketballTeamData): string {
-  const rec = data.record ? ` <span class="bb-team-record">(${data.record.wins}-${data.record.losses})</span>` : "";
+  const recText = data.record
+    ? `(${data.record.wins}-${data.record.losses}${data.isPreseason ? " Preseason" : ""})`
+    : "";
+  const rec = recText ? ` <span class="bb-team-record">${recText}</span>` : "";
   return `<div class="bb-team-heading">${escapeHtml(data.team.name)}${rec}</div>`;
 }
 
@@ -109,9 +112,10 @@ function renderStandings(data: BasketballTeamData, web: boolean, league: Basketb
     (a, b) => (b.stats.winPercent?.value ?? 0) - (a.stats.winPercent?.value ?? 0),
   );
   const rows = sorted.map((e, i) => renderStandingsRow(e, i + 1, e.team.id === data.espnId, web, league)).join("");
+  const suffix = data.isPreseason ? " Standings (Preseason)" : " Standings";
   return `
 <section class="bb-section">
-  <h2 class="bb-section-title">${escapeHtml(data.conference.name)} Standings</h2>
+  <h2 class="bb-section-title">${escapeHtml(data.conference.name)}${suffix}</h2>
   <table class="bb-standings-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
     <thead>
       <tr>

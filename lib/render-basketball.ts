@@ -113,11 +113,11 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
 
   const sections = [
     masthead,
-    renderStandingsColumns(data.standings, web, league),
-    renderLeaders(data.leaders, data.sport, web, league),
+    renderStandingsColumns(data.standings, web, league, data.isPreseason),
+    renderLeaders(data.leaders, data.sport, web, league, data.isPreseason),
     renderYesterdayResults(data, web, league),
     renderTodaysGames(data, web, league),
-    renderResults(data, "Box scores", web, league),
+    renderResults(data, data.isPreseason ? "Box scores (Preseason)" : "Box scores", web, league),
     renderTransactions(data.transactions),
   ];
   return sections.filter((s) => s.length > 0).join("\n");
@@ -149,8 +149,9 @@ function renderYesterdayResults(data: BasketballData, web: boolean, league: Bask
       <span class="${aClass}">${teamNameLink(away.team.name, web, league)} ${aScore}</span>, <span class="${hClass}">${teamNameLink(home.team.name, web, league)} ${hScore}</span>${tag}
     </div>`;
   }).join("");
+  const title = data.isPreseason ? "Preseason Results" : "Yesterday’s Results";
   return `<div class="games-section">
-  <div class="games-section-title">Yesterday’s Results</div>
+  <div class="games-section-title">${title}</div>
   <div class="games-grid">${lines}</div>
 </div>`;
 }
@@ -213,9 +214,13 @@ export function renderGameBlock(
   // "wins series 4-1" line before the round label was wired up.
   const round = event.roundName;
   const summary = event.series?.summary;
+  // Exhibition games (seasonType=1) get a "Preseason" tag in the same context
+  // slot the playoffs use for the round, so a box score is never mistaken for
+  // one that counts. Postseason context takes precedence when both somehow set.
+  const preseasonTag = event.seasonType === 1 ? "Preseason" : "";
   const contextText = round
     ? summary ? `${round} (${summary})` : round
-    : summary ?? "";
+    : summary || preseasonTag;
   const context = contextText
     ? `<div class="bb-game-context">${escapeHtml(contextText)}</div>`
     : "";
@@ -560,20 +565,22 @@ function renderUpcomingGames(data: BasketballData, web: boolean, league: Basketb
 // is a 2-col grid, mirroring MLB's AL/NL league-layout); email and narrow
 // viewports stack them. Empty conferences → "" so the wrapper never emits a
 // bare grid.
-function renderStandingsColumns(standings: BasketballData["standings"], web: boolean, league: BasketballLeague): string {
+function renderStandingsColumns(standings: BasketballData["standings"], web: boolean, league: BasketballLeague, preseason = false): string {
   if (standings.conferences.length === 0) return "";
-  const cols = standings.conferences.map((c) => renderConferenceSection(c, web, league)).join("\n");
+  const cols = standings.conferences.map((c) => renderConferenceSection(c, web, league, preseason)).join("\n");
   return `<div class="bb-standings-cols">${cols}</div>`;
 }
 
 // Each conference renders as its own section ("Eastern Conference Standings" /
 // "Western Conference Standings") rather than packed into a single "Standings"
-// box — matches baseball's per-league sectioning.
-function renderConferenceSection(conf: BasketballConferenceStandings, web: boolean, league: BasketballLeague): string {
+// box — matches baseball's per-league sectioning. The "(Preseason)" qualifier
+// makes clear the W-L is exhibition, not the real season.
+function renderConferenceSection(conf: BasketballConferenceStandings, web: boolean, league: BasketballLeague, preseason = false): string {
   const table = renderConference(conf, web, league);
+  const suffix = preseason ? " Standings (Preseason)" : " Standings";
   return `
 <section class="bb-section">
-  <h2 class="bb-section-title">${escapeHtml(conf.name)} Standings</h2>
+  <h2 class="bb-section-title">${escapeHtml(conf.name)}${suffix}</h2>
   ${table}
 </section>
 `.trim();
@@ -581,15 +588,20 @@ function renderConferenceSection(conf: BasketballConferenceStandings, web: boole
 
 // ---- League leaders -------------------------------------------------------
 
-function renderLeaders(leaders: BasketballLeaders, sport: BasketballData["sport"], web: boolean, league: BasketballLeague): string {
+function renderLeaders(leaders: BasketballLeaders, sport: BasketballData["sport"], web: boolean, league: BasketballLeague, preseason = false): string {
   const nonEmpty = leaders.categories.filter((c) => c.entries.length > 0);
+  // ESPN doesn't aggregate preseason into its byathlete leaderboard, so this is
+  // normally empty in the preseason and the section hides — but if a future
+  // feed ever populates it, label it so exhibition numbers aren't mistaken for
+  // real-season leaders.
   if (nonEmpty.length === 0) return "";
   const tables = nonEmpty.map((c) => renderLeaderCategory(c, web, league)).join("\n");
   // "NBA League Leaders" / "WNBA League Leaders" — this renderer is shared
   // by both leagues, so the label comes from the slug, not a constant.
+  const title = preseason ? `${sport.toUpperCase()} Preseason Leaders` : `${sport.toUpperCase()} League Leaders`;
   return `
 <section class="bb-section">
-  <h2 class="bb-section-title">${sport.toUpperCase()} League Leaders</h2>
+  <h2 class="bb-section-title">${title}</h2>
   <div class="bb-leaders-cols">${tables}</div>
 </section>
 `.trim();

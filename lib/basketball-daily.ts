@@ -70,6 +70,11 @@ export type BasketballRaw = {
   // re-render can reason about which season the blob represents without
   // re-running the league's seasonForDate logic.
   season: number;
+  // ESPN seasontype the standings/leaders were fetched under (1=preseason,
+  // 2=regular). Stored so a cached preseason row fetched before this field
+  // existed (all-0-0 regular-season standings) can be detected and refetched
+  // against the preseason standings. Undefined on pre-fix rows.
+  standingsSeasonType?: number;
 };
 
 // ---- Renderer-ready shape -------------------------------------------------
@@ -91,6 +96,11 @@ export type BasketballData = {
   // Derived from any game's seasonType (ESPN type=3 means post-season). When
   // true the renderer shows a playoff series section in place of standings.
   isPlayoffs: boolean;
+  // True when the whole slate is exhibition (ESPN seasonType=1), before
+  // opening night. The renderer labels the digest "Preseason" and the
+  // standings carry real preseason W-L (fetched under seasontype=1) rather
+  // than the all-0-0 regular-season table.
+  isPreseason: boolean;
   // Scoreboard events from the UPCOMING_WINDOW_DAYS window after the digest
   // date. Drives both the playoff series view (catches series that haven't
   // started yet) and the Upcoming games section (next chronological events
@@ -152,31 +162,39 @@ async function fetchBasketballRaw(
   // 400s in the offseason (a date range with zero scheduled events is rejected,
   // unlike the single-date scoreboard which returns an empty list), so it can't
   // be required or every offseason tick fails and pages oncall.
+  // Fetch the scoreboard first: its games tell us whether this is a preseason
+  // slate, which decides the seasontype for the standings + leaders pulls.
+  // ESPN's regular-season (seasontype=2) standings read all-0-0 until opening
+  // night, and preseason exhibition W-L only lives under seasontype=1 — so a
+  // preseason digest must scope those two pulls to type 1 or the standings are
+  // meaningless. A mixed or empty slate falls back to regular season.
+  const scoreboardRaw = await fetchScoreboardRaw(sport, date);
+  const events = parseScoreboard(scoreboardRaw);
+  const preseason = events.length > 0 && events.every((e) => e.seasonType === 1);
+  const statSeasonType = preseason ? 1 : 2;
+
   const upcomingStart = addDays(date, 1);
   const upcomingEnd = addDays(date, UPCOMING_WINDOW_DAYS);
-  // Seasontype 2 = regular season; the leaders endpoint requires it for
-  // per-game averages to be meaningful. During postseason the regular-
-  // season averages still apply (no separate playoff leaderboard).
   const [
-    scoreboardRaw,
     upcomingScoreboardRaw,
     standingsRaw,
     athleteStatsRaw,
     transactionsRaw,
   ] = await Promise.all([
-    fetchScoreboardRaw(sport, date),
     fetchScoreboardRangeRaw(sport, upcomingStart, upcomingEnd).catch((e: unknown) => {
       console.error(
         `[basketball] upcoming-window fetch failed for ${sport}/${date}: ${(e as Error).message}`,
       );
       return null;
     }),
-    fetchStandingsRaw(sport, season),
+    fetchStandingsRaw(sport, season, statSeasonType),
     // limit=600 covers every player who's logged minutes (NBA ~500, WNBA ~180)
     // so the same payload feeds both the top-5 league leaders AND full per-team
     // rosters for the team digests — no separate roster fetch. Top-100 (the old
-    // limit) only held the league's leading scorers, ~3 per team.
-    fetchAthleteStatsRaw(sport, season, 2, 600).catch((e: unknown) => {
+    // limit) only held the league's leading scorers, ~3 per team. ESPN doesn't
+    // aggregate preseason into byathlete (type 1 returns zero athletes), so the
+    // leaders section is simply empty until the regular season — expected.
+    fetchAthleteStatsRaw(sport, season, statSeasonType, 600).catch((e: unknown) => {
       console.error(
         `[basketball] leaders fetch failed for ${sport}/${date}: ${(e as Error).message}`,
       );
@@ -194,7 +212,6 @@ async function fetchBasketballRaw(
   // basketball-sized fan-outs (NBA peaks at ~15 games/day in the regular
   // season; postseason is 1–4). If it ever becomes a problem, swap in a
   // small concurrency limiter.
-  const events = parseScoreboard(scoreboardRaw);
   const finalEventIds = events.filter((e) => e.status === "final").map((e) => e.id);
   const summaryResults = await Promise.all(
     finalEventIds.map(async (id) => [id, await fetchSummaryRaw(sport, id)] as const),
@@ -211,6 +228,7 @@ async function fetchBasketballRaw(
     transactions: transactionsRaw ?? undefined,
     games,
     season,
+    standingsSeasonType: statSeasonType,
   };
 }
 
@@ -235,6 +253,11 @@ function rawToBasketballData(
   const isPlayoffs =
     games.some((g) => g.event.seasonType === 3) ||
     upcomingEvents.some((e) => e.seasonType === 3);
+  // Preseason when every game on the slate is exhibition (type 1). Scoped to
+  // today's games only (not the upcoming window) — the label describes what
+  // this edition recaps.
+  const isPreseason =
+    games.length > 0 && games.every((g) => g.event.seasonType === 1);
   const leaders = parseLeaders(raw.athleteStats ?? {});
   const transactions = raw.transactions ? parseTransactions(raw.transactions) : [];
   return {
@@ -245,6 +268,7 @@ function rawToBasketballData(
     standings: parseStandings(raw.standings),
     season: raw.season,
     isPlayoffs,
+    isPreseason,
     upcomingEvents,
     leaders,
     transactions,
@@ -260,8 +284,16 @@ function rawToBasketballData(
 // next load. That's actually desirable (try ESPN again until it comes
 // back) and the cost is tiny at boxscore's scale.
 function isOldShape(raw: BasketballRaw): boolean {
-  return raw.upcomingScoreboard === undefined ||
-         raw.athleteStats === undefined;
+  if (raw.upcomingScoreboard === undefined || raw.athleteStats === undefined) {
+    return true;
+  }
+  // Preseason rows fetched before the preseason-standings fix carry the
+  // regular-season (all-0-0) standings table. Detect them from the cached
+  // scoreboard and force a refetch so the table shows real exhibition W-L.
+  const events = parseScoreboard(raw.scoreboard);
+  const preseason = events.length > 0 && events.every((e) => e.seasonType === 1);
+  if (preseason && raw.standingsSeasonType !== 1) return true;
+  return false;
 }
 
 /**
