@@ -41,6 +41,7 @@ import {
   type BasketballLeague,
 } from "./basketball-links";
 import { BASKETBALL_LEADER_CATEGORY_SLUG } from "./basketball-leaders";
+import type { BasketballConference } from "./basketball-conferences";
 
 // Link a team by its ESPN nickname ("Cavaliers") to its team page; a player by
 // ESPN athlete id to their player page. `web` picks relative vs absolute href +
@@ -120,6 +121,29 @@ export function renderBasketballContent(data: BasketballData, navSports: NavSpor
 
 export function renderBasketballEmailContent(data: BasketballData, navSports: NavSport[] = []): string {
   return renderBody(data, false, navSports);
+}
+
+// A conference-scoped digest (college): the full conference standings — which
+// the ranked-focused league digest omits — plus that conference's scores and
+// every one of its box scores. Web-only (like the football conference page);
+// `data` should already be scoped via scopeBasketballToConference.
+export function renderBasketballConferenceContent(
+  data: BasketballData,
+  conf: BasketballConference,
+  navSports: NavSport[] = [],
+): string {
+  const web = true;
+  const league = data.sport;
+  const masthead = renderMasthead({ date: data.date, sport: data.sport, surface: "web", navSports });
+  const header = `<div class="bb-team-heading">${escapeHtml(conf.short)}</div>`;
+  const sections = [
+    masthead,
+    header,
+    renderStandingsColumns(data.standings, web, league, data.isPreseason),
+    renderYesterdayResults(data, web, league),
+    renderResults(data, "Box Scores", web, league, true),
+  ];
+  return sections.filter((s) => s.length > 0).join("\n");
 }
 
 // ---- Body -----------------------------------------------------------------
@@ -271,14 +295,16 @@ function buildRecordMap(standings: BasketballStandings): Map<string, string> {
   return out;
 }
 
-function renderResults(data: BasketballData, title: string, web: boolean, league: BasketballLeague): string {
+function renderResults(data: BasketballData, title: string, web: boolean, league: BasketballLeague, allGames = false): string {
   let finalsAndLive = data.games.filter(
     (g) => g.event.status === "final" || g.event.status === "in_progress",
   );
-  // College shows only Top-25 box scores (a full D1 night is 100+ games),
-  // ranked games first — the compact Scores list above covers the rest.
+  // College LEAGUE digest shows only Top-25 box scores (a full D1 night is 100+
+  // games), ranked games first — the compact Scores list covers the rest. The
+  // conference page passes allGames=true to show every conference game.
   if (isCollege(league)) {
-    finalsAndLive = orderGamesForCollege(finalsAndLive.filter((g) => isRankedGame(g.event)), league);
+    const filtered = allGames ? finalsAndLive : finalsAndLive.filter((g) => isRankedGame(g.event));
+    finalsAndLive = orderGamesForCollege(filtered, league);
   }
   if (finalsAndLive.length === 0) {
     // College: no ranked games today — hide the Top-25 box section entirely
@@ -313,7 +339,7 @@ export function renderGameBlock(
   league: BasketballLeague,
   records?: Map<string, string>,
 ): string {
-  const lineScore = renderLineScore(event, records);
+  const lineScore = renderLineScore(event, league, records);
   const boxTables = box ? renderBoxScore(box, web, league) : "";
   // Playoff series context: round + current state above the matchup. Only
   // present on postseason events; regular-season game blocks skip it. Round
@@ -349,18 +375,21 @@ export function renderGameBlock(
 `.trim();
 }
 
-function renderLineScore(event: BasketballScoreboardEvent, records?: Map<string, string>): string {
-  // Periods 1-4 are quarters; 5+ are overtime. Render whichever periods
-  // either side has a linescore for. ESPN's linescores arrays are sorted
-  // by period, so taking the max length covers both sides.
+function renderLineScore(event: BasketballScoreboardEvent, league: BasketballLeague, records?: Map<string, string>): string {
+  // Regulation is 2 halves in college, 4 quarters in the pros; anything beyond
+  // is overtime. Render whichever periods either side has a linescore for.
+  // ESPN's linescores arrays are sorted by period, so max length covers both.
+  const regPeriods = isCollege(league) ? 2 : 4;
   const maxPeriods = Math.max(
     event.away.linescores.length,
     event.home.linescores.length,
-    4,
+    regPeriods,
   );
   const periodLabels: string[] = [];
   for (let i = 1; i <= maxPeriods; i++) {
-    periodLabels.push(i <= 4 ? `Q${i}` : `OT${i - 4}`);
+    periodLabels.push(
+      i <= regPeriods ? (regPeriods === 2 ? `H${i}` : `Q${i}`) : `OT${i - regPeriods}`,
+    );
   }
 
   // No winner highlight per the newspaper aesthetic — the score column
@@ -414,7 +443,7 @@ function renderBoxTeam(team: BasketballBoxTeam, web: boolean, league: Basketball
   // (matches MLB's sub-h pattern) rather than a <caption> inside — captions
   // don't reliably span table width across email clients.
   return `
-<h3 class="bb-team-caption">${teamNameLink(team.team.name, web, league)}</h3>
+<h3 class="bb-team-caption">${teamLabel(team.team, web, league)}</h3>
 <table class="bb-player-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
   <thead>
     <tr>
@@ -508,9 +537,10 @@ function renderStandingsRow(entry: BasketballStandingsEntry, rank: number, web: 
     const display = stat?.displayValue ?? "";
     return `<td class="bb-st-stat">${escapeHtml(display)}</td>`;
   }).join("");
-  // team.name = "Cavaliers" (no city), linked to the team page. Matches
-  // baseball's convention of showing just the nickname in standings tables.
-  return `<tr><td class="bb-st-rank">${rank}</td><td class="bb-st-team">${teamNameLink(team.name, web, league)}</td>${cells}</tr>`;
+  // Pros show the nickname ("Cavaliers", like baseball); college shows the
+  // school ("Michigan") and links by espnId via teamLabel.
+  const name = isCollege(league) ? teamLabel(team, web, league) : teamNameLink(team.name, web, league);
+  return `<tr><td class="bb-st-rank">${rank}</td><td class="bb-st-team">${name}</td>${cells}</tr>`;
 }
 
 // ---- Playoff series (Glance) ----------------------------------------------

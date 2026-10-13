@@ -1273,7 +1273,10 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-boxscores { column-count: 3; column-gap: 20px; margin-top: 8px; }
 .bb-boxscores .bb-game { break-inside: avoid; page-break-inside: avoid;
                          margin: 0 0 18px; }
-.bb-standings-cols { display: grid; grid-template-columns: 1fr 1fr;
+/* auto-fit so two conferences (NBA/WNBA) sit side by side, but a single one
+   (a college conference page) spans the full width instead of being squished
+   into one half. */
+.bb-standings-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
                      gap: 4px 24px; align-items: start; }
 .bb-leaders-cols { column-count: 2; column-gap: 18px; margin-top: 8px; }
 .bb-leaders-cols .bb-ldr-cat { break-inside: avoid; page-break-inside: avoid; }

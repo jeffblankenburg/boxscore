@@ -9,6 +9,8 @@
 
 import ncaamConf from "./conferences-ncaam.generated.json";
 import ncaawConf from "./conferences-ncaaw.generated.json";
+import type { BasketballData } from "./basketball-daily";
+import type { BasketballScoreboardEvent } from "./basketball";
 
 export type BasketballConference = {
   slug: string;     // URL/subscription id ("acc", "big-ten")
@@ -43,4 +45,24 @@ export function findBasketballConferenceByAnyName(
 ): BasketballConference | undefined {
   if (!name) return undefined;
   return BY_LEAGUE[league]?.find((c) => c.espnName === name || c.short === name);
+}
+
+// A conference-scoped view of the daily data: standings narrowed to the one
+// conference, games/box/upcoming filtered to its teams. Rankings stay national
+// (AP is league-wide). Powers the conference page + conference email — the one
+// surface where the full conference standings live (the league digest omits
+// them). Mirrors football's scopeToConference.
+export function scopeBasketballToConference(
+  data: BasketballData,
+  conf: BasketballConference,
+): BasketballData {
+  const confStandings = data.standings.conferences.filter((c) => c.name === conf.espnName);
+  const teamIds = new Set(confStandings.flatMap((c) => c.entries.map((e) => e.team.id)));
+  const inConf = (e: BasketballScoreboardEvent) => teamIds.has(e.away.team.id) || teamIds.has(e.home.team.id);
+  return {
+    ...data,
+    standings: { conferences: confStandings },
+    games: data.games.filter((g) => inConf(g.event)),
+    upcomingEvents: data.upcomingEvents.filter(inConf),
+  };
 }

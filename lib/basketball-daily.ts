@@ -473,7 +473,10 @@ export async function loadBasketballDataFor(
   // we're in the playoffs — off-season/regular-season digests skip the scan.
   // Feed today's games + the upcoming window too, so a matchup that's set but
   // not yet played (e.g. a Finals whose Game 1 is days out) still shows.
-  if (data.isPlayoffs) {
+  // College is excluded: the NCAA tournament is single-elimination (a separate
+  // bracket feature), not the best-of-series this models, and it never renders
+  // the series bracket — so skip the scan entirely.
+  if (data.isPlayoffs && !isCollegeBasketball(sport)) {
     const live = [...data.games.map((g) => g.event), ...data.upcomingEvents];
     data.bracket = await loadPlayoffBracket(sport, date, live);
   }
