@@ -10,6 +10,7 @@
 //   - leaders are season totals (goals/assists/points) plus goalie rates.
 
 import { dedupeTransactions } from "./dedupe-transactions";
+import { enumerateDatesInclusive } from "./dates";
 
 const SCOREBOARD_BASE = "https://site.api.espn.com/apis/site/v2/sports/hockey";
 const STANDINGS_BASE = "https://site.web.api.espn.com/apis/v2/sports/hockey";
@@ -162,10 +163,22 @@ export async function fetchScoreboardRaw(date: string): Promise<unknown> {
   return getJson(`${SCOREBOARD_BASE}/nhl/scoreboard?dates=${date.replace(/-/g, "")}`);
 }
 
+// ESPN's dates=START-END range form now 400s for hockey (verified 2026-10-12);
+// only single-date queries work. Walk the window one day at a time and merge
+// the events into one scoreboard-shaped envelope, so the upcoming/playoff
+// readers see the whole window exactly as before. See the basketball twin in
+// lib/basketball.ts for the full rationale.
 export async function fetchScoreboardRangeRaw(startDate: string, endDate: string): Promise<unknown> {
-  return getJson(
-    `${SCOREBOARD_BASE}/nhl/scoreboard?dates=${startDate.replace(/-/g, "")}-${endDate.replace(/-/g, "")}`,
+  const days = enumerateDatesInclusive(startDate, endDate);
+  const envelopes = await Promise.all(
+    days.map((d) => fetchScoreboardRaw(d).catch(() => null)),
   );
+  const events: unknown[] = [];
+  for (const e of envelopes) {
+    const evs = (e as { events?: unknown })?.events;
+    if (Array.isArray(evs)) events.push(...evs);
+  }
+  return { events };
 }
 
 export async function fetchAthleteStatsRaw(

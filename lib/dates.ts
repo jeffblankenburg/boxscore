@@ -116,6 +116,20 @@ export function addDaysToISO(iso: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+// Inclusive list of ISO dates from `start` to `end`. Empty when end < start.
+// `cap` bounds the result so a bad range can't fan out unboundedly (the
+// per-day scoreboard fetchers use this to walk an upcoming window one day at a
+// time, since ESPN dropped the dates=START-END range form).
+export function enumerateDatesInclusive(start: string, end: string, cap = 40): string[] {
+  const out: string[] = [];
+  let cur = start;
+  while (cur <= end && out.length < cap) {
+    out.push(cur);
+    cur = addDaysToISO(cur, 1);
+  }
+  return out;
+}
+
 // Whole days from ISO `a` to ISO `b` (b − a). Negative if b precedes a.
 // UTC-noon-free integer math; DST-safe since both are pure calendar dates.
 export function daysBetweenISO(a: string, b: string): number {

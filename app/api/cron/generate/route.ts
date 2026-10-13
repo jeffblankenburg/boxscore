@@ -381,7 +381,9 @@ export async function GET(req: Request) {
       const email_html = renderHockeyEmailContent(hc, navSports);
       await upsertDigest({
         sport, date, html, email_html, game_count: hc.games.length,
-        mode: hc.games.length > 0 ? "regular" : "offseason",
+        // Playoff off-days stay "postseason" (in-season) so the bracket doesn't
+        // vanish between series games — see the basketball note above.
+        mode: hc.isPlayoffs ? "postseason" : hc.games.length > 0 ? "regular" : "offseason",
       });
       const playedSlugs = skipTeams
         ? []
@@ -438,7 +440,12 @@ export async function GET(req: Request) {
       // year-round. Basketball plays near-daily in-season, so "0 games today"
       // reliably means offseason; a rare in-season dark day just falls back to
       // the prior day's digest, which getLatestDigest already returns.
-      mode: bb.games.length > 0 ? "regular" : "offseason",
+      // EXCEPT the playoffs: series have multi-day gaps between games, so a
+      // 0-game day mid-series must NOT read as offseason or the bracket would
+      // vanish between Finals games. isPlayoffs (today's or upcoming-window
+      // seasonType=3) tags those days "postseason" — an in-season mode — so the
+      // bracket stays live and the edition stays navigable.
+      mode: bb.isPlayoffs ? "postseason" : bb.games.length > 0 ? "regular" : "offseason",
     });
 
     // Per-team digests — basketball/football/hockey cadence: write a digest ONLY

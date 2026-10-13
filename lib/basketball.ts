@@ -12,6 +12,7 @@
 // output through the parsers without re-hitting ESPN.
 
 import { dedupeTransactions } from "./dedupe-transactions";
+import { enumerateDatesInclusive } from "./dates";
 
 const SCOREBOARD_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball";
 const STANDINGS_BASE = "https://site.web.api.espn.com/apis/v2/sports/basketball";
@@ -182,19 +183,37 @@ export async function fetchScoreboardRaw(
   return getJson(`${SCOREBOARD_BASE}/${league}/scoreboard?dates=${espnDate}`);
 }
 
-// ESPN's scoreboard accepts a date range as `dates=YYYYMMDD-YYYYMMDD`. One
-// call returns every event whose date falls inside the inclusive range,
-// each with its full series + roundName context. The bracket renderer uses
-// this to surface playoff series that haven't started yet (e.g., next-round
-// series whose game 1 is several days away).
+// A window of scoreboard events across [startDate, endDate], each with its full
+// series + roundName context. The bracket/upcoming renderers use this to
+// surface playoff series that haven't started yet (e.g., next-round series
+// whose game 1 is several days away) and to detect postseason mode on a team's
+// off-days.
+//
+// ESPN USED to accept `dates=YYYYMMDD-YYYYMMDD` here, but that range form now
+// 400s for both basketball and hockey (verified 2026-10-12) — only single-date
+// queries still work. So walk the window one day at a time and merge the events
+// into one scoreboard-shaped envelope `{ events }` that parseScoreboard reads
+// exactly as before. A per-day failure drops that day, not the whole window.
 export async function fetchScoreboardRangeRaw(
   league: BasketballLeagueSlug,
   startDate: string,
   endDate: string,
 ): Promise<unknown> {
-  const start = startDate.replace(/-/g, "");
-  const end = endDate.replace(/-/g, "");
-  return getJson(`${SCOREBOARD_BASE}/${league}/scoreboard?dates=${start}-${end}`);
+  const days = enumerateDatesInclusive(startDate, endDate);
+  const envelopes = await Promise.all(
+    days.map((d) => fetchScoreboardRaw(league, d).catch(() => null)),
+  );
+  return { events: mergeScoreboardEvents(envelopes) };
+}
+
+// Flatten the `events` arrays out of several scoreboard envelopes into one list.
+function mergeScoreboardEvents(envelopes: Array<unknown | null>): unknown[] {
+  const out: unknown[] = [];
+  for (const e of envelopes) {
+    const events = (e as { events?: unknown })?.events;
+    if (Array.isArray(events)) out.push(...events);
+  }
+  return out;
 }
 
 // Per-athlete season stats. One call returns every athlete's general,
