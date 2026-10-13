@@ -19,6 +19,7 @@ import {
 import { getSportById } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
 import { findConferenceBySlug } from "@/lib/sports/football/conferences";
+import { findBasketballConferenceBySlug } from "@/lib/basketball-conferences";
 
 export async function requestSignInLink(formData: FormData) {
   const rawEmail = formData.get("email");
@@ -152,8 +153,15 @@ export async function setConferenceSubscription(formData: FormData) {
   const sport = await getSportById(sportId as string);
   if (!sport) redirect("/settings?error=unknown_sport");
 
-  const conf = sport.id === "ncaaf" ? findConferenceBySlug(confSlug as string) : undefined;
-  if (!conf) redirect("/settings?error=unknown_conference");
+  // Validate the conference against the static registry for the sport so a
+  // crafted POST can't subscribe to a nonexistent scope.
+  const validConf =
+    sport.id === "ncaaf"
+      ? !!findConferenceBySlug(confSlug as string)
+      : sport.id === "ncaam" || sport.id === "ncaaw"
+        ? !!findBasketballConferenceBySlug(sport.id, confSlug as string)
+        : false;
+  if (!validConf) redirect("/settings?error=unknown_conference");
 
   if (sport.visibility === "admin_only") {
     const { data: sub } = await supabaseAdmin()
@@ -164,6 +172,6 @@ export async function setConferenceSubscription(formData: FormData) {
     if (sub?.is_admin !== true) redirect("/settings?error=forbidden");
   }
 
-  await upsertConferenceSubscription(session.subscriber_id, sport.id, conf.slug, next === "on");
+  await upsertConferenceSubscription(session.subscriber_id, sport.id, confSlug, next === "on");
   revalidatePath("/settings");
 }

@@ -6,6 +6,7 @@ import { SettingsTabs } from "@/app/settings/SettingsTabs";
 import { getVisibleSports } from "@/lib/sports";
 import { teamsBySport, type Sport } from "@/lib/teams";
 import { NCAAF_CONFERENCES } from "@/lib/sports/football/conferences";
+import { basketballConferences } from "@/lib/basketball-conferences";
 import "@/app/settings/predictions-settings.css";
 
 // Sports that have a per-team digest pipeline + a team page for the "Preview →"
@@ -48,7 +49,11 @@ export default async function SubscribePage({
             : []
         }
         conferences={
-          s.id === "ncaaf" ? NCAAF_CONFERENCES.map((c) => ({ slug: c.slug, name: c.short })) : []
+          s.id === "ncaaf"
+            ? NCAAF_CONFERENCES.map((c) => ({ slug: c.slug, name: c.short }))
+            : s.id === "ncaam" || s.id === "ncaaw"
+              ? basketballConferences(s.id).map((c) => ({ slug: c.slug, name: c.short }))
+              : []
         }
       />
     ),

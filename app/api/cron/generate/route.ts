@@ -16,6 +16,7 @@ import {
   renderBasketballTeamEmailContent,
 } from "@/lib/render-basketball-team";
 import { teamsBySport, findTeamByAbbr, type Sport } from "@/lib/teams";
+import { getActiveTeamIds } from "@/lib/email-subscriptions";
 import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
 import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
 import { loadNbaData } from "@/lib/nba";
@@ -462,18 +463,36 @@ export async function GET(req: Request) {
     // daily above, since teams play nearly every day.) Teams with no row are
     // cleanly skipped by the send cron. Collect today's played teams from the
     // finals, mapping each ESPN side to its boxscore slug.
-    // College team digests are deferred (Phase 3): a D1 night is 100+ games /
-    // 200+ teams, and the slug resolution needs the espnId path, not the
-    // nickname match (362 colliding nicknames). Skip them here for now.
-    const bbPlayedSlugs = skipTeams || sport === "ncaam" || sport === "ncaaw"
-      ? []
-      : [...new Set(
-          bb.games
-            .filter((g) => g.event.status === "final")
-            .flatMap((g) => [g.event.away.team, g.event.home.team])
-            .map((t) => teamSlugForEspn(sport, { displayName: t.displayName, nickname: t.name }))
-            .filter((s): s is string => s != null),
-        )];
+    //
+    // College (NCAAM/NCAAW) scales differently: a D1 night is 100+ games / 200+
+    // teams, so pre-generating every played team would blow the function. Gate
+    // to teams that actually have a subscriber (bounded by real demand) and
+    // resolve ESPN side -> registry slug by espnId (362 nicknames collide).
+    const isCollegeBB = sport === "ncaam" || sport === "ncaaw";
+    let bbPlayedSlugs: string[];
+    if (skipTeams) {
+      bbPlayedSlugs = [];
+    } else if (isCollegeBB) {
+      const subscribed = new Set(await getActiveTeamIds(sport));
+      const slugByEspnId = new Map(
+        teamsBySport(sport as Sport).filter((t) => t.espnId).map((t) => [t.espnId!, t.slug]),
+      );
+      bbPlayedSlugs = [...new Set(
+        bb.games
+          .filter((g) => g.event.status === "final")
+          .flatMap((g) => [g.event.away.team.id, g.event.home.team.id])
+          .map((id) => slugByEspnId.get(id))
+          .filter((s): s is string => s != null && subscribed.has(s)),
+      )];
+    } else {
+      bbPlayedSlugs = [...new Set(
+        bb.games
+          .filter((g) => g.event.status === "final")
+          .flatMap((g) => [g.event.away.team, g.event.home.team])
+          .map((t) => teamSlugForEspn(sport, { displayName: t.displayName, nickname: t.name }))
+          .filter((s): s is string => s != null),
+      )];
+    }
     let bbTeamOk = 0;
     const bbTeamFails: string[] = [];
     for (const slug of bbPlayedSlugs) {

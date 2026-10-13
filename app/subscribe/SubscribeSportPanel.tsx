@@ -20,13 +20,14 @@ export function SubscribeSportPanel({
   teams: TeamRow[];
   conferences?: ConferenceRow[];
 }) {
-  // NCAAF's league digest is the Top 25 recap.
-  const leagueName = sportId === "ncaaf" ? "Top 25" : "league";
+  // The college league digests are Top 25 recaps (NCAAF + college basketball).
+  const isTop25 = sportId === "ncaaf" || sportId === "ncaam" || sportId === "ncaaw";
+  const leagueName = isTop25 ? "Top 25" : "league";
 
   return (
     <div className="settings-panel">
       <h3 className="settings-panel-h">
-        {sportLabel} {sportId === "ncaaf" ? "Top 25 " : ""}digest
+        {sportLabel} {isTop25 ? "Top 25 " : ""}digest
       </h3>
       <p className="settings-freq">{digestFrequency(sportId)}</p>
       <ul className="settings-sport-list">

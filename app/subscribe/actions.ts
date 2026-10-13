@@ -11,6 +11,7 @@ import { requestMagicLink } from "@/lib/subscriber-auth";
 import { isSportVisible } from "@/lib/sports";
 import { findTeam, type Sport } from "@/lib/teams";
 import { findConferenceBySlug } from "@/lib/sports/football/conferences";
+import { findBasketballConferenceBySlug } from "@/lib/basketball-conferences";
 import { checkSubscribeRate, recordSubscribeAttempt } from "@/lib/subscribe-rate-limit";
 import { validateEmail } from "@/lib/email-validate";
 
@@ -99,13 +100,18 @@ export async function subscribe(formData: FormData): Promise<void> {
     teams.push({ sport, slug });
   }
 
-  // Parse "sport:slug" conference pairs (NCAAF) against the static registry.
+  // Parse "sport:slug" conference pairs (NCAAF + college basketball) against the
+  // static registry for that sport.
   const conferences: Array<{ sport: string; slug: string }> = [];
   for (const pair of rawConfs) {
     const [sport, slug] = pair.split(":", 2);
     if (!sport || !slug) continue;
     if (!(await isSportVisible(sport, { includeAdminOnly: false }))) continue;
-    if (sport !== "ncaaf" || !findConferenceBySlug(slug)) continue;
+    const valid =
+      sport === "ncaaf"
+        ? !!findConferenceBySlug(slug)
+        : (sport === "ncaam" || sport === "ncaaw") && !!findBasketballConferenceBySlug(sport, slug);
+    if (!valid) continue;
     conferences.push({ sport, slug });
   }
 

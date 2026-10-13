@@ -17,7 +17,11 @@ type ConferenceRow = { slug: string; name: string };
 // the stored team digest). NHL has a registry but no team page yet. Preview
 // links only make sense here — and only when the page is loadable by the
 // viewer, so we AND this with `available` below.
-const TEAM_PAGE_SPORTS = new Set(["mlb", "nfl", "ncaaf", "nba", "wnba", "nhl"]);
+const TEAM_PAGE_SPORTS = new Set(["mlb", "nfl", "ncaaf", "nba", "wnba", "nhl", "ncaam", "ncaaw"]);
+
+// Sports whose team list is large enough to warrant the grouped-by-conference
+// accordion + search (vs a flat alphabetical list): the college sports.
+const GROUPED_TEAM_SPORTS = new Set(["ncaaf", "ncaam", "ncaaw"]);
 
 export function SportPanel({
   sportId,
@@ -39,14 +43,15 @@ export function SportPanel({
   confSubs?: Map<string, boolean>;
 }) {
   const subs = Object.fromEntries(teamSubs); // plain object for the client component
-  // NCAAF's league digest IS the Top 25 recap — name it that so the three
-  // tiers (Top 25 / Conference / Team) read clearly.
-  const leagueName = sportId === "ncaaf" ? "Top 25" : "league";
+  // The college league digests ARE Top 25 recaps (NCAAF + college basketball) —
+  // name them that so the three tiers (Top 25 / Conference / Team) read clearly.
+  const isTop25 = sportId === "ncaaf" || sportId === "ncaam" || sportId === "ncaaw";
+  const leagueName = isTop25 ? "Top 25" : "league";
 
   return (
     <div className="settings-panel">
       <h3 className="settings-panel-h">
-        {sportLabel} {sportId === "ncaaf" ? "Top 25 " : ""}digest
+        {sportLabel} {isTop25 ? "Top 25 " : ""}digest
       </h3>
       <p className="settings-freq">{digestFrequency(sportId)}</p>
       {available ? (
@@ -111,7 +116,7 @@ export function SportPanel({
             sportId={sportId}
             teams={teams}
             subs={subs}
-            grouped={sportId === "ncaaf"}
+            grouped={GROUPED_TEAM_SPORTS.has(sportId)}
             canSubscribe={available}
             showPreview={available && TEAM_PAGE_SPORTS.has(sportId)}
           />

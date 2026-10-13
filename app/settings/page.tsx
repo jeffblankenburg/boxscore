@@ -18,6 +18,7 @@ import {
 } from "@/lib/email-subscriptions";
 import { teamsBySport, type Sport } from "@/lib/teams";
 import { NCAAF_CONFERENCES } from "@/lib/sports/football/conferences";
+import { basketballConferences } from "@/lib/basketball-conferences";
 import { requestSignInLink } from "./actions";
 import { DemographicsForm } from "@/app/welcome/DemographicsForm";
 import { PredictionsSection } from "./PredictionsSection";
@@ -36,6 +37,8 @@ const SPORT_TABS: { id: string; label: string }[] = [
   { id: "wnba", label: "WNBA" },
   { id: "ncaaf", label: "NCAAF" },
   { id: "nhl", label: "NHL" },
+  { id: "ncaam", label: "NCAAM" },
+  { id: "ncaaw", label: "NCAAW" },
 ];
 
 export const metadata = { title: "Settings — boxscore", robots: { index: false } };
@@ -81,11 +84,14 @@ export default async function SettingsPage({
     const visibleIds = new Set(sports.map((s) => s.id));
     const sportTabs = SPORT_TABS.map((s) => {
       const teams = teamsBySport(s.id as Sport);
-      // NCAAF splits into three tiers: Top 25 (league), Conference, Team.
+      // NCAAF + college basketball split into three tiers: league, Conference,
+      // Team.
       const conferences =
         s.id === "ncaaf"
           ? NCAAF_CONFERENCES.map((c) => ({ slug: c.slug, name: c.short }))
-          : [];
+          : s.id === "ncaam" || s.id === "ncaaw"
+            ? basketballConferences(s.id).map((c) => ({ slug: c.slug, name: c.short }))
+            : [];
       return {
         id: s.id,
         label: s.label,

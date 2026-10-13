@@ -175,6 +175,38 @@
     {
       "path": "/api/cron/predictions-retention",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/generate?sport=ncaam&refetch=true",
+      "schedule": "2 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-email?sport=ncaam",
+      "schedule": "15 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-team-email?sport=ncaam",
+      "schedule": "45 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-conference-email?sport=ncaam",
+      "schedule": "50 9 * * *"
+    },
+    {
+      "path": "/api/cron/generate?sport=ncaaw&refetch=true",
+      "schedule": "7 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-email?sport=ncaaw",
+      "schedule": "20 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-team-email?sport=ncaaw",
+      "schedule": "48 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-conference-email?sport=ncaaw",
+      "schedule": "52 9 * * *"
     }
   ],
   "functions": {
