@@ -76,6 +76,11 @@ export const SPORT_FEATURES: Record<string, SportFeatures> = {
   // on game days (no empty offseason/preseason-gap emails). No share images or
   // social posts yet.
   nhl:   { hasPreview: true, hasShareImages: false, hasTeamDigests: true,  hasRegenAll: false, expectedRoutes: ["generate", "send-email", "send-team-email"], sendsOnGameDaysOnly: true },
+  // College basketball: league digest (ranked-focused) + conference digests;
+  // team digests come in a later phase. Sends only on game days. No share
+  // images / social posts yet. Season runs Nov–Apr.
+  ncaam: { hasPreview: true, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email", "send-conference-email"], sendsOnGameDaysOnly: true },
+  ncaaw: { hasPreview: true, hasShareImages: false, hasTeamDigests: false, hasRegenAll: false, expectedRoutes: ["generate", "send-email", "send-conference-email"], sendsOnGameDaysOnly: true },
 };
 
 export function featuresFor(sport: string): SportFeatures {

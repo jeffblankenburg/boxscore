@@ -20,9 +20,10 @@ export type NavSport = { id: string; label: string };
 // mastheadNavSports without touching the generator. Sports not listed (soccer,
 // golf, …) fall to the end in registry order. Labels are abbreviations because
 // the registry `name` ("College Football") is too wide for a nav row.
-const NAV_ORDER = ["mlb", "nfl", "ncaaf", "nba", "wnba", "nhl"];
+const NAV_ORDER = ["mlb", "nfl", "ncaaf", "nba", "wnba", "nhl", "ncaam", "ncaaw"];
 const NAV_LABEL: Record<string, string> = {
   mlb: "MLB", nfl: "NFL", ncaaf: "NCAAF", nba: "NBA", wnba: "WNBA", nhl: "NHL",
+  ncaam: "NCAAM", ncaaw: "NCAAW",
 };
 
 /** Order + label the public sports for the masthead nav. Caller passes the

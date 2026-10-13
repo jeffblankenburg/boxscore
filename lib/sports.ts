@@ -32,6 +32,8 @@ export const SPORTS: readonly Sport[] = [
   { id: "nfl",   name: "NFL",   visibility: "admin_only" },
   { id: "ncaaf", name: "College Football", visibility: "admin_only" },
   { id: "nhl",   name: "NHL",   visibility: "admin_only" },
+  { id: "ncaam", name: "College Basketball (M)", visibility: "admin_only" },
+  { id: "ncaaw", name: "College Basketball (W)", visibility: "admin_only" },
 ] as const;
 
 const BY_ID = new Map<string, Sport>(SPORTS.map((s) => [s.id, s]));

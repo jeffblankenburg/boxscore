@@ -20,6 +20,8 @@ import { adaptStatsapiDailyRaw } from "@/lib/sports/mlb/adapters/from-statsapi";
 import { getCanonicalPlayerLookup } from "@/lib/canonical-players";
 import { loadNbaData } from "@/lib/nba";
 import { loadWnbaData } from "@/lib/wnba";
+import { loadNcaamData } from "@/lib/ncaam";
+import { loadNcaawData } from "@/lib/ncaaw";
 import { loadNhlData } from "@/lib/nhl";
 import { renderHockeyContent, renderHockeyEmailContent } from "@/lib/render-hockey";
 import { loadHockeyTeamData } from "@/lib/hockey-team";
@@ -96,7 +98,7 @@ export async function GET(req: Request) {
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
-  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba" && sport !== "nfl" && sport !== "ncaaf" && sport !== "nhl") {
+  if (sport !== "mlb" && sport !== "nba" && sport !== "wnba" && sport !== "nfl" && sport !== "ncaaf" && sport !== "nhl" && sport !== "ncaam" && sport !== "ncaaw") {
     return NextResponse.json(
       { error: `no generator implemented for sport=${sport}` },
       { status: 501 },
@@ -426,11 +428,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
 
-    // Basketball (nba | wnba): load → render → upsert. Same shape as MLB
-    // above; the only difference is the data loader and the renderer used.
+    // Basketball (nba | wnba | ncaam | ncaaw): load → render → upsert. Same
+    // shape as MLB above; only the data loader (per-league season logic) and
+    // the renderer differ. College adds rankings + ranked-focused layout inside
+    // the shared renderer.
     const bb = sport === "nba"
       ? await loadNbaData(date, { refetch })
-      : await loadWnbaData(date, { refetch });
+      : sport === "wnba"
+        ? await loadWnbaData(date, { refetch })
+        : sport === "ncaam"
+          ? await loadNcaamData(date, { refetch })
+          : await loadNcaawData(date, { refetch });
     const html = renderBasketballContent(bb, navSports);
     const email_html = renderBasketballEmailContent(bb, navSports);
     await upsertDigest({
@@ -454,7 +462,10 @@ export async function GET(req: Request) {
     // daily above, since teams play nearly every day.) Teams with no row are
     // cleanly skipped by the send cron. Collect today's played teams from the
     // finals, mapping each ESPN side to its boxscore slug.
-    const bbPlayedSlugs = skipTeams
+    // College team digests are deferred (Phase 3): a D1 night is 100+ games /
+    // 200+ teams, and the slug resolution needs the espnId path, not the
+    // nickname match (362 colliding nicknames). Skip them here for now.
+    const bbPlayedSlugs = skipTeams || sport === "ncaam" || sport === "ncaaw"
       ? []
       : [...new Set(
           bb.games
