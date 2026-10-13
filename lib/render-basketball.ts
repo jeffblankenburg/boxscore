@@ -198,7 +198,7 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
       renderResults(data, "Top 25 Box Scores", web, league),
       renderLeaders(data.leaders, data.sport, web, league, data.isPreseason),
       renderTodaysGames(data, web, league),
-      renderTransactions(data.transactions),
+      renderTransactions(data.transactions, web),
     ];
     return sections.filter((s) => s.length > 0).join("\n");
   }
@@ -392,13 +392,21 @@ export function renderGameBlock(
   // "Spurs @ Knicks", matching the Yesterday's Results list above. Each side
   // links to its team page. College shows the school + AP rank badge.
   const matchup = `${teamLabel(event.away.team, web, league)} @ ${teamLabel(event.home.team, web, league)}`;
+  const status = escapeHtml(event.statusDetail || event.status);
+  // Web: flex header (matchup left, status right). Email can't rely on flex
+  // (mail clients shrink-wrap it so the two run together — same trap as the
+  // upcoming rows), so inline-style it with an explicit gap.
+  const header = web
+    ? `<header class="bb-game-header">
+    <span class="bb-game-matchup">${matchup}</span>
+    <span class="bb-game-status">${status}</span>
+  </header>`
+    : `<header style="margin:0 0 4px"><span style="font-weight:700">${matchup}</span>`
+      + `<span style="color:#6a6354;font-size:11px;font-style:italic">&nbsp;&nbsp;${status}</span></header>`;
   return `
 <article class="bb-game">
   ${context}
-  <header class="bb-game-header">
-    <span class="bb-game-matchup">${matchup}</span>
-    <span class="bb-game-status">${escapeHtml(event.statusDetail || event.status)}</span>
-  </header>
+  ${header}
   ${lineScore}
   ${boxTables}
 </article>
@@ -836,7 +844,7 @@ function renderTodaysGames(data: BasketballData, web: boolean, league: Basketbal
 
 // ---- Transactions --------------------------------------------------------
 
-function renderTransactions(transactions: BasketballTransaction[]): string {
+function renderTransactions(transactions: BasketballTransaction[], web = true): string {
   if (transactions.length === 0) return "";
   // The list spans every move since the previous league game (see
   // transactionsSinceLastLeagueGame), so group by ET day — newest first — with
@@ -853,7 +861,15 @@ function renderTransactions(transactions: BasketballTransaction[]): string {
       const rows = byDay.get(day)!
         .sort((a, b) => (a.teamAbbr ?? "").localeCompare(b.teamAbbr ?? "") || a.description.localeCompare(b.description))
         .map((t) => {
-          const team = t.teamAbbr ? `<span class="bb-tx-team">${escapeHtml(t.teamAbbr)}</span>` : "";
+          const abbr = t.teamAbbr ? escapeHtml(t.teamAbbr) : "";
+          // Web: flex row (abbr column + desc). Email can't rely on flex, so
+          // inline-style with an explicit gap so the abbr doesn't fuse into the
+          // description.
+          if (!web) {
+            const team = abbr ? `<span style="font-weight:700">${abbr}</span>&nbsp;&nbsp;` : "";
+            return `<li style="padding:4px 0;list-style:none">${team}<span>${escapeHtml(t.description)}</span></li>`;
+          }
+          const team = abbr ? `<span class="bb-tx-team">${abbr}</span>` : "";
           return `<li class="bb-tx-row">
       ${team}
       <span class="bb-tx-desc">${escapeHtml(t.description)}</span>
