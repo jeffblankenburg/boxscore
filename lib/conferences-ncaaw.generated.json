@@ -1,0 +1,157 @@
+[
+  {
+    "slug": "a-10",
+    "short": "A-10",
+    "espnName": "Atlantic 10 Conference"
+  },
+  {
+    "slug": "acc",
+    "short": "ACC",
+    "espnName": "Atlantic Coast Conference"
+  },
+  {
+    "slug": "am-east",
+    "short": "Am. East",
+    "espnName": "America East Conference"
+  },
+  {
+    "slug": "american",
+    "short": "American",
+    "espnName": "American Conference"
+  },
+  {
+    "slug": "atlantic-sun",
+    "short": "Atlantic Sun",
+    "espnName": "Atlantic Sun Conference"
+  },
+  {
+    "slug": "big-12",
+    "short": "Big 12",
+    "espnName": "Big 12 Conference"
+  },
+  {
+    "slug": "big-east",
+    "short": "Big East",
+    "espnName": "Big East Conference"
+  },
+  {
+    "slug": "big-sky",
+    "short": "Big Sky",
+    "espnName": "Big Sky Conference"
+  },
+  {
+    "slug": "big-south",
+    "short": "Big South",
+    "espnName": "Big South Conference"
+  },
+  {
+    "slug": "big-ten",
+    "short": "Big Ten",
+    "espnName": "Big Ten Conference"
+  },
+  {
+    "slug": "big-west",
+    "short": "Big West",
+    "espnName": "Big West Conference"
+  },
+  {
+    "slug": "caa",
+    "short": "CAA",
+    "espnName": "Coastal Athletic Association"
+  },
+  {
+    "slug": "cusa",
+    "short": "CUSA",
+    "espnName": "Conference USA"
+  },
+  {
+    "slug": "horizon",
+    "short": "Horizon",
+    "espnName": "Horizon League"
+  },
+  {
+    "slug": "ivy",
+    "short": "Ivy",
+    "espnName": "Ivy League"
+  },
+  {
+    "slug": "mac",
+    "short": "MAC",
+    "espnName": "Mid-American Conference"
+  },
+  {
+    "slug": "meac",
+    "short": "MEAC",
+    "espnName": "Mid-Eastern Athletic Conference"
+  },
+  {
+    "slug": "metro",
+    "short": "Metro",
+    "espnName": "Metro Conference"
+  },
+  {
+    "slug": "mountain-west",
+    "short": "Mountain West",
+    "espnName": "Mountain West Conference"
+  },
+  {
+    "slug": "mvc",
+    "short": "MVC",
+    "espnName": "Missouri Valley Conference"
+  },
+  {
+    "slug": "nec",
+    "short": "NEC",
+    "espnName": "Northeast Conference"
+  },
+  {
+    "slug": "ovc",
+    "short": "OVC",
+    "espnName": "Ohio Valley Conference"
+  },
+  {
+    "slug": "patriot",
+    "short": "Patriot",
+    "espnName": "Patriot League"
+  },
+  {
+    "slug": "sec",
+    "short": "SEC",
+    "espnName": "Southeastern Conference"
+  },
+  {
+    "slug": "socon",
+    "short": "SoCon",
+    "espnName": "Southern Conference"
+  },
+  {
+    "slug": "southland",
+    "short": "Southland",
+    "espnName": "Southland Conference"
+  },
+  {
+    "slug": "summit",
+    "short": "Summit",
+    "espnName": "Summit League"
+  },
+  {
+    "slug": "sun-belt",
+    "short": "Sun Belt",
+    "espnName": "Sun Belt Conference"
+  },
+  {
+    "slug": "swac",
+    "short": "SWAC",
+    "espnName": "Southwestern Athletic Conference"
+  },
+  {
+    "slug": "uac",
+    "short": "UAC",
+    "espnName": "United Athletic Conference"
+  },
+  {
+    "slug": "wcc",
+    "short": "WCC",
+    "espnName": "West Coast Conference"
+  }
+]

@@ -7,7 +7,7 @@
 //
 // For v1 only MLB is populated; the shape is stable for future sports.
 
-export type Sport = "mlb" | "nfl" | "nba" | "wnba" | "nhl" | "ncaaf";
+export type Sport = "mlb" | "nfl" | "nba" | "wnba" | "nhl" | "ncaaf" | "ncaam" | "ncaaw";
 
 export type Team = {
   sport: Sport;
@@ -17,7 +17,10 @@ export type Team = {
   nickname: string;    // "Guardians"
   abbreviation: string; // "CLE"
   mlbApiId?: number;   // present for MLB teams
-  conference?: string; // present for NCAAF (division/conference), used to group teams
+  espnId?: string;     // ESPN team id — stored for college basketball (362
+                       // teams make runtime name-matching ambiguous); used for
+                       // exact team resolution against the ESPN feeds
+  conference?: string; // present for NCAAF/NCAAM/NCAAW, used to group teams
   // ADMIN-ONLY: each team's recognizable primary color, used to tint
   // tabs/rows in admin tools so scanning by color works ("the orange
   // one"). Never surfaces on the public newspaper-style site/emails;
@@ -30,6 +33,12 @@ export type Team = {
 // maintained literal below and spread into TEAMS.
 import ncaafNhlGenerated from "./teams-ncaaf-nhl.generated.json";
 const NCAAF_NHL_TEAMS = ncaafNhlGenerated as unknown as Team[];
+
+// College basketball — 362 men's + 362 women's D1 teams with conference +
+// espnId, generated from ESPN. See scripts/gen-teams-ncaab.ts.
+import ncaamGenerated from "./teams-ncaam.generated.json";
+import ncaawGenerated from "./teams-ncaaw.generated.json";
+const NCAAB_TEAMS = [...ncaamGenerated, ...ncaawGenerated] as unknown as Team[];
 
 export const TEAMS: readonly Team[] = [
   { sport: "mlb", slug: "ari", name: "Arizona Diamondbacks", city: "Arizona", nickname: "Diamondbacks", abbreviation: "ARI", mlbApiId: 109, primary: "#A71930" },
@@ -152,6 +161,7 @@ export const TEAMS: readonly Team[] = [
   { sport: "nfl", slug: "ten", name: "Tennessee Titans", city: "Tennessee", nickname: "Titans", abbreviation: "TEN", primary: "#0C2340" },
   { sport: "nfl", slug: "wsh", name: "Washington Commanders", city: "Washington", nickname: "Commanders", abbreviation: "WSH", primary: "#5A1414" },
   ...NCAAF_NHL_TEAMS,
+  ...NCAAB_TEAMS,
 ];
 
 export function findTeam(sport: Sport, slug: string): Team | undefined {
