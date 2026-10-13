@@ -131,10 +131,10 @@ export function renderBasketballConferenceContent(
   data: BasketballData,
   conf: BasketballConference,
   navSports: NavSport[] = [],
+  web = true,
 ): string {
-  const web = true;
   const league = data.sport;
-  const masthead = renderMasthead({ date: data.date, sport: data.sport, surface: "web", navSports });
+  const masthead = renderMasthead({ date: data.date, sport: data.sport, surface: web ? "web" : "email", navSports });
   const header = `<div class="bb-team-heading">${escapeHtml(conf.short)}</div>`;
   const sections = [
     masthead,
@@ -144,6 +144,16 @@ export function renderBasketballConferenceContent(
     renderResults(data, "Box Scores", web, league, true),
   ];
   return sections.filter((s) => s.length > 0).join("\n");
+}
+
+// Email variant of the conference digest (same body, email surface). Wrapped by
+// the send-conference-email cron in the teamDailyEmail shell + BASKETBALL styles.
+export function renderBasketballConferenceEmailContent(
+  data: BasketballData,
+  conf: BasketballConference,
+  navSports: NavSport[] = [],
+): string {
+  return renderBasketballConferenceContent(data, conf, navSports, false);
 }
 
 // ---- Body -----------------------------------------------------------------

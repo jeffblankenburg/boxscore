@@ -9,6 +9,10 @@ import { teamDailyEmail } from "@/lib/emails/templates";
 import { getAnnouncement } from "@/lib/announcements";
 import { loadFootballData } from "@/lib/sports/football/data";
 import { renderFootballConferenceEmailContent } from "@/lib/sports/football/render/digest";
+import { loadNcaamData } from "@/lib/ncaam";
+import { loadNcaawData } from "@/lib/ncaaw";
+import { renderBasketballConferenceEmailContent } from "@/lib/render-basketball";
+import { findBasketballConferenceBySlug, scopeBasketballToConference } from "@/lib/basketball-conferences";
 import { getVisibleSports } from "@/lib/sports";
 import { mastheadNavSports } from "@/lib/masthead";
 import { findConferenceBySlug, scopeToConference } from "@/lib/sports/football/conferences";
@@ -56,8 +60,9 @@ export async function GET(req: Request) {
   if (!isValidIsoDate(date)) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
-  // Conference digests are an NCAAF concept only.
-  if (sport !== "ncaaf") {
+  // Conference digests exist for NCAAF + college basketball (NCAAM/NCAAW).
+  const isBasketball = sport === "ncaam" || sport === "ncaaw";
+  if (sport !== "ncaaf" && !isBasketball) {
     return NextResponse.json({ error: `no conference digests for sport=${sport}` }, { status: 501 });
   }
 
@@ -82,7 +87,12 @@ export async function GET(req: Request) {
     }
 
     // One bundle for the day, reused across every conference (scoped per conf).
-    const bundle = await loadFootballData(sport, date);
+    const fbBundle = isBasketball ? null : await loadFootballData(sport, date);
+    const bbBundle = !isBasketball
+      ? null
+      : sport === "ncaam"
+        ? await loadNcaamData(date)
+        : await loadNcaawData(date);
     const navSports = mastheadNavSports(await getVisibleSports());
     const digestPrettyDate = prettyDate(date);
     const announcementBanner = (await getAnnouncement(sport, date)) ?? undefined;
@@ -93,22 +103,38 @@ export async function GET(req: Request) {
     const perConf: ConfResult[] = [];
 
     for (const slug of confSlugs) {
-      const conf = findConferenceBySlug(slug);
-      if (!conf) {
+      // Resolve the conference + render its scoped email body, per sport. hadGame
+      // is the cadence gate: a conference only sends on days it had a final.
+      let confShort: string | null = null;
+      let hadGame = false;
+      let body = "";
+      if (isBasketball) {
+        const conf = findBasketballConferenceBySlug(sport as "ncaam" | "ncaaw", slug);
+        if (conf) {
+          confShort = conf.short;
+          const scoped = scopeBasketballToConference(bbBundle!, conf);
+          hadGame = scoped.games.some((g) => g.event.status === "final");
+          if (hadGame) body = renderBasketballConferenceEmailContent(scoped, conf, navSports);
+        }
+      } else {
+        const conf = findConferenceBySlug(slug);
+        if (conf) {
+          confShort = conf.short;
+          const scoped = scopeToConference(fbBundle!, conf);
+          hadGame = scoped.games.some((g) => g.status === "final");
+          if (hadGame) body = renderFootballConferenceEmailContent(fbBundle!, conf, navSports);
+        }
+      }
+      if (!confShort) {
         perConf.push({ conference: slug, sent: 0, skipped: 0, failed: 0, error: "unknown conference" });
         continue;
       }
       try {
-        // Weekly cadence: only send when the conference had a final on the date.
-        const scoped = scopeToConference(bundle, conf);
-        const hadGame = scoped.games.some((g) => g.status === "final");
         if (!hadGame) {
           totalEmpty++;
           perConf.push({ conference: slug, sent: 0, skipped: 0, failed: 0, empty: true });
           continue;
         }
-
-        const body = renderFootballConferenceEmailContent(bundle, conf, navSports);
 
         const optedIds = await getConferenceOptInSubscriberIds(sport, slug);
         const subscribers: Subscriber[] = [];
@@ -140,7 +166,7 @@ export async function GET(req: Request) {
             const oneClickUrl = `${EMAIL_LINK_BASE}/api/u/${sub.unsubscribe_token}`;
             const { subject, html, text } = teamDailyEmail({
               sport,
-              teamName: `${conf.short} Conference`,
+              teamName: `${confShort} Conference`,
               digestDate: date,
               digestPrettyDate,
               digestUrl: digestTrackedUrl,

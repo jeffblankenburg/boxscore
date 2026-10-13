@@ -21,7 +21,7 @@ function stylesForSport(sport: string): string {
   // render-hockey.ts), plus a small hockey-only override block that makes its
   // denser standings fit a 400px email.
   if (sport === "nhl") return BASKETBALL_EMAIL_STYLES + HOCKEY_EMAIL_STYLES;
-  if (sport === "nba" || sport === "wnba") return BASKETBALL_EMAIL_STYLES;
+  if (sport === "nba" || sport === "wnba" || sport === "ncaam" || sport === "ncaaw") return BASKETBALL_EMAIL_STYLES;
   if (sport === "nfl" || sport === "ncaaf") return FOOTBALL_EMAIL_STYLES;
   return EMAIL_STYLES; // mlb + safe default
 }
