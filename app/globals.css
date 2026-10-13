@@ -1282,7 +1282,28 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   .bb-boxscores { column-count: 1; }
   .bb-standings-cols { grid-template-columns: 1fr; }
   .bb-leaders-cols { column-count: 1; }
+  .bb-rk-cols { grid-template-columns: 1fr; }
 }
+
+/* College AP rank badge (in scores, box headers, today's matchups). */
+.bb-rank {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  vertical-align: middle; margin-right: 1px; color: #6a6354;
+}
+.bb-rank::before { content: "#"; }
+
+/* AP Top 25 / Coaches rankings — two side-by-side tables (college only). */
+.bb-rk-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 8px; }
+.bb-rk-caption {
+  margin: 0 0 4px; padding-bottom: 2px; font-size: 13px; font-weight: 700;
+  border-bottom: 1px solid #161410;
+}
+.bb-rk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bb-rk-table td { padding: 2px 0; vertical-align: baseline; }
+.bb-rk-rank { width: 22px; text-align: right; padding-right: 8px !important; color: #6a6354; font-variant-numeric: tabular-nums; }
+.bb-rk-rec { color: #6a6354; font-size: 11px; }
+.bb-rk-trend { width: 16px; text-align: right; font-size: 11px; }
+.bb-rk-new { font-weight: 700; font-size: 9px; }
 
 /* Hockey-only overrides (scoped to .hk; NHL reuses the bb-* classes). Its
    standings carry more columns than basketball (GP/W/L/OTL/PTS/DIFF/L10/STRK),

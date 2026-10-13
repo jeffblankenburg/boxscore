@@ -93,6 +93,21 @@ export function teamLinkByNickname(
   return linkAnchor(`/${league}/${team.slug}`, text, web, "team-link", "es-team-link");
 }
 
+// College team link, resolved by ESPN team id. Nicknames collide across the
+// 362-team college registries (dozens of "Wildcats"/"Bulldogs"), so
+// teamLinkByNickname is unsafe there — the registry stores each team's espnId
+// for exactly this. Falls back to plain text when unmatched.
+export function teamLinkByEspnId(
+  league: BasketballLeague,
+  espnId: string,
+  text: string,
+  web: boolean,
+): string {
+  const team = teamsBySport(league as Sport).find((t) => t.espnId === espnId);
+  if (!team) return escText(text);
+  return linkAnchor(`/${league}/${team.slug}`, text, web, "team-link", "es-team-link");
+}
+
 // Boxscore team slug for an ESPN team, matched by full name or nickname.
 export function teamSlugForEspn(
   league: BasketballLeague,

@@ -22,6 +22,8 @@ import type {
   BasketballStandings,
   BasketballStandingsEntry,
   BasketballLeaders,
+  BasketballRanking,
+  BasketballTeam,
   LeaderCategory,
   BasketballTransaction,
 } from "./basketball";
@@ -35,6 +37,7 @@ import {
   slugifyName,
   escText,
   linkAnchor,
+  teamLinkByEspnId,
   type BasketballLeague,
 } from "./basketball-links";
 import { BASKETBALL_LEADER_CATEGORY_SLUG } from "./basketball-leaders";
@@ -45,6 +48,39 @@ import { BASKETBALL_LEADER_CATEGORY_SLUG } from "./basketball-leaders";
 // return escape-safe HTML, so call sites pass raw names (no pre-escaping).
 export function teamNameLink(name: string, web: boolean, league: BasketballLeague): string {
   return teamLinkByNickname(league, name, name, web);
+}
+
+function isCollege(league: BasketballLeague): boolean {
+  return league === "ncaam" || league === "ncaaw";
+}
+
+// AP rank badge for a ranked college team.
+function rankBadge(rank: number | null | undefined): string {
+  return rank ? `<span class="bb-rank">${rank}</span> ` : "";
+}
+
+// A team's label in scores/box headers: rank badge + linked name. College shows
+// the SCHOOL (location) and links by espnId — nicknames collide across 362
+// teams; the pros show the nickname and link by it.
+function teamLabel(team: BasketballTeam, web: boolean, league: BasketballLeague): string {
+  if (isCollege(league)) {
+    const display = team.location || team.name;
+    return rankBadge(team.rank) + teamLinkByEspnId(league, team.id, display, web);
+  }
+  return teamNameLink(team.name, web, league);
+}
+
+// Order games ranked-first for college (best AP rank leads); feed order
+// otherwise. A game's sort key is the better (lower) rank of its two teams.
+function orderGamesForCollege<T extends { event: BasketballScoreboardEvent }>(games: T[], league: BasketballLeague): T[] {
+  if (!isCollege(league)) return games;
+  const key = (e: BasketballScoreboardEvent) => Math.min(e.away.team.rank ?? 999, e.home.team.rank ?? 999);
+  return [...games].sort((a, b) => key(a.event) - key(b.event));
+}
+
+// A game involving at least one ranked (Top 25) team — the college box-score filter.
+function isRankedGame(e: BasketballScoreboardEvent): boolean {
+  return e.away.team.rank != null || e.home.team.rank != null;
 }
 export function playerNameLink(
   id: string,
@@ -93,6 +129,26 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
   const masthead = renderMasthead({
     date: data.date, sport: data.sport, surface: web ? "web" : "email", navSports,
   });
+  // College (NCAAM/NCAAW): ranked-focused, and it NEVER uses the best-of-series
+  // playoff branch below — the NCAA tournament is single-elimination (its
+  // bracket is a separate, later feature), and the 14-day upcoming window would
+  // otherwise flip isPlayoffs true in March and hijack the layout. AP Top 25
+  // leads, then the day's scores (ranked first), Top-25 box scores, league-wide
+  // leaders, tonight's ranked matchups. No full standings — 31 conferences
+  // would bloat the email; they live on the conference pages.
+  if (isCollege(league)) {
+    const sections = [
+      masthead,
+      renderRankings(data.rankings, web, league),
+      renderYesterdayResults(data, web, league),
+      renderResults(data, "Top 25 Box Scores", web, league),
+      renderLeaders(data.leaders, data.sport, web, league, data.isPreseason),
+      renderTodaysGames(data, web, league),
+      renderTransactions(data.transactions),
+    ];
+    return sections.filter((s) => s.length > 0).join("\n");
+  }
+
   // Playoffs and regular-season modes use different section orders. Playoffs
   // leads with the result (the big news is the game just played), then the
   // current series state, then what's coming up. Regular season mirrors
@@ -130,6 +186,42 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
   return sections.filter((s) => s.length > 0).join("\n");
 }
 
+// ---- Rankings (college only) ----------------------------------------------
+
+// AP Top 25 (+ Coaches), shown side by side like the football digest. Each
+// entry: rank, school (linked), record, and a trend glyph vs the previous poll.
+function renderRankings(rankings: BasketballRanking[], web: boolean, league: BasketballLeague): string {
+  const polls = rankings.filter((p) => p.entries.length > 0).slice(0, 2);
+  if (polls.length === 0) return "";
+  const tables = polls.map((poll) => {
+    const rows = poll.entries.map((e) => {
+      const trend = e.previousRank == null
+        ? `<span class="bb-rk-new">NR</span>`
+        : e.previousRank > e.rank
+          ? `<span class="bb-rk-up">▲</span>`
+          : e.previousRank < e.rank
+            ? `<span class="bb-rk-down">▼</span>`
+            : `<span class="bb-rk-flat">–</span>`;
+      const link = teamLinkByEspnId(league, e.team.id, e.team.school, web);
+      return `<tr>
+        <td class="bb-rk-rank">${e.rank}</td>
+        <td class="bb-rk-team">${link}${e.record ? ` <span class="bb-rk-rec">(${escapeHtml(e.record)})</span>` : ""}</td>
+        <td class="bb-rk-trend">${trend}</td>
+      </tr>`;
+    }).join("");
+    return `<div class="bb-rk-col">
+  <h3 class="bb-rk-caption">${escapeHtml(poll.poll)}</h3>
+  <table class="bb-rk-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tbody>${rows}</tbody></table>
+</div>`;
+  }).join("");
+  return `
+<section class="bb-section">
+  <h2 class="bb-section-title">Rankings</h2>
+  <div class="bb-rk-cols">${tables}</div>
+</section>
+`.trim();
+}
+
 // ---- Yesterday's results (compact score-line list) ------------------------
 
 // Mirrors the MLB digest's "Yesterday's Results" section — a compact grid of
@@ -139,8 +231,9 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
 // identical to MLB with no new CSS; the email surface gets matching rules in
 // BASKETBALL_EMAIL_STYLES.
 function renderYesterdayResults(data: BasketballData, web: boolean, league: BasketballLeague): string {
-  const games = data.games.filter(
-    (g) => g.event.status === "final" || g.event.status === "in_progress",
+  const games = orderGamesForCollege(
+    data.games.filter((g) => g.event.status === "final" || g.event.status === "in_progress"),
+    league,
   );
   if (games.length === 0) return "";
   const lines = games.map((g) => {
@@ -153,10 +246,10 @@ function renderYesterdayResults(data: BasketballData, web: boolean, league: Bask
       ? ""
       : ` <span class="game-line-status">(${escapeHtml(statusDetail || status)})</span>`;
     return `<div class="game-score-line">
-      <span class="${aClass}">${teamNameLink(away.team.name, web, league)} ${aScore}</span>, <span class="${hClass}">${teamNameLink(home.team.name, web, league)} ${hScore}</span>${tag}
+      <span class="${aClass}">${teamLabel(away.team, web, league)} ${aScore}</span>, <span class="${hClass}">${teamLabel(home.team, web, league)} ${hScore}</span>${tag}
     </div>`;
   }).join("");
-  const title = data.isPreseason ? "Preseason Results" : "Yesterday’s Results";
+  const title = isCollege(league) ? "Scores" : data.isPreseason ? "Preseason Results" : "Yesterday’s Results";
   return `<div class="games-section">
   <div class="games-section-title">${title}</div>
   <div class="games-grid">${lines}</div>
@@ -179,10 +272,18 @@ function buildRecordMap(standings: BasketballStandings): Map<string, string> {
 }
 
 function renderResults(data: BasketballData, title: string, web: boolean, league: BasketballLeague): string {
-  const finalsAndLive = data.games.filter(
+  let finalsAndLive = data.games.filter(
     (g) => g.event.status === "final" || g.event.status === "in_progress",
   );
+  // College shows only Top-25 box scores (a full D1 night is 100+ games),
+  // ranked games first — the compact Scores list above covers the rest.
+  if (isCollege(league)) {
+    finalsAndLive = orderGamesForCollege(finalsAndLive.filter((g) => isRankedGame(g.event)), league);
+  }
   if (finalsAndLive.length === 0) {
+    // College: no ranked games today — hide the Top-25 box section entirely
+    // (the Scores list already covered the full slate).
+    if (isCollege(league)) return "";
     const total = data.games.length;
     return `
 <section class="bb-section">
@@ -233,8 +334,8 @@ export function renderGameBlock(
     : "";
   // Nicknames rather than ESPN's abbreviated shortName ("SA @ NY") — reads as
   // "Spurs @ Knicks", matching the Yesterday's Results list above. Each side
-  // links to its team page.
-  const matchup = `${teamNameLink(event.away.team.name, web, league)} @ ${teamNameLink(event.home.team.name, web, league)}`;
+  // links to its team page. College shows the school + AP rank badge.
+  const matchup = `${teamLabel(event.away.team, web, league)} @ ${teamLabel(event.home.team, web, league)}`;
   return `
 <article class="bb-game">
   ${context}
@@ -655,14 +756,17 @@ function renderTodaysGames(data: BasketballData, web: boolean, league: Basketbal
   // Don't filter by status — historical regens see these events as
   // 'final' now, but the section is "what was scheduled today" and the
   // tipoff time is still meaningful (and consistent across regens).
-  const games = data.upcomingEvents
+  let games = data.upcomingEvents
     .filter((e) => etCalendarDate(e.date) === todayEt)
     .sort((a, b) => a.date.localeCompare(b.date));
+  // College: only ranked matchups (a full slate is 100+ games), ranked first.
+  if (isCollege(league)) games = games.filter(isRankedGame).sort((a, b) =>
+    Math.min(a.away.team.rank ?? 999, a.home.team.rank ?? 999) - Math.min(b.away.team.rank ?? 999, b.home.team.rank ?? 999));
   if (games.length === 0) return "";
 
   const rows = games.map((e) => {
     const tipoff = timeInET(e.date);
-    const matchup = `${teamNameLink(e.away.team.name, web, league)} @ ${teamNameLink(e.home.team.name, web, league)}`;
+    const matchup = `${teamLabel(e.away.team, web, league)} @ ${teamLabel(e.home.team, web, league)}`;
     return `<li class="bb-upcoming-row">
       <span class="bb-upcoming-matchup">${matchup}</span>
       <span class="bb-upcoming-time">${escapeHtml(tipoff)}</span>
@@ -810,6 +914,21 @@ export const BASKETBALL_EMAIL_STYLES = `
 .pb-team .pb-w { font-variant-numeric: tabular-nums; color: #6a6354; padding-left: 10px; }
 .pb-win .pb-nm { font-weight: 700; }
 .pb-win .pb-w { color: #161410; font-weight: 700; }
+
+/* College AP rank badge + rankings tables — email stacks the two polls. */
+.bb-rank { font-size: 10px; font-weight: 700; color: #6a6354; }
+.bb-rank:before { content: "#"; }
+.bb-rk-caption {
+  margin: 0 0 4px; padding-bottom: 2px; font-size: 13px; font-weight: 700;
+  border-bottom: 1px solid #161410;
+}
+.bb-rk-col { margin-bottom: 14px; }
+.bb-rk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bb-rk-table td { padding: 2px 0; vertical-align: baseline; }
+.bb-rk-rank { width: 22px; text-align: right; padding-right: 8px; color: #6a6354; }
+.bb-rk-rec { color: #6a6354; font-size: 11px; }
+.bb-rk-trend { width: 16px; text-align: right; font-size: 11px; }
+.bb-rk-new { font-weight: 700; font-size: 9px; }
 
 .bb-leader-table { width: 100%; border-collapse: collapse;
                    font-size: 12px; margin: 6px 0 14px; }
