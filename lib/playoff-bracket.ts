@@ -68,6 +68,7 @@ export type BracketEntrant = {
   abbr: string;
   name: string;
   wins: number;
+  seed?: number | null; // playoff seed when known (null for leagues without one)
 };
 
 export type BracketSeries = {
@@ -168,36 +169,158 @@ function esc(s: string): string {
 
 type LinkFn = (name: string) => string; // team name -> anchor HTML
 
+// Colors matched to the MLB postseason bracket (lib/sports/mlb/render/postseason
+// .ts) so the two read identically — including how mail clients invert the
+// white boxes in dark mode.
+const BK_LINE = "#333333";
+const BK_WON = "#000000";
+const BK_LOST = "#999999";
+const BOX_W = 66;
+const CONN_W = 14;
+const FONT = "Arial,Helvetica,sans-serif";
+
+// ---- Tree reconstruction --------------------------------------------------
+
+type Tree = {
+  byRound: BracketSeries[][];
+  childrenOf: Map<BracketSeries, [BracketSeries, BracketSeries]>;
+  topOf: Map<BracketSeries, number>;
+  rows: number;
+};
+
+// A bracket is a binary tree, but assembleBracket only knows the flat per-round
+// series list — not which series feeds which. Reconstruct the edges by matching
+// each series' two teams back to the prior round's series that contained them.
+// Returns null when the structure isn't a clean, balanced single-rooted tree
+// (then the caller falls back to the columnar list).
+function buildTree(bracket: Bracket): Tree | null {
+  const byRound = bracket.rounds.map((r) => bracket.series.filter((s) => s.round === r));
+  if (byRound.length < 2 || byRound.some((g) => g.length === 0)) return null;
+  const last = byRound[byRound.length - 1]!;
+  if (last.length !== 1) return null; // one champion series at the top
+
+  const childrenOf = new Map<BracketSeries, [BracketSeries, BracketSeries]>();
+  for (let k = 1; k < byRound.length; k++) {
+    const prev = byRound[k - 1]!;
+    for (const s of byRound[k]!) {
+      const child = (teamId: string) => prev.find((c) => c.top.teamId === teamId || c.bottom.teamId === teamId);
+      const a = child(s.top.teamId);
+      const b = child(s.bottom.teamId);
+      if (!a || !b || a === b) return null; // can't resolve a clean tree
+      childrenOf.set(s, [a, b]);
+    }
+  }
+
+  // In-order leaf assignment: each leaf (first-round series) gets a 4-row slot,
+  // each internal node sits at the midpoint of its two children.
+  const topOf = new Map<BracketSeries, number>();
+  let slot = 0;
+  const assign = (s: BracketSeries): number => {
+    const kids = childrenOf.get(s);
+    const t = kids ? (assign(kids[0]) + assign(kids[1])) / 2 : (slot++ * 4);
+    topOf.set(s, t);
+    return t;
+  };
+  assign(last[0]!);
+  if (slot !== byRound[0]!.length) return null; // not balanced
+
+  return { byRound, childrenOf, topOf, rows: slot * 4 - 2 };
+}
+
+// ---- Table (connector-line) bracket ---------------------------------------
+
+function teamCell(e: BracketEntrant | undefined, isWinner: boolean, decided: boolean): string {
+  if (!e) return "";
+  const color = decided && !isWinner ? BK_LOST : BK_WON;
+  const weight = isWinner ? 700 : 400;
+  const seed = e.seed != null ? `<span style="color:${BK_LOST};font-weight:700">${e.seed}</span> ` : "";
+  return `${seed}<span style="color:${color};font-weight:${weight}">${esc(e.abbr)}</span>`
+    + ` <span style="color:${color};font-weight:${weight}">${e.wins}</span>`;
+}
+
+function boxTd(content: string): string {
+  return `<td width="${BOX_W}" style="border:1px solid ${BK_LINE};padding:4px 6px;`
+    + `font-family:${FONT};font-size:12px;line-height:1.2;white-space:nowrap;background:#ffffff">${content}</td>`;
+}
+const emptyTd = `<td width="${BOX_W}"></td>`;
+function connTd(bottom: boolean, right: boolean): string {
+  const b = [bottom ? `border-bottom:1px solid ${BK_LINE}` : "", right ? `border-right:1px solid ${BK_LINE}` : ""].filter(Boolean);
+  return `<td width="${CONN_W}" style="${b.join(";")}"></td>`;
+}
+
+// Short column header — drop the league/conference prefix so it fits the box.
+function roundHeader(label: string): string {
+  const short = label.replace(/^(WNBA|NBA|NHL|Eastern|Western)\s+/i, "");
+  return `<td style="font-family:${FONT};font-size:10px;font-weight:700;letter-spacing:.04em;`
+    + `text-transform:uppercase;color:${BK_LINE};text-align:center;padding:0 0 3px">${esc(short)}</td>`;
+}
+
+function renderBracketTree(bracket: Bracket, t: Tree): string {
+  const nRounds = t.byRound.length;
+  // Header row: a label over each box column, blanks over the connectors.
+  const headerCells: string[] = [];
+  for (let c = 0; c < nRounds; c++) {
+    headerCells.push(roundHeader(bracket.rounds[c]!));
+    if (c < nRounds - 1) headerCells.push(`<td></td>`);
+  }
+
+  const bodyRows: string[] = [];
+  for (let row = 0; row < t.rows; row++) {
+    const cells: string[] = [];
+    for (let c = 0; c < nRounds; c++) {
+      // Box column: top team at topOf, bottom team at topOf+1.
+      const s = t.byRound[c]!.find((x) => t.topOf.get(x) === row || t.topOf.get(x) === row - 1);
+      if (s && t.topOf.get(s) === row) cells.push(boxTd(teamCell(s.top, s.winnerTeamId === s.top.teamId, s.winnerTeamId != null)));
+      else if (s) cells.push(boxTd(teamCell(s.bottom, s.winnerTeamId === s.bottom.teamId, s.winnerTeamId != null)));
+      else cells.push(emptyTd);
+      // Connector column into the next round.
+      if (c < nRounds - 1) {
+        let bottom = false, right = false;
+        for (const parent of t.byRound[c + 1]!) {
+          const kids = t.childrenOf.get(parent);
+          if (!kids) continue;
+          let a = t.topOf.get(kids[0])!, b = t.topOf.get(kids[1])!;
+          if (a > b) [a, b] = [b, a];
+          if (row === a || row === b) bottom = true;
+          if (row > a && row <= b) right = true;
+        }
+        cells.push(connTd(bottom, right));
+      }
+    }
+    bodyRows.push(`<tr>${cells.join("")}</tr>`);
+  }
+
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" `
+    + `style="border-collapse:collapse;margin:2px 0 6px"><tr>${headerCells.join("")}</tr>${bodyRows.join("")}</table>`;
+}
+
+// ---- Columnar fallback (non-tree brackets) --------------------------------
+
 function entrantRow(e: BracketEntrant, isWinner: boolean, link: LinkFn): string {
   const cls = isWinner ? "pb-team pb-win" : "pb-team";
   return `<div class="${cls}"><span class="pb-nm">${link(e.name)}</span><span class="pb-w">${e.wins}</span></div>`;
 }
 
-function seriesBox(s: BracketSeries, link: LinkFn): string {
-  const topWin = s.winnerTeamId === s.top.teamId;
-  const botWin = s.winnerTeamId === s.bottom.teamId;
-  return `<div class="pb-series">
-    ${entrantRow(s.top, topWin, link)}
-    ${entrantRow(s.bottom, botWin, link)}
-  </div>`;
-}
-
-// Columnar bracket: one column per round, each a stack of that round's series.
-// Rounds render left (earliest) to right (championship).
-export function renderBracket(bracket: Bracket, link: LinkFn): string {
-  if (bracket.series.length === 0) return "";
+function renderBracketColumnar(bracket: Bracket, link: LinkFn): string {
   const cols = bracket.rounds
     .map((round) => {
-      const inRound = bracket.series.filter((s) => s.round === round);
-      const boxes = inRound.map((s) => seriesBox(s, link)).join("");
-      return `<div class="pb-col">
-    <div class="pb-round-label">${esc(round)}</div>
-    <div class="pb-round-body">${boxes}</div>
-  </div>`;
+      const boxes = bracket.series.filter((s) => s.round === round).map((s) =>
+        `<div class="pb-series">${entrantRow(s.top, s.winnerTeamId === s.top.teamId, link)}${entrantRow(s.bottom, s.winnerTeamId === s.bottom.teamId, link)}</div>`,
+      ).join("");
+      return `<div class="pb-col"><div class="pb-round-label">${esc(round)}</div><div class="pb-round-body">${boxes}</div></div>`;
     })
     .join("");
+  return `<div class="pb-bracket">${cols}</div>`;
+}
+
+// Visual connector-line bracket (matches the MLB postseason bracket). Falls back
+// to the columnar list when the series can't be resolved into a clean tree.
+export function renderBracket(bracket: Bracket, link: LinkFn): string {
+  if (bracket.series.length === 0) return "";
+  const tree = buildTree(bracket);
+  const inner = tree ? renderBracketTree(bracket, tree) : renderBracketColumnar(bracket, link);
   return `<section class="bb-section">
   <h2 class="bb-section-title">Playoff bracket</h2>
-  <div class="pb-bracket">${cols}</div>
+  ${inner}
 </section>`;
 }

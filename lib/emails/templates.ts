@@ -609,15 +609,10 @@ function wrapWithDigest(opts: {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Declare dark-mode awareness so clients (Apple Mail especially) render the
-     light-designed newspaper layout AS AUTHORED instead of force-inverting it,
-     which muddied the white table/bracket boxes in dark mode. -->
-<meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap">
-<style>:root{color-scheme:light dark}${opts.styles ?? EMAIL_STYLES}</style>
+<style>${opts.styles ?? EMAIL_STYLES}</style>
 </head>
 <body style="margin:0; padding:0; background:${PAPER}; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; color:${INK}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; text-size-adjust:100%;">
 ${pixel}${preview}
