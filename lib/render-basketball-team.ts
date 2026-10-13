@@ -101,7 +101,9 @@ function renderHeading(data: BasketballTeamData): string {
     ? `(${data.record.wins}-${data.record.losses}${data.isPreseason ? " Preseason" : ""})`
     : "";
   const rec = recText ? ` <span class="bb-team-record">${recText}</span>` : "";
-  return `<div class="bb-team-heading">${escapeHtml(data.team.name)}${rec}</div>`;
+  // College AP Top 25 badge in front of the name ("#5 Florida Gators").
+  const badge = data.apRank ? `<span class="bb-rank">${data.apRank}</span> ` : "";
+  return `<div class="bb-team-heading">${badge}${escapeHtml(data.team.name)}${rec}</div>`;
 }
 
 // ---- Standings (team's conference, team row highlighted) ------------------

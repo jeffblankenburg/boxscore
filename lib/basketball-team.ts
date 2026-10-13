@@ -60,6 +60,8 @@ export type BasketballTeamData = {
   // the renderer can show the full table with the team highlighted.
   conference: BasketballConferenceStandings | null;
   teamRank: number | null;
+  // National AP Top 25 rank (college only); null when unranked or pro.
+  apRank: number | null;
   record: { wins: number; losses: number } | null;
   // True when the digest date's game(s) are exhibition (preseason). The record
   // and standings then carry preseason W-L, and the renderer labels them so the
@@ -93,6 +95,20 @@ function extractTeamAthletes(rawAthleteStats: unknown, abbr: string): Basketball
 // don't. Scans standings first (always present in-season), then the day's
 // games and the upcoming window as fallbacks.
 function resolveEspnTeam(data: BasketballData, team: Team): { id: string; abbr: string } | null {
+  // College registries store the ESPN id directly (362 teams make nickname
+  // matching ambiguous), so resolve by id first — exact. Recover the ESPN
+  // abbreviation from today's data when present; otherwise the registry's is
+  // fine (the roster endpoint keys on the id anyway).
+  if (team.espnId) {
+    const byId = (t: { id: string }) => t.id === team.espnId;
+    for (const c of data.standings.conferences) {
+      for (const e of c.entries) if (byId(e.team)) return { id: e.team.id, abbr: e.team.abbreviation };
+    }
+    for (const ev of [...data.games.map((g) => g.event), ...data.upcomingEvents]) {
+      for (const side of [ev.away, ev.home]) if (byId(side.team)) return { id: side.team.id, abbr: side.team.abbreviation };
+    }
+    return { id: team.espnId, abbr: team.abbreviation };
+  }
   const matches = (t: { name: string; displayName: string }) =>
     t.displayName === team.name || t.name === team.nickname;
   for (const c of data.standings.conferences) {
@@ -187,6 +203,11 @@ export async function loadBasketballTeamData(
   const mode: BasketballTeamMode =
     games.length > 0 ? "game" : upcoming.length > 0 ? "no-game" : "offseason";
 
+  // National AP Top 25 rank (college only) — for the heading badge.
+  const apRank = data.rankings
+    .find((p) => /AP Top 25/i.test(p.poll))
+    ?.entries.find((e) => e.team.id === espn.id)?.rank ?? null;
+
   return {
     sport,
     team,
@@ -197,6 +218,7 @@ export async function loadBasketballTeamData(
     games,
     conference,
     teamRank: teamIdx >= 0 ? teamIdx + 1 : null,
+    apRank,
     record,
     isPreseason: data.isPreseason,
     roster,

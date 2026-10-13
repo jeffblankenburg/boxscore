@@ -599,6 +599,12 @@ function extractStandingsEntry(entry: Record<string, unknown>): BasketballStandi
   for (const s of (entry.stats as Array<Record<string, unknown>>) ?? []) {
     const name = String(s.name ?? "");
     if (!name) continue;
+    // College standings repeat wins/losses/etc. across home/road/vs-conference
+    // SPLIT blocks (type "home_wins", "road_losses", …), all sharing the bare
+    // `name` — which would overwrite the OVERALL record (type "wins") with a
+    // split. Keep only the overall block by skipping any split (type with "_").
+    const type = String(s.type ?? "");
+    if (type.includes("_")) continue;
     stats[name] = {
       value: Number(s.value ?? 0),
       displayValue: String(s.displayValue ?? ""),

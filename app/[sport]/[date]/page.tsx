@@ -173,7 +173,7 @@ export default async function DayPage({
   // Basketball also renders live (like football) so team pages resolve in the
   // offseason / pre-launch, when no team_digest has been generated yet. The
   // loader returns a graceful offseason/no-game shell rather than erroring.
-  if (sport === "nba" || sport === "wnba") {
+  if (sport === "nba" || sport === "wnba" || sport === "ncaam" || sport === "ncaaw") {
     const bbData = await loadBasketballTeamData(sport, team.slug, yesterdayInET());
     const bbToday = nextDay(yesterdayInET());
     const bbEdition = nextDay(bbData.date);
