@@ -308,7 +308,11 @@ function emWorldSeries(bracket: PostseasonBracket, hi?: number): string {
 // highlightTeamId bolds one team throughout the bracket (the subscriber's team
 // in a team digest). Omitted by the league digest, which has no "self" team.
 export function renderPostseasonBracketEmail(bracket: PostseasonBracket, highlightTeamId?: number): string {
-  return `<div class="es-section">
+  // Explicit bottom margin: the World Series box (emWorldSeries) ends with
+  // margin-bottom 0, so without this the next section — the box score in a team
+  // digest, or standings/leaders in the league digest — butts right up against
+  // it with no breathing room.
+  return `<div class="es-section" style="margin-bottom:26px">
   ${sectionH("Postseason")}
   ${emLeagueBlock(bracket, "AL", "American League", highlightTeamId)}
   ${emLeagueBlock(bracket, "NL", "National League", highlightTeamId)}

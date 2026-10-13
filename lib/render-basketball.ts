@@ -83,6 +83,26 @@ function orderGamesForCollege<T extends { event: BasketballScoreboardEvent }>(ga
 function isRankedGame(e: BasketballScoreboardEvent): boolean {
   return e.away.team.rank != null || e.home.team.rank != null;
 }
+
+// One upcoming/today row. Web uses the flex layout (matchup left, time right, TV
+// wraps). Email can't: mail clients shrink-wrap the flex row so space-between
+// collapses and the spans run together, and Gmail strips the <style> block —
+// so email gets inline styles + an explicit gap + TV on its own line, which
+// survive every client. `matchup` is anchor HTML; `meta`/`tv` are escaped text.
+function upcomingRow(matchup: string, meta: string, tv: string, web: boolean): string {
+  if (web) {
+    return `<li class="bb-upcoming-row">
+      <span class="bb-upcoming-matchup">${matchup}</span>
+      <span class="bb-upcoming-time">${meta}</span>
+      ${tv ? `<span class="bb-upcoming-tv">${tv}</span>` : ""}
+    </li>`;
+  }
+  return `<li style="padding:5px 0;border-bottom:1px dotted #e8e2d4;list-style:none">`
+    + `<span style="font-weight:700">${matchup}</span>`
+    + (meta ? `<span style="color:#6a6354;font-style:italic">&nbsp;&nbsp;${meta}</span>` : "")
+    + (tv ? `<br><span style="font-size:11px;color:#6a6354">${tv}</span>` : "")
+    + `</li>`;
+}
 export function playerNameLink(
   id: string,
   fullName: string,
@@ -687,11 +707,7 @@ function renderUpcomingGames(data: BasketballData, web: boolean, league: Basketb
       const tipoff = timeInET(e.date);
       const round = e.roundName ? ` · ${e.roundName}` : "";
       const matchup = `${teamNameLink(e.away.team.name, web, league)} @ ${teamNameLink(e.home.team.name, web, league)}`;
-      return `<li class="bb-upcoming-row">
-        <span class="bb-upcoming-matchup">${matchup}</span>
-        <span class="bb-upcoming-time">${escapeHtml(tipoff)}${escapeHtml(round)}</span>
-        ${e.tv.length ? `<span class="bb-upcoming-tv">${escapeHtml(e.tv.join(" / "))}</span>` : ""}
-      </li>`;
+      return upcomingRow(matchup, `${escapeHtml(tipoff)}${escapeHtml(round)}`, e.tv.length ? escapeHtml(e.tv.join(" / ")) : "", web);
     }).join("");
     return `<div class="bb-upcoming-day">
   <h3 class="bb-upcoming-day-title">${escapeHtml(label)}</h3>
@@ -807,11 +823,7 @@ function renderTodaysGames(data: BasketballData, web: boolean, league: Basketbal
   const rows = games.map((e) => {
     const tipoff = timeInET(e.date);
     const matchup = `${teamLabel(e.away.team, web, league)} @ ${teamLabel(e.home.team, web, league)}`;
-    return `<li class="bb-upcoming-row">
-      <span class="bb-upcoming-matchup">${matchup}</span>
-      <span class="bb-upcoming-time">${escapeHtml(tipoff)}</span>
-      ${e.tv.length ? `<span class="bb-upcoming-tv">${escapeHtml(e.tv.join(" / "))}</span>` : ""}
-    </li>`;
+    return upcomingRow(matchup, escapeHtml(tipoff), e.tv.length ? escapeHtml(e.tv.join(" / ")) : "", web);
   }).join("");
 
   return `

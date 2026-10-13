@@ -457,6 +457,25 @@ function digestDatePlusOne(digestDate: string): string {
   return `${r.getUTCFullYear()}-${String(r.getUTCMonth() + 1).padStart(2, "0")}-${String(r.getUTCDate()).padStart(2, "0")}`;
 }
 
+// One upcoming/today row. Web keeps the flex layout; email can't rely on it
+// (mail clients shrink-wrap the flex row so the spans run together, and Gmail
+// strips <style>), so email gets inline styles + an explicit gap + TV on its
+// own line. Mirrors the basketball twin in lib/render-basketball.ts.
+function upcomingRow(matchup: string, meta: string, tv: string, web: boolean): string {
+  if (web) {
+    return `<li class="bb-upcoming-row">
+      <span class="bb-upcoming-matchup">${matchup}</span>
+      <span class="bb-upcoming-time">${meta}</span>
+      ${tv ? `<span class="bb-upcoming-tv">${tv}</span>` : ""}
+    </li>`;
+  }
+  return `<li style="padding:5px 0;border-bottom:1px dotted #e8e2d4;list-style:none">`
+    + `<span style="font-weight:700">${matchup}</span>`
+    + (meta ? `<span style="color:#6a6354;font-style:italic">&nbsp;&nbsp;${meta}</span>` : "")
+    + (tv ? `<br><span style="font-size:11px;color:#6a6354">${tv}</span>` : "")
+    + `</li>`;
+}
+
 function renderTodaysGames(data: HockeyData, web: boolean): string {
   const todayEt = digestDatePlusOne(data.date);
   const games = data.upcomingEvents
@@ -465,11 +484,7 @@ function renderTodaysGames(data: HockeyData, web: boolean): string {
   if (games.length === 0) return "";
   const rows = games.map((e) => {
     const matchup = `${teamNameLink(e.away.team.name, web)} @ ${teamNameLink(e.home.team.name, web)}`;
-    return `<li class="bb-upcoming-row">
-      <span class="bb-upcoming-matchup">${matchup}</span>
-      <span class="bb-upcoming-time">${escapeHtml(timeInET(e.date))}</span>
-      ${e.tv.length ? `<span class="bb-upcoming-tv">${escapeHtml(e.tv.join(" / "))}</span>` : ""}
-    </li>`;
+    return upcomingRow(matchup, escapeHtml(timeInET(e.date)), e.tv.length ? escapeHtml(e.tv.join(" / ")) : "", web);
   }).join("");
   return `
 <section class="bb-section">
@@ -492,11 +507,7 @@ function renderUpcomingGames(data: HockeyData, web: boolean): string {
     const rows = events.map((e) => {
       const round = e.roundName ? ` · ${e.roundName}` : "";
       const matchup = `${teamNameLink(e.away.team.name, web)} @ ${teamNameLink(e.home.team.name, web)}`;
-      return `<li class="bb-upcoming-row">
-        <span class="bb-upcoming-matchup">${matchup}</span>
-        <span class="bb-upcoming-time">${escapeHtml(timeInET(e.date))}${escapeHtml(round)}</span>
-        ${e.tv.length ? `<span class="bb-upcoming-tv">${escapeHtml(e.tv.join(" / "))}</span>` : ""}
-      </li>`;
+      return upcomingRow(matchup, `${escapeHtml(timeInET(e.date))}${escapeHtml(round)}`, e.tv.length ? escapeHtml(e.tv.join(" / ")) : "", web);
     }).join("");
     return `<div class="bb-upcoming-day">
   <h3 class="bb-upcoming-day-title">${escapeHtml(etDayLabel(events[0]!.date))}</h3>
