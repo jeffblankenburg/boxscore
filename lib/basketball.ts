@@ -1,5 +1,6 @@
-// ESPN hidden-API client for basketball (NBA + WNBA). The same endpoint
-// shapes work for both leagues — only the URL slug differs ('nba' | 'wnba').
+// ESPN hidden-API client for basketball (NBA, WNBA, and college — NCAAM /
+// NCAAW). The same endpoint shapes work across leagues; only the URL slug
+// differs (espnSlugFor), plus college adds rankings + level=3 standings.
 //
 // Three endpoints we hit:
 //   scoreboard?dates=YYYYMMDD     → list of games + per-quarter linescores
@@ -22,7 +23,25 @@ const LEADERS_BASE = "https://site.web.api.espn.com/apis/common/v3/sports/basket
 // Team roster (full player list w/ jersey/position/injuries; no stats).
 const ROSTER_BASE = "https://site.web.api.espn.com/apis/site/v2/sports/basketball";
 
-export type BasketballLeagueSlug = "nba" | "wnba";
+export type BasketballLeagueSlug = "nba" | "wnba" | "ncaam" | "ncaaw";
+
+// The college leagues carry AP Top 25 rankings + many conferences; the pro
+// leagues don't. Gate college-only behavior (rankings fetch, ranked ordering,
+// league-wide leaders) on this.
+export function isCollegeBasketball(league: BasketballLeagueSlug): boolean {
+  return league === "ncaam" || league === "ncaaw";
+}
+
+// ESPN's URL path segment for a league. For the pros the sport id IS the ESPN
+// slug ("nba"/"wnba"); college uses verbose slugs, so every fetch URL must
+// translate the id rather than interpolate it directly.
+function espnSlugFor(league: BasketballLeagueSlug): string {
+  switch (league) {
+    case "ncaam": return "mens-college-basketball";
+    case "ncaaw": return "womens-college-basketball";
+    default: return league;
+  }
+}
 
 // Coarse status bucket. ESPN's status.type.id is "1"=scheduled, "2"=in
 // progress, "3"=final, "5"=postponed, etc. We collapse to what the renderer
@@ -35,6 +54,10 @@ export type BasketballTeam = {
   location: string;     // "Cleveland"
   name: string;         // "Cavaliers"
   displayName: string;  // "Cleveland Cavaliers"
+  // AP rank (1-25) for ranked college teams, from ESPN's curatedRank; null/
+  // undefined when unranked or not applicable (pro leagues). Drives the rank
+  // badge and ranked-games-first ordering in college digests.
+  rank?: number | null;
 };
 
 export type BasketballLinescore = {
@@ -180,7 +203,7 @@ export async function fetchScoreboardRaw(
   date: string,  // YYYY-MM-DD
 ): Promise<unknown> {
   const espnDate = date.replace(/-/g, "");
-  return getJson(`${SCOREBOARD_BASE}/${league}/scoreboard?dates=${espnDate}`);
+  return getJson(`${SCOREBOARD_BASE}/${espnSlugFor(league)}/scoreboard?dates=${espnDate}`);
 }
 
 // A window of scoreboard events across [startDate, endDate], each with its full
@@ -228,7 +251,7 @@ export async function fetchAthleteStatsRaw(
   limit: number = 100,
 ): Promise<unknown> {
   return getJson(
-    `${LEADERS_BASE}/${league}/statistics/byathlete` +
+    `${LEADERS_BASE}/${espnSlugFor(league)}/statistics/byathlete` +
     `?lang=en&region=us&season=${season}&seasontype=${seasonType}&limit=${limit}`,
   );
 }
@@ -249,7 +272,7 @@ export async function fetchTransactionsRaw(
   date: string,  // YYYY-MM-DD
 ): Promise<unknown> {
   const espnDate = date.replace(/-/g, "");
-  return getJson(`${SCOREBOARD_BASE}/${league}/transactions?dates=${espnDate}`);
+  return getJson(`${SCOREBOARD_BASE}/${espnSlugFor(league)}/transactions?dates=${espnDate}`);
 }
 
 export function parseScoreboard(raw: unknown): BasketballScoreboardEvent[] {
@@ -383,6 +406,10 @@ function extractSide(
     period: Number(l.period),
     value: Number(l.value),
   }));
+  // ESPN marks ranked college teams with curatedRank.current (1-25); 99 = "not
+  // ranked". Normalize to a 1-25 rank or null.
+  const curated = Number((c.curatedRank as { current?: unknown } | undefined)?.current ?? 99);
+  const rank = curated >= 1 && curated <= 25 ? curated : null;
   return {
     team: {
       id: String(team.id),
@@ -390,11 +417,66 @@ function extractSide(
       location: String(team.location ?? ""),
       name: String(team.name ?? ""),
       displayName: String(team.displayName ?? `${team.location ?? ""} ${team.name ?? ""}`.trim()),
+      rank,
     },
     score: scoreStr == null || scoreStr === "" ? null : Number(scoreStr),
     linescores,
     winner: c.winner === true,
   };
+}
+
+// ---- Rankings (college only) ----------------------------------------------
+
+export type BasketballRankingTeam = {
+  id: string;
+  abbreviation: string;
+  school: string;   // "Michigan" (college display name — the school, not mascot)
+  nickname: string; // "Wolverines"
+};
+
+export type BasketballRankingEntry = {
+  rank: number;
+  previousRank: number | null; // null when new to the poll
+  record: string;              // "37-3"
+  team: BasketballRankingTeam;
+};
+
+export type BasketballRanking = {
+  poll: string;      // "AP Top 25"
+  entries: BasketballRankingEntry[];
+};
+
+// AP Top 25 (+ Coaches). ESPN serves CURRENT polls only (no date param), like
+// the football rankings endpoint. Pro leagues have no rankings — callers gate
+// on isCollegeBasketball.
+export async function fetchRankingsRaw(league: BasketballLeagueSlug): Promise<unknown> {
+  return getJson(`${SCOREBOARD_BASE}/${espnSlugFor(league)}/rankings`);
+}
+
+export function parseRankings(raw: unknown): BasketballRanking[] {
+  const data = raw as { rankings?: Array<Record<string, unknown>> };
+  return (data.rankings ?? []).map((p) => {
+    const ranks = (p.ranks as Array<Record<string, unknown>>) ?? [];
+    return {
+      poll: String(p.name ?? p.shortName ?? ""),
+      entries: ranks.map((r) => {
+        const t = (r.team as Record<string, unknown>) ?? {};
+        const prev = Number(r.previous ?? 0);
+        return {
+          rank: Number(r.current ?? 0),
+          previousRank: prev >= 1 && prev <= 25 ? prev : null,
+          record: String(r.recordSummary ?? ""),
+          team: {
+            id: String(t.id ?? ""),
+            abbreviation: String(t.abbreviation ?? ""),
+            // College: location is the school ("Michigan"), name is the mascot.
+            school: String(t.location ?? t.nickname ?? t.name ?? ""),
+            nickname: String(t.name ?? ""),
+          },
+        };
+      }),
+    };
+  });
 }
 
 // ---- Summary (box score) --------------------------------------------------
@@ -403,7 +485,7 @@ export async function fetchSummaryRaw(
   league: BasketballLeagueSlug,
   eventId: string,
 ): Promise<unknown> {
-  return getJson(`${SCOREBOARD_BASE}/${league}/summary?event=${eventId}`);
+  return getJson(`${SCOREBOARD_BASE}/${espnSlugFor(league)}/summary?event=${eventId}`);
 }
 
 export function parseBoxscore(raw: unknown, eventId: string): BasketballBoxscore | null {
@@ -485,8 +567,12 @@ export async function fetchStandingsRaw(
   // 2 = regular season, 3 = postseason. Default to regular for sortable W-L.
   seasonType: number = 2,
 ): Promise<unknown> {
+  // College basketball groups into ~31 conferences only at level=3; without it
+  // ESPN returns an empty top level. The pro leagues ignore the param and
+  // return their two conferences (East/West) by default.
+  const level = isCollegeBasketball(league) ? "&level=3" : "";
   return getJson(
-    `${STANDINGS_BASE}/${league}/standings?season=${season}&seasontype=${seasonType}`,
+    `${STANDINGS_BASE}/${espnSlugFor(league)}/standings?season=${season}&seasontype=${seasonType}${level}`,
   );
 }
 
@@ -613,7 +699,7 @@ export async function fetchTeamRosterRaw(
   league: BasketballLeagueSlug,
   teamId: string,   // ESPN numeric team id or abbreviation slug
 ): Promise<unknown> {
-  return getJson(`${ROSTER_BASE}/${league}/teams/${teamId}/roster`);
+  return getJson(`${ROSTER_BASE}/${espnSlugFor(league)}/teams/${teamId}/roster`);
 }
 
 export function parseRoster(raw: unknown): BasketballRosterEntry[] {

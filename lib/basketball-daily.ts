@@ -17,17 +17,21 @@ import {
   fetchStandingsRaw,
   fetchAthleteStatsRaw,
   fetchTransactionsRaw,
+  fetchRankingsRaw,
   parseScoreboard,
   parseBoxscore,
   parseStandings,
   parseLeaders,
   parseTransactions,
+  parseRankings,
+  isCollegeBasketball,
   type BasketballLeagueSlug,
   type BasketballScoreboardEvent,
   type BasketballBoxscore,
   type BasketballStandings,
   type BasketballLeaders,
   type BasketballTransaction,
+  type BasketballRanking,
 } from "./basketball";
 import { assembleBracket, eventToBracketRow, type Bracket, type BracketGameRow, type BracketLeague } from "./playoff-bracket";
 
@@ -64,6 +68,9 @@ export type BasketballRaw = {
   athleteStats?: unknown;
   // Recent league transactions envelope. null when the fetch failed.
   transactions?: unknown;
+  // AP Top 25 (+ Coaches) rankings envelope — college only; undefined for the
+  // pro leagues (and when the fetch failed).
+  rankings?: unknown;
   // Keyed by event id (stringified). Only final games are fetched; in-
   // progress/scheduled games have no summary yet.
   games: Record<string, unknown>;
@@ -119,6 +126,8 @@ export type BasketballData = {
   // seen across the persisted daily_raw this postseason. Only populated on the
   // league digest during the playoffs (isPlayoffs); null otherwise.
   bracket?: Bracket | null;
+  // AP Top 25 (+ Coaches) polls — college only; empty for the pro leagues.
+  rankings: BasketballRanking[];
 };
 
 // ---- Cache helpers (same table as MLB, different payload shape) -----------
@@ -185,6 +194,7 @@ async function fetchBasketballRaw(
     standingsRaw,
     athleteStatsRaw,
     transactionsRaw,
+    rankingsRaw,
   ] = await Promise.all([
     fetchScoreboardRangeRaw(sport, upcomingStart, upcomingEnd).catch((e: unknown) => {
       console.error(
@@ -211,6 +221,13 @@ async function fetchBasketballRaw(
       );
       return null;
     }),
+    // AP Top 25 (+ Coaches) — college only; pro leagues skip the fetch entirely.
+    isCollegeBasketball(sport)
+      ? fetchRankingsRaw(sport).catch((e: unknown) => {
+          console.error(`[basketball] rankings fetch failed for ${sport}/${date}: ${(e as Error).message}`);
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
 
   // Per-final-game summaries in parallel. ESPN tolerates burst requests at
@@ -231,6 +248,7 @@ async function fetchBasketballRaw(
     standings: standingsRaw,
     athleteStats: athleteStatsRaw ?? undefined,
     transactions: transactionsRaw ?? undefined,
+    rankings: rankingsRaw ?? undefined,
     games,
     season,
     standingsSeasonType: statSeasonType,
@@ -265,6 +283,7 @@ function rawToBasketballData(
     games.length > 0 && games.every((g) => g.event.seasonType === 1);
   const leaders = parseLeaders(raw.athleteStats ?? {});
   const transactions = raw.transactions ? parseTransactions(raw.transactions) : [];
+  const rankings = raw.rankings ? parseRankings(raw.rankings) : [];
   return {
     sport,
     date,
@@ -277,6 +296,7 @@ function rawToBasketballData(
     upcomingEvents,
     leaders,
     transactions,
+    rankings,
   };
 }
 

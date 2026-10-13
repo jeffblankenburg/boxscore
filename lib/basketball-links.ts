@@ -14,7 +14,7 @@
 import { EMAIL_LINK_BASE } from "./site";
 import { teamsBySport, type Sport } from "./teams";
 
-export type BasketballLeague = "nba" | "wnba";
+export type BasketballLeague = "nba" | "wnba" | "ncaam" | "ncaaw";
 
 export function slugifyName(name: string): string {
   return name
