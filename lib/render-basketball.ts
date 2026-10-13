@@ -27,6 +27,7 @@ import type {
 } from "./basketball";
 import { lastName } from "./render-email";
 import { timeInET, etDateFromISO } from "./dates";
+import { renderBracket } from "./playoff-bracket";
 import { renderMasthead, type NavSport } from "./masthead";
 import {
   teamLinkByNickname,
@@ -98,10 +99,16 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
   // baseball: league context first (standings + leaders), then today's
   // schedule, then yesterday's box scores, then transactions.
   if (data.isPlayoffs) {
+    // Prefer the reconstructed visual bracket; fall back to the text series
+    // glance if the bracket scan turned up nothing (e.g. a brand-new postseason
+    // with a single game's worth of data).
+    const bracket = data.bracket
+      ? renderBracket(data.bracket, (name) => teamNameLink(name, web, league))
+      : "";
     const sections = [
       masthead,
       renderResults(data, "Yesterday\u2019s games", web, league),
-      renderPlayoffSeries(data, web, league),
+      bracket || renderPlayoffSeries(data, web, league),
       // Today's games surfaces a Game N of an ongoing series scheduled for
       // tonight — should always be visible above the broader upcoming
       // list. Upcoming then covers the rest of the postseason window.
@@ -784,6 +791,25 @@ export const BASKETBALL_EMAIL_STYLES = `
 .bb-bracket-vs { font-weight: 400; color: #6a6354;
                  font-style: italic; padding: 0 4px; }
 .bb-bracket-summary { font-size: 12px; color: #6a6354; margin-top: 2px; }
+
+/* Visual bracket — email stacks rounds vertically (flex is unreliable in
+   Outlook); the same markup lays out horizontally on the web via globals.css. */
+.pb-bracket { margin: 6px 0 2px; }
+.pb-col { margin: 0 0 14px; }
+.pb-round-label {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  padding-bottom: 2px; margin-bottom: 6px; border-bottom: 1px solid #161410;
+}
+.pb-series { border: 1px solid #161410; background: #ffffff; margin-bottom: 6px; }
+.pb-team {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 4px 7px; font-size: 13px;
+}
+.pb-team + .pb-team { border-top: 1px solid #cfc8b8; }
+.pb-team .pb-nm { font-weight: 400; }
+.pb-team .pb-w { font-variant-numeric: tabular-nums; color: #6a6354; padding-left: 10px; }
+.pb-win .pb-nm { font-weight: 700; }
+.pb-win .pb-w { color: #161410; font-weight: 700; }
 
 .bb-leader-table { width: 100%; border-collapse: collapse;
                    font-size: 12px; margin: 6px 0 14px; }

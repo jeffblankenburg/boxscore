@@ -30,6 +30,7 @@ import { lastName } from "./render-email";
 import { timeInET, etDateFromISO } from "./dates";
 import { renderMasthead, type NavSport } from "./masthead";
 import { teamLinkByNickname, playerLink, slugifyName, escText, linkAnchor } from "./hockey-links";
+import { renderBracket } from "./playoff-bracket";
 import { NHL_LEADER_CATEGORY_SLUG } from "./hockey-leaders";
 
 export function teamNameLink(name: string, web: boolean): string {
@@ -97,11 +98,14 @@ function renderBody(data: HockeyData, web: boolean, navSports: NavSport[]): stri
   const masthead = renderMasthead({
     date: data.date, sport: "nhl", surface: web ? "web" : "email", navSports,
   });
+  const bracket = data.bracket
+    ? renderBracket(data.bracket, (name) => teamNameLink(name, web))
+    : "";
   const sections = data.isPlayoffs
     ? [
         masthead,
         renderResults(data, "Yesterday’s games", web),
-        renderPlayoffSeries(data, web),
+        bracket || renderPlayoffSeries(data, web),
         renderTodaysGames(data, web),
         renderUpcomingGames(data, web),
       ]

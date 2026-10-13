@@ -24,6 +24,7 @@ import {
   type HockeyLeaders,
   type HockeyTransaction,
 } from "./hockey";
+import { assembleBracket, eventToBracketRow, type Bracket, type BracketGameRow } from "./playoff-bracket";
 
 const SPORT = "nhl";
 const UPCOMING_WINDOW_DAYS = 14;
@@ -64,6 +65,9 @@ export type HockeyData = {
   upcomingEvents: HockeyScoreboardEvent[];
   leaders: HockeyLeaders;
   transactions: HockeyTransaction[];
+  // Full postseason bracket, reconstructed from every seasonType=3 series in
+  // the persisted daily_raw this postseason. Only set during the playoffs.
+  bracket?: Bracket | null;
 };
 
 // ---- Cache helpers --------------------------------------------------------
@@ -261,7 +265,45 @@ export async function loadHockeyData(
   const raw = await loadHockeyRaw(date, season, opts);
   const data = rawToHockeyData(raw, date);
   data.transactions = await transactionsSinceLastLeagueGame(date);
+  if (data.isPlayoffs) {
+    const live = [...data.games.map((g) => g.event), ...data.upcomingEvents];
+    data.bracket = await loadPlayoffBracket(date, live);
+  }
   return data;
+}
+
+// Mirror of the basketball bracket loader (see lib/basketball-daily.ts): union
+// every seasonType=3 series from the persisted daily_raw over the last ~80
+// days, plus today's + upcoming events, into the full bracket. Returns null
+// when no postseason games are found.
+const POSTSEASON_LOOKBACK_DAYS = 80;
+
+async function loadPlayoffBracket(
+  date: string,
+  liveEvents: HockeyScoreboardEvent[] = [],
+): Promise<Bracket | null> {
+  const since = addDays(date, -POSTSEASON_LOOKBACK_DAYS);
+  const { data, error } = await supabaseAdmin()
+    .from("daily_raw")
+    .select("sb:payload->scoreboard")
+    .eq("sport", SPORT)
+    .gte("date", since)
+    .lte("date", date);
+  if (error) throw new Error(`loadPlayoffBracket: ${error.message}`);
+
+  const rows: BracketGameRow[] = [];
+  for (const r of (data ?? []) as Array<{ sb: unknown }>) {
+    for (const e of parseScoreboard(r.sb)) {
+      const row = eventToBracketRow(e);
+      if (row) rows.push(row);
+    }
+  }
+  for (const e of liveEvents) {
+    const row = eventToBracketRow(e);
+    if (row) rows.push(row);
+  }
+  if (rows.length === 0) return null;
+  return assembleBracket("nhl", rows);
 }
 
 export { rawToHockeyData };

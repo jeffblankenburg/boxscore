@@ -1348,6 +1348,33 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
                  font-style: italic; padding: 0 4px; }
 .bb-bracket-summary { font-size: 12px; color: #6a6354; margin-top: 2px; }
 
+/* Visual playoff bracket (pb-*). Columnar: one column per round left→right,
+   each a stack of series boxes; the championship round is the rightmost box.
+   Shared by NBA/WNBA/NHL. Horizontal scroll on narrow screens so a wide
+   bracket never squishes; rounds stay aligned. */
+.pb-bracket {
+  display: flex; gap: 14px; align-items: stretch;
+  overflow-x: auto; padding-bottom: 4px; margin: 6px 0 2px;
+}
+.pb-col { flex: 0 0 auto; min-width: 150px; display: flex; flex-direction: column; }
+.pb-round-label {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  padding-bottom: 2px; margin-bottom: 8px; border-bottom: 1px solid #161410;
+}
+/* Series boxes spread evenly down the column so later rounds sit centered
+   against the pair they feed from. */
+.pb-round-body { display: flex; flex-direction: column; justify-content: space-around; flex: 1; gap: 8px; }
+.pb-series { border: 1px solid #161410; background: #ffffff; }
+.pb-team {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 4px 7px; font-size: 13px;
+}
+.pb-team + .pb-team { border-top: 1px solid #cfc8b8; }
+.pb-team .pb-nm { font-weight: 400; }
+.pb-team .pb-w { font-variant-numeric: tabular-nums; color: #6a6354; padding-left: 10px; }
+.pb-win .pb-nm { font-weight: 700; }
+.pb-win .pb-w { color: #161410; font-weight: 700; }
+
 /* League leaders — five stacked mini-tables (PTS, REB, AST, STL, BLK). */
 .bb-leader-table { width: 100%; border-collapse: collapse;
                    font-size: 12px; margin: 6px 0 14px; }

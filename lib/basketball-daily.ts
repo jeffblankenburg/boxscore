@@ -29,6 +29,7 @@ import {
   type BasketballLeaders,
   type BasketballTransaction,
 } from "./basketball";
+import { assembleBracket, eventToBracketRow, type Bracket, type BracketGameRow, type BracketLeague } from "./playoff-bracket";
 
 // How many days past the digest date the upcoming-events window covers.
 // 14 catches the typical Conference Finals → Finals transition; bumps up
@@ -114,6 +115,10 @@ export type BasketballData = {
   // description text from ESPN (e.g. "New Orleans hired Jamahl Mosley as
   // head coach"). Empty array means none returned.
   transactions: BasketballTransaction[];
+  // The full postseason bracket, reconstructed from every seasonType=3 series
+  // seen across the persisted daily_raw this postseason. Only populated on the
+  // league digest during the playoffs (isPlayoffs); null otherwise.
+  bracket?: Bracket | null;
 };
 
 // ---- Cache helpers (same table as MLB, different payload shape) -----------
@@ -444,7 +449,55 @@ export async function loadBasketballDataFor(
   const raw = await loadBasketballRawFor(sport, date, season, opts);
   const data = rawToBasketballData(raw, sport, date);
   data.transactions = await transactionsSinceLastLeagueGame(sport, date);
+  // Reconstruct the postseason bracket from the persisted daily_raw only while
+  // we're in the playoffs — off-season/regular-season digests skip the scan.
+  // Feed today's games + the upcoming window too, so a matchup that's set but
+  // not yet played (e.g. a Finals whose Game 1 is days out) still shows.
+  if (data.isPlayoffs) {
+    const live = [...data.games.map((g) => g.event), ...data.upcomingEvents];
+    data.bracket = await loadPlayoffBracket(sport, date, live);
+  }
   return data;
+}
+
+// How far back to scan daily_raw for postseason series. Comfortably covers an
+// NBA/NHL playoff run (~2 months); a new postseason's series never collide
+// with the prior one (10 months apart). WNBA's ~3-week run is well inside it.
+const POSTSEASON_LOOKBACK_DAYS = 80;
+
+// Reconstruct the full bracket by unioning every seasonType=3 series across the
+// persisted daily_raw from (date − 80d, date]. Projects just the scoreboard
+// subtree (not the whole payload) to keep the multi-day read small, mirroring
+// aggregateTransactions. Returns null when no postseason games are found.
+async function loadPlayoffBracket(
+  sport: BasketballLeagueSlug,
+  date: string,
+  liveEvents: BasketballScoreboardEvent[] = [],
+): Promise<Bracket | null> {
+  const since = addDays(date, -POSTSEASON_LOOKBACK_DAYS);
+  const { data, error } = await supabaseAdmin()
+    .from("daily_raw")
+    .select("sb:payload->scoreboard")
+    .eq("sport", sport)
+    .gte("date", since)
+    .lte("date", date);
+  if (error) throw new Error(`loadPlayoffBracket: ${error.message}`);
+
+  const rows: BracketGameRow[] = [];
+  for (const r of (data ?? []) as Array<{ sb: unknown }>) {
+    for (const e of parseScoreboard(r.sb)) {
+      const row = eventToBracketRow(e);
+      if (row) rows.push(row);
+    }
+  }
+  // Today's games + upcoming window: catches a matchup that's set but not yet
+  // played, which the historical daily_raw scan can't see.
+  for (const e of liveEvents) {
+    const row = eventToBracketRow(e);
+    if (row) rows.push(row);
+  }
+  if (rows.length === 0) return null;
+  return assembleBracket(sport as BracketLeague, rows);
 }
 
 // Exposed so the team-digest loader can turn one raw read into both the daily
