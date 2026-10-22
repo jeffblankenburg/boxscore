@@ -1443,14 +1443,21 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   border-bottom: 1px solid #161410; color: #6a6354;
 }
 .bb-upcoming { list-style: none; padding: 0; margin: 0; }
-.bb-upcoming-row { display: flex; justify-content: space-between;
-                   align-items: baseline; gap: 8px;
+/* Matchup grows to fill the row and pushes time + network to the right edge.
+   time/tv are nowrap so "7:00 PM ET" and "ESPN" never split mid-value; the
+   row wraps as a whole only if a long matchup needs the width (then time+tv
+   drop together to a second line). The old flex-basis:100% on .tv, with no
+   flex-wrap, crushed the other two columns into ragged two-line wraps. */
+.bb-upcoming-row { display: flex; flex-wrap: wrap; align-items: baseline;
+                   column-gap: 10px; row-gap: 1px;
                    padding: 4px 0; border-bottom: 1px dotted #e8e2d4;
                    font-size: 12px; }
 .bb-upcoming-row:last-child { border-bottom: none; }
-.bb-upcoming-matchup { font-weight: 700; }
-.bb-upcoming-time { color: #6a6354; font-style: italic; }
-.bb-upcoming-tv { flex-basis: 100%; font-size: 11px; color: var(--text-muted); }
+.bb-upcoming-matchup { font-weight: 700; flex: 1 1 auto; min-width: 0; }
+.bb-upcoming-time { color: #6a6354; font-style: italic;
+                    white-space: nowrap; flex: 0 0 auto; }
+.bb-upcoming-tv { font-size: 11px; color: var(--text-muted);
+                  white-space: nowrap; flex: 0 0 auto; }
 
 .bb-linescore { width: 100%; border-collapse: collapse; margin: 0 0 6px;
                 font-size: 12px; table-layout: fixed; }
