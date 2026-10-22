@@ -1,0 +1,17 @@
+#!/bin/sh
+# Blocks `git push` when a high-or-critical vulnerability is present in
+# production dependencies. Mirrors `npm run audit` (--audit-level=high
+# --omit=dev) so dev-only chains (esbuild etc.) don't block a push.
+#
+# Wired via core.hooksPath=.githooks (set by the `prepare` npm script on
+# `npm install`). Bypass a known-good push with `git push --no-verify`.
+# Filed as GH #97 (keep audit from silently regrowing).
+
+echo "pre-push: npm audit (high+, prod deps)…"
+if ! npm run --silent audit; then
+  echo
+  echo "pre-push: BLOCKED — high/critical vulnerability in production deps."
+  echo "  Fix:    npm audit fix        (review the diff; avoid --force)"
+  echo "  Bypass: git push --no-verify (only if you've assessed it)"
+  exit 1
+fi

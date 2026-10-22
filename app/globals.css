@@ -1481,15 +1481,20 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
   border-bottom: 1px solid #161410;
 }
 .bb-player-table th, .bb-player-table td {
-  padding: 2px 3px; text-align: right; white-space: nowrap;
+  padding: 2px 2px; text-align: right; white-space: nowrap;
 }
 .bb-player-table th {
   font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.04em;
   border-bottom: 1px solid #161410;
 }
+/* The nine-column daily box keeps numerics at 11px at phone width; scope the
+   shrink to .bb-box so the (wider, web-only) player game-log table is left
+   alone. Mirrors BASKETBALL_EMAIL_STYLES. */
+.bb-box .bb-pl-stat { font-size: 11px; }
+.bb-box .bb-player-table tbody tr.bb-pl-bench td { border-top: 1px solid #c9c2b4; }
 .bb-pl-name   { text-align: left !important; font-size: 12px;
-                width: 38%; white-space: normal; word-break: break-word; }
+                width: 24%; white-space: normal; word-break: break-word; }
 .bb-pl-pos    { font-size: 10px; color: #6a6354; margin-left: 3px;
                 text-transform: lowercase; letter-spacing: 0.04em;
                 white-space: nowrap; font-weight: 400; }

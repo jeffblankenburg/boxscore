@@ -11,7 +11,9 @@
     "backfill": "tsx --env-file=.env.local scripts/backfill.ts",
     "backfill-shares": "tsx --env-file=.env.local scripts/backfill-scoreboard-images.ts",
     "screenshot": "tsx scripts/screenshot-sections.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "audit": "npm audit --audit-level=high --omit=dev",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@atproto/api": "^0.19.18",

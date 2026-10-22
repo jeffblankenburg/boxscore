@@ -117,13 +117,17 @@ export function playerNameLink(
 // 7-column box score per Jeff's call. The full ESPN set has 14; these are
 // the high-signal ones for a glance. Tweak this array to change the line.
 const PLAYER_STAT_COLUMNS: ReadonlyArray<{ key: string; label: string }> = [
+  // Keys are ESPN's own box-score column names (the `names` array). Shooting
+  // is grouped after PTS (FG, then 3PT); TO trails the defensive counts.
   { key: "MIN", label: "MIN" },
   { key: "PTS", label: "PTS" },
+  { key: "FG", label: "FG" },
+  { key: "3PT", label: "3PT" },
   { key: "REB", label: "REB" },
   { key: "AST", label: "AST" },
-  { key: "3PT", label: "3PT" },
   { key: "STL", label: "STL" },
   { key: "BLK", label: "BLK" },
+  { key: "TO", label: "TO" },
 ];
 
 // Standings columns. The standings "stats" map uses these ESPN names.
@@ -468,13 +472,24 @@ function renderBoxScore(box: BasketballBoxscore, web: boolean, league: Basketbal
 }
 
 function renderBoxTeam(team: BasketballBoxTeam, web: boolean, league: BasketballLeague): string {
-  // Players who played, sorted by minutes desc. ESPN's MIN comes as a
-  // string ("25"); Number() handles the parse, NaN → 0 so DNPs sink.
-  const played = team.players
-    .filter((p) => !p.didNotPlay && Object.keys(p.stats).length > 0)
-    .sort((a, b) => parseMinutes(b) - parseMinutes(a));
+  // Official box-score order: the five starters first (in ESPN's listed
+  // order, which already follows the official position order), then the
+  // bench. We deliberately do NOT re-sort by minutes — the request was to
+  // mirror the official box, which groups starters vs reserves.
+  const played = team.players.filter(
+    (p) => !p.didNotPlay && Object.keys(p.stats).length > 0,
+  );
+  const starters = played.filter((p) => p.starter);
+  const reserves = played.filter((p) => !p.starter);
+  const ordered = [...starters, ...reserves];
 
-  const rows = played.map((p) => renderPlayerRow(p, web, league)).join("");
+  // Mark the first bench row so CSS can draw a subtle rule between the
+  // starters and reserves, the way the printed box score separates them.
+  const benchStart =
+    starters.length > 0 && reserves.length > 0 ? starters.length : -1;
+  const rows = ordered
+    .map((p, i) => renderPlayerRow(p, web, league, i === benchStart))
+    .join("");
   const totals = renderTotalsRow(team);
 
   // Team name (nickname link) renders as an h3 sibling above the table
@@ -495,19 +510,20 @@ function renderBoxTeam(team: BasketballBoxTeam, web: boolean, league: Basketball
 `.trim();
 }
 
-function renderPlayerRow(p: BasketballPlayerLine, web: boolean, league: BasketballLeague): string {
+function renderPlayerRow(p: BasketballPlayerLine, web: boolean, league: BasketballLeague, benchStart = false): string {
   const cells = PLAYER_STAT_COLUMNS.map((c) =>
     `<td class="bb-pl-stat">${escapeHtml(p.stats[c.key] ?? "")}</td>`,
   ).join("");
-  // Basketball has more cell width than baseball's box, so we show first
-  // initial + last name ("L. Doncic") rather than baseball's last-name-only
-  // convention, linked to the player page. Position stays lowercase suffix.
-  const name = playerNameLink(p.athleteId, p.displayName, initialLast(p.displayName), web, league);
+  // Last name only ("Doncic"), matching baseball's box convention. With nine
+  // stat columns the name has to stay narrow to keep the whole box inside
+  // 400px; the first initial was costing width we need for the numbers.
+  const name = playerNameLink(p.athleteId, p.displayName, lastName(p.displayName), web, league);
   const pos = p.position ? p.position.toLowerCase() : "";
   const nameCell = pos
     ? `${name} <span class="bb-pl-pos">${escapeHtml(pos)}</span>`
     : name;
-  return `<tr><td class="bb-pl-name">${nameCell}</td>${cells}</tr>`;
+  const trClass = benchStart ? ' class="bb-pl-bench"' : "";
+  return `<tr${trClass}><td class="bb-pl-name">${nameCell}</td>${cells}</tr>`;
 }
 
 // "Devin Vassell" → "D. Vassell". Falls back to the full string for one-word
@@ -527,13 +543,6 @@ function renderTotalsRow(team: BasketballBoxTeam): string {
     `<td class="bb-pl-stat">${escapeHtml(team.totals[c.key] ?? "")}</td>`,
   ).join("");
   return `<tr><td class="bb-pl-name bb-pl-totals">Totals</td>${cells}</tr>`;
-}
-
-function parseMinutes(p: BasketballPlayerLine): number {
-  const v = p.stats.MIN;
-  if (!v) return 0;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
 }
 
 // ---- Standings ------------------------------------------------------------
@@ -1077,21 +1086,25 @@ export const BASKETBALL_EMAIL_STYLES = `
   border-bottom: 1px solid #161410;
 }
 .bb-player-table th, .bb-player-table td {
-  padding: 2px 3px; text-align: right; white-space: nowrap;
+  padding: 2px 2px; text-align: right; white-space: nowrap;
 }
 .bb-player-table th {
   font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.04em;
+  text-transform: uppercase; letter-spacing: 0.03em;
   border-bottom: 1px solid #161410;
 }
 .bb-pl-name      { text-align: left !important; font-size: 12px;
-                   width: 38%; white-space: normal; word-break: break-word; }
+                   width: 24%; white-space: normal; word-break: break-word; }
 .bb-pl-pos       { font-size: 10px; color: #6a6354; margin-left: 3px;
                    text-transform: lowercase; letter-spacing: 0.04em;
                    white-space: nowrap; font-weight: 400; }
 .bb-pl-jersey    { font-size: 10px; color: #6a6354; font-weight: 400; }
 .bb-pl-inj       { font-size: 10px; color: #6a6354; font-style: italic; }
-.bb-pl-stat      { min-width: 22px; }
+/* Nine stat columns at phone width: last-name-only keeps the name column
+   narrow (24%) so the numerics get comfortable room without clipping. */
+.bb-pl-stat      { font-size: 11px; }
+/* Soft rule between the starters and the bench, mirroring the printed box. */
+.bb-player-table tbody tr.bb-pl-bench td { border-top: 1px solid #c9c2b4; }
 .bb-player-table tfoot td { font-weight: 700; border-top: 1px solid #161410; }
 
 .bb-standings-table { width: 100%; border-collapse: collapse;
