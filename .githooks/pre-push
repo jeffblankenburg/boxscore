@@ -6,12 +6,42 @@
 # Wired via core.hooksPath=.githooks (set by the `prepare` npm script on
 # `npm install`). Bypass a known-good push with `git push --no-verify`.
 # Filed as GH #97 (keep audit from silently regrowing).
+#
+# Design: fail OPEN on tooling trouble (npm missing, registry unreachable),
+# fail CLOSED only on a real vulnerability finding. A hook that blocks every
+# push because it can't find npm is worse than no hook — a missing tool is
+# not a vulnerability.
+
+# GUI git clients and IDEs run hooks with a minimal PATH that omits Homebrew /
+# version-manager bin dirs, so `npm` isn't found. Prepend the usual macOS
+# locations before looking it up.
+PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.volta/bin:$PATH"
+export PATH
+
+NPM="$(command -v npm 2>/dev/null)"
+if [ -z "$NPM" ]; then
+  echo "pre-push: npm not on PATH — skipping the vulnerability audit (advisory)."
+  echo "  Run 'npm run audit' manually to check prod deps."
+  exit 0
+fi
 
 echo "pre-push: npm audit (high+, prod deps)…"
-if ! npm run --silent audit; then
+out="$("$NPM" run --silent audit 2>&1)"
+if [ $? -eq 0 ]; then
+  exit 0
+fi
+
+# Non-zero exit: distinguish a genuine vulnerability report from a tooling
+# failure (offline, registry error). Only the former should block the push.
+if printf '%s\n' "$out" | grep -qiE '[0-9]+ vulnerabilit'; then
+  printf '%s\n' "$out" | tail -n 20
   echo
   echo "pre-push: BLOCKED — high/critical vulnerability in production deps."
   echo "  Fix:    npm audit fix        (review the diff; avoid --force)"
   echo "  Bypass: git push --no-verify (only if you've assessed it)"
   exit 1
 fi
+
+echo "pre-push: audit could not complete (not a vuln finding) — allowing push."
+printf '%s\n' "$out" | tail -n 5
+exit 0
