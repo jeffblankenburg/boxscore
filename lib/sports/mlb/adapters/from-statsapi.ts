@@ -749,8 +749,8 @@ type StatsapiPostseasonEnvelope = {
       status?: { abstractGameState?: string; detailedState?: string; startTimeTBD?: boolean };
       broadcasts?: StatsapiBroadcast[];
       teams?: {
-        away?: { team?: { id?: number; name?: string }; isWinner?: boolean };
-        home?: { team?: { id?: number; name?: string }; isWinner?: boolean };
+        away?: { team?: { id?: number; name?: string }; isWinner?: boolean; probablePitcher?: { id: number; fullName: string } };
+        home?: { team?: { id?: number; name?: string }; isWinner?: boolean; probablePitcher?: { id: number; fullName: string } };
       };
     }>;
   }>;
@@ -1022,6 +1022,7 @@ function upcomingPostseasonFromRaw(
   raw: unknown,
   date: string,
   idx: Map<number, MlbTeamRef>,
+  pitcherStats: PitcherStatsMap,
 ): PostseasonScheduledGame[] {
   const env = raw as StatsapiPostseasonEnvelope | null;
   const rawSeries = env?.series;
@@ -1049,6 +1050,8 @@ function upcomingPostseasonFromRaw(
         startTimeTBD: g.status?.startTimeTBD === true,
         away: { id: awayId, abbr: away.abbr, name: away.name },
         home: { id: homeId, abbr: home.abbr, name: home.name },
+        awayProbable: adaptProbablePitcher(g.teams?.away?.probablePitcher, pitcherStats),
+        homeProbable: adaptProbablePitcher(g.teams?.home?.probablePitcher, pitcherStats),
         tv: tvFromBroadcasts(g.broadcasts),
       });
     }
@@ -1150,7 +1153,7 @@ export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDai
     allStarRosters: raw.allStarRosters ?? null,
     allStarMvp: raw.allStarMvp ?? null,
     postseason,
-    upcomingPostseason: postseason ? upcomingPostseasonFromRaw(raw.postseasonSeries, date, teamIdx) : null,
+    upcomingPostseason: postseason ? upcomingPostseasonFromRaw(raw.postseasonSeries, date, teamIdx, pitcherIdx) : null,
     seasonSignoff: seasonSignoffFromRaw(raw.postseasonSeries, postseason, season, date),
   };
 }

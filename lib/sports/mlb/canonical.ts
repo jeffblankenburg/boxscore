@@ -11,6 +11,7 @@ import type {
   MlbDivisionStandings,
   MlbLeaderboard,
   MlbLeague,
+  MlbProbablePitcher,
   MlbScoringPlay,
   MlbTransaction,
   MlbWildCardStandings,
@@ -100,6 +101,9 @@ export type PostseasonScheduledGame = {
   startTimeTBD: boolean;       // statsapi hasn't locked the first pitch yet
   away: { id: number; abbr: string; name: string };
   home: { id: number; abbr: string; name: string };
+  // Announced starters (MLB names them a game or two out; null = TBD).
+  awayProbable: MlbProbablePitcher | null;
+  homeProbable: MlbProbablePitcher | null;
   tv: string[];
 };
 

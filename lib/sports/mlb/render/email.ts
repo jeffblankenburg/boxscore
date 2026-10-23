@@ -862,6 +862,12 @@ function dateInET(dateOnly: string): string {
   }).format(dt);
 }
 
+// Primary TV network — the first broadcast, trimmed of the streaming/alt-feed
+// suffix MLB appends ("FOX / FOX ONE" → "FOX").
+function network(tv: string[]): string {
+  return tv.length ? (tv[0]!.split(/\s*\/\s*/)[0] ?? "") : "";
+}
+
 function postseasonScheduleTitle(games: PostseasonScheduledGame[]): string {
   const rounds = new Set(games.map((g) => g.round));
   if (rounds.size === 1) {
@@ -882,19 +888,32 @@ function postseasonScheduleTitle(games: PostseasonScheduledGame[]): string {
 // Today's Games so it reads as native.
 function renderPostseasonSchedule(games: PostseasonScheduledGame[]): string {
   if (games.length === 0) return "";
+  const probable = (p: PostseasonScheduledGame["awayProbable"]): string => {
+    if (!p) return "TBD";
+    const parts: string[] = [esc(lastName(p.fullName))];
+    const detail: string[] = [];
+    if (p.wins != null && p.losses != null) detail.push(`${p.wins}-${p.losses}`);
+    if (p.era != null) detail.push(p.era.toFixed(2));
+    if (detail.length > 0) parts.push(`(${detail.join(", ")})`);
+    return parts.join(" ");
+  };
   const rows = games.map((g) => {
     const when = g.startTimeTBD
       ? `${dateInET(g.date)}, Time TBD`
       : `${dateInET(g.date)}, ${timeInET(g.startTime)}`;
-    const matchup = `${esc(tla(g.away.name))} @ ${esc(tla(g.home.name))}`;
-    const detail = g.gameNumber > 0 ? `Game ${g.gameNumber}` : "";
-    const tv = g.tv.length ? `${detail ? "&nbsp;&nbsp;" : ""}${esc(g.tv.join(" / "))}` : "";
+    const gameNo = g.gameNumber > 0
+      ? ` <span style="font-weight:400;color:#6a6354;font-size:11px;">Game ${g.gameNumber}</span>`
+      : "";
+    const matchup = `${esc(nickname(g.away.name))} @ ${esc(nickname(g.home.name))}`;
+    const pitchers = `${probable(g.awayProbable)} vs ${probable(g.homeProbable)}`;
+    const net = network(g.tv);
+    const tv = net ? `<br><span style="font-size:11px;">${esc(net)}</span>` : "";
     return `<tr>
-      <td align="left" style="font-size:13px;font-weight:700;padding:3px 0 0;">${matchup}</td>
+      <td align="left" style="font-size:13px;font-weight:700;padding:3px 0 0;">${matchup}${gameNo}</td>
       <td align="right" style="font-size:13px;color:#6a6354;padding:3px 0 0;white-space:nowrap;">${esc(when)}</td>
     </tr>
     <tr>
-      <td colspan="2" style="font-size:12px;color:#6a6354;padding:0 0 4px;border-bottom:1px dotted #e8e2d4;">${detail}${tv}</td>
+      <td colspan="2" style="font-size:12px;color:#6a6354;padding:0 0 4px;border-bottom:1px dotted #e8e2d4;">${pitchers}${tv}</td>
     </tr>`;
   }).join("");
   return `${sectionH(postseasonScheduleTitle(games))}

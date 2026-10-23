@@ -982,6 +982,12 @@ function dateInET(dateOnly: string): string {
   }).format(dt);
 }
 
+// Primary TV network — the first broadcast, trimmed of the streaming/alt-feed
+// suffix MLB appends ("FOX / FOX ONE" → "FOX").
+function network(tv: string[]): string {
+  return tv.length ? (tv[0]!.split(/\s*\/\s*/)[0] ?? "") : "";
+}
+
 function postseasonScheduleTitle(games: PostseasonScheduledGame[]): string {
   const rounds = new Set(games.map((g) => g.round));
   if (rounds.size === 1) {
@@ -1000,20 +1006,30 @@ function postseasonScheduleTitle(games: PostseasonScheduledGame[]): string {
 // the next-day preview leaves across postseason layoffs.
 function renderPostseasonSchedule(games: PostseasonScheduledGame[]): string {
   if (games.length === 0) return "";
+  const probable = (p: PostseasonScheduledGame["awayProbable"]): string => {
+    if (!p) return "TBD";
+    const parts: string[] = [esc(lastName(p.fullName))];
+    const detail: string[] = [];
+    if (p.wins != null && p.losses != null) detail.push(`${p.wins}-${p.losses}`);
+    if (p.era != null && Number.isFinite(p.era)) detail.push(p.era.toFixed(2));
+    if (detail.length > 0) parts.push(`(${detail.join(", ")})`);
+    return parts.join(" ");
+  };
   const lines = games.map((g) => {
     const when = g.startTimeTBD
       ? `${dateInET(g.date)}, Time TBD`
       : `${dateInET(g.date)}, ${timeInET(g.startTime)}`;
-    const matchup = `${esc(tla(g.away.name))} @ ${esc(tla(g.home.name))}`;
-    const detail = g.gameNumber > 0 ? `Game ${g.gameNumber}` : "";
-    const tvSep = detail && g.tv.length ? "&nbsp;&nbsp;" : "";
-    const detailLine = `${detail}${tvSep}${g.tv.length ? esc(g.tv.join(" / ")) : ""}`;
+    const gameNo = g.gameNumber > 0 ? ` <span class="game-record">Game ${g.gameNumber}</span>` : "";
+    const matchup = `${esc(nickname(g.away.name))} @ ${esc(nickname(g.home.name))}`;
+    const pitchers = `${probable(g.awayProbable)} vs ${probable(g.homeProbable)}`;
+    const net = network(g.tv);
     return `<div>
       <div class="game-score-line">
-        <span class="game-matchup">${matchup}</span>
+        <span class="game-matchup">${matchup}${gameNo}</span>
         <span class="game-time">${esc(when)}</span>
       </div>
-      ${detailLine ? `<div class="game-pitchers probable">${detailLine}</div>` : ""}
+      <div class="game-pitchers probable">${pitchers}</div>
+      ${net ? `<div class="game-tv">${esc(net)}</div>` : ""}
     </div>`;
   }).join("");
   return `<div class="games-section">

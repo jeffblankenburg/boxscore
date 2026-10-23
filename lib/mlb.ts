@@ -142,7 +142,10 @@ export async function fetchScheduleSeasonRaw(season: number): Promise<unknown> {
 // (see fetchDailyRaw); replaces standings, which statsapi returns empty once
 // the regular season ends.
 export async function fetchPostseasonSeriesRaw(season: number): Promise<unknown> {
-  return getRaw(`/v1/schedule/postseason/series?sportId=1&season=${season}`);
+  // hydrate probablePitcher + broadcasts so the upcoming-games schedule can show
+  // announced starters (MLB names them a game or two out, TBD beyond) and the TV
+  // network for each game.
+  return getRaw(`/v1/schedule/postseason/series?sportId=1&season=${season}&hydrate=probablePitcher,broadcasts`);
 }
 
 // Final regular-season standings for a season (no date → end-of-season state).

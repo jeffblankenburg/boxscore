@@ -128,6 +128,29 @@ function probablePitcherIds(scheduleRaw: unknown): number[] {
   return Array.from(ids);
 }
 
+// Probable-pitcher ids from the postseason series envelope (different shape
+// from the daily schedule: series[].games[] rather than dates[].games[]). Union
+// with the next-day ids so season W-L/ERA gets fetched for upcoming postseason
+// starters too, not just the literal next day's.
+function postseasonProbablePitcherIds(postseasonRaw: unknown): number[] {
+  const env = postseasonRaw as {
+    series?: Array<{ games?: Array<{ teams?: {
+      away?: { probablePitcher?: { id?: number } };
+      home?: { probablePitcher?: { id?: number } };
+    } }> }>;
+  } | null | undefined;
+  const ids = new Set<number>();
+  for (const s of env?.series ?? []) {
+    for (const g of s.games ?? []) {
+      const a = g.teams?.away?.probablePitcher?.id;
+      const h = g.teams?.home?.probablePitcher?.id;
+      if (a) ids.add(a);
+      if (h) ids.add(h);
+    }
+  }
+  return Array.from(ids);
+}
+
 // Fetch every MLB endpoint needed for a single date, returning the unmodified
 // envelopes plus pre-parsed scoring plays and probable-pitcher records. This
 // is the only function that hits MLB; everything else parses what we already
@@ -315,7 +338,10 @@ async function fetchDailyRaw(date: string): Promise<DailyRaw> {
       ])
     : [undefined, undefined];
 
-  const pitcherIds = probablePitcherIds(nextDayScheduleRaw);
+  const pitcherIds = Array.from(new Set([
+    ...probablePitcherIds(nextDayScheduleRaw),
+    ...postseasonProbablePitcherIds(postseasonSeries),
+  ]));
 
   const [gameResults, pitcherResults] = await Promise.all([
     Promise.all(
