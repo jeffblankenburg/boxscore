@@ -19,6 +19,7 @@ import {
   type PostseasonRound,
   type PostseasonSeries,
   type PostseasonEntrant,
+  type PostseasonScheduledGame,
   type SeasonSignoff,
 } from "../canonical";
 import { prevDay } from "@/lib/dates";
@@ -742,8 +743,11 @@ type StatsapiPostseasonEnvelope = {
       gameType?: string;
       seriesDescription?: string;
       gamesInSeries?: number;
+      seriesGameNumber?: number;
       officialDate?: string;
-      status?: { abstractGameState?: string };
+      gameDate?: string;
+      status?: { abstractGameState?: string; detailedState?: string; startTimeTBD?: boolean };
+      broadcasts?: StatsapiBroadcast[];
       teams?: {
         away?: { team?: { id?: number; name?: string }; isWinner?: boolean };
         home?: { team?: { id?: number; name?: string }; isWinner?: boolean };
@@ -1007,6 +1011,53 @@ function postseasonBracketFromRaw(
   return { season, series };
 }
 
+// Remaining scheduled postseason games (officialDate strictly after `date`,
+// not yet final), soonest first. Same series feed as the bracket, so no extra
+// fetch. Only games whose BOTH sides map to real clubs are kept — a game in a
+// round whose matchup isn't set yet ("AL Champion" placeholder) is skipped
+// rather than rendered as "TBD @ TBD". During the World Series layoff this is
+// the whole remaining WS slate; the renderer turns it into the schedule strip
+// that would otherwise be blank (nextDaySchedule is empty across the layoff).
+function upcomingPostseasonFromRaw(
+  raw: unknown,
+  date: string,
+  idx: Map<number, MlbTeamRef>,
+): PostseasonScheduledGame[] {
+  const env = raw as StatsapiPostseasonEnvelope | null;
+  const rawSeries = env?.series;
+  if (!Array.isArray(rawSeries) || rawSeries.length === 0) return [];
+
+  const out: PostseasonScheduledGame[] = [];
+  for (const s of rawSeries) {
+    for (const g of s.games ?? []) {
+      const round = POSTSEASON_ROUND[g.gameType ?? ""];
+      if (!round) continue;
+      if ((g.officialDate ?? "") <= date) continue;              // past or same day
+      if ((g.status?.abstractGameState ?? "") === "Final") continue; // already played
+      const homeId = g.teams?.home?.team?.id;
+      const awayId = g.teams?.away?.team?.id;
+      if (typeof homeId !== "number" || !idx.has(homeId)) continue;
+      if (typeof awayId !== "number" || !idx.has(awayId)) continue;
+      const home = teamRefById(idx, homeId, g.teams?.home?.team?.name);
+      const away = teamRefById(idx, awayId, g.teams?.away?.team?.name);
+      out.push({
+        round,
+        seriesDescription: g.seriesDescription ?? "",
+        gameNumber: g.seriesGameNumber ?? 0,
+        date: g.officialDate ?? "",
+        startTime: g.gameDate ?? g.officialDate ?? "",
+        startTimeTBD: g.status?.startTimeTBD === true,
+        away: { id: awayId, abbr: away.abbr, name: away.name },
+        home: { id: homeId, abbr: home.abbr, name: home.name },
+        tv: tvFromBroadcasts(g.broadcasts),
+      });
+    }
+  }
+  out.sort((a, b) =>
+    a.date !== b.date ? a.date.localeCompare(b.date) : a.gameNumber - b.gameNumber);
+  return out;
+}
+
 // The season farewell fires on the first quiet day after the World Series: the
 // WS has a winner and the last postseason game was `date`'s previous day (so the
 // clinch recap already went out as its own postseason edition the morning
@@ -1099,6 +1150,7 @@ export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDai
     allStarRosters: raw.allStarRosters ?? null,
     allStarMvp: raw.allStarMvp ?? null,
     postseason,
+    upcomingPostseason: postseason ? upcomingPostseasonFromRaw(raw.postseasonSeries, date, teamIdx) : null,
     seasonSignoff: seasonSignoffFromRaw(raw.postseasonSeries, postseason, season, date),
   };
 }

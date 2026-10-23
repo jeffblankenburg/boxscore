@@ -86,6 +86,23 @@ export type PostseasonBracket = {
   series: PostseasonSeries[];
 };
 
+// One not-yet-played postseason game, pulled from the same series feed as the
+// bracket. Drives the "World Series Schedule" strip so the digest shows the
+// upcoming slate even across the multi-day layoffs between postseason games —
+// when nextDayGames (literal tomorrow) is empty and Today's Games would
+// otherwise vanish. See upcomingPostseasonFromRaw in from-statsapi.
+export type PostseasonScheduledGame = {
+  round: PostseasonRound;
+  seriesDescription: string;   // "World Series", "AL Championship Series"
+  gameNumber: number;          // series game number (1..7)
+  date: string;                // officialDate, ISO YYYY-MM-DD
+  startTime: string;           // gameDate ISO datetime (for ET time)
+  startTimeTBD: boolean;       // statsapi hasn't locked the first pitch yet
+  away: { id: number; abbr: string; name: string };
+  home: { id: number; abbr: string; name: string };
+  tv: string[];
+};
+
 // The one-time season farewell edition, rendered the morning after the World
 // Series clinches. Present on exactly one date per season (see the adapter).
 export type SeasonSignoff = {
@@ -111,6 +128,10 @@ export type CanonicalDailyData = {
   // Present only on postseason days. Drives the bracket that replaces
   // standings + leaders in the postseason digest.
   postseason?: PostseasonBracket | null;
+  // Remaining scheduled postseason games (not yet played), soonest first.
+  // Fills the "schedule" strip across layoffs between games — see
+  // PostseasonScheduledGame. Empty/absent outside the postseason.
+  upcomingPostseason?: PostseasonScheduledGame[] | null;
   // Present on exactly one date per season — the morning after the World Series
   // clinches. Turns that edition into the league season farewell.
   seasonSignoff?: SeasonSignoff | null;

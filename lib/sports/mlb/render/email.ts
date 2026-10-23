@@ -15,7 +15,7 @@
 // markup against the same class names so the wrapping templates don't
 // have to know which renderer produced the body.
 
-import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher, SeasonSignoff } from "../canonical";
+import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher, SeasonSignoff, PostseasonScheduledGame } from "../canonical";
 import type {
   MlbBoxPlayer,
   MlbBoxScore,
@@ -848,6 +848,61 @@ function renderTodaysGames(
     </table>`;
 }
 
+// ─── Postseason Schedule ─────────────────────────────────────────────────
+
+// Weekday + month + day from a date-only ISO string ("2026-10-24" → "Sat, Oct
+// 24"), built at UTC noon so no timezone shift ever moves it across a day. The
+// game TIME uses timeInET on the full datetime; this is for the date only.
+function dateInET(dateOnly: string): string {
+  const [y, m, d] = dateOnly.split("-").map(Number);
+  if (!y || !m || !d) return dateOnly;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short", month: "short", day: "numeric", timeZone: "UTC",
+  }).format(dt);
+}
+
+function postseasonScheduleTitle(games: PostseasonScheduledGame[]): string {
+  const rounds = new Set(games.map((g) => g.round));
+  if (rounds.size === 1) {
+    switch (games[0]!.round) {
+      case "world-series":     return "World Series Schedule";
+      case "lcs":              return "League Championship Series Schedule";
+      case "division-series":  return "Division Series Schedule";
+      case "wild-card":        return "Wild Card Schedule";
+    }
+  }
+  return "Postseason Schedule";
+}
+
+// The remaining scheduled postseason games, soonest first. Fills the slot that
+// Today's Games leaves blank across the multi-day layoffs between postseason
+// games (nextDaySchedule is empty then). Game number + date/time on row 1,
+// matchup (+ TV when the feed carries it) on row 2 — same two-row rhythm as
+// Today's Games so it reads as native.
+function renderPostseasonSchedule(games: PostseasonScheduledGame[]): string {
+  if (games.length === 0) return "";
+  const rows = games.map((g) => {
+    const when = g.startTimeTBD
+      ? `${dateInET(g.date)}, Time TBD`
+      : `${dateInET(g.date)}, ${timeInET(g.startTime)}`;
+    const matchup = `${esc(tla(g.away.name))} @ ${esc(tla(g.home.name))}`;
+    const detail = g.gameNumber > 0 ? `Game ${g.gameNumber}` : "";
+    const tv = g.tv.length ? `${detail ? "&nbsp;&nbsp;" : ""}${esc(g.tv.join(" / "))}` : "";
+    return `<tr>
+      <td align="left" style="font-size:13px;font-weight:700;padding:3px 0 0;">${matchup}</td>
+      <td align="right" style="font-size:13px;color:#6a6354;padding:3px 0 0;white-space:nowrap;">${esc(when)}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="font-size:12px;color:#6a6354;padding:0 0 4px;border-bottom:1px dotted #e8e2d4;">${detail}${tv}</td>
+    </tr>`;
+  }).join("");
+  return `${sectionH(postseasonScheduleTitle(games))}
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;">
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 // ─── Transactions ───────────────────────────────────────────────────────
 
 function renderTransactions(txs: MlbTransaction[]): string {
@@ -995,7 +1050,9 @@ ${seasonFinaleOutroEmail(data.seasonSignoff)}
 ${masthead}
 ${renderPostseasonBracketEmail(data.postseason)}
 ${renderResults(data)}
-${renderTodaysGames(data.nextDayGames, teamRecords)}
+${data.upcomingPostseason && data.upcomingPostseason.length
+  ? renderPostseasonSchedule(data.upcomingPostseason)
+  : renderTodaysGames(data.nextDayGames, teamRecords)}
 ${data.games.length ? renderBoxScores(data) : ""}
 ${renderTransactions(data.transactions)}
 </div>`;

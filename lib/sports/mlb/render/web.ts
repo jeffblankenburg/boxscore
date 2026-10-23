@@ -10,7 +10,7 @@
 // /admin/preview/canonical/[date]?source=statsapi&surface=web is the
 // validation surface for that contract.
 
-import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher, SeasonSignoff } from "../canonical";
+import type { CanonicalDailyData, AsgSide, AsgHitter, AsgPitcher, SeasonSignoff, PostseasonScheduledGame } from "../canonical";
 import type {
   MlbBoxPlayer,
   MlbBoxScore,
@@ -376,7 +376,9 @@ ${renderPostseasonBracketWeb(data.postseason)}
 
 ${data.games.length ? renderSchedule(data.games, hl) : ""}
 
-${renderTodaysGames(data.nextDayGames, teamRecords, hl)}
+${data.upcomingPostseason && data.upcomingPostseason.length
+  ? renderPostseasonSchedule(data.upcomingPostseason)
+  : renderTodaysGames(data.nextDayGames, teamRecords, hl)}
 
 ${data.games.length ? `<div class="boxscores-title">Yesterday's Box Scores</div>
 ${renderGames(data, hl)}` : ""}
@@ -962,6 +964,60 @@ function renderTodaysGames(
   }).join("");
   return `<div class="games-section">
   <div class="games-section-title">Today's Games</div>
+  <div class="games-grid games-grid-upcoming">${lines}</div>
+</div>`;
+}
+
+// ─── Postseason Schedule ─────────────────────────────────────────────────
+
+// Weekday + month + day from a date-only ISO ("2026-10-24" → "Sat, Oct 24"),
+// built at UTC noon so no timezone shift moves it across a day. Game TIME uses
+// timeInET on the full datetime; this is the date only.
+function dateInET(dateOnly: string): string {
+  const [y, m, d] = dateOnly.split("-").map(Number);
+  if (!y || !m || !d) return dateOnly;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short", month: "short", day: "numeric", timeZone: "UTC",
+  }).format(dt);
+}
+
+function postseasonScheduleTitle(games: PostseasonScheduledGame[]): string {
+  const rounds = new Set(games.map((g) => g.round));
+  if (rounds.size === 1) {
+    switch (games[0]!.round) {
+      case "world-series":     return "World Series Schedule";
+      case "lcs":              return "League Championship Series Schedule";
+      case "division-series":  return "Division Series Schedule";
+      case "wild-card":        return "Wild Card Schedule";
+    }
+  }
+  return "Postseason Schedule";
+}
+
+// Remaining scheduled postseason games — the web twin of the email schedule.
+// Reuses the Today's Games markup/classes so it reads as native; fills the gap
+// the next-day preview leaves across postseason layoffs.
+function renderPostseasonSchedule(games: PostseasonScheduledGame[]): string {
+  if (games.length === 0) return "";
+  const lines = games.map((g) => {
+    const when = g.startTimeTBD
+      ? `${dateInET(g.date)}, Time TBD`
+      : `${dateInET(g.date)}, ${timeInET(g.startTime)}`;
+    const matchup = `${esc(tla(g.away.name))} @ ${esc(tla(g.home.name))}`;
+    const detail = g.gameNumber > 0 ? `Game ${g.gameNumber}` : "";
+    const tvSep = detail && g.tv.length ? "&nbsp;&nbsp;" : "";
+    const detailLine = `${detail}${tvSep}${g.tv.length ? esc(g.tv.join(" / ")) : ""}`;
+    return `<div>
+      <div class="game-score-line">
+        <span class="game-matchup">${matchup}</span>
+        <span class="game-time">${esc(when)}</span>
+      </div>
+      ${detailLine ? `<div class="game-pitchers probable">${detailLine}</div>` : ""}
+    </div>`;
+  }).join("");
+  return `<div class="games-section">
+  <div class="games-section-title">${postseasonScheduleTitle(games)}</div>
   <div class="games-grid games-grid-upcoming">${lines}</div>
 </div>`;
 }
