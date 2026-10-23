@@ -1034,7 +1034,7 @@ function renderPostseasonSchedule(games: PostseasonScheduledGame[]): string {
   }).join("");
   return `<div class="games-section">
   <div class="games-section-title">${postseasonScheduleTitle(games)}</div>
-  <div class="games-grid games-grid-upcoming">${lines}</div>
+  <div class="postseason-schedule">${lines}</div>
 </div>`;
 }
 

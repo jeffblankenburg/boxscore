@@ -93,7 +93,7 @@ function renderGameLog(data: BasketballPlayerPageData): string {
   return `
 <div class="bb-game-header">Recent Games — ${data.season} Regular Season</div>
 <table class="bb-player-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-  <thead><tr><th class="bb-pl-name">Date</th><th class="bb-pl-stat">Opp</th><th class="bb-pl-stat">Res</th>${statHead}</tr></thead>
+  <thead><tr><th class="bb-pl-name">Date</th><th class="bb-pl-stat bb-pl-opp">Opp</th><th class="bb-pl-stat">Res</th>${statHead}</tr></thead>
   <tbody>${body}</tbody>
 </table>`.trim();
 }

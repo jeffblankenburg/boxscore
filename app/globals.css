@@ -468,6 +468,20 @@ th { border-top: 1px solid var(--border-strong); font-weight: 700; }
    Results" above it). Pitcher names + W-L + ERA push the line too wide for
    three columns at the digest's body width. */
 .games-grid-upcoming { grid-template-columns: 1fr 1fr; }
+/* Postseason schedule: a short sequential list. Newspaper columns (CSS multicol
+   fills DOWN each column — Games 1-4 left, 5-7 right) so it reads in order and
+   uses the wide-width space, collapsing to one column on mobile. The shared
+   grid would instead fill ACROSS rows, zigzagging the game order. */
+.postseason-schedule { column-count: 2; column-gap: 32px; }
+.postseason-schedule > div {
+  break-inside: avoid; padding: 3px 0 5px;
+  border-bottom: 1px dotted var(--border-light);
+}
+.postseason-schedule .game-score-line {
+  display: flex; justify-content: space-between; gap: 8px;
+  align-items: baseline; border-bottom: none; padding: 0;
+}
+@media (max-width: 640px) { .postseason-schedule { column-count: 1; } }
 .games-grid-upcoming .game-score-line {
   display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
   border-bottom: none;

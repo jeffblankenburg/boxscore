@@ -10,6 +10,7 @@
 
 import type { FootballLeague } from "./types";
 import type { FootballPlayerRef } from "./types";
+import { sportHasPlayerPages } from "@/lib/sports";
 
 /** Build the canonical path for a player. */
 export function footballPlayerPath(
@@ -50,6 +51,9 @@ export function playerLinkWeb(
   ref: Pick<FootballPlayerRef, "id" | "slug">,
   text: string,
 ): string {
+  // Never emit a link to a player page that doesn't exist — render plain text
+  // for any league without a /[sport]/player route (see sportHasPlayerPages).
+  if (!sportHasPlayerPages(league)) return escapeText(text);
   return `<a class="player-link" href="${escapeAttr(footballPlayerPath(league, ref))}">${escapeText(text)}</a>`;
 }
 

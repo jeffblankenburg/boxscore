@@ -10,7 +10,17 @@
 import { slugifyName, teamSlugForEspn, type BasketballLeague } from "./basketball-links";
 import { seasonForDate as nbaSeasonForDate } from "./nba";
 import { seasonForDate as wnbaSeasonForDate } from "./wnba";
+import { seasonForDate as ncaamSeasonForDate } from "./ncaam";
+import { seasonForDate as ncaawSeasonForDate } from "./ncaaw";
 import { yesterdayInET } from "./dates";
+
+// ESPN's athlete API path uses the full sport slug, not our short league key.
+const ESPN_LEAGUE_SLUG: Record<BasketballLeague, string> = {
+  nba: "nba",
+  wnba: "wnba",
+  ncaam: "mens-college-basketball",
+  ncaaw: "womens-college-basketball",
+};
 
 // ── canonical model ─────────────────────────────────────────────────────────
 
@@ -73,9 +83,10 @@ async function getJson(url: string): Promise<unknown | null> {
 }
 
 async function fetchAthleteRaw(league: BasketballLeague, athleteId: string, season: number): Promise<AthleteRaw> {
+  const slug = ESPN_LEAGUE_SLUG[league];
   const [overview, gamelog] = await Promise.all([
-    getJson(`${ATHLETE_BASE}/${league}/athletes/${athleteId}`),
-    getJson(`${ATHLETE_BASE}/${league}/athletes/${athleteId}/gamelog?season=${season}`),
+    getJson(`${ATHLETE_BASE}/${slug}/athletes/${athleteId}`),
+    getJson(`${ATHLETE_BASE}/${slug}/athletes/${athleteId}/gamelog?season=${season}`),
   ]);
   return { league, athleteId, season, overview, gamelog };
 }
@@ -166,10 +177,24 @@ function pickSeasonType(gl: GamelogJson): NonNullable<GamelogJson["seasonTypes"]
   return types.reduce((best, t) => (countEvents(t) > countEvents(best) ? t : best), types[0]!);
 }
 
+// Curated per-game columns (ESPN stat `names`) so the log fits mobile without
+// horizontal scroll — the essential box line, not ESPN's full 14 columns
+// (which drop the FG%/3P%/FT/FT%/PF detail better suited to a season view).
+const GAMELOG_COLS = [
+  "minutes", "points", "totalRebounds", "assists",
+  "fieldGoalsMade-fieldGoalsAttempted",
+  "threePointFieldGoalsMade-threePointFieldGoalsAttempted",
+  "steals", "blocks",
+];
+
 function adaptGamelog(gl: GamelogJson): { columns: BasketballStatColumn[]; rows: BasketballGameLogRow[] } {
   const labels = gl.labels ?? [];
   const names = gl.names ?? [];
-  const columns = labels.map((label, i) => ({ name: names[i] ?? label, label }));
+  // Column indices to keep, in curated display order. Fall back to the full set
+  // if ESPN's names don't match (feed change), so the log never renders blank.
+  let idxs = GAMELOG_COLS.map((n) => names.indexOf(n)).filter((i) => i >= 0);
+  if (idxs.length === 0) idxs = names.map((_, i) => i);
+  const columns = idxs.map((i) => ({ name: names[i] ?? labels[i] ?? "", label: labels[i] ?? names[i] ?? "" }));
   const meta = gl.events ?? {};
 
   const seasonType = pickSeasonType(gl);
@@ -183,6 +208,7 @@ function adaptGamelog(gl: GamelogJson): { columns: BasketballStatColumn[]; rows:
       if (!id) continue;
       const m = meta[id] ?? {};
       const gr = str(m.gameResult);
+      const stats = ev.stats ?? [];
       rows.push({
         eventId: id,
         date: str(m.gameDate) ?? "",
@@ -190,7 +216,7 @@ function adaptGamelog(gl: GamelogJson): { columns: BasketballStatColumn[]; rows:
         atVs: m.atVs === "@" || m.homeAway === "away" ? "@" : "vs",
         result: gr === "W" || gr === "L" ? gr : null,
         score: str(m.score),
-        cells: (ev.stats ?? []).map((c) => c ?? ""),
+        cells: idxs.map((i) => stats[i] ?? ""),
       });
     }
   }
@@ -210,7 +236,12 @@ function adaptAthlete(league: BasketballLeague, raw: AthleteRaw): BasketballPlay
 // ── loader ────────────────────────────────────────────────────────────────────
 
 function seasonFor(league: BasketballLeague, date: string): number {
-  return league === "nba" ? nbaSeasonForDate(date) : wnbaSeasonForDate(date);
+  switch (league) {
+    case "nba":   return nbaSeasonForDate(date);
+    case "wnba":  return wnbaSeasonForDate(date);
+    case "ncaam": return ncaamSeasonForDate(date);
+    case "ncaaw": return ncaawSeasonForDate(date);
+  }
 }
 
 /**

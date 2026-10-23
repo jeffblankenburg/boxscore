@@ -38,6 +38,19 @@ export const SPORTS: readonly Sport[] = [
 
 const BY_ID = new Map<string, Sport>(SPORTS.map((s) => [s.id, s]));
 
+// Single source of truth for which sports have a player-profile page at
+// /[sport]/player/[id]. The player route gates on this, AND every player-name
+// link helper consults it — so a sport without a page renders names as plain
+// text instead of emitting a dead link. This is what keeps link-emission and
+// page-existence from drifting apart (the cause of the NHL/NCAAM/NCAAW 404s).
+// Only add a sport here once its page + data loader actually exist.
+const PLAYER_PAGE_SPORTS = new Set<string>([
+  "mlb", "nfl", "ncaaf", "nba", "wnba", "nhl", "ncaam", "ncaaw",
+]);
+export function sportHasPlayerPages(sport: string): boolean {
+  return PLAYER_PAGE_SPORTS.has(sport);
+}
+
 // In-process cache of DB visibility overrides. Short TTL so a per-render read
 // never hits the DB; on read failure we return the last good value (or {}),
 // so callers fall back to the static baseline — the outage-resilience contract.

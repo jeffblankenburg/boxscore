@@ -13,11 +13,18 @@ import {
   basketballPlayerPath,
   type BasketballLeague,
 } from "@/lib/basketball-links";
+import { loadHockeyPlayerData } from "@/lib/hockey-player";
+import { renderHockeyPlayerContent } from "@/lib/render-hockey-player";
+import {
+  decodeAthleteId as decodeHockeyAthleteId,
+  hockeyPlayerPath,
+} from "@/lib/hockey-links";
 import { EMAIL_LINK_BASE } from "@/lib/site";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const FOOTBALL_LEAGUES = new Set(["nfl", "ncaaf"]);
-const BASKETBALL_LEAGUES = new Set(["nba", "wnba"]);
+const BASKETBALL_LEAGUES = new Set(["nba", "wnba", "ncaam", "ncaaw"]);
+const HOCKEY_LEAGUES = new Set(["nhl"]);
 
 // Player profile at /{sport}/player/{id}. The `id` URL segment accepts
 // either:
@@ -81,6 +88,18 @@ export async function generateMetadata({
       id: data.bio.id,
       slug: data.bio.slug,
     })}`;
+    return {
+      title: `${data.bio.fullName} — ${data.season} Game Log and Stats | boxscore`,
+      description: `${data.bio.fullName} game log, season stats, and recent games.`,
+      alternates: { canonical },
+    };
+  }
+  if (HOCKEY_LEAGUES.has(sport)) {
+    const athleteId = decodeHockeyAthleteId(id);
+    if (!athleteId) return {};
+    const data = await loadHockeyPlayerData(athleteId);
+    if (!data) return {};
+    const canonical = `${EMAIL_LINK_BASE}${hockeyPlayerPath({ id: data.bio.id, slug: data.bio.slug })}`;
     return {
       title: `${data.bio.fullName} — ${data.season} Game Log and Stats | boxscore`,
       description: `${data.bio.fullName} game log, season stats, and recent games.`,
@@ -173,6 +192,34 @@ export default async function PlayerPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
         />
         <div dangerouslySetInnerHTML={{ __html: renderBasketballPlayerContent(data) }} />
+      </>
+    );
+  }
+
+  if (HOCKEY_LEAGUES.has(sport)) {
+    const athleteId = decodeHockeyAthleteId(id);
+    if (!athleteId) notFound();
+    const data = await loadHockeyPlayerData(athleteId);
+    if (!data) notFound();
+    const canonicalUrl = `${EMAIL_LINK_BASE}${hockeyPlayerPath({ id: data.bio.id, slug: data.bio.slug })}`;
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "@id": canonicalUrl,
+      name: data.bio.fullName,
+      url: canonicalUrl,
+      jobTitle: "Hockey Player",
+      ...(data.bio.teamName && {
+        affiliation: { "@type": "SportsTeam", name: data.bio.teamName },
+      }),
+    };
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        />
+        <div dangerouslySetInnerHTML={{ __html: renderHockeyPlayerContent(data) }} />
       </>
     );
   }

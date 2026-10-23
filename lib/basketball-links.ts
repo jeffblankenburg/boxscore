@@ -13,6 +13,7 @@
 
 import { EMAIL_LINK_BASE } from "./site";
 import { teamsBySport, type Sport } from "./teams";
+import { sportHasPlayerPages } from "./sports";
 
 export type BasketballLeague = "nba" | "wnba" | "ncaam" | "ncaaw";
 
@@ -75,6 +76,9 @@ export function playerLink(
   text: string,
   web: boolean,
 ): string {
+  // Never emit a link to a player page that doesn't exist — render plain text
+  // for any league without a /[sport]/player route (see sportHasPlayerPages).
+  if (!sportHasPlayerPages(league)) return escText(text);
   return linkAnchor(basketballPlayerPath(league, ref), text, web, "player-link", "es-player-link");
 }
 
