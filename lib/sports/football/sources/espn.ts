@@ -11,6 +11,7 @@
 // adapter can rebuild the canonical bundle offline with no network.
 
 import type { FootballLeagueConfig } from "../leagues";
+import { espnJson } from "@/lib/espn-fetch";
 
 const FOOTBALL_BASE = "https://site.api.espn.com/apis/site/v2/sports/football";
 const FOOTBALL_WEB_BASE = "https://site.web.api.espn.com/apis/v2/sports/football";
@@ -54,18 +55,9 @@ export type FootballRaw = {
 // ---- Network --------------------------------------------------------------
 
 async function getJson(url: string): Promise<unknown> {
-  // One retry with linear backoff, matching the basketball client: ESPN
-  // serves the occasional 5xx during cache rebuilds, and a single retry
-  // covers it without becoming a thundering herd when they're truly down.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (res.ok) return res.json();
-    if (attempt === 2 || res.status < 500) {
-      throw new Error(`ESPN ${res.status} for ${url}`);
-    }
-    await new Promise((r) => setTimeout(r, 750));
-  }
-  throw new Error("unreachable");
+  // Shared ESPN fetch (retries transient 403/429/5xx + browser UA) — see
+  // lib/espn-fetch. A scoreboard/summary 404 is a real error.
+  return espnJson(url);
 }
 
 // Run `fn` over `items` with bounded concurrency. A full FBS Saturday is

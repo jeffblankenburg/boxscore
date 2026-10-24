@@ -6,6 +6,7 @@
 
 import type { FootballLeagueConfig } from "../leagues";
 import { summaryUrl } from "./espn";
+import { espnJson } from "@/lib/espn-fetch";
 
 const FOOTBALL_BASE = "https://site.api.espn.com/apis/site/v2/sports/football";
 
@@ -53,14 +54,9 @@ function scoreNum(score: unknown): number | null {
 }
 
 async function getJson(url: string): Promise<unknown | null> {
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (res.ok) return res.json();
-    if (res.status === 404) return null;
-    if (attempt === 2 || res.status < 500) throw new Error(`ESPN ${res.status} for ${url}`);
-    await new Promise((r) => setTimeout(r, 750));
-  }
-  throw new Error("unreachable");
+  // Shared ESPN fetch (retries transient 403/429/5xx + browser UA) — see
+  // lib/espn-fetch. 404 = unknown team → null, not an error.
+  return espnJson(url, { nullOn404: true });
 }
 
 // One game's box summary, for roster aggregation. Concurrency is the caller's

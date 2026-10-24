@@ -14,6 +14,7 @@
 
 import { dedupeTransactions } from "./dedupe-transactions";
 import { enumerateDatesInclusive } from "./dates";
+import { espnJson } from "./espn-fetch";
 
 const SCOREBOARD_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball";
 const STANDINGS_BASE = "https://site.web.api.espn.com/apis/v2/sports/basketball";
@@ -182,18 +183,9 @@ export type BasketballStandings = {
 // ---- Network ---------------------------------------------------------------
 
 async function getJson(url: string): Promise<unknown> {
-  // One retry with linear backoff. ESPN occasionally serves 5xx during their
-  // own cache rebuilds; a single quick retry covers the common case without
-  // turning into a thundering-herd source if they're actually down.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (res.ok) return res.json();
-    if (attempt === 2 || res.status < 500) {
-      throw new Error(`ESPN ${res.status} for ${url}`);
-    }
-    await new Promise((r) => setTimeout(r, 750));
-  }
-  throw new Error("unreachable");
+  // Shared ESPN fetch: retries transient 403/429/5xx with backoff + a browser
+  // User-Agent (see lib/espn-fetch). A scoreboard/summary 404 is a real error.
+  return espnJson(url);
 }
 
 // ---- Scoreboard -----------------------------------------------------------

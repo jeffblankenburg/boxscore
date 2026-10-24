@@ -10,6 +10,7 @@
 // the two raw JSON blobs; there's no slimming for storage.
 
 import type { FootballLeagueConfig } from "../leagues";
+import { espnJson } from "@/lib/espn-fetch";
 
 const ATHLETE_BASE = "https://site.web.api.espn.com/apis/common/v3/sports/football";
 
@@ -24,19 +25,9 @@ export type FootballAthleteRaw = {
 };
 
 async function getJson(url: string): Promise<unknown | null> {
-  // Mirror the daily client's one-retry-on-5xx policy, but treat a 404 as a
-  // soft miss (null) rather than throwing — an unknown athlete id is a
-  // notFound() on the page, not an error.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (res.ok) return res.json();
-    if (res.status === 404) return null;
-    if (attempt === 2 || res.status < 500) {
-      throw new Error(`ESPN ${res.status} for ${url}`);
-    }
-    await new Promise((r) => setTimeout(r, 750));
-  }
-  throw new Error("unreachable");
+  // Shared ESPN fetch (retries transient 403/429/5xx + browser UA) — see
+  // lib/espn-fetch. 404 = unknown athlete id → null, not an error.
+  return espnJson(url, { nullOn404: true });
 }
 
 export function athleteOverviewUrl(cfg: FootballLeagueConfig, athleteId: string): string {

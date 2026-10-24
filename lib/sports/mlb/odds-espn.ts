@@ -14,6 +14,8 @@
 // `yrfi_odds` columns in `daily_odds` exist for the day we plug in a
 // real NRFI source — see reference_nrfi_central.md.
 
+import { espnJson } from "@/lib/espn-fetch";
+
 const ESPN_SCOREBOARD =
   "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard";
 const ESPN_EVENT_ODDS = (eventId: string) =>
@@ -128,11 +130,9 @@ function isoToEspnDate(iso: string): string {
 }
 
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(url, { signal, cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`${url} → HTTP ${res.status}`);
-  }
-  return (await res.json()) as T;
+  // Shared ESPN fetch (retries transient 403/429/5xx + browser UA) — see
+  // lib/espn-fetch. A 404 here is a real miss, so let it throw.
+  return (await espnJson(url, { signal })) as T;
 }
 
 /** Pulls every MLB game's DraftKings ML odds for a single date from

@@ -11,6 +11,7 @@
 import { slugifyName, teamSlugForEspn } from "./hockey-links";
 import { seasonForDate } from "./nhl";
 import { yesterdayInET } from "./dates";
+import { espnJson } from "./espn-fetch";
 
 // ── canonical model ─────────────────────────────────────────────────────────
 
@@ -61,14 +62,9 @@ const ATHLETE_BASE = "https://site.web.api.espn.com/apis/common/v3/sports/hockey
 type AthleteRaw = { athleteId: string; season: number; overview: unknown; gamelog: unknown };
 
 async function getJson(url: string): Promise<unknown | null> {
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (res.ok) return res.json();
-    if (res.status === 404) return null;         // unknown id → notFound, not error
-    if (attempt === 2 || res.status < 500) throw new Error(`ESPN ${res.status} for ${url}`);
-    await new Promise((r) => setTimeout(r, 750));
-  }
-  throw new Error("unreachable");
+  // Shared ESPN fetch (retries transient 403/429/5xx + browser UA) — see
+  // lib/espn-fetch. 404 = unknown athlete id → null, not an error.
+  return espnJson(url, { nullOn404: true });
 }
 
 async function fetchAthleteRaw(athleteId: string, season: number): Promise<AthleteRaw> {
