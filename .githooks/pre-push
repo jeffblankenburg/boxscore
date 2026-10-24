@@ -33,7 +33,11 @@ fi
 
 # Non-zero exit: distinguish a genuine vulnerability report from a tooling
 # failure (offline, registry error). Only the former should block the push.
-if printf '%s\n' "$out" | grep -qiE '[0-9]+ vulnerabilit'; then
+# A real finding mentions "vulnerabilit" or "severity" (covers both
+# "21 vulnerabilities (…)" and "7 high severity vulnerabilities"). A tooling
+# failure (offline, registry error) says "npm error …" with neither — that's
+# the only case we fail open on.
+if printf '%s\n' "$out" | grep -qiE 'vulnerabilit|severity'; then
   printf '%s\n' "$out" | tail -n 20
   echo
   echo "pre-push: BLOCKED — high/critical vulnerability in production deps."

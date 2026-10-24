@@ -12,7 +12,7 @@
     "backfill-shares": "tsx --env-file=.env.local scripts/backfill-scoreboard-images.ts",
     "screenshot": "tsx scripts/screenshot-sections.ts",
     "typecheck": "tsc --noEmit",
-    "audit": "npm audit --audit-level=high --omit=dev",
+    "audit": "node scripts/audit-check.mjs",
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
