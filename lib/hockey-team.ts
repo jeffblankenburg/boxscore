@@ -17,6 +17,10 @@ import {
   parseRoster,
   athleteStatsById,
   teamAthletes,
+  extractAthletes,
+  reconcileHockeyAthletes,
+  teamGamesPlayedByAbbr,
+  type AthleteRecord,
   type HockeyScoreboardEvent,
   type HockeyConferenceStandings,
   type HockeyStandingsEntry,
@@ -51,8 +55,8 @@ export type HockeyTeamData = {
   transactions: HockeyTransaction[];
 };
 
-function extractTeamAthletes(rawAthleteStats: unknown, abbr: string): HockeyTeamPlayer[] {
-  return teamAthletes(rawAthleteStats, abbr).map((a) => ({
+function extractTeamAthletes(athletes: AthleteRecord[], abbr: string): HockeyTeamPlayer[] {
+  return teamAthletes(athletes, abbr).map((a) => ({
     id: a.id,
     name: a.name,
     position: a.position || undefined,
@@ -108,7 +112,15 @@ export async function loadHockeyTeamData(
       }
     : null;
 
-  const statsById = athleteStatsById(raw.athleteStats);
+  // Fold the day's game lines into the lagged byathlete season aggregate so the
+  // roster's season totals include the game whose box score renders above them
+  // (see reconcileHockeyAthletes).
+  const athletes = reconcileHockeyAthletes(
+    extractAthletes(raw.athleteStats ?? {}),
+    data.games,
+    teamGamesPlayedByAbbr(data.standings),
+  );
+  const statsById = athleteStatsById(athletes);
   let roster: HockeyTeamPlayer[];
   try {
     if (!espn.id) throw new Error("no ESPN team id");
@@ -116,7 +128,7 @@ export async function loadHockeyTeamData(
     roster = parseRoster(rosterRaw).map((r) => ({ ...r, stats: statsById.get(r.id) ?? {} }));
   } catch (err) {
     console.error(`[hockey-team] roster fetch failed for ${slug}: ${(err as Error).message}`);
-    roster = extractTeamAthletes(raw.athleteStats, espn.abbr);
+    roster = extractTeamAthletes(athletes, espn.abbr);
   }
   // Skaters ranked by points; goalies (no points) sink but the renderer splits
   // them into their own table anyway.

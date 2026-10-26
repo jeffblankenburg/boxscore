@@ -19,6 +19,10 @@ import {
   parseRoster,
   athleteStatsById,
   teamAthletes,
+  extractAthletes,
+  reconcileAthletes,
+  teamGamesPlayedByAbbr,
+  type AthleteRecord,
   type BasketballScoreboardEvent,
   type BasketballConferenceStandings,
   type BasketballStandingsEntry,
@@ -81,8 +85,8 @@ function seasonFor(sport: BasketballLeagueSlug, date: string): number {
 
 // Roster fallback when ESPN's roster endpoint is down: the byathlete feed
 // filtered to the team (stats-only players, no jersey/position/injury).
-function extractTeamAthletes(rawAthleteStats: unknown, abbr: string): BasketballTeamPlayer[] {
-  return teamAthletes(rawAthleteStats, abbr).map((a) => ({
+function extractTeamAthletes(athletes: AthleteRecord[], abbr: string): BasketballTeamPlayer[] {
+  return teamAthletes(athletes, abbr).map((a) => ({
     id: a.id,
     name: a.name,
     injured: false,
@@ -177,7 +181,15 @@ export async function loadBasketballTeamData(
   // Best-effort — an ESPN hiccup shouldn't sink the whole digest, so on failure
   // (or an unresolved team id) we fall back to a stats-only roster built from
   // the athlete feed. Players with no stats yet sink to the bottom.
-  const statsById = athleteStatsById(raw.athleteStats);
+  // Fold the day's game lines into the lagged byathlete season aggregate so the
+  // roster's season averages include the game whose box score renders above them
+  // (see reconcileAthletes). Uses the same data the league digest reconciles on.
+  const athletes = reconcileAthletes(
+    extractAthletes(raw.athleteStats ?? {}),
+    data.games.map((g) => g.box).filter((b): b is NonNullable<typeof b> => !!b),
+    teamGamesPlayedByAbbr(data.standings),
+  );
+  const statsById = athleteStatsById(athletes);
   let roster: BasketballTeamPlayer[];
   try {
     if (!espn.id) throw new Error("no ESPN team id");
@@ -190,7 +202,7 @@ export async function loadBasketballTeamData(
     console.error(`[basketball-team] roster fetch failed for ${sport}/${slug}: ${(err as Error).message}`);
     // Fallback: the athlete feed filtered by team abbreviation — players with
     // stats only, no jersey/position/injury, but the digest still renders.
-    roster = extractTeamAthletes(raw.athleteStats, espn.abbr);
+    roster = extractTeamAthletes(athletes, espn.abbr);
   }
   roster.sort((a, b) => (b.stats.avgPoints ?? -1) - (a.stats.avgPoints ?? -1));
 

@@ -24,6 +24,9 @@ import {
   parseLeaders,
   parseTransactions,
   parseRankings,
+  extractAthletes,
+  reconcileAthletes,
+  teamGamesPlayedByAbbr,
   isCollegeBasketball,
   type BasketballLeagueSlug,
   type BasketballScoreboardEvent,
@@ -281,7 +284,16 @@ function rawToBasketballData(
   // this edition recaps.
   const isPreseason =
     games.length > 0 && games.every((g) => g.event.seasonType === 1);
-  const leaders = parseLeaders(raw.athleteStats ?? {});
+  const standings = parseStandings(raw.standings);
+  // Fold the day's game lines into the (lagged) byathlete season aggregate
+  // before building leaders, so the leaderboard reflects games it recaps.
+  const boxscores = games.map((g) => g.box).filter((b): b is NonNullable<typeof b> => !!b);
+  const athletes = reconcileAthletes(
+    extractAthletes(raw.athleteStats ?? {}),
+    boxscores,
+    teamGamesPlayedByAbbr(standings),
+  );
+  const leaders = parseLeaders(athletes);
   const transactions = raw.transactions ? parseTransactions(raw.transactions) : [];
   const rankings = raw.rankings ? parseRankings(raw.rankings) : [];
   return {
@@ -289,7 +301,7 @@ function rawToBasketballData(
     date,
     prettyDate: prettyDate(date),
     games,
-    standings: parseStandings(raw.standings),
+    standings,
     season: raw.season,
     isPlayoffs,
     isPreseason,

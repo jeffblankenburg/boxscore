@@ -18,6 +18,9 @@ import {
   parseStandings,
   parseLeaders,
   parseTransactions,
+  extractAthletes,
+  reconcileHockeyAthletes,
+  teamGamesPlayedByAbbr,
   type HockeyScoreboardEvent,
   type HockeyBoxscore,
   type HockeyStandings,
@@ -163,15 +166,23 @@ function rawToHockeyData(raw: HockeyRaw, date: string): HockeyData {
   const upcomingEvents = raw.upcomingScoreboard ? parseScoreboard(raw.upcomingScoreboard) : [];
   const isPlayoffs =
     games.some((g) => g.event.seasonType === 3) || upcomingEvents.some((e) => e.seasonType === 3);
+  const standings = parseStandings(raw.standings);
+  // Fold the day's game lines into the lagged byathlete season aggregate before
+  // building leaders (see reconcileHockeyAthletes).
+  const athletes = reconcileHockeyAthletes(
+    extractAthletes(raw.athleteStats ?? {}),
+    games,
+    teamGamesPlayedByAbbr(standings),
+  );
   return {
     date,
     prettyDate: prettyDate(date),
     games,
-    standings: parseStandings(raw.standings),
+    standings,
     season: raw.season,
     isPlayoffs,
     upcomingEvents,
-    leaders: parseLeaders(raw.athleteStats ?? {}),
+    leaders: parseLeaders(athletes),
     transactions: raw.transactions ? parseTransactions(raw.transactions) : [],
   };
 }

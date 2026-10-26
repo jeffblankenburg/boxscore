@@ -723,10 +723,132 @@ export function parseRoster(raw: unknown): BasketballRosterEntry[] {
   });
 }
 
+// ── byathlete lag reconciliation ───────────────────────────────────────────
+// ESPN's byathlete season aggregate is batch-updated on a lag: at our ~5 AM ET
+// generate time it often hasn't folded in the previous night's games yet, so a
+// game-day digest renders the box score of a game whose counting stats are
+// missing from the season averages right below it (reader report 2026-10-26:
+// Timberwolves "Team Statistics" showed 2 GP while the 3rd game's box was shown
+// above). The byathlete feed carries season TOTALS alongside the per-game
+// averages, and the box score carries the game line — so we fold the game line
+// into the totals and recompute the averages ourselves, exactly as MLB does in
+// lib/daily.ts reconcileLeaders for the identical lag on statsapi's leaders.
+//
+// Idempotency without dates: the lag isn't uniform across the league (verified
+// in the stored 2026-10-25 snapshot — some teams' games were aggregated by 5 AM,
+// MIN's were not), so we decide per team. Standings update faster than byathlete
+// (that same snapshot had MIN at 3 games in standings, 2 in byathlete), so we
+// only fold a team's game when its standings games-played exceeds the max GP its
+// players show in byathlete. A settled snapshot (historical backfill: both feeds
+// current) shows parity → no fold. This reads only from the daily_raw row, so it
+// also retroactively corrects already-stored editions with no regeneration.
+
+// "8-14" → [8, 14]; "", "--", or malformed → [0, 0].
+function madeAttempted(s: string | undefined): [number, number] {
+  const m = /^(\d+)-(\d+)$/.exec((s ?? "").trim());
+  return m ? [Number(m[1]), Number(m[2])] : [0, 0];
+}
+
+// "30", "11", "+9", "" → integer (leading sign / empties tolerated, non-numeric → 0).
+function intStat(s: string | undefined): number {
+  const n = parseInt((s ?? "").trim(), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Box-score stat label → the byathlete season-total key it accumulates into.
+const FOLD_COUNTING: ReadonlyArray<readonly [label: string, total: string]> = [
+  ["PTS", "points"], ["REB", "rebounds"], ["AST", "assists"], ["TO", "turnovers"],
+  ["STL", "steals"], ["BLK", "blocks"], ["PF", "fouls"], ["MIN", "minutes"],
+];
+// Total key → its per-game average key, recomputed as total / gamesPlayed.
+const FOLD_AVERAGES: ReadonlyArray<readonly [total: string, avg: string]> = [
+  ["points", "avgPoints"], ["rebounds", "avgRebounds"], ["assists", "avgAssists"],
+  ["turnovers", "avgTurnovers"], ["steals", "avgSteals"], ["blocks", "avgBlocks"],
+  ["fouls", "avgFouls"], ["minutes", "avgMinutes"],
+  ["fieldGoalsMade", "avgFieldGoalsMade"], ["fieldGoalsAttempted", "avgFieldGoalsAttempted"],
+  ["threePointFieldGoalsMade", "avgThreePointFieldGoalsMade"],
+  ["threePointFieldGoalsAttempted", "avgThreePointFieldGoalsAttempted"],
+  ["freeThrowsMade", "avgFreeThrowsMade"], ["freeThrowsAttempted", "avgFreeThrowsAttempted"],
+];
+// Percentage key → [madeTotal, attemptedTotal], recomputed on the 0–100 scale ESPN uses.
+const FOLD_PERCENTS: ReadonlyArray<readonly [pct: string, made: string, att: string]> = [
+  ["fieldGoalPct", "fieldGoalsMade", "fieldGoalsAttempted"],
+  ["threePointFieldGoalPct", "threePointFieldGoalsMade", "threePointFieldGoalsAttempted"],
+  ["freeThrowPct", "freeThrowsMade", "freeThrowsAttempted"],
+];
+
+// Fold one game line into a player's season stats in place (mutates the fresh
+// record extractAthletes just built — not shared with any cache).
+function foldGameLine(season: Record<string, number>, line: Record<string, string>): void {
+  const gp = (season.gamesPlayed ?? 0) + 1;
+  season.gamesPlayed = gp;
+  for (const [label, total] of FOLD_COUNTING) season[total] = (season[total] ?? 0) + intStat(line[label]);
+  const splits: ReadonlyArray<readonly [string, string, string]> = [
+    ["FG", "fieldGoalsMade", "fieldGoalsAttempted"],
+    ["3PT", "threePointFieldGoalsMade", "threePointFieldGoalsAttempted"],
+    ["FT", "freeThrowsMade", "freeThrowsAttempted"],
+  ];
+  for (const [label, made, att] of splits) {
+    const [m, a] = madeAttempted(line[label]);
+    season[made] = (season[made] ?? 0) + m;
+    season[att] = (season[att] ?? 0) + a;
+  }
+  for (const [total, avg] of FOLD_AVERAGES) season[avg] = (season[total] ?? 0) / gp;
+  for (const [pct, made, att] of FOLD_PERCENTS) {
+    const a = season[att] ?? 0;
+    season[pct] = a > 0 ? ((season[made] ?? 0) / a) * 100 : 0;
+  }
+}
+
+// Patch each athlete's season line with the games in `boxscores` that byathlete
+// hasn't folded in yet, decided per team against `teamGamesPlayed` (standings
+// games-played, keyed by ESPN abbreviation). Returns the same array, mutated.
+export function reconcileAthletes(
+  athletes: AthleteRecord[],
+  boxscores: BasketballBoxscore[],
+  teamGamesPlayed: Map<string, number>,
+): AthleteRecord[] {
+  const byId = new Map(athletes.map((a) => [a.id, a]));
+  const byathleteMaxGp = new Map<string, number>();
+  for (const a of athletes) {
+    const gp = a.stats.gamesPlayed ?? 0;
+    byathleteMaxGp.set(a.teamAbbr, Math.max(byathleteMaxGp.get(a.teamAbbr) ?? 0, gp));
+  }
+  for (const box of boxscores) {
+    for (const t of box.teams) {
+      const abbr = t.team.abbreviation;
+      const teamGp = teamGamesPlayed.get(abbr);
+      // Fold only when standings are ahead of byathlete for this team — i.e.
+      // byathlete is still missing this game. Parity (or missing standings)
+      // means it's already counted; leave it.
+      if (teamGp === undefined || (byathleteMaxGp.get(abbr) ?? 0) >= teamGp) continue;
+      for (const p of t.players) {
+        if (p.didNotPlay) continue;
+        const a = byId.get(p.athleteId);
+        if (a) foldGameLine(a.stats, p.stats); // a debutant absent from byathlete appears next day
+      }
+    }
+  }
+  return athletes;
+}
+
+// Games-played per team (ESPN abbreviation → wins + losses) from parsed
+// standings — the reference count reconcileAthletes compares byathlete against.
+export function teamGamesPlayedByAbbr(standings: BasketballStandings): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const c of standings.conferences) {
+    for (const e of c.entries) {
+      const gp = (e.stats.wins?.value ?? 0) + (e.stats.losses?.value ?? 0);
+      if (e.team.abbreviation) m.set(e.team.abbreviation, gp);
+    }
+  }
+  return m;
+}
+
 // Season averages keyed by athlete id, for joining onto a roster.
-export function athleteStatsById(raw: unknown): Map<string, Record<string, number>> {
+export function athleteStatsById(athletes: AthleteRecord[]): Map<string, Record<string, number>> {
   const m = new Map<string, Record<string, number>>();
-  for (const a of extractAthletes(raw)) m.set(a.id, a.stats);
+  for (const a of athletes) m.set(a.id, a.stats);
   return m;
 }
 
@@ -734,16 +856,15 @@ export function athleteStatsById(raw: unknown): Map<string, Record<string, numbe
 // stats only). Used when ESPN's roster endpoint is unavailable. teamAbbr is
 // ESPN's teamShortName ("LAL").
 export function teamAthletes(
-  raw: unknown,
+  athletes: AthleteRecord[],
   teamAbbr: string,
 ): Array<{ id: string; name: string; stats: Record<string, number> }> {
-  return extractAthletes(raw)
+  return athletes
     .filter((a) => a.teamAbbr === teamAbbr)
     .map((a) => ({ id: a.id, name: a.name, stats: a.stats }));
 }
 
-export function parseLeaders(raw: unknown): BasketballLeaders {
-  const athletes = extractAthletes(raw);
+export function parseLeaders(athletes: AthleteRecord[]): BasketballLeaders {
 
   // Percentage leaders need a minimum-makes qualifier — without one a player who
   // went 2-for-2 tops the FG% board. The NBA's official season minimums are 300

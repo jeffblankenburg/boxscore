@@ -471,9 +471,123 @@ export function extractAthletes(raw: unknown): AthleteRecord[] {
   return out;
 }
 
-export function athleteStatsById(raw: unknown): Map<string, Record<string, number>> {
+// ── byathlete lag reconciliation (hockey twin of basketball) ────────────────
+// Same ESPN byathlete lag and the same per-team detector as lib/basketball.ts
+// reconcileAthletes (standings games-played vs the team's max byathlete games) —
+// see that file for the full rationale and idempotency argument. Hockey differs
+// in two ways: the stat split (skaters vs goalies), and goalie decisions — the
+// box line carries no W/L field, so wins/losses/OT-losses come from the game
+// result, credited to each team's goalie of record (most time on ice). SV% and
+// GAA are recomputed from the folded saves/shots/goals-against/TOI totals.
+
+// "59:55" → 3595 seconds; "" / malformed → 0.
+function toiSeconds(s: string | undefined): number {
+  const m = /^(\d+):(\d+)$/.exec((s ?? "").trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+}
+// ".905", "21", "" → number (empties / non-numeric → 0).
+function numStat(s: string | undefined): number {
+  const n = parseFloat((s ?? "").trim());
+  return Number.isFinite(n) ? n : 0;
+}
+
+function foldSkaterLine(season: Record<string, number>, line: Record<string, string>): void {
+  season.games = (season.games ?? 0) + 1;
+  season.goals = (season.goals ?? 0) + numStat(line.goals);
+  season.assists = (season.assists ?? 0) + numStat(line.assists);
+  season.points = (season.goals ?? 0) + (season.assists ?? 0); // hockey points = G + A
+  season.plusMinus = (season.plusMinus ?? 0) + numStat(line.plusMinus);
+  season.shotsTotal = (season.shotsTotal ?? 0) + numStat(line.shotsTotal);
+  season.penaltyMinutes = (season.penaltyMinutes ?? 0) + numStat(line.penaltyMinutes);
+}
+
+function foldGoalieLine(
+  season: Record<string, number>,
+  line: Record<string, string>,
+  decision: "W" | "L" | "OTL" | null, // null → appeared but not the goalie of record
+): void {
+  season.games = (season.games ?? 0) + 1;
+  season.saves = (season.saves ?? 0) + numStat(line.saves);
+  season.shotsAgainst = (season.shotsAgainst ?? 0) + numStat(line.shotsAgainst);
+  season.goalsAgainst = (season.goalsAgainst ?? 0) + numStat(line.goalsAgainst);
+  season.timeOnIce = (season.timeOnIce ?? 0) + toiSeconds(line.timeOnIce);
+  if (decision === "W") {
+    season.wins = (season.wins ?? 0) + 1;
+    if (numStat(line.goalsAgainst) === 0) season.shutouts = (season.shutouts ?? 0) + 1;
+  } else if (decision === "L") {
+    season.losses = (season.losses ?? 0) + 1;
+  } else if (decision === "OTL") {
+    season.overtimeLosses = (season.overtimeLosses ?? 0) + 1;
+  }
+  const sa = season.shotsAgainst ?? 0;
+  season.savePct = sa > 0 ? (season.saves ?? 0) / sa : 0; // 0–1, as ESPN returns
+  const toi = season.timeOnIce ?? 0;
+  season.avgGoalsAgainst = toi > 0 ? ((season.goalsAgainst ?? 0) * 3600) / toi : 0; // GAA per 60 min
+}
+
+export function reconcileHockeyAthletes(
+  athletes: AthleteRecord[],
+  games: Array<{ event: HockeyScoreboardEvent; box?: HockeyBoxscore }>,
+  teamGamesPlayed: Map<string, number>,
+): AthleteRecord[] {
+  const byId = new Map(athletes.map((a) => [a.id, a]));
+  const maxGames = new Map<string, number>();
+  for (const a of athletes) {
+    maxGames.set(a.teamAbbr, Math.max(maxGames.get(a.teamAbbr) ?? 0, a.stats.games ?? 0));
+  }
+  for (const { event, box } of games) {
+    if (!box) continue;
+    const otOrSo = /\/(OT|SO)/i.test(event.statusDetail); // "Final/OT", "Final/SO"
+    const winnerId = event.away.winner
+      ? event.away.team.id
+      : event.home.winner
+        ? event.home.team.id
+        : null;
+    for (const t of box.teams) {
+      const abbr = t.team.abbreviation;
+      const teamGp = teamGamesPlayed.get(abbr);
+      // Only fold when standings lead byathlete for this team (game still missing).
+      if (teamGp === undefined || (maxGames.get(abbr) ?? 0) >= teamGp) continue;
+      for (const p of t.skaters) {
+        const a = byId.get(p.athleteId);
+        if (a) foldSkaterLine(a.stats, p.stats);
+      }
+      // Every goalie who appeared gets the game + save totals; the decision
+      // (W/L/OTL) goes only to the goalie of record — the one with the most TOI.
+      const recordGoalie = [...t.goalies].sort(
+        (x, y) => toiSeconds(y.stats.timeOnIce) - toiSeconds(x.stats.timeOnIce),
+      )[0];
+      const teamWon = winnerId !== null && t.team.id === winnerId;
+      for (const p of t.goalies) {
+        const a = byId.get(p.athleteId);
+        if (!a) continue;
+        const decision =
+          p === recordGoalie && winnerId !== null ? (teamWon ? "W" : otOrSo ? "OTL" : "L") : null;
+        foldGoalieLine(a.stats, p.stats, decision);
+      }
+    }
+  }
+  return athletes;
+}
+
+// Games played per team (ESPN abbreviation → gamesPlayed) from parsed standings,
+// the reference count reconcileHockeyAthletes compares byathlete against.
+export function teamGamesPlayedByAbbr(standings: HockeyStandings): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const c of standings.conferences) {
+    for (const e of c.entries) {
+      const gp =
+        e.stats.gamesPlayed?.value ??
+        (e.stats.wins?.value ?? 0) + (e.stats.losses?.value ?? 0) + (e.stats.otLosses?.value ?? 0);
+      if (e.team.abbreviation) m.set(e.team.abbreviation, gp);
+    }
+  }
+  return m;
+}
+
+export function athleteStatsById(athletes: AthleteRecord[]): Map<string, Record<string, number>> {
   const m = new Map<string, Record<string, number>>();
-  for (const a of extractAthletes(raw)) m.set(a.id, a.stats);
+  for (const a of athletes) m.set(a.id, a.stats);
   return m;
 }
 
@@ -511,16 +625,15 @@ export function parseRoster(raw: unknown): HockeyRosterEntry[] {
 }
 
 export function teamAthletes(
-  raw: unknown,
+  athletes: AthleteRecord[],
   teamAbbr: string,
 ): Array<{ id: string; name: string; position: string; stats: Record<string, number> }> {
-  return extractAthletes(raw)
+  return athletes
     .filter((a) => a.teamAbbr === teamAbbr)
     .map((a) => ({ id: a.id, name: a.name, position: a.position, stats: a.stats }));
 }
 
-export function parseLeaders(raw: unknown): HockeyLeaders {
-  const athletes = extractAthletes(raw);
+export function parseLeaders(athletes: AthleteRecord[]): HockeyLeaders {
   const skaters = athletes.filter((a) => a.position !== "G");
   const goalies = athletes.filter((a) => a.position === "G");
 
