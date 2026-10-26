@@ -547,18 +547,28 @@ function renderTotalsRow(team: BasketballBoxTeam): string {
 
 // ---- Standings ------------------------------------------------------------
 
+// Standings order: by playoff seed once ESPN assigns them (late season /
+// postseason), otherwise by win% with explicit tiebreakers — more wins, then
+// fewer losses — so two 1.000 teams never show the 2-0 above the 3-0. Teams
+// with an identical record keep ESPN's order (stable sort), preserving its
+// official head-to-head tiebreak. Shared by the league digest and the team
+// page so both order standings the same way.
+export function compareBasketballStanding(a: BasketballStandingsEntry, b: BasketballStandingsEntry): number {
+  const seedA = a.stats.playoffSeed?.value;
+  const seedB = b.stats.playoffSeed?.value;
+  // Only trust the seed when it actually distinguishes the two — ESPN has been
+  // seen handing the same seed to multiple teams early season, so an equal seed
+  // falls through to the record tiebreakers below.
+  if (seedA && seedB && seedA !== seedB) return seedA - seedB;
+  const pct = (b.stats.winPercent?.value ?? 0) - (a.stats.winPercent?.value ?? 0);
+  if (pct !== 0) return pct;
+  const wins = (b.stats.wins?.value ?? 0) - (a.stats.wins?.value ?? 0);
+  if (wins !== 0) return wins;
+  return (a.stats.losses?.value ?? 0) - (b.stats.losses?.value ?? 0);
+}
+
 function renderConference(conf: BasketballConferenceStandings, web: boolean, league: BasketballLeague): string {
-  // Sort by playoffSeed when present (postseason / late-season), falling
-  // back to win percentage. ESPN sometimes returns seed=0 for non-playoff
-  // teams; treat as "no seed" and sort by winPercent.
-  const sorted = [...conf.entries].sort((a, b) => {
-    const seedA = a.stats.playoffSeed?.value;
-    const seedB = b.stats.playoffSeed?.value;
-    if (seedA && seedB) return seedA - seedB;
-    const pctA = a.stats.winPercent?.value ?? 0;
-    const pctB = b.stats.winPercent?.value ?? 0;
-    return pctB - pctA;
-  });
+  const sorted = [...conf.entries].sort(compareBasketballStanding);
 
   // No inner caption — the section's h2 ("Eastern Conference Standings")
   // already labels the table; a repeated <h3> here was a double header.

@@ -7,6 +7,7 @@ import type { HockeyTeamData, HockeyTeamPlayer } from "./hockey-team";
 import type { HockeyScoreboardEvent, HockeyStandingsEntry, HockeyTransaction } from "./hockey";
 import {
   renderGameBlock, initialLast, escapeHtml, teamNameLink, playerNameLink, txDateLabel,
+  compareHockeyStanding,
 } from "./render-hockey";
 import { nextDay, prettyDate, timeInET, etDateFromISO } from "./dates";
 
@@ -88,12 +89,7 @@ function renderHeading(data: HockeyTeamData): string {
 
 function renderStandings(data: HockeyTeamData, web: boolean): string {
   if (!data.conference || data.conference.entries.length === 0) return "";
-  const sorted = [...data.conference.entries].sort((a, b) => {
-    const seedA = a.stats.playoffSeed?.value;
-    const seedB = b.stats.playoffSeed?.value;
-    if (seedA && seedB) return seedA - seedB;
-    return (b.stats.points?.value ?? 0) - (a.stats.points?.value ?? 0);
-  });
+  const sorted = [...data.conference.entries].sort(compareHockeyStanding);
   const rows = sorted.map((e, i) => renderStandingsRow(e, i + 1, e.team.id === data.espnId, web)).join("");
   return `
 <section class="bb-section">

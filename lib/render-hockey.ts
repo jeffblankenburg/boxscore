@@ -352,13 +352,26 @@ function renderConferenceSection(conf: HockeyConferenceStandings, web: boolean):
 </section>`.trim();
 }
 
+// Standings order: by playoff seed once ESPN assigns them, otherwise by points
+// with explicit tiebreakers — more wins, then fewer losses — so two equal-point
+// teams never show the fewer-wins team on top. Identical records keep ESPN's
+// order (stable sort), preserving its official tiebreak. Shared by the league
+// digest and the team page.
+export function compareHockeyStanding(a: HockeyStandingsEntry, b: HockeyStandingsEntry): number {
+  const seedA = a.stats.playoffSeed?.value;
+  const seedB = b.stats.playoffSeed?.value;
+  // Equal seeds fall through to the record tiebreakers (ESPN can hand the same
+  // seed to multiple teams early season).
+  if (seedA && seedB && seedA !== seedB) return seedA - seedB;
+  const pts = (b.stats.points?.value ?? 0) - (a.stats.points?.value ?? 0);
+  if (pts !== 0) return pts;
+  const wins = (b.stats.wins?.value ?? 0) - (a.stats.wins?.value ?? 0);
+  if (wins !== 0) return wins;
+  return (a.stats.losses?.value ?? 0) - (b.stats.losses?.value ?? 0);
+}
+
 function renderConference(conf: HockeyConferenceStandings, web: boolean): string {
-  const sorted = [...conf.entries].sort((a, b) => {
-    const seedA = a.stats.playoffSeed?.value;
-    const seedB = b.stats.playoffSeed?.value;
-    if (seedA && seedB) return seedA - seedB;
-    return (b.stats.points?.value ?? 0) - (a.stats.points?.value ?? 0);
-  });
+  const sorted = [...conf.entries].sort(compareHockeyStanding);
   const rows = sorted.map((e, i) => renderStandingsRow(e, i + 1, web)).join("");
   return `
 <table class="bb-standings-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">

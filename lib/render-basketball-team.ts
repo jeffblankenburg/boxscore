@@ -10,7 +10,7 @@ import type {
   BasketballStandingsEntry,
   BasketballTransaction,
 } from "./basketball";
-import { renderGameBlock, initialLast, escapeHtml, teamNameLink, playerNameLink, txDateLabel } from "./render-basketball";
+import { renderGameBlock, initialLast, escapeHtml, teamNameLink, playerNameLink, txDateLabel, compareBasketballStanding } from "./render-basketball";
 import { nextDay, prettyDate, timeInET, etDateFromISO } from "./dates";
 
 // Stat formatters. Averages → 1 decimal; GP → integer; percentages → ".476"
@@ -110,9 +110,7 @@ function renderHeading(data: BasketballTeamData): string {
 
 function renderStandings(data: BasketballTeamData, web: boolean, league: BasketballTeamData["sport"]): string {
   if (!data.conference || data.conference.entries.length === 0) return "";
-  const sorted = [...data.conference.entries].sort(
-    (a, b) => (b.stats.winPercent?.value ?? 0) - (a.stats.winPercent?.value ?? 0),
-  );
+  const sorted = [...data.conference.entries].sort(compareBasketballStanding);
   const rows = sorted.map((e, i) => renderStandingsRow(e, i + 1, e.team.id === data.espnId, web, league)).join("");
   const suffix = data.isPreseason ? " Standings (Preseason)" : " Standings";
   return `
