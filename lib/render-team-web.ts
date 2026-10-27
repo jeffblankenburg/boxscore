@@ -17,10 +17,11 @@ import {
 import { lastNameLinkWeb } from "./player-links";
 import {
   teamPlayedGames, classifyTeamMode,
-  seriesRoundName, seriesState, seriesGameNumber, signoffStatusLine, leagueListText,
+  seriesRoundName, seriesGameNumber, signoffStatusLine, leagueListText,
   playoffStatusLine,
   type TeamEmailData,
 } from "./render-team-email";
+import { seriesStandingLine } from "./sports/mlb/canonical";
 import { renderPostseasonBracketWeb } from "./sports/mlb/render/postseason";
 import { showMagicNumbers, clinchLetter, clinchKeyLine } from "./standings-format";
 
@@ -66,9 +67,10 @@ function renderYesterdayBox(data: TeamEmailData): string {
   if (played.length === 0) {
     return `<div class="no-games-note">No game played on ${esc(data.prettyDate)}.</div>`;
   }
-  // Postseason framing: round + game number + series state above the box.
+  // Postseason framing: round + game number + series standing above the box.
+  // Same seriesStandingLine the league box score uses, so they read identically.
   const label = data.teamSeries
-    ? `<div style="font-weight:700;margin:0 0 4px;">${esc(seriesRoundName(data.teamSeries))} — Game ${seriesGameNumber(data.teamSeries)} <span style="font-weight:400;opacity:.7;">(${esc(seriesState(data.teamSeries))})</span></div>`
+    ? `<div style="font-weight:700;margin:0 0 4px;">${esc(seriesRoundName(data.teamSeries))}, Game ${seriesGameNumber(data.teamSeries)} <span style="font-weight:400;opacity:.7;">(${esc(seriesStandingLine(data.teamSeries))})</span></div>`
     : "";
   // Both halves of a doubleheader, in schedule order (postseason has none).
   return label + played

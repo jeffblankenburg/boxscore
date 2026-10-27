@@ -31,6 +31,7 @@ import {
   playoffSeedForTeam, preWildCardBracket, teamRefIndex,
 } from "./sports/mlb/adapters/from-statsapi";
 import type { PostseasonSeries, PostseasonBracket } from "./sports/mlb/canonical";
+import { seriesStandingLine } from "./sports/mlb/canonical";
 import { renderPostseasonBracketEmail } from "./sports/mlb/render/postseason";
 import { getVisibleSports } from "./sports";
 import { EMAIL_LINK_BASE } from "./site";
@@ -261,21 +262,6 @@ function teamLatestSeries(series: PostseasonSeries[], teamId: number): Postseaso
   return latest;
 }
 
-// Human series state as of the date: "series tied 1-1", "NYY lead 2-1", or the
-// clinched "NYY win 3-1". Uses abbreviations. Exported for the web renderer.
-export function seriesState(s: PostseasonSeries): string {
-  const { top, bottom } = s;
-  const hi = Math.max(top.wins, bottom.wins);
-  const lo = Math.min(top.wins, bottom.wins);
-  if (s.winnerTeamId != null) {
-    const w = s.winnerTeamId === top.teamId ? top : bottom;
-    return `${w.abbr} win ${hi}-${lo}`;
-  }
-  if (top.wins === bottom.wins) return `series tied ${top.wins}-${bottom.wins}`;
-  const lead = top.wins > bottom.wins ? top : bottom;
-  return `${lead.abbr} lead ${hi}-${lo}`;
-}
-
 // Games played in the series through the digest date = the game number of the
 // most recent (yesterday's) game. Exported for the web renderer.
 export function seriesGameNumber(s: PostseasonSeries): number {
@@ -361,10 +347,12 @@ function renderTeamYesterdayBox(data: TeamEmailData): string {
     return `<p class="es-info">No game played on ${esc(data.prettyDate)}.</p>`;
   }
   // Postseason framing: box scores are game-type agnostic, so during October
-  // we prepend the round + game number + series state ("AL Division Series —
-  // Game 2 (series tied 1-1)") that a reader can't otherwise infer from the box.
+  // we prepend the round + game number + series standing ("AL Division Series,
+  // Game 2 (tied 1-1)") that a reader can't otherwise infer from the box. The
+  // standing uses seriesStandingLine — the same formatter as the league box
+  // score's context line, so the two surfaces read identically.
   const label = data.teamSeries
-    ? `<div style="font-size:13px;font-weight:700;margin:0 0 4px;">${esc(seriesRoundName(data.teamSeries))} — Game ${seriesGameNumber(data.teamSeries)} <span style="font-weight:400;color:#6a6354;">(${esc(seriesState(data.teamSeries))})</span></div>`
+    ? `<div style="font-size:13px;font-weight:700;margin:0 0 4px;">${esc(seriesRoundName(data.teamSeries))}, Game ${seriesGameNumber(data.teamSeries)} <span style="font-weight:400;color:#6a6354;">(${esc(seriesStandingLine(data.teamSeries))})</span></div>`
     : "";
   // Both halves of a doubleheader, in schedule order (postseason has none).
   return label + played.map((g) => renderGame(g as Required<GameDetail>, data.liveAbbrev)).join("");

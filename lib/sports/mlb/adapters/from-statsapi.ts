@@ -14,6 +14,7 @@ import type { DailyRaw } from "@/lib/daily-raw";
 import { canonicalTeamRefForRef } from "@/lib/teams";
 import {
   sortGamesCanonically,
+  seriesStandingLine,
   type CanonicalDailyData,
   type PostseasonBracket,
   type PostseasonRound,
@@ -405,6 +406,10 @@ function gamesFromSchedule(scheduleRaw: unknown, idx: Map<number, MlbTeamRef>, p
   return games.map((g) => {
     const away = teamRef(idx, g.teams.away);
     const home = teamRef(idx, g.teams.home);
+    const gameType = mapGameType(g.gameType);
+    const isPostseason =
+      gameType === "wild-card" || gameType === "division-series" ||
+      gameType === "lcs" || gameType === "world-series";
     const innings: MlbInningLine[] = (g.linescore?.innings ?? []).map((i) => ({
       num: i.num,
       awayRuns: typeof i.away?.runs === "number" ? i.away.runs : null,
@@ -414,7 +419,7 @@ function gamesFromSchedule(scheduleRaw: unknown, idx: Map<number, MlbTeamRef>, p
     return {
       id: g.gamePk,
       startTime: g.gameDate,
-      gameType: mapGameType(g.gameType),
+      gameType,
       status: mapStatus(g.status),
       statusDetail: g.status.detailedState ?? "",
       awayTeam: away,
@@ -437,10 +442,11 @@ function gamesFromSchedule(scheduleRaw: unknown, idx: Map<number, MlbTeamRef>, p
         : null,
       venueName: g.venue?.name ?? null,
       tv: tvFromBroadcasts(g.broadcasts),
-      seriesContext:
-        g.seriesDescription && g.seriesGameNumber
-          ? `${g.seriesDescription} (Game ${g.seriesGameNumber}${g.gamesInSeries ? ` of ${g.gamesInSeries}` : ""})`
-          : null,
+      // Series name only here (and only in the postseason — statsapi tags
+      // regular-season games "Regular Season"). adaptStatsapiDailyRaw appends
+      // the standing ("Brewers lead 3-2") once the bracket, which carries the
+      // per-club win totals the schedule game lacks, is built.
+      seriesContext: isPostseason ? g.seriesDescription || null : null,
     };
   });
 }
@@ -1130,6 +1136,25 @@ export function finalRecordForTeam(
   return null;
 }
 
+// Append the current series standing to a postseason game's context line. The
+// schedule game carries only the series name (statsapi's seriesStatus is null),
+// but the bracket tallies games won per club, so match the game's two teams to
+// their series and append the standing: "World Series (Blue Jays lead 2-1)",
+// "(tied 1-1)", or "(Blue Jays win series 4-2)" once it clinches. The
+// parenthetical is built by seriesStandingLine — the same formatter the team
+// digest's series heading uses, so the two surfaces never drift. Returns the
+// base line unchanged when the series hasn't started (0-0, nothing to report)
+// or no series matches (the opponent is still a TBD slot).
+function withSeriesRecord(game: MlbGame, bracket: PostseasonBracket | null): string | null {
+  const base = game.seriesContext;
+  if (!base || !bracket) return base;
+  const abbrs = new Set([game.awayTeam.abbr, game.homeTeam.abbr]);
+  const s = bracket.series.find((x) => abbrs.has(x.top.abbr) && abbrs.has(x.bottom.abbr));
+  if (!s) return base;
+  if (s.top.wins === 0 && s.bottom.wins === 0) return base;   // series not yet underway
+  return `${base} (${seriesStandingLine(s)})`;
+}
+
 // ─── Public adapter ──────────────────────────────────────────────────────
 
 export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDailyData {
@@ -1147,6 +1172,12 @@ export function adaptStatsapiDailyRaw(date: string, raw: DailyRaw): CanonicalDai
     teamIdx,
     deriveSeeds(raw.finalStandings),
   );
+  // Fold the series standing into each postseason game's context line now that
+  // the bracket exists. Mutates in place so the box scores built below (which
+  // reference these same game objects) and the Today's Games strip both pick it
+  // up. No-op for games with no seriesContext (regular season, no bracket).
+  for (const g of games) g.seriesContext = withSeriesRecord(g, postseason);
+  for (const g of nextDayGames) g.seriesContext = withSeriesRecord(g, postseason);
   return {
     date,
     games,

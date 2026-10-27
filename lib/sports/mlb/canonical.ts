@@ -16,6 +16,7 @@ import type {
   MlbTransaction,
   MlbWildCardStandings,
 } from "./types";
+import { findTeamByMlbApiId } from "@/lib/teams";
 
 // Canonical display order for any game list (yesterday's results,
 // today's slate, the all-star game tile, etc). Sort by startTime
@@ -86,6 +87,26 @@ export type PostseasonBracket = {
   season: number;
   series: PostseasonSeries[];
 };
+
+// The series standing as a display string, shared by the league box-score
+// context line (adaptStatsapiDailyRaw) and the team digest's series heading so
+// the two never drift: "Brewers lead 3-0", "tied 2-2", "Brewers win series
+// 4-2". Uses the club nickname — the entrant carries the numeric statsapi team
+// id, which resolves to the canonical nickname (falls back to the full name for
+// a TBD/placeholder side whose id isn't a real club).
+export function seriesStandingLine(s: PostseasonSeries): string {
+  const { top, bottom } = s;
+  const hi = Math.max(top.wins, bottom.wins);
+  const lo = Math.min(top.wins, bottom.wins);
+  const nick = (e: PostseasonEntrant) => findTeamByMlbApiId(e.teamId)?.nickname ?? e.name;
+  if (s.winnerTeamId != null) {
+    const w = s.winnerTeamId === top.teamId ? top : bottom;
+    return `${nick(w)} win series ${hi}-${lo}`;
+  }
+  if (top.wins === bottom.wins) return `tied ${top.wins}-${bottom.wins}`;
+  const lead = top.wins > bottom.wins ? top : bottom;
+  return `${nick(lead)} lead ${hi}-${lo}`;
+}
 
 // One not-yet-played postseason game, pulled from the same series feed as the
 // bracket. Drives the "World Series Schedule" strip so the digest shows the
