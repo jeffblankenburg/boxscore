@@ -1,4 +1,4 @@
-import { buildHomeEdition, splitColumns } from "@/lib/home-edition";
+import { buildHomeEdition } from "@/lib/home-edition";
 import { getVisibleSports } from "@/lib/sports";
 import { mastheadNavSports, renderMasthead } from "@/lib/masthead";
 import { yesterdayInET } from "@/lib/dates";
@@ -12,7 +12,6 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const edition = await buildHomeEdition();
   const empty = edition.length === 0;
-  const columns = splitColumns(edition, 3);
   // Same masthead as the digests: sport nav + dateline. No current sport is
   // bolded on the home page; the dateline shows the edition date (yesterday + 1).
   const navSports = mastheadNavSports(await getVisibleSports());
@@ -22,34 +21,31 @@ export default async function HomePage() {
     <main className="home">
       <div dangerouslySetInnerHTML={{ __html: masthead }} />
 
-      <section className="home-subscribe">
-        <p>The daily box score for every sport, free in your inbox.</p>
-        <a className="home-subscribe-btn" href={BRAND.subscribeUrl}>Subscribe free &rarr;</a>
-      </section>
+      {/* Home-only tagline bar — a second masthead-style strip under the
+          dateline, styled to match the sports nav above it. */}
+      <div className="home-tagline">{BRAND.tagline}</div>
 
       {empty && <p className="home-empty">No games yesterday. Check back after tonight&rsquo;s slate.</p>}
 
-      {/* Explicit newspaper columns: each column is topped with a league header
-          (a league continuing from the previous column shows its header again),
-          so every column's first game lands on the same line. */}
+      {/* Newspaper columns via CSS multi-column: the browser flows these cells
+          into 3 / 2 / 1 columns by viewport width (never narrower than a box
+          needs) and balances them by height. A league header drops in whenever
+          the league changes; break-inside:avoid keeps a box from splitting
+          across a column break. */}
       <div className="home-cols">
-        {columns.map((col, ci) => (
-          <div className="home-col" key={ci}>
-            {col.map((cell, i) => {
-              const showHeader = i === 0 || col[i - 1]!.leagueId !== cell.leagueId;
-              return (
-                <div className="home-cell" key={i}>
-                  {showHeader && (
-                    <h2 className="home-sport-head">
-                      <a href={`/${cell.leagueId}`}>{cell.leagueName}</a>
-                    </h2>
-                  )}
-                  <div className="home-game" dangerouslySetInnerHTML={{ __html: cell.html }} />
-                </div>
-              );
-            })}
-          </div>
-        ))}
+        {edition.map((cell, i) => {
+          const showHeader = i === 0 || edition[i - 1]!.leagueId !== cell.leagueId;
+          return (
+            <div className="home-cell" key={i}>
+              {showHeader && (
+                <h2 className="home-sport-head">
+                  <a href={`/${cell.leagueId}`}>{cell.leagueName}</a>
+                </h2>
+              )}
+              <div className="home-game" dangerouslySetInnerHTML={{ __html: cell.html }} />
+            </div>
+          );
+        })}
       </div>
 
       <section className="home-premium">

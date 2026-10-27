@@ -1076,8 +1076,12 @@ export const BASKETBALL_EMAIL_STYLES = `
 .bb-upcoming-time { color: #6a6354; font-style: italic; }
 .bb-upcoming-tv { flex-basis: 100%; font-size: 11px; color: #6a6354; }
 
+/* Auto layout (not fixed): fixed layout hard-caps each column to its share and,
+   with nowrap cells, overflows long values ("30-14" records, "19-61" totals)
+   into the next column. Auto sizes every column to its content so nothing
+   clips — the team column, set to wrap below, absorbs any leftover width. */
 .bb-linescore { width: 100%; border-collapse: collapse; margin: 0 0 6px;
-                font-size: 12px; table-layout: fixed; }
+                font-size: 12px; }
 .bb-linescore th, .bb-linescore td {
   padding: 2px 4px; text-align: right; white-space: nowrap;
 }
@@ -1094,9 +1098,10 @@ export const BASKETBALL_EMAIL_STYLES = `
 .bb-ls-cell       { min-width: 22px; }
 
 .bb-box { display: block; margin: 4px 0 0; }
+/* Auto layout so the numeric columns size to their widest value (e.g. the
+   "19-61" FG totals) instead of being clipped by an equal-share fixed grid. */
 .bb-player-table { width: 100%; border-collapse: collapse;
-                   font-size: 12px; margin: 6px 0 10px;
-                   table-layout: fixed; }
+                   font-size: 12px; margin: 6px 0 10px; }
 .bb-team-caption {
   margin: 10px 0 2px; padding: 0 0 2px;
   font-size: 13px; font-weight: 700;

@@ -26,18 +26,11 @@ import { renderHockeyGames } from "@/lib/render-hockey";
 
 const IN_SEASON_DAYS = 5;
 
-// One cell = a single game's box score, tagged with its league (so the page can
-// drop a league header at each column top + league change) and a rough rendered
-// height (to balance the columns).
-export type HomeCell = { html: string; leagueId: string; leagueName: string; weight: number };
-
-// Crude height proxy: table rows (one per player) plus a text-length term so
-// score-heavy boxes (MLB scoring plays) weigh more. Exact balance isn't needed —
-// it only decides where columns break; the top-of-column headers align regardless.
-function estimateWeight(html: string): number {
-  const rows = (html.match(/<tr/g) ?? []).length;
-  return 6 + rows + Math.floor(html.length / 600);
-}
+// One cell = a single game's box score, tagged with its league so the page can
+// drop a league header when the league changes. The page flows these into a CSS
+// multi-column container that balances by height and reflows 3/2/1 by width, so
+// there's no server-side column split or height estimation to do here.
+export type HomeCell = { html: string; leagueId: string; leagueName: string };
 
 async function renderSportGames(sportId: string, date: string): Promise<string[]> {
   switch (sportId) {
@@ -80,7 +73,7 @@ async function build(): Promise<HomeCell[]> {
   const cells: HomeCell[] = [];
   for (const { sport, blocks } of perSport) {
     for (const html of blocks) {
-      cells.push({ html, leagueId: sport.id, leagueName: sport.name, weight: estimateWeight(html) });
+      cells.push({ html, leagueId: sport.id, leagueName: sport.name });
     }
   }
   return cells;
@@ -90,27 +83,4 @@ export function buildHomeEdition(): Promise<HomeCell[]> {
   // Skip the cache in dev so renderer/CSS edits show immediately.
   if (process.env.NODE_ENV === "development") return build();
   return cachedRead(build, ["home-edition"], 300);
-}
-
-// Split the ordered cells into `n` contiguous columns of roughly equal weight —
-// column-major (so each league's games stay together) with balanced heights.
-export function splitColumns(cells: HomeCell[], n: number): HomeCell[][] {
-  const cols: HomeCell[][] = Array.from({ length: n }, () => []);
-  const total = cells.reduce((s, c) => s + c.weight, 0);
-  const target = total / n;
-  let ci = 0;
-  let acc = 0;
-  for (let i = 0; i < cells.length; i++) {
-    cols[ci]!.push(cells[i]!);
-    acc += cells[i]!.weight;
-    const remainingCells = cells.length - i - 1;
-    const remainingCols = n - ci - 1;
-    // Advance to the next column once this one hits its target, but always leave
-    // at least one cell for each remaining column.
-    if (ci < n - 1 && acc >= target && remainingCells > remainingCols) {
-      ci++;
-      acc = 0;
-    }
-  }
-  return cols;
 }

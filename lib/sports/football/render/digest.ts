@@ -1172,7 +1172,7 @@ export const FOOTBALL_EMAIL_STYLES = `
 .fb-score-row:nth-child(even) td { background: rgba(0,0,0,0.025); }
 .fb-score-clock { width: 72px; white-space: nowrap; font-weight: 700; color: #2a2620;
                   font-size: 10px; letter-spacing: 0.02em; padding-right: 8px; }
-.fb-score-text { padding-right: 8px; overflow-wrap: break-word; }
+.fb-score-text { padding-right: 8px; overflow-wrap: break-word; font-style: italic; }
 .fb-score-tally { width: 48px; white-space: nowrap; font-weight: 700; text-align: right; }
 
 .fb-box { display: block; margin: 6px 0 0; }

@@ -252,7 +252,9 @@ function renderScoringPlays(box: HockeyBoxscore): string {
   const blocks = [...byPeriod.keys()].sort((a, b) => a - b).map((per) => {
     const rows = byPeriod.get(per)!.map((p) => {
       const clock = p.clock ? `<span style="${clockStyle}">${escapeHtml(p.clock)}</span> ` : "";
-      return `<div style="${row}">${clock}<b>${escapeHtml(abbr.get(p.teamId) ?? "")}</b> ${escapeHtml(p.text)}</div>`;
+      // Italic play text mirrors baseball's scoring-play description (.ev), so
+      // every sport's scoring lines read the same; the team abbr stays upright.
+      return `<div style="${row}">${clock}<b>${escapeHtml(abbr.get(p.teamId) ?? "")}</b> <span style="font-style:italic">${escapeHtml(p.text)}</span></div>`;
     }).join("");
     return `<div style="${perHead}">${escapeHtml(periodName(per))}</div>${rows}`;
   }).join("");

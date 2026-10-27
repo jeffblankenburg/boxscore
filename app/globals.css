@@ -1477,8 +1477,14 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-upcoming-tv { font-size: 11px; color: var(--text-muted);
                   white-space: nowrap; flex: 0 0 auto; }
 
+/* Auto layout (must override the global `table { table-layout: fixed }`): fixed
+   caps each column to an equal share and, with the global `th,td{overflow:hidden}`,
+   CLIPS long values ("30-14" records, "19-61" totals). Auto sizes each column to
+   its content; overflow:visible on the cells belt-and-suspenders against clipping. */
 .bb-linescore { width: 100%; border-collapse: collapse; margin: 0 0 6px;
-                font-size: 12px; table-layout: fixed; }
+                font-size: 12px; table-layout: auto; }
+.bb-linescore th, .bb-linescore td,
+.bb-player-table th, .bb-player-table td { overflow: visible; }
 .bb-linescore th, .bb-linescore td {
   padding: 2px 4px; text-align: right; white-space: nowrap;
 }
@@ -1497,9 +1503,10 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-ls-cell      { min-width: 22px; }
 
 .bb-box { display: block; margin: 4px 0 0; }
+/* Auto layout (overrides global `table{table-layout:fixed}`) so numeric columns
+   size to their widest value (the "19-61" FG totals) instead of being clipped. */
 .bb-player-table { width: 100%; border-collapse: collapse;
-                   font-size: 12px; margin: 6px 0 10px;
-                   table-layout: fixed; }
+                   font-size: 12px; margin: 6px 0 10px; table-layout: auto; }
 .bb-team-caption {
   margin: 10px 0 2px; padding: 0 0 2px;
   font-size: 13px; font-weight: 700;
@@ -1676,7 +1683,7 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 /* Override the sitewide `th, td { white-space: nowrap; overflow: hidden; text-align: right }`
    (globals.css ~L230) so long scoring descriptions wrap instead of clipping. */
 .fb-score-text { padding-right: 8px; text-align: left; white-space: normal; overflow: visible;
-                 overflow-wrap: break-word; }
+                 overflow-wrap: break-word; font-style: italic; }
 .fb-score-tally { width: 48px; white-space: nowrap; font-weight: 700; text-align: right; }
 
 .fb-box { display: block; margin: 6px 0 0; }
@@ -3810,35 +3817,55 @@ tr.cx-diff-hl > td { background: transparent; }
    .newspaper wrapper is widened for it below) instead of a narrow column. */
 .home { max-width: none; margin: 0 auto; }
 
-/* Subscribe band: the primary CTA, right under the masthead. */
-.home-subscribe { text-align: center; max-width: 520px; margin: 20px auto; }
-.home-subscribe p { margin: 0 0 12px; font-size: 15px; color: var(--text-secondary); }
-.home-subscribe-btn {
-  display: inline-block; background: var(--text-primary); color: #fff;
-  text-decoration: none; padding: 11px 22px; font-weight: 700; font-size: 15px;
+/* Home-only tagline bar: a second strip under the dateline that mirrors the
+   sports nav above it (same border, centering, type). Pulls the dateline's
+   bottom margin to 0 on home so the two bars sit symmetric around the date. */
+.home .dateline { margin-bottom: 0; }
+.home-tagline {
+  text-align: center;
+  border-bottom: 2px solid var(--border-strong);
+  padding: 5px 0;
+  margin: 0 0 18px;
+  line-height: 1.1;
+  color: var(--border-strong);
+  font-weight: 400;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
-.home-subscribe-btn:hover { background: #333; }
 
 /* The edition: yesterday's box scores from every sport flowed into one
-   newspaper masonry. CSS columns fill down then across, so a light slate
-   (one World Series game) is followed immediately by the next sport — no
-   whitespace. Each item is kept whole (break-inside: avoid). content-visibility
-   lets the browser skip off-screen items so a very long page still paints fast.
-   The box-score HTML reuses the digest classes, already styled above. */
-/* Explicit newspaper columns (split server-side in lib/home-edition). Three on
-   desktop, one on mobile (never two — box scores need ~320px to stay readable).
-   Each column is topped with a league header, so the first game of each column
-   aligns across the page. */
-.home-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 12px; align-items: start; }
-@media (max-width: 960px) { .home-cols { grid-template-columns: 1fr; } }
-.home-col { min-width: 0; }
-.home-cell { margin: 0 0 22px; min-width: 0; }
+   newspaper via CSS multi-column. Columns fill down then across and the browser
+   balances them by height, so a light slate (one World Series game) is followed
+   immediately by the next sport with no whitespace. Each box is kept whole
+   (break-inside: avoid). Column count steps 1 → 2 → 3 at widths where each
+   column stays ≥ ~370px — the room a ten-column basketball box needs at the
+   home page's 13px type (see the size bump below) to render without clipping or
+   horizontal overflow. The box-score HTML reuses the digest classes, styled
+   above. */
+.home-cols { column-count: 1; column-gap: 24px; margin-top: 12px; }
+@media (min-width: 810px)  { .home-cols { column-count: 2; } }
+@media (min-width: 1200px) { .home-cols { column-count: 3; } }
+.home-cell { break-inside: avoid; margin: 0 0 22px; }
 .home-game { margin: 0; }
 /* The cell owns the spacing — strip each sport's own box margins so every
    game sits flush under its header and the first games align across columns. */
 .home-cell .game-container,
 .home-cell .bb-game,
 .home-cell .fb-game { margin: 0; }
+/* Home page shows every sport's box at MLB's 13px (basketball/hockey/football
+   run 10-12px by default for their denser standalone pages + email). Scoped to
+   .home so only this page is bumped; the breakpoints above are tuned for the
+   wider boxes this produces. */
+.home .bb-linescore, .home .bb-linescore th, .home .bb-linescore td,
+.home .bb-player-table, .home .bb-player-table th, .home .bb-player-table td,
+.home .bb-box .bb-pl-stat, .home .bb-pl-name,
+.home .fb-linescore, .home .fb-linescore th, .home .fb-linescore td,
+.home .fb-ts-table, .home .fb-ts-table th, .home .fb-ts-table td,
+.home .fb-stat-table, .home .fb-stat-table th, .home .fb-stat-table td,
+.home .fb-st-name {
+  font-size: 13px;
+}
 .home-sport-head {
   font-weight: 800; font-size: 20px; letter-spacing: -0.02em;
   margin: 0 0 10px; border-bottom: 2px solid var(--text-primary); padding-bottom: 4px;
