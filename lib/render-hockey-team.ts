@@ -4,10 +4,10 @@
 // sheet (skaters + goalies), upcoming games, transactions.
 
 import type { HockeyTeamData, HockeyTeamPlayer } from "./hockey-team";
-import type { HockeyScoreboardEvent, HockeyStandingsEntry, HockeyTransaction } from "./hockey";
+import type { HockeyScoreboardEvent, HockeyTransaction } from "./hockey";
 import {
   renderGameBlock, initialLast, escapeHtml, teamNameLink, playerNameLink, txDateLabel,
-  compareHockeyStanding,
+  compareHockeyStanding, renderStandingsTable, divisionShort,
 } from "./render-hockey";
 import { nextDay, prettyDate, timeInET, etDateFromISO } from "./dates";
 
@@ -41,23 +41,6 @@ const GOALIE_COLUMNS: ReadonlyArray<StatCol> = [
   { label: "SO",  get: (s) => fmtInt(s.shutouts ?? NaN) },
 ];
 
-const l10 = (dv: string) => dv.split(",")[0]!.trim();
-// Widths sized for end-of-season worst cases (see render-hockey.ts). Rank 5 +
-// team 26 + stats 69 = 100.
-const STANDINGS_COLUMNS: ReadonlyArray<{ key: string; label: string; w: string; fmt?: (dv: string) => string }> = [
-  { key: "gamesPlayed", label: "GP", w: "7%" },
-  { key: "wins", label: "W", w: "7%" },
-  { key: "losses", label: "L", w: "7%" },
-  { key: "otLosses", label: "OTL", w: "8%" },
-  { key: "points", label: "PTS", w: "9%" },
-  { key: "pointDifferential", label: "DIFF", w: "10%" },
-  { key: "Last Ten Games", label: "L10", w: "12%", fmt: l10 },
-  { key: "streak", label: "STRK", w: "9%" },
-];
-const STANDINGS_COLGROUP =
-  `<colgroup><col style="width:5%" /><col style="width:26%" />` +
-  `${STANDINGS_COLUMNS.map((c) => `<col style="width:${c.w}" />`).join("")}</colgroup>`;
-
 export function renderHockeyTeamContent(data: HockeyTeamData): string {
   return renderBody(data, true);
 }
@@ -87,34 +70,26 @@ function renderHeading(data: HockeyTeamData): string {
   return `<div class="bb-team-heading">${escapeHtml(data.team.name)}${rec}</div>`;
 }
 
+// The team's own division standings, with the team's row highlighted — mirrors
+// the MLB team digest (which shows the team's division). Falls back to the full
+// conference table for older conference-only payloads.
 function renderStandings(data: HockeyTeamData, web: boolean): string {
-  if (!data.conference || data.conference.entries.length === 0) return "";
-  const sorted = [...data.conference.entries].sort(compareHockeyStanding);
-  const rows = sorted.map((e, i) => renderStandingsRow(e, i + 1, e.team.id === data.espnId, web)).join("");
+  const conf = data.conference;
+  if (!conf || conf.entries.length === 0) return "";
+  const me = data.espnId;
+  const division = conf.divisions.find((d) => d.entries.some((e) => e.team.id === me));
+  if (!division) {
+    return `
+<section class="bb-section">
+  <h2 class="bb-section-title">${escapeHtml(conf.name)} Standings</h2>
+  ${renderStandingsTable([...conf.entries].sort(compareHockeyStanding), web, { meId: me })}
+</section>`.trim();
+  }
   return `
 <section class="bb-section">
-  <h2 class="bb-section-title">${escapeHtml(data.conference.name)} Standings</h2>
-  <table class="bb-standings-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-    ${STANDINGS_COLGROUP}
-    <thead>
-      <tr>
-        <th class="bb-st-rank">#</th>
-        <th class="bb-st-team">Team</th>
-        ${STANDINGS_COLUMNS.map((c) => `<th class="bb-st-stat">${c.label}</th>`).join("")}
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
+  <h2 class="bb-section-title">${escapeHtml(divisionShort(division.name))} Standings</h2>
+  ${renderStandingsTable([...division.entries].sort(compareHockeyStanding), web, { meId: me })}
 </section>`.trim();
-}
-
-function renderStandingsRow(entry: HockeyStandingsEntry, rank: number, isMe: boolean, web: boolean): string {
-  const cells = STANDINGS_COLUMNS.map((c) => {
-    const dv = entry.stats[c.key]?.displayValue ?? "";
-    return `<td class="bb-st-stat">${escapeHtml(c.fmt ? c.fmt(dv) : dv)}</td>`;
-  }).join("");
-  const cls = isMe ? ' class="bb-st-me"' : "";
-  return `<tr${cls}><td class="bb-st-rank">${rank}</td><td class="bb-st-team">${teamNameLink(entry.team.name, web)}</td>${cells}</tr>`;
 }
 
 function renderGame(data: HockeyTeamData, web: boolean): string {

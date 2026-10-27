@@ -14,7 +14,10 @@ import { enumerateDatesInclusive } from "./dates";
 import { espnJson } from "./espn-fetch";
 
 const SCOREBOARD_BASE = "https://site.api.espn.com/apis/site/v2/sports/hockey";
-const STANDINGS_BASE = "https://site.web.api.espn.com/apis/v2/sports/hockey";
+// The site.api host (not site.web.api) returns conference→division nesting when
+// asked with level=3; site.web.api only ever returns the two conferences. See
+// fetchStandingsRaw.
+const STANDINGS_BASE = "https://site.api.espn.com/apis/v2/sports/hockey";
 const LEADERS_BASE = "https://site.web.api.espn.com/apis/common/v3/sports/hockey";
 const ROSTER_BASE = "https://site.web.api.espn.com/apis/site/v2/sports/hockey";
 
@@ -109,10 +112,21 @@ export type HockeyStandingsEntry = {
   stats: Record<string, { value: number; displayValue: string }>;
 };
 
+export type HockeyDivisionStandings = {
+  id: string;
+  name: string;          // "Atlantic Division"
+  abbreviation: string;  // "Atlantic"
+  entries: HockeyStandingsEntry[];
+};
+
 export type HockeyConferenceStandings = {
   id: string;
   name: string;          // "Eastern Conference"
   abbreviation: string;  // "East"
+  // The conference's divisions (empty for older conference-only payloads). The
+  // division + wildcard views render from these; `entries` stays the flat list
+  // of every team in the conference, for the record map and conference fallback.
+  divisions: HockeyDivisionStandings[];
   entries: HockeyStandingsEntry[];
 };
 
@@ -395,23 +409,63 @@ function extractPlayerLine(entry: Record<string, unknown>, keys: string[]): Hock
 // ---- Standings ------------------------------------------------------------
 
 export async function fetchStandingsRaw(season: number, seasonType: number = 2): Promise<unknown> {
-  return getJson(`${STANDINGS_BASE}/nhl/standings?season=${season}&seasontype=${seasonType}`);
+  // level=3 returns the two conferences each with nested division children
+  // (Atlantic/Metropolitan, Central/Pacific) — the grouping the NHL actually
+  // seeds the playoffs on (top 3 per division + 2 wildcards per conference).
+  // parseStandings reads the nesting and falls back to conference-only for the
+  // older conference-grouped payloads still in daily_raw.
+  return getJson(`${STANDINGS_BASE}/nhl/standings?season=${season}&seasontype=${seasonType}&level=3`);
+}
+
+function entriesOf(node: Record<string, unknown>): HockeyStandingsEntry[] {
+  const standings = (node.standings as Record<string, unknown>) ?? {};
+  const entries = (standings.entries as Array<Record<string, unknown>>) ?? [];
+  return entries.map(extractStandingsEntry);
 }
 
 export function parseStandings(raw: unknown): HockeyStandings {
   const data = raw as { children?: Array<Record<string, unknown>> };
   const conferences: HockeyConferenceStandings[] = [];
   for (const child of data.children ?? []) {
-    const standings = (child.standings as Record<string, unknown>) ?? {};
-    const entries = (standings.entries as Array<Record<string, unknown>>) ?? [];
+    // level=3 nests divisions under each conference; older conference-only
+    // payloads carry the teams directly on the conference node instead.
+    const divisionNodes = (child.children as Array<Record<string, unknown>>) ?? [];
+    const divisions: HockeyDivisionStandings[] = divisionNodes.map((d) => ({
+      id: String(d.id ?? ""),
+      name: String(d.name ?? ""),
+      abbreviation: String(d.abbreviation ?? d.name ?? ""),
+      entries: entriesOf(d),
+    }));
+    const entries = divisions.length
+      ? divisions.flatMap((d) => d.entries)
+      : entriesOf(child);
     conferences.push({
       id: String(child.id ?? ""),
       name: String(child.name ?? ""),
       abbreviation: String(child.abbreviation ?? child.name ?? ""),
-      entries: entries.map(extractStandingsEntry),
+      divisions,
+      entries,
     });
   }
   return { conferences };
+}
+
+// Standings order: by playoff seed once ESPN assigns them, otherwise by points
+// with explicit tiebreakers — more wins, then fewer losses — so two equal-point
+// teams never show the fewer-wins team on top. Identical records keep ESPN's
+// order (stable sort), preserving its official tiebreak. Shared by the league
+// digest, the team page, and the wildcard computation.
+export function compareHockeyStanding(a: HockeyStandingsEntry, b: HockeyStandingsEntry): number {
+  const seedA = a.stats.playoffSeed?.value;
+  const seedB = b.stats.playoffSeed?.value;
+  // Equal seeds fall through to the record tiebreakers (ESPN can hand the same
+  // seed to multiple teams early season).
+  if (seedA && seedB && seedA !== seedB) return seedA - seedB;
+  const pts = (b.stats.points?.value ?? 0) - (a.stats.points?.value ?? 0);
+  if (pts !== 0) return pts;
+  const wins = (b.stats.wins?.value ?? 0) - (a.stats.wins?.value ?? 0);
+  if (wins !== 0) return wins;
+  return (a.stats.losses?.value ?? 0) - (b.stats.losses?.value ?? 0);
 }
 
 function extractStandingsEntry(entry: Record<string, unknown>): HockeyStandingsEntry {

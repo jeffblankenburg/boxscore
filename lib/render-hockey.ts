@@ -26,6 +26,9 @@ import type {
   LeaderCategory,
   HockeyTransaction,
 } from "./hockey";
+import { compareHockeyStanding } from "./hockey";
+// Re-exported so the team renderer keeps importing it from here.
+export { compareHockeyStanding };
 import { lastName } from "./render-email";
 import { timeInET, etDateFromISO } from "./dates";
 import { renderMasthead, type NavSport } from "./masthead";
@@ -345,34 +348,44 @@ function renderStandingsColumns(standings: HockeyStandings, web: boolean): strin
 }
 
 function renderConferenceSection(conf: HockeyConferenceStandings, web: boolean): string {
+  // Older conference-only payload (no divisions): one sorted conference table.
+  if (conf.divisions.length === 0) {
+    return `
+<section class="bb-section">
+  <h2 class="bb-section-title">${escapeHtml(conf.name)} Standings</h2>
+  ${renderStandingsTable([...conf.entries].sort(compareHockeyStanding), web)}
+</section>`.trim();
+  }
+  // Each division's full standings, mirroring the MLB digest (division tables
+  // grouped under their conference).
+  const divisions = conf.divisions
+    .map((d) =>
+      `<h3 class="bb-team-caption">${escapeHtml(divisionShort(d.name))}</h3>${renderStandingsTable([...d.entries].sort(compareHockeyStanding), web)}`,
+    )
+    .join("\n");
   return `
 <section class="bb-section">
   <h2 class="bb-section-title">${escapeHtml(conf.name)} Standings</h2>
-  ${renderConference(conf, web)}
+  ${divisions}
 </section>`.trim();
 }
 
-// Standings order: by playoff seed once ESPN assigns them, otherwise by points
-// with explicit tiebreakers — more wins, then fewer losses — so two equal-point
-// teams never show the fewer-wins team on top. Identical records keep ESPN's
-// order (stable sort), preserving its official tiebreak. Shared by the league
-// digest and the team page.
-export function compareHockeyStanding(a: HockeyStandingsEntry, b: HockeyStandingsEntry): number {
-  const seedA = a.stats.playoffSeed?.value;
-  const seedB = b.stats.playoffSeed?.value;
-  // Equal seeds fall through to the record tiebreakers (ESPN can hand the same
-  // seed to multiple teams early season).
-  if (seedA && seedB && seedA !== seedB) return seedA - seedB;
-  const pts = (b.stats.points?.value ?? 0) - (a.stats.points?.value ?? 0);
-  if (pts !== 0) return pts;
-  const wins = (b.stats.wins?.value ?? 0) - (a.stats.wins?.value ?? 0);
-  if (wins !== 0) return wins;
-  return (a.stats.losses?.value ?? 0) - (b.stats.losses?.value ?? 0);
+// "Atlantic Division" → "Atlantic".
+export function divisionShort(name: string): string {
+  return name.replace(/\s+Division$/i, "");
 }
 
-function renderConference(conf: HockeyConferenceStandings, web: boolean): string {
-  const sorted = [...conf.entries].sort(compareHockeyStanding);
-  const rows = sorted.map((e, i) => renderStandingsRow(e, i + 1, web)).join("");
+// Generic standings table (one division, or a whole conference in the fallback).
+// `meId` highlights one team's row (team digest). Rows are ranked 1..n in the
+// order given, so sort before calling.
+export function renderStandingsTable(
+  entries: HockeyStandingsEntry[],
+  web: boolean,
+  opts?: { meId?: string },
+): string {
+  const rows = entries
+    .map((e, i) => renderStandingsRow(e, i + 1, web, !!opts?.meId && e.team.id === opts.meId))
+    .join("");
   return `
 <table class="bb-standings-table" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
   ${STANDINGS_COLGROUP}
@@ -387,12 +400,13 @@ function renderConference(conf: HockeyConferenceStandings, web: boolean): string
 </table>`.trim();
 }
 
-function renderStandingsRow(entry: HockeyStandingsEntry, rank: number, web: boolean): string {
+function renderStandingsRow(entry: HockeyStandingsEntry, rank: number, web: boolean, me: boolean): string {
   const cells = STANDINGS_COLUMNS.map((c) => {
     const dv = entry.stats[c.key]?.displayValue ?? "";
     return `<td class="bb-st-stat">${escapeHtml(c.fmt ? c.fmt(dv) : dv)}</td>`;
   }).join("");
-  return `<tr><td class="bb-st-rank">${rank}</td><td class="bb-st-team">${teamNameLink(entry.team.name, web)}</td>${cells}</tr>`;
+  const attr = me ? ' class="bb-st-me"' : "";
+  return `<tr${attr}><td class="bb-st-rank">${rank}</td><td class="bb-st-team">${teamNameLink(entry.team.name, web)}</td>${cells}</tr>`;
 }
 
 // ---- Playoff series -------------------------------------------------------
