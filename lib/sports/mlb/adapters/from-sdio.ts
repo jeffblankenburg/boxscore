@@ -538,6 +538,9 @@ function adaptGame(g: SdioGame, idx: Map<number, MlbTeamRef>, pitcherStats: Pitc
     // SDIO broadcast mapping is a follow-up (vendor gated on ad revenue); the
     // live statsapi path populates TV. Empty keeps the canonical shape valid.
     tv: [],
+    // SDIO schedule doesn't carry the series description; left unset until we
+    // wire postseason context from SDIO.
+    seriesContext: null,
   };
 }
 

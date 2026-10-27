@@ -741,6 +741,7 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
   ].filter(Boolean).join(" &nbsp;·&nbsp; ");
   return `<div class="es-game">
     ${gameH(gameHead)}
+    ${game.seriesContext ? `<div style="font-size:11px;font-style:italic;color:#6a6354;letter-spacing:0.04em;margin:3px 0 5px;">${esc(game.seriesContext)}</div>` : ""}
     <table cellpadding="0" cellspacing="0" border="0" width="100%">
       <tbody>
         ${renderInningLine(tla(game.awayTeam.name), aLine, records?.get(game.awayTeam.id))}

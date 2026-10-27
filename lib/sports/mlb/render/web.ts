@@ -1213,6 +1213,7 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
 
   return `<div class="game-container">
   <div class="game-header">${gameHead}</div>
+  ${game.seriesContext ? `<div class="game-context">${esc(game.seriesContext)}</div>` : ""}
   <div class="team-line">
     <div class="team-name">${teamLabel(game.awayTeam)}</div>
     <div class="${scoreClass}">${aCells}</div>

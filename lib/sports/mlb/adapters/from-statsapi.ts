@@ -87,6 +87,10 @@ type StatsapiScheduleGame = {
   };
   venue?: { name?: string };
   broadcasts?: Array<{ name?: string; callSign?: string; type?: string; isNational?: boolean; homeAway?: string }>;
+  // Postseason context (present only on postseason games).
+  seriesDescription?: string;   // "World Series", "AL Championship Series"
+  seriesGameNumber?: number;     // game number within the series (1..7)
+  gamesInSeries?: number;        // best-of length (7 for WS)
 };
 
 type StatsapiStandingsEnvelope = {
@@ -433,6 +437,10 @@ function gamesFromSchedule(scheduleRaw: unknown, idx: Map<number, MlbTeamRef>, p
         : null,
       venueName: g.venue?.name ?? null,
       tv: tvFromBroadcasts(g.broadcasts),
+      seriesContext:
+        g.seriesDescription && g.seriesGameNumber
+          ? `${g.seriesDescription} (Game ${g.seriesGameNumber}${g.gamesInSeries ? ` of ${g.gamesInSeries}` : ""})`
+          : null,
     };
   });
 }

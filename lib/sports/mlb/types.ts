@@ -135,6 +135,11 @@ export type MlbGame = {
   // Games preview. Empty when the schedule carries no TV listing. Populated
   // from the schedule's broadcasts(all) hydrate.
   tv: string[];
+
+  // Postseason context line ("World Series (Game 3 of 7)"), for the box-score
+  // header — the baseball analog of the basketball/hockey series line. Null for
+  // regular-season games.
+  seriesContext: string | null;
 };
 
 // ─── Box score ────────────────────────────────────────────────────────────
