@@ -712,10 +712,12 @@ function renderGameInfo(info: { label: string; value: string }[]): string {
 function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], records?: Map<string, string>): string {
   const aScore = game.awayScore ?? 0;
   const hScore = game.homeScore ?? 0;
-  const winnerFirst = hScore >= aScore
-    ? `${nickname(game.homeTeam.name)} ${hScore}, ${nickname(game.awayTeam.name)} ${aScore}`
-    : `${nickname(game.awayTeam.name)} ${aScore}, ${nickname(game.homeTeam.name)} ${hScore}`;
   const innings = game.innings;
+  // Road team first (newspaper convention), score each, with an extra-innings
+  // note — the shared box-score header format across every sport.
+  const gameHead =
+    `${nickname(game.awayTeam.name)} ${aScore}, ` +
+    `${nickname(game.homeTeam.name)} ${hScore}${innings.length > 9 ? ` (${innings.length} inn)` : ""}`;
   const w = inningCellWidth(innings);
   const aLine = `${inningGroups(innings, "away", w)}  —  ${padRhe(game.awayScore)} ${padRhe(game.awayHits)} ${padRhe(game.awayErrors)}`;
   const hLine = `${inningGroups(innings, "home", w)}  —  ${padRhe(game.homeScore)} ${padRhe(game.homeHits)} ${padRhe(game.homeErrors)}`;
@@ -738,7 +740,7 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
     d?.save   && `<b>Sv:</b> ${decLink(d.save)}`,
   ].filter(Boolean).join(" &nbsp;·&nbsp; ");
   return `<div class="es-game">
-    ${gameH(winnerFirst)}
+    ${gameH(gameHead)}
     <table cellpadding="0" cellspacing="0" border="0" width="100%">
       <tbody>
         ${renderInningLine(tla(game.awayTeam.name), aLine, records?.get(game.awayTeam.id))}

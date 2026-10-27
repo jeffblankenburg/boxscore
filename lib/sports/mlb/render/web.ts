@@ -1048,6 +1048,15 @@ ${completed.map((g) => renderGame(g, data.boxScores.get(g.id)!, data.scoringPlay
 </div>`;
 }
 
+// Individual box-score blocks — for the cross-sport home page masonry.
+export function renderMlbGames(data: CanonicalDailyData): string[] {
+  const completed = data.games.filter((g) => g.status === "final" && data.boxScores.has(g.id));
+  const records = buildTeamRecordMap(data.standings);
+  return completed.map((g) =>
+    renderGame(g, data.boxScores.get(g.id)!, data.scoringPlays.get(g.id) ?? [], undefined, records),
+  );
+}
+
 function renderAllStarGame(data: CanonicalDailyData, hl?: HighlightMap): string {
   const asg = data.games.find((g) => g.gameType === "all-star");
   if (!asg) return "";
@@ -1141,9 +1150,11 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
   const hScore = game.homeScore ?? 0;
   const innings = game.innings;
 
-  const winnerFirst = hScore >= aScore
-    ? `${nicknameHtml(game.homeTeam.name)} ${hScore}, ${nicknameHtml(game.awayTeam.name)} ${aScore}`
-    : `${nicknameHtml(game.awayTeam.name)} ${aScore}, ${nicknameHtml(game.homeTeam.name)} ${hScore}`;
+  // Road team first (newspaper convention), score each, with an extra-innings
+  // note — the shared box-score header format across every sport.
+  const gameHead =
+    `${nicknameHtml(game.awayTeam.name)} ${aScore}, ` +
+    `${nicknameHtml(game.homeTeam.name)} ${hScore}${innings.length > 9 ? ` (${innings.length} inn)` : ""}`;
 
   const w = inningCellWidth(innings);
   const extras = innings.length > 9;
@@ -1201,7 +1212,7 @@ function renderGame(game: MlbGame, box: MlbBoxScore, scoring: MlbScoringPlay[], 
     .join(" ");
 
   return `<div class="game-container">
-  <div class="game-header">${winnerFirst}</div>
+  <div class="game-header">${gameHead}</div>
   <div class="team-line">
     <div class="team-name">${teamLabel(game.awayTeam)}</div>
     <div class="${scoreClass}">${aCells}</div>

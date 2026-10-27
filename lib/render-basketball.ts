@@ -366,6 +366,16 @@ function renderResults(data: BasketballData, title: string, web: boolean, league
 `.trim();
 }
 
+// Individual box-score blocks — for the cross-sport home page masonry. College
+// shows only ranked games (a full D1 night is 100+), matching the league digest.
+export function renderBasketballGames(data: BasketballData, web: boolean, league: BasketballLeague): string[] {
+  let games = data.games.filter((g) => g.event.status === "final" || g.event.status === "in_progress");
+  if (isCollege(league)) games = orderGamesForCollege(games.filter((g) => isRankedGame(g.event)), league);
+  if (games.length === 0) return [];
+  const records = buildRecordMap(data.standings);
+  return games.map((g) => renderGameBlock(g.event, g.box, web, league, records));
+}
+
 export function renderGameBlock(
   event: BasketballScoreboardEvent,
   box: BasketballBoxscore | undefined,
@@ -392,21 +402,18 @@ export function renderGameBlock(
   const context = contextText
     ? `<div class="bb-game-context">${escapeHtml(contextText)}</div>`
     : "";
-  // Nicknames rather than ESPN's abbreviated shortName ("SA @ NY") — reads as
-  // "Spurs @ Knicks", matching the Yesterday's Results list above. Each side
-  // links to its team page. College shows the school + AP rank badge.
-  const matchup = `${teamLabel(event.away.team, web, league)} @ ${teamLabel(event.home.team, web, league)}`;
-  const status = escapeHtml(event.statusDetail || event.status);
-  // Web: flex header (matchup left, status right). Email can't rely on flex
-  // (mail clients shrink-wrap it so the two run together — same trap as the
-  // upcoming rows), so inline-style it with an explicit gap.
+  // Consistent box-score header (matches MLB): road team first, score each,
+  // with an overtime note. Nicknames link to their team page; college shows the
+  // school + AP rank badge. "Final" is implied on a results page, so it's gone.
+  const regP = isCollege(league) ? 2 : 4;
+  const otP = Math.max(event.away.linescores.length, event.home.linescores.length) - regP;
+  const otLabel = otP === 1 ? " (OT)" : otP > 1 ? ` (${otP}OT)` : "";
+  const head =
+    `${teamLabel(event.away.team, web, league)} ${event.away.score ?? ""}, ` +
+    `${teamLabel(event.home.team, web, league)} ${event.home.score ?? ""}${otLabel}`;
   const header = web
-    ? `<header class="bb-game-header">
-    <span class="bb-game-matchup">${matchup}</span>
-    <span class="bb-game-status">${status}</span>
-  </header>`
-    : `<header style="margin:0 0 4px"><span style="font-weight:700">${matchup}</span>`
-      + `<span style="color:#6a6354;font-size:11px;font-style:italic">&nbsp;&nbsp;${status}</span></header>`;
+    ? `<header class="bb-game-header"><span class="bb-game-matchup">${head}</span></header>`
+    : `<header style="margin:0 0 4px"><span style="font-weight:700">${head}</span></header>`;
   return `
 <article class="bb-game">
   ${context}

@@ -286,6 +286,12 @@ function renderGameScores(data: CanonicalFootballDailyData, web: boolean): strin
 </section>`.trim();
 }
 
+// Individual box-score blocks — for the cross-sport home page masonry. Full
+// per-game boxes for every played game.
+export function renderFootballGames(data: CanonicalFootballDailyData, web: boolean): string[] {
+  return playedGames(data).map((g) => renderGameBlock(data, g, data.boxScores.get(g.id), web));
+}
+
 // ---- Next Matchups --------------------------------------------------------
 
 function kickoffET(iso: string): string {
@@ -660,13 +666,13 @@ export function renderGameBlock(data: CanonicalFootballDailyData, g: FootballGam
   // per-team headers below keep the full "school + mascot" via teamLabel.
   const head = (t: FootballTeamRef) => (data.league === "nfl" ? teamShort(data, t, web) : teamTitle(data.league, t, web));
 
+  // Consistent box-score header (matches MLB): road team first, score each, with
+  // an OT note. "Final" is implied on a results page, so it's dropped.
+  const ot = /\/\s*OT/i.test(g.statusDetail) ? " (OT)" : "";
   return `
 <article class="fb-game">
   ${context}
-  <header class="fb-game-header">
-    <span class="fb-game-matchup">${head(g.awayTeam)} @ ${head(g.homeTeam)} ${upset}</span>
-    <span class="fb-game-status">${escapeHtml(g.statusDetail)}</span>
-  </header>
+  <header class="fb-game-header"><span class="fb-game-matchup">${head(g.awayTeam)} ${g.awayScore ?? ""}, ${head(g.homeTeam)} ${g.homeScore ?? ""}${ot}${upset ? ` ${upset}` : ""}</span></header>
   ${renderLineScore(g, buildRecordMap(data))}
   ${box ? renderScoringSummary(box.scoringPlays) : ""}
   ${box ? renderBox(box, data.league, web) : ""}

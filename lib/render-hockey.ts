@@ -184,6 +184,16 @@ function renderResults(data: HockeyData, title: string, web: boolean): string {
 </section>`.trim();
 }
 
+// Individual box-score blocks — for the cross-sport home page, which flows every
+// sport's games into one masonry so nothing leaves whitespace. Empty when
+// nothing's final.
+export function renderHockeyGames(data: HockeyData, web: boolean): string[] {
+  const games = data.games.filter((g) => g.event.status === "final" || g.event.status === "in_progress");
+  if (games.length === 0) return [];
+  const records = buildRecordMap(data.standings);
+  return games.map((g) => renderGameBlock(g.event, g.box, web, records));
+}
+
 export function renderGameBlock(
   event: HockeyScoreboardEvent,
   box: HockeyBoxscore | undefined,
@@ -197,14 +207,20 @@ export function renderGameBlock(
   const summary = event.series?.summary;
   const contextText = round ? (summary ? `${round} (${summary})` : round) : summary ?? "";
   const context = contextText ? `<div class="bb-game-context">${escapeHtml(contextText)}</div>` : "";
-  const matchup = `${teamNameLink(event.away.team.name, web)} @ ${teamNameLink(event.home.team.name, web)}`;
+  // Consistent box-score header (matches MLB): road team first, score each, with
+  // an OT/SO note. "Final" is implied on a results page, so it's dropped.
+  const otso = /\/\s*SO/i.test(event.statusDetail)
+    ? " (SO)"
+    : /\/\s*OT/i.test(event.statusDetail)
+      ? " (OT)"
+      : "";
+  const head =
+    `${teamNameLink(event.away.team.name, web)} ${event.away.score ?? ""}, ` +
+    `${teamNameLink(event.home.team.name, web)} ${event.home.score ?? ""}${otso}`;
   return `
 <article class="bb-game">
   ${context}
-  <header class="bb-game-header">
-    <span class="bb-game-matchup">${matchup}</span>
-    <span class="bb-game-status">${escapeHtml(event.statusDetail || event.status)}</span>
-  </header>
+  <header class="bb-game-header"><span class="bb-game-matchup">${head}</span></header>
   ${lineScore}
   ${scoring}
   ${boxTables}
