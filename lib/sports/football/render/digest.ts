@@ -671,8 +671,8 @@ export function renderGameBlock(data: CanonicalFootballDailyData, g: FootballGam
   const ot = /\/\s*OT/i.test(g.statusDetail) ? " (OT)" : "";
   return `
 <article class="fb-game">
-  ${context}
   <header class="fb-game-header"><span class="fb-game-matchup">${head(g.awayTeam)} ${g.awayScore ?? ""}, ${head(g.homeTeam)} ${g.homeScore ?? ""}${ot}${upset ? ` ${upset}` : ""}</span></header>
+  ${context}
   ${renderLineScore(g, buildRecordMap(data))}
   ${box ? renderScoringSummary(box.scoringPlays) : ""}
   ${box ? renderBox(box, data.league, web) : ""}

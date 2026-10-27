@@ -1,10 +1,10 @@
 // Composes the home page "complete edition": every sport that played YESTERDAY,
-// its box scores flowed into one cross-sport masonry (so a light slate like a
-// lone World Series game doesn't leave whitespace — the next sport packs in).
-// Each sport opens with a linked header (→ /[sport]). Reuses the exact box-score
+// its box scores, split into explicit newspaper columns server-side. Each column
+// is topped with a league header (a league continuing into the next column shows
+// its header again), so the first game of every column lands on the same line
+// and you always know which league you're reading. Reuses the exact box-score
 // renderers the emails use; reads the already-cached daily_raw per sport (no new
-// data, no cron). Wrapped in a short cached read so the render runs once per
-// interval, not per visitor.
+// data, no cron). Cached 300s in prod, bypassed in dev.
 import { getVisibleSports } from "@/lib/sports";
 import { mastheadNavSports } from "@/lib/masthead";
 import { yesterdayInET } from "@/lib/dates";
@@ -24,13 +24,21 @@ import { renderFootballGames } from "@/lib/sports/football/render/digest";
 import { loadNhlData } from "@/lib/nhl";
 import { renderHockeyGames } from "@/lib/render-hockey";
 
-// One cell in the grid: a single game's box score. The first game of each sport
-// also carries the sport header (→ /[sport]), so headers ride inline with the
-// games as the cells flow left-to-right, top-to-bottom.
-export type HomeCell = { html: string; header?: { id: string; name: string } };
+const IN_SEASON_DAYS = 5;
 
-// Load the sport's data for `date` (cached daily_raw) and render each game's box
-// score. Empty array when the sport didn't play that day.
+// One cell = a single game's box score, tagged with its league (so the page can
+// drop a league header at each column top + league change) and a rough rendered
+// height (to balance the columns).
+export type HomeCell = { html: string; leagueId: string; leagueName: string; weight: number };
+
+// Crude height proxy: table rows (one per player) plus a text-length term so
+// score-heavy boxes (MLB scoring plays) weigh more. Exact balance isn't needed —
+// it only decides where columns break; the top-of-column headers align regardless.
+function estimateWeight(html: string): number {
+  const rows = (html.match(/<tr/g) ?? []).length;
+  return 6 + rows + Math.floor(html.length / 600);
+}
+
 async function renderSportGames(sportId: string, date: string): Promise<string[]> {
   switch (sportId) {
     case "mlb": {
@@ -61,8 +69,7 @@ async function build(): Promise<HomeCell[]> {
   const perSport = await Promise.all(
     [...sports].sort((a, b) => rank(a.id) - rank(b.id)).map(async (sport) => {
       try {
-        const blocks = await renderSportGames(sport.id, date);
-        return { sport, blocks };
+        return { sport, blocks: await renderSportGames(sport.id, date) };
       } catch (err) {
         console.error(`[home-edition] ${sport.id} failed: ${(err as Error).message}`);
         return { sport, blocks: [] as string[] };
@@ -72,10 +79,9 @@ async function build(): Promise<HomeCell[]> {
 
   const cells: HomeCell[] = [];
   for (const { sport, blocks } of perSport) {
-    if (blocks.length === 0) continue; // didn't play yesterday → no header, no gap
-    blocks.forEach((html, idx) => {
-      cells.push(idx === 0 ? { html, header: { id: sport.id, name: sport.name } } : { html });
-    });
+    for (const html of blocks) {
+      cells.push({ html, leagueId: sport.id, leagueName: sport.name, weight: estimateWeight(html) });
+    }
   }
   return cells;
 }
@@ -84,4 +90,27 @@ export function buildHomeEdition(): Promise<HomeCell[]> {
   // Skip the cache in dev so renderer/CSS edits show immediately.
   if (process.env.NODE_ENV === "development") return build();
   return cachedRead(build, ["home-edition"], 300);
+}
+
+// Split the ordered cells into `n` contiguous columns of roughly equal weight —
+// column-major (so each league's games stay together) with balanced heights.
+export function splitColumns(cells: HomeCell[], n: number): HomeCell[][] {
+  const cols: HomeCell[][] = Array.from({ length: n }, () => []);
+  const total = cells.reduce((s, c) => s + c.weight, 0);
+  const target = total / n;
+  let ci = 0;
+  let acc = 0;
+  for (let i = 0; i < cells.length; i++) {
+    cols[ci]!.push(cells[i]!);
+    acc += cells[i]!.weight;
+    const remainingCells = cells.length - i - 1;
+    const remainingCols = n - ci - 1;
+    // Advance to the next column once this one hits its target, but always leave
+    // at least one cell for each remaining column.
+    if (ci < n - 1 && acc >= target && remainingCells > remainingCols) {
+      ci++;
+      acc = 0;
+    }
+  }
+  return cols;
 }

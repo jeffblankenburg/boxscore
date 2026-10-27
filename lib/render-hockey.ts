@@ -219,8 +219,8 @@ export function renderGameBlock(
     `${teamNameLink(event.home.team.name, web)} ${event.home.score ?? ""}${otso}`;
   return `
 <article class="bb-game">
-  ${context}
   <header class="bb-game-header"><span class="bb-game-matchup">${head}</span></header>
+  ${context}
   ${lineScore}
   ${scoring}
   ${boxTables}

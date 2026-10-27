@@ -416,8 +416,8 @@ export function renderGameBlock(
     : `<header style="margin:0 0 4px"><span style="font-weight:700">${head}</span></header>`;
   return `
 <article class="bb-game">
-  ${context}
   ${header}
+  ${context}
   ${lineScore}
   ${boxTables}
 </article>

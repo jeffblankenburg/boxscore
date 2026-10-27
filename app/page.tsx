@@ -1,24 +1,26 @@
-import { buildHomeEdition } from "@/lib/home-edition";
-import { todayInET, prettyDate } from "@/lib/dates";
+import { buildHomeEdition, splitColumns } from "@/lib/home-edition";
+import { getVisibleSports } from "@/lib/sports";
+import { mastheadNavSports, renderMasthead } from "@/lib/masthead";
+import { yesterdayInET } from "@/lib/dates";
 import { BRAND } from "@/lib/brand";
 
-// The home page: a newspaper front page and the complete edition — every
-// in-season sport's yesterday box scores, each under a linked section header
-// that leads to the full digest (standings, leaders, …) at /[sport].
+// The home page: the complete edition — every in-season sport's yesterday box
+// scores — under the same masthead (sport nav + dateline) every /[sport] page
+// uses, so the header is identical site-wide.
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const today = todayInET();
   const edition = await buildHomeEdition();
   const empty = edition.length === 0;
+  const columns = splitColumns(edition, 3);
+  // Same masthead as the digests: sport nav + dateline. No current sport is
+  // bolded on the home page; the dateline shows the edition date (yesterday + 1).
+  const navSports = mastheadNavSports(await getVisibleSports());
+  const masthead = renderMasthead({ date: yesterdayInET(), sport: "", surface: "web", navSports });
 
   return (
     <main className="home">
-      <div className="home-nameplate">
-        <h1 className="home-wordmark">{BRAND.name}</h1>
-        <div className="home-dateline">{prettyDate(today)}</div>
-        <div className="home-tagline">{BRAND.tagline}</div>
-      </div>
+      <div dangerouslySetInnerHTML={{ __html: masthead }} />
 
       <section className="home-subscribe">
         <p>The daily box score for every sport, free in your inbox.</p>
@@ -27,17 +29,25 @@ export default async function HomePage() {
 
       {empty && <p className="home-empty">No games yesterday. Check back after tonight&rsquo;s slate.</p>}
 
-      {/* Column-major (newspaper agate): games flow down each column then over to
-          the next, so each league's games stay contiguous under its header. */}
-      <div className="home-flow">
-        {edition.map((cell, i) => (
-          <div className="home-cell" key={i}>
-            {cell.header && (
-              <h2 className="home-sport-head">
-                <a href={`/${cell.header.id}`}>{cell.header.name} &rarr;</a>
-              </h2>
-            )}
-            <div className="home-game" dangerouslySetInnerHTML={{ __html: cell.html }} />
+      {/* Explicit newspaper columns: each column is topped with a league header
+          (a league continuing from the previous column shows its header again),
+          so every column's first game lands on the same line. */}
+      <div className="home-cols">
+        {columns.map((col, ci) => (
+          <div className="home-col" key={ci}>
+            {col.map((cell, i) => {
+              const showHeader = i === 0 || col[i - 1]!.leagueId !== cell.leagueId;
+              return (
+                <div className="home-cell" key={i}>
+                  {showHeader && (
+                    <h2 className="home-sport-head">
+                      <a href={`/${cell.leagueId}`}>{cell.leagueName}</a>
+                    </h2>
+                  )}
+                  <div className="home-game" dangerouslySetInnerHTML={{ __html: cell.html }} />
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

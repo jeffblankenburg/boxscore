@@ -29,6 +29,8 @@ a { color: inherit; }
   background-color: var(--bg-paper); box-shadow: 0 0 10px var(--shadow);
   /* Override below on narrow viewports — see @media (max-width: 480px). */
 }
+/* The home page (full sports page) uses more of the width than a digest. */
+.newspaper:has(.home) { max-width: 1680px; }
 
 .site-header {
   display: grid;
@@ -1367,12 +1369,11 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 /* No top rule — the header's bottom rule separates games, matching MLB. */
 .bb-game { margin: 18px 0 6px; }
 .bb-game-context { font-size: 11px; font-style: italic; color: #6a6354;
-                   letter-spacing: 0.04em; margin-bottom: 2px; }
-.bb-game-header { display: flex; justify-content: space-between;
-                  align-items: baseline; margin: 0 0 4px;
-                  padding-bottom: 3px; border-bottom: 1px solid #161410; }
+                   letter-spacing: 0.04em; margin: 3px 0 5px; }
+/* Box-score game header — identical treatment across every sport (matches the
+   MLB .game-header): 18px bold with a strong bottom rule, no top rule. */
+.bb-game-header { margin: 0; border-bottom: 1px solid var(--border-strong); }
 .bb-game-matchup { font-size: 18px; font-weight: 700; }
-.bb-game-status  { font-size: 11px; color: #6a6354; font-style: italic; }
 
 .bb-bracket-round { margin: 10px 0 14px; }
 .bb-bracket-round-title {
@@ -1524,7 +1525,7 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 .bb-pl-inj    { font-size: 10px; color: #6a6354; font-style: italic; }
 
 /* Player page (web only) — mirrors the football fb-pl- layout. */
-.bb-game-header { font-size: 14px; font-weight: 700; margin: 16px 0 4px;
+.bb-player .bb-game-header { font-size: 14px; font-weight: 700; margin: 16px 0 4px;
                   padding-bottom: 3px; border-bottom: 1px solid #161410; }
 .bb-player .bb-player-table { table-layout: auto; }
 .bb-player .bb-pl-name { width: auto; white-space: nowrap; }
@@ -1641,11 +1642,9 @@ a.subscribe-button-outline:hover, .subscribe-button-outline:hover {
 /* No top rule — the header's bottom rule separates games, matching MLB. */
 .fb-game { margin: 18px 0 8px; }
 .fb-game-context { font-size: 11px; font-style: italic; color: #6a6354;
-                   letter-spacing: 0.04em; margin-bottom: 2px; }
-.fb-game-header { display: flex; justify-content: space-between; align-items: baseline;
-                  margin: 0 0 4px; padding-bottom: 3px; border-bottom: 1px solid #161410; }
+                   letter-spacing: 0.04em; margin: 3px 0 5px; }
+.fb-game-header { margin: 0; border-bottom: 1px solid var(--border-strong); }
 .fb-game-matchup { font-size: 18px; font-weight: 700; }
-.fb-game-status  { font-size: 11px; color: #6a6354; font-style: italic; }
 .fb-rank-badge { font-size: 11px; font-weight: 700; color: #6a6354; }
 .fb-upset {
   font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
@@ -3805,31 +3804,11 @@ tr.cx-diff-hl > td { background: transparent; }
    reading column. Reuses the digest aesthetic: Source Sans, double rules,
    monochrome.
    ========================================================================= */
-.home { max-width: 1120px; margin: 0 auto; }
+/* The home page is the full sports page — let it use the width (the global
+   .newspaper wrapper is widened for it below) instead of a narrow column. */
+.home { max-width: none; margin: 0 auto; }
 
-/* Nameplate: the front-page masthead wordmark + date + tagline. */
-.home-nameplate {
-  text-align: center;
-  border-top: 3px double var(--text-primary);
-  border-bottom: 1px solid var(--text-primary);
-  padding: 16px 0 12px;
-  margin-top: 4px;
-}
-.home-wordmark {
-  font-family: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
-  font-weight: 800; font-size: 48px; letter-spacing: -0.03em; line-height: 1;
-  margin: 0; color: var(--text-primary);
-}
-.home-dateline {
-  margin-top: 10px; font-size: 11px; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--text-muted);
-}
-.home-tagline {
-  margin-top: 4px; font-family: Georgia, 'Times New Roman', serif;
-  font-style: italic; font-size: 14px; color: var(--text-secondary);
-}
-
-/* Subscribe band: the primary CTA, right under the nameplate. */
+/* Subscribe band: the primary CTA, right under the masthead. */
 .home-subscribe { text-align: center; max-width: 520px; margin: 20px auto; }
 .home-subscribe p { margin: 0 0 12px; font-size: 15px; color: var(--text-secondary); }
 .home-subscribe-btn {
@@ -3844,15 +3823,20 @@ tr.cx-diff-hl > td { background: transparent; }
    whitespace. Each item is kept whole (break-inside: avoid). content-visibility
    lets the browser skip off-screen items so a very long page still paints fast.
    The box-score HTML reuses the digest classes, already styled above. */
-/* Column-major newspaper flow: CSS columns fill down then across, so each
-   league's games stay contiguous under its header (the reader scans a column
-   and doesn't lose the league). Three columns on desktop; straight to one on
-   mobile (never two — box scores need ~320px to stay readable). Each cell stays
-   whole. */
-.home-flow { column-count: 3; column-gap: 24px; margin-top: 12px; }
-@media (max-width: 960px) { .home-flow { column-count: 1; } }
-.home-cell { break-inside: avoid; page-break-inside: avoid; margin: 0 0 22px; min-width: 0; }
+/* Explicit newspaper columns (split server-side in lib/home-edition). Three on
+   desktop, one on mobile (never two — box scores need ~320px to stay readable).
+   Each column is topped with a league header, so the first game of each column
+   aligns across the page. */
+.home-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 12px; align-items: start; }
+@media (max-width: 960px) { .home-cols { grid-template-columns: 1fr; } }
+.home-col { min-width: 0; }
+.home-cell { margin: 0 0 22px; min-width: 0; }
 .home-game { margin: 0; }
+/* The cell owns the spacing — strip each sport's own box margins so every
+   game sits flush under its header and the first games align across columns. */
+.home-cell .game-container,
+.home-cell .bb-game,
+.home-cell .fb-game { margin: 0; }
 .home-sport-head {
   font-weight: 800; font-size: 20px; letter-spacing: -0.02em;
   margin: 0 0 10px; border-bottom: 2px solid var(--text-primary); padding-bottom: 4px;
