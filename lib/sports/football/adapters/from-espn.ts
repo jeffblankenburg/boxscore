@@ -487,12 +487,12 @@ function parseRecord(record: string | null): { wins: number; losses: number; tie
   return { wins: parts[0]!, losses: parts[1]!, ties: parts[2] ?? 0 };
 }
 
-function adaptStandingsGroup(node: Rec, parentConference: string | null): FootballStandingsGroup[] {
+function adaptStandingsGroup(cfg: FootballLeagueConfig, node: Rec, parentConference: string | null): FootballStandingsGroup[] {
   const groupName = str(node.name || node.abbreviation);
   const children = arr(node.children).map(rec);
   if (children.length) {
     // A conference with divisions (NFL): recurse, tagging conference.
-    return children.flatMap((c) => adaptStandingsGroup(c, groupName || parentConference));
+    return children.flatMap((c) => adaptStandingsGroup(cfg, c, groupName || parentConference));
   }
   const entries = arr(rec(node.standings).entries).map(rec);
   if (!entries.length) return [];
@@ -524,12 +524,25 @@ function adaptStandingsGroup(node: Rec, parentConference: string | null): Footba
     };
   });
   // ESPN's entry order is unreliable — some divisions arrive win%-sorted, others
-  // put the leader last (a 14-3 team shown 4th). Sort ourselves: win% desc, then
-  // more wins (breaks ties when games-played differ early season), then net
-  // points. This is a display heuristic, not the NFL's full official tiebreaker
-  // chain (head-to-head / common games / etc., which the feed doesn't give us).
+  // put the leader last (a 14-3 team shown 4th). Sort ourselves. College
+  // "Conference Standings" rank by in-conference record (that's what the table
+  // claims to be), so for NCAAF lead with conference win%, then conference wins.
+  // NFL division standings rank by OVERALL win% (the conference record is only a
+  // downstream tiebreaker there), so NFL keeps the overall-first order. Both
+  // then fall through to overall win%, wins, and net points — a display
+  // heuristic, not the full official tiebreaker chain (head-to-head / common
+  // games / etc., which the feed doesn't give us).
   const netPoints = (r: FootballStandingsRow) => (r.pointsFor ?? 0) - (r.pointsAgainst ?? 0);
+  const confPct = (r: FootballStandingsRow) => {
+    const c = parseRecord(r.conferenceRecord);
+    if (!c) return -1;
+    const played = c.wins + c.losses + c.ties;
+    return played > 0 ? (c.wins + 0.5 * c.ties) / played : 0;
+  };
+  const confWins = (r: FootballStandingsRow) => parseRecord(r.conferenceRecord)?.wins ?? -1;
+  const byConference = cfg.league === "ncaaf";
   rows.sort((a, b) =>
+    (byConference ? (confPct(b) - confPct(a)) || (confWins(b) - confWins(a)) : 0) ||
     (b.pct ?? -1) - (a.pct ?? -1) ||
     b.wins - a.wins ||
     netPoints(b) - netPoints(a) ||
@@ -538,12 +551,12 @@ function adaptStandingsGroup(node: Rec, parentConference: string | null): Footba
   return [{ group: groupName, conference: parentConference, rows }];
 }
 
-function adaptStandings(raw: FootballRaw): FootballStandingsGroup[] {
+function adaptStandings(cfg: FootballLeagueConfig, raw: FootballRaw): FootballStandingsGroup[] {
   const root = rec(raw.standings);
   // ESPN returns either {children:[...]} or {standings:{entries}} at top level.
   const top = arr(root.children).map(rec);
-  if (top.length) return top.flatMap((c) => adaptStandingsGroup(c, null));
-  return adaptStandingsGroup(root, null);
+  if (top.length) return top.flatMap((c) => adaptStandingsGroup(cfg, c, null));
+  return adaptStandingsGroup(cfg, root, null);
 }
 
 // ─── Season leaders ───────────────────────────────────────────────────────
@@ -617,7 +630,7 @@ export function adaptEspnFootball(
     if (box) boxScores.set(id, box);
   }
 
-  const standings = adaptStandings(raw);
+  const standings = adaptStandings(cfg, raw);
   // team.id → "W-L" (or "W-L-T") from the per-game standings feed, so the Top 25
   // record column stays in lockstep with the conference standings tables that
   // render from this same data.
