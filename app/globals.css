@@ -3875,14 +3875,3 @@ tr.cx-diff-hl > td { background: transparent; }
 .home-sport-head a:hover { text-decoration: underline; }
 .home-empty { text-align: center; color: var(--text-muted); font-size: 15px; margin: 28px 0; }
 
-/* Premium strip: names the paid offerings; filled in as they launch. */
-.home-premium {
-  margin-top: 24px; padding-top: 14px; text-align: center;
-  border-top: 3px double var(--text-primary);
-}
-.home-premium-kicker {
-  font-weight: 800; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--text-primary);
-}
-.home-premium p { margin: 7px auto 0; max-width: 480px; font-size: 14px; color: var(--text-muted); }
-

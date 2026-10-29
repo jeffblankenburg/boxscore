@@ -47,11 +47,6 @@ export default async function HomePage() {
           );
         })}
       </div>
-
-      <section className="home-premium">
-        <div className="home-premium-kicker">Premium</div>
-        <p>Model picks and pre-game lineup cheatsheets, by sport. Launching after the World Series.</p>
-      </section>
     </main>
   );
 }
