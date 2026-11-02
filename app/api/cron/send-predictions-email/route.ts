@@ -75,6 +75,15 @@ export async function GET(req: Request) {
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });
     }
+    // No MLB slate for `date` (the season's over, or a rare dark day) → no picks
+    // to send. Skip so the daily cron doesn't mail a "No games today" card all
+    // offseason. Self-resuming: picks go out again the day games return.
+    if (data.today.length === 0) {
+      const result = { sport: SEND_KEY, date, total_active_subscribers: subscribers.length, sent: 0, skipped: 0, failed: 0, skipped_reason: "no_games" };
+      console.log(`[send-predictions-email] date=${date} status=skipped reason=no_games`);
+      await finishCronRun(runId, { status: "ok", result });
+      return NextResponse.json({ ok: true, ...result });
+    }
     const body = renderPredictionsDigestBody(data);
 
     const digestUrl0 = `${EMAIL_LINK_BASE}/mlb/predictions`;
