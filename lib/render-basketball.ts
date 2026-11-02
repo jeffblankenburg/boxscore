@@ -55,6 +55,13 @@ function isCollege(league: BasketballLeague): boolean {
   return league === "ncaam" || league === "ncaaw";
 }
 
+// Only MEN'S college ball plays two halves; NCAAW (like the NBA/WNBA) plays four
+// quarters. Keep this distinct from isCollege, which drives the shared college
+// LAYOUT (both ncaam and ncaaw) — period structure is the one place they differ.
+function usesHalves(league: BasketballLeague): boolean {
+  return league === "ncaam";
+}
+
 // AP rank badge for a ranked college team.
 function rankBadge(rank: number | null | undefined): string {
   return rank ? `<span class="bb-rank">${rank}</span> ` : "";
@@ -405,7 +412,7 @@ export function renderGameBlock(
   // Consistent box-score header (matches MLB): road team first, score each,
   // with an overtime note. Nicknames link to their team page; college shows the
   // school + AP rank badge. "Final" is implied on a results page, so it's gone.
-  const regP = isCollege(league) ? 2 : 4;
+  const regP = usesHalves(league) ? 2 : 4;
   const otP = Math.max(event.away.linescores.length, event.home.linescores.length) - regP;
   const otLabel = otP === 1 ? " (OT)" : otP > 1 ? ` (${otP}OT)` : "";
   const head =
@@ -425,10 +432,11 @@ export function renderGameBlock(
 }
 
 function renderLineScore(event: BasketballScoreboardEvent, league: BasketballLeague, records?: Map<string, string>): string {
-  // Regulation is 2 halves in college, 4 quarters in the pros; anything beyond
-  // is overtime. Render whichever periods either side has a linescore for.
-  // ESPN's linescores arrays are sorted by period, so max length covers both.
-  const regPeriods = isCollege(league) ? 2 : 4;
+  // Regulation is 2 halves in men's college, 4 quarters everywhere else (NBA,
+  // WNBA, and NCAAW); anything beyond is overtime. Render whichever periods
+  // either side has a linescore for. ESPN's linescores arrays are sorted by
+  // period, so max length covers both.
+  const regPeriods = usesHalves(league) ? 2 : 4;
   const maxPeriods = Math.max(
     event.away.linescores.length,
     event.home.linescores.length,
