@@ -197,15 +197,15 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
   // College (NCAAM/NCAAW): ranked-focused, and it NEVER uses the best-of-series
   // playoff branch below — the NCAA tournament is single-elimination (its
   // bracket is a separate, later feature), and the 14-day upcoming window would
-  // otherwise flip isPlayoffs true in March and hijack the layout. AP Top 25
-  // leads, then the day's scores (ranked first), Top-25 box scores, league-wide
-  // leaders, tonight's ranked matchups. No full standings — 31 conferences
-  // would bloat the email; they live on the conference pages.
+  // otherwise flip isPlayoffs true in March and hijack the layout. Yesterday's
+  // results lead, then the AP Top 25, Top-25 box scores, league-wide leaders,
+  // tonight's ranked matchups. No full standings — 31 conferences would bloat
+  // the email; they live on the conference pages.
   if (isCollege(league)) {
     const sections = [
       masthead,
-      renderRankings(data.rankings, web, league),
       renderYesterdayResults(data, web, league),
+      renderRankings(data.rankings, web, league),
       renderResults(data, "Top 25 Box Scores", web, league),
       renderLeaders(data.leaders, data.sport, web, league, data.isPreseason),
       renderTodaysGames(data, web, league),
@@ -216,9 +216,9 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
 
   // Playoffs and regular-season modes use different section orders. Playoffs
   // leads with the result (the big news is the game just played), then the
-  // current series state, then what's coming up. Regular season mirrors
-  // baseball: league context first (standings + leaders), then today's
-  // schedule, then yesterday's box scores, then transactions.
+  // current series state, then what's coming up. Regular season leads with
+  // yesterday's results, then league context (standings + leaders), today's
+  // schedule, yesterday's box scores, then transactions.
   if (data.isPlayoffs) {
     // Prefer the reconstructed visual bracket; fall back to the text series
     // glance if the bracket scan turned up nothing (e.g. a brand-new postseason
@@ -241,9 +241,9 @@ function renderBody(data: BasketballData, web: boolean, navSports: NavSport[]): 
 
   const sections = [
     masthead,
+    renderYesterdayResults(data, web, league),
     renderStandingsColumns(data.standings, web, league, data.isPreseason),
     renderLeaders(data.leaders, data.sport, web, league, data.isPreseason),
-    renderYesterdayResults(data, web, league),
     renderTodaysGames(data, web, league),
     renderResults(data, data.isPreseason ? "Box scores (Preseason)" : "Box scores", web, league),
     renderTransactions(data.transactions),
@@ -314,7 +314,7 @@ function renderYesterdayResults(data: BasketballData, web: boolean, league: Bask
       <span class="${aClass}">${teamLabel(away.team, web, league)} ${aScore}</span>, <span class="${hClass}">${teamLabel(home.team, web, league)} ${hScore}</span>${tag}
     </div>`;
   }).join("");
-  const title = isCollege(league) ? "Scores" : data.isPreseason ? "Preseason Results" : "Yesterday’s Results";
+  const title = data.isPreseason ? "Preseason Results" : "Yesterday’s Results";
   return `<div class="games-section">
   <div class="games-section-title">${title}</div>
   <div class="games-grid">${lines}</div>

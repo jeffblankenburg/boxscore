@@ -114,9 +114,9 @@ function renderBody(data: HockeyData, web: boolean, navSports: NavSport[]): stri
       ]
     : [
         masthead,
+        renderYesterdayResults(data, web),
         renderStandingsColumns(data.standings, web),
         renderLeaders(data.leaders, web),
-        renderYesterdayResults(data, web),
         renderTodaysGames(data, web),
         renderResults(data, "Box scores", web),
         renderTransactions(data.transactions),
