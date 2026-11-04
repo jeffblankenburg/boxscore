@@ -29,6 +29,13 @@ export default async function BracketShareImage({
   const bracket = raw ? postseasonBracketForDate(raw, gamesDate) : null;
   // No bracket (not a postseason day) → 404 so the renderer skips it cleanly.
   if (!bracket || bracket.series.length === 0) notFound();
+  // Once the champion is crowned the postseason is over, but statsapi keeps
+  // returning the completed series all offseason — so without this the finished
+  // bracket would 200 (and the social cron would post it) every day until
+  // spring. 404 as soon as the World Series has a winner; the clinch day itself
+  // is still covered by the game scoreboard post.
+  const ws = bracket.series.find((s) => s.round === "world-series");
+  if (ws?.winnerTeamId != null) notFound();
 
   return (
     <div className="share-image-canvas bracket-share">
