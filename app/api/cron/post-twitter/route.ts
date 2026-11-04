@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { EUploadMimeType } from "twitter-api-v2";
 import { isValidIsoDate, nextDay, prettyDate, yesterdayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost } from "@/lib/social-posts";
-import { deleteTweet, postTweetWithImage, twitterAccountConfigured } from "@/lib/twitter";
+import { deleteTweet, postTweetWithImage, twitterAccountConfigured, twitterTargetsForSport } from "@/lib/twitter";
 import { siteOrigin } from "@/lib/site";
 import { socialSendsAllowed } from "@/lib/sports";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -47,14 +47,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
 
-    // Skip sports whose X account isn't wired up yet (no per-league creds).
-    // MLB always resolves to the shared base account; other leagues skip until
-    // their TWITTER_*_<SPORT> vars exist — never leaking onto the MLB profile.
+    // Every sport posts to the shared main account; most also post to their own
+    // dedicated profile. Skip only when no account resolves at all (base creds
+    // missing). See twitterTargetsForSport.
     if (!twitterAccountConfigured(sport)) {
       const result = { sport, date, skipped: "no twitter account configured for this sport" };
       await finishCronRun(runId, { status: "ok", result });
       return NextResponse.json({ ok: true, ...result });
     }
+    const targets = twitterTargetsForSport(sport);
 
     if (reset) {
       const { data: prior, error: priorErr } = await supabaseAdmin()
@@ -66,7 +67,11 @@ export async function GET(req: Request) {
       if (priorErr) throw new Error(`reset query: ${priorErr.message}`);
       for (const row of prior ?? []) {
         if (row.remote_id) {
-          try { await deleteTweet(sport, row.remote_id); } catch { /* gone */ }
+          // A tweet id belongs to exactly one account; try each target and let
+          // the non-owners fail harmlessly.
+          for (const t of targets) {
+            try { await deleteTweet(t, row.remote_id); } catch { /* not owner / gone */ }
+          }
         }
       }
       const { error: delErr } = await supabaseAdmin()
@@ -120,37 +125,42 @@ export async function GET(req: Request) {
         results.push({ subId: entry.subId, url: "(skipped: full image disabled)" });
         continue;
       }
-      if (await hasAlreadyPosted("twitter", sport, date, entry.subId)) {
-        skipped++;
-        results.push({ subId: entry.subId, url: "(already posted)" });
-        continue;
-      }
-
       // No digestUrl for Twitter: URL-bearing posts cost $0.20 vs $0.015
       // without. The bio link covers click-through.
       const { text, alt } = imagePostContent(entry, captionDates, undefined, sport, officialMap);
       const mimeType = mime === "image/jpeg" ? EUploadMimeType.Jpeg : EUploadMimeType.Png;
 
-      try {
-        const { id, url: postUrl } = await postTweetWithImage({
-          text, altText: alt, imageBytes: png, mimeType, sport,
-        });
-        await recordPost({
-          platform: "twitter", sport, date, subId: entry.subId,
-          remoteId: id, remoteUrl: postUrl, error: null,
-        });
-        posted++;
-        results.push({ subId: entry.subId, url: postUrl });
-        // Pace posts so the feed reads as a series, not a burst.
-        await new Promise((r) => setTimeout(r, 500));
-      } catch (err) {
-        const msg = (err as Error).message;
-        await recordPost({
-          platform: "twitter", sport, date, subId: entry.subId,
-          remoteId: null, remoteUrl: null, error: msg,
-        });
-        failed++;
-        results.push({ subId: entry.subId, error: msg });
+      // Fan out to every account for this sport (dedicated + main mirror). Each
+      // account dedups on its own sub_id (bare for the primary, "#handle" for a
+      // mirror), so a re-run skips only the accounts already posted.
+      for (const target of targets) {
+        const subId = `${entry.subId}${target.subIdSuffix}`;
+        if (await hasAlreadyPosted("twitter", sport, date, subId)) {
+          skipped++;
+          results.push({ subId, url: "(already posted)" });
+          continue;
+        }
+        try {
+          const { id, url: postUrl } = await postTweetWithImage({
+            text, altText: alt, imageBytes: png, mimeType, target,
+          });
+          await recordPost({
+            platform: "twitter", sport, date, subId,
+            remoteId: id, remoteUrl: postUrl, error: null,
+          });
+          posted++;
+          results.push({ subId, url: postUrl });
+          // Pace posts so the feed reads as a series, not a burst.
+          await new Promise((r) => setTimeout(r, 500));
+        } catch (err) {
+          const msg = (err as Error).message;
+          await recordPost({
+            platform: "twitter", sport, date, subId,
+            remoteId: null, remoteUrl: null, error: msg,
+          });
+          failed++;
+          results.push({ subId, error: msg });
+        }
       }
     }
 

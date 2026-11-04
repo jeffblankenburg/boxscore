@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 import { EUploadMimeType } from "twitter-api-v2";
 import { isValidIsoDate, timeInET, todayInET } from "@/lib/dates";
 import { hasAlreadyPosted, recordPost, type Platform } from "@/lib/social-posts";
-import { deleteTweet, postTweetWithImage, twitterAccountConfigured } from "@/lib/twitter";
+import { deleteTweet, postTweetWithImage, twitterTargetsForSport } from "@/lib/twitter";
 import { blueskyTargetsForSport, deleteBlueskyPost, postToBlueskyWithImage } from "@/lib/bluesky";
 import { deleteFacebookPost, publishAlbum, uploadUnpublishedPhoto, FACEBOOK_POSTING_ENABLED } from "@/lib/facebook";
 import { loadLeagueWebhook, postToWebhook } from "@/lib/discord";
@@ -76,18 +76,24 @@ function caption(data: LineupCardData, officialMap: Record<string, string | null
 
 type PostResult = { platform: Platform; url?: string; skipped?: string; error?: string };
 
-async function postToTwitter(data: LineupCardData, subId: string, text: string, alt: string, png: Uint8Array): Promise<PostResult> {
-  if (!twitterAccountConfigured(SPORT)) return { platform: "twitter", skipped: "not configured" };
-  if (await hasAlreadyPosted("twitter", SPORT, data.date, subId)) return { platform: "twitter", skipped: "already posted" };
-  try {
-    const { id, url } = await postTweetWithImage({ text, altText: alt, imageBytes: png, mimeType: EUploadMimeType.Png, sport: SPORT });
-    await recordPost({ platform: "twitter", sport: SPORT, date: data.date, subId, remoteId: id, remoteUrl: url, error: null });
-    return { platform: "twitter", url };
-  } catch (err) {
-    const msg = (err as Error).message;
-    await recordPost({ platform: "twitter", sport: SPORT, date: data.date, subId, remoteId: null, remoteUrl: null, error: msg });
-    return { platform: "twitter", error: msg };
+async function postToTwitter(data: LineupCardData, subId: string, text: string, alt: string, png: Uint8Array): Promise<PostResult[]> {
+  const targets = twitterTargetsForSport(SPORT);
+  if (targets.length === 0) return [{ platform: "twitter", skipped: "not configured" }];
+  const out: PostResult[] = [];
+  for (const target of targets) {
+    const sub = `${subId}${target.subIdSuffix}`;
+    if (await hasAlreadyPosted("twitter", SPORT, data.date, sub)) { out.push({ platform: "twitter", skipped: "already posted" }); continue; }
+    try {
+      const { id, url } = await postTweetWithImage({ text, altText: alt, imageBytes: png, mimeType: EUploadMimeType.Png, target });
+      await recordPost({ platform: "twitter", sport: SPORT, date: data.date, subId: sub, remoteId: id, remoteUrl: url, error: null });
+      out.push({ platform: "twitter", url });
+    } catch (err) {
+      const msg = (err as Error).message;
+      await recordPost({ platform: "twitter", sport: SPORT, date: data.date, subId: sub, remoteId: null, remoteUrl: null, error: msg });
+      out.push({ platform: "twitter", error: msg });
+    }
   }
+  return out;
 }
 
 async function postToBluesky(data: LineupCardData, subId: string, text: string, alt: string, png: Uint8Array): Promise<PostResult[]> {
@@ -164,13 +170,17 @@ async function resetDate(date: string): Promise<void> {
     .eq("sport", SPORT)
     .eq("date", date)
     .like("sub_id", "lineup-%");
-  const targets = blueskyTargetsForSport(SPORT);
+  const bskyTargets = blueskyTargetsForSport(SPORT);
+  const xTargets = twitterTargetsForSport(SPORT);
   for (const row of rows ?? []) {
     if (!row.remote_id) continue;
     try {
-      if (row.platform === "twitter") await deleteTweet(SPORT, row.remote_id);
+      if (row.platform === "twitter") {
+        // A tweet id belongs to one account; try each and let non-owners fail.
+        for (const t of xTargets) { try { await deleteTweet(t, row.remote_id); } catch { /* not owner / gone */ } }
+      }
       else if (row.platform === "facebook") await deleteFacebookPost(row.remote_id);
-      else if (row.platform === "bluesky" && targets[0]) await deleteBlueskyPost(targets[0], row.remote_id);
+      else if (row.platform === "bluesky" && bskyTargets[0]) await deleteBlueskyPost(bskyTargets[0], row.remote_id);
     } catch { /* already gone */ }
   }
   await supabaseAdmin()
@@ -269,7 +279,7 @@ export async function GET(req: Request) {
 
       const { text, alt } = caption(data, officialMap);
       const posts: PostResult[] = [];
-      posts.push(await postToTwitter(data, subId, text, alt, png));
+      posts.push(...await postToTwitter(data, subId, text, alt, png));
       posts.push(...await postToBluesky(data, subId, text, alt, png));
       if (imageUrl) {
         posts.push(await postToFacebook(data, subId, text, imageUrl));

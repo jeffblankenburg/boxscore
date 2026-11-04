@@ -1,10 +1,12 @@
 import { EUploadMimeType, TwitterApi } from "twitter-api-v2";
 
-// Per-league credential resolution. MLB owns the shared/base account
-// (TWITTER_API_KEY etc.) — its posts are unchanged. Every other sport posts to
-// its own profile via _<SPORT>-suffixed vars (TWITTER_API_KEY_NFL, ...). If a
-// sport has no suffixed creds it is treated as "not configured" and the caller
-// skips it — we never leak a league's posts onto the shared MLB account.
+// Social-account resolution. Every sport posts to its dedicated profile AND
+// mirrors to the shared main account (@boxscoreemail — the base TWITTER_* vars),
+// so the main feed carries every sport while each per-sport channel carries only
+// its own. MLB IS the main account (its creds are the unsuffixed base vars).
+// Other sports read _<SPORT>-suffixed vars (TWITTER_API_KEY_NFL, ...) for their
+// dedicated account; a sport with no suffixed creds posts to the main account
+// ONLY (see issue #152 for the dedicated accounts still to be created).
 
 type TwitterCreds = {
   appKey: string;
@@ -14,51 +16,83 @@ type TwitterCreds = {
   handle: string;
 };
 
-function envSuffix(sport: string): string {
-  return sport === "mlb" ? "" : `_${sport.toUpperCase()}`;
-}
+// A resolved account to post to, plus the sub_id suffix that keeps each
+// account's social_posts dedup rows distinct. The primary account for a sport
+// uses "" (bare sub_id) to preserve existing post history; a mirror gets
+// "#handle" so it dedups independently.
+export type TwitterTarget = TwitterCreds & { subIdSuffix: string };
 
-function credsForSport(sport: string): TwitterCreds | null {
-  const s = envSuffix(sport);
-  const appKey = process.env[`TWITTER_API_KEY${s}`];
-  const appSecret = process.env[`TWITTER_API_SECRET${s}`];
-  const accessToken = process.env[`TWITTER_ACCESS_TOKEN${s}`];
-  const accessSecret = process.env[`TWITTER_ACCESS_SECRET${s}`];
+function readCreds(suffix: string, defaultHandle: string): TwitterCreds | null {
+  const appKey = process.env[`TWITTER_API_KEY${suffix}`];
+  const appSecret = process.env[`TWITTER_API_SECRET${suffix}`];
+  const accessToken = process.env[`TWITTER_ACCESS_TOKEN${suffix}`];
+  const accessSecret = process.env[`TWITTER_ACCESS_SECRET${suffix}`];
   if (!appKey || !appSecret || !accessToken || !accessSecret) return null;
   // Handle only shapes the post URL, so it isn't required for "configured".
-  const handle =
-    process.env[`TWITTER_HANDLE${s}`] ?? (sport === "mlb" ? "boxscoreemail" : "");
+  const handle = process.env[`TWITTER_HANDLE${suffix}`] ?? defaultHandle;
   return { appKey, appSecret, accessToken, accessSecret, handle };
 }
 
-/**
- * Whether an X/Twitter account is set up for this sport. Crons call this to
- * skip a league before rendering images when its profile isn't wired yet.
- */
-export function twitterAccountConfigured(sport: string): boolean {
-  return credsForSport(sport) !== null;
+function baseCreds(): TwitterCreds | null {
+  return readCreds("", "boxscoreemail");
 }
 
+function ownCreds(sport: string): TwitterCreds | null {
+  return readCreds(`_${sport.toUpperCase()}`, "");
+}
+
+/**
+ * The X/Twitter account(s) a sport posts to, in priority order. MLB's account
+ * IS the shared main account, so it resolves to a single target. Every other
+ * sport keeps its dedicated account primary (bare sub_id, preserving history)
+ * and mirrors to the main account; a sport with no dedicated account (creds not
+ * set yet — see #152) posts to the main account only.
+ */
+export function twitterTargetsForSport(sport: string): TwitterTarget[] {
+  const candidates: TwitterCreds[] = [];
+  if (sport === "mlb") {
+    const base = baseCreds();
+    if (base) candidates.push(base);
+  } else {
+    const own = ownCreds(sport);
+    if (own) candidates.push(own);
+    const base = baseCreds();
+    if (base) candidates.push(base);
+  }
+  // Dedupe by access token in case a sport's suffixed creds point at the base.
+  const seen = new Set<string>();
+  const unique = candidates.filter((c) =>
+    seen.has(c.accessToken) ? false : (seen.add(c.accessToken), true),
+  );
+  return unique.map((c, i) => ({
+    ...c,
+    subIdSuffix: i === 0 ? "" : `#${c.handle || "main"}`,
+  }));
+}
+
+/**
+ * Whether any X/Twitter account is set up for this sport. Crons call this to
+ * skip a league before rendering images. With the main-account mirror this is
+ * true for every sport whenever the base creds are set.
+ */
+export function twitterAccountConfigured(sport: string): boolean {
+  return twitterTargetsForSport(sport).length > 0;
+}
+
+// Clients are cached per account (keyed by access token), since one sport now
+// fans out to multiple accounts and several sports share the base account.
 const clients = new Map<string, TwitterApi>();
 
-function client(sport: string): TwitterApi {
-  const existing = clients.get(sport);
+function clientFor(creds: TwitterCreds): TwitterApi {
+  const existing = clients.get(creds.accessToken);
   if (existing) return existing;
-  const creds = credsForSport(sport);
-  if (!creds) {
-    const s = envSuffix(sport);
-    throw new Error(
-      `Twitter credentials missing for sport "${sport}": set TWITTER_API_KEY${s}, ` +
-      `TWITTER_API_SECRET${s}, TWITTER_ACCESS_TOKEN${s}, TWITTER_ACCESS_SECRET${s}.`,
-    );
-  }
   const c = new TwitterApi({
     appKey: creds.appKey,
     appSecret: creds.appSecret,
     accessToken: creds.accessToken,
     accessSecret: creds.accessSecret,
   });
-  clients.set(sport, c);
+  clients.set(creds.accessToken, c);
   return c;
 }
 
@@ -79,9 +113,8 @@ function wrapError(err: unknown): Error {
   );
 }
 
-function tweetUrl(sport: string, id: string): string {
-  const handle = credsForSport(sport)?.handle || "boxscoreemail";
-  return `https://twitter.com/${handle}/status/${id}`;
+function tweetUrl(handle: string, id: string): string {
+  return `https://twitter.com/${handle || "boxscoreemail"}/status/${id}`;
 }
 
 export async function postTweetWithImage(args: {
@@ -89,10 +122,10 @@ export async function postTweetWithImage(args: {
   altText: string;
   imageBytes: Uint8Array;
   mimeType?: EUploadMimeType;
-  sport: string;
+  target: TwitterTarget;
 }): Promise<{ id: string; url: string }> {
   try {
-    const c = client(args.sport);
+    const c = clientFor(args.target);
     const buf = Buffer.from(args.imageBytes);
     const mediaId = await c.v2.uploadMedia(buf, {
       media_type: args.mimeType ?? EUploadMimeType.Png,
@@ -111,15 +144,15 @@ export async function postTweetWithImage(args: {
     if (!res.data?.id) {
       throw new Error(`twitter: no id returned (${JSON.stringify(res)})`);
     }
-    return { id: res.data.id, url: tweetUrl(args.sport, res.data.id) };
+    return { id: res.data.id, url: tweetUrl(args.target.handle, res.data.id) };
   } catch (err) {
     throw wrapError(err);
   }
 }
 
-export async function deleteTweet(sport: string, id: string): Promise<void> {
+export async function deleteTweet(target: TwitterTarget, id: string): Promise<void> {
   try {
-    await client(sport).v2.deleteTweet(id);
+    await clientFor(target).v2.deleteTweet(id);
   } catch (err) {
     throw wrapError(err);
   }

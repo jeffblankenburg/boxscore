@@ -41,25 +41,32 @@ function suffixedCreds(sport: string): BlueskyCreds | null {
 }
 
 /**
- * The Bluesky account(s) a sport posts to, in priority order. Most sports post
- * to their single dedicated <sport>.boxscore.email account. MLB is dual-homed
- * for the 2026 season: it mirrors to BOTH the original shared account
- * (BLUESKY_HANDLE / boxscore.email) and its new dedicated account
- * (BLUESKY_HANDLE_MLB / mlb.boxscore.email). After the 2026 season, delete the
- * `candidates.push(base)` line below so MLB posts only to its dedicated handle.
+ * The Bluesky account(s) a sport posts to, in priority order. Every sport posts
+ * to its dedicated <sport>.boxscore.email account AND mirrors to the shared main
+ * account (BLUESKY_HANDLE / boxscore.email), so the main feed carries every
+ * sport while each per-sport channel carries only its own. The primary target
+ * keeps the bare sub_id to preserve post history; the mirror gets "#handle".
+ * MLB began on the shared account, so there the shared account stays primary
+ * and the dedicated mlb handle is the mirror. Sports with no dedicated handle
+ * (ncaam/ncaaw) post to the main account only.
  */
 export function blueskyTargetsForSport(sport: string): BlueskyTarget[] {
+  const base = baseCreds();
+  const own = suffixedCreds(sport);
   const candidates: BlueskyCreds[] = [];
   if (sport === "mlb") {
-    const base = baseCreds();
-    if (base) candidates.push(base); // 2026-season mirror — remove after the season
-    const own = suffixedCreds("mlb");
+    if (base) candidates.push(base);
     if (own) candidates.push(own);
   } else {
-    const own = suffixedCreds(sport);
     if (own) candidates.push(own);
+    if (base) candidates.push(base);
   }
-  return candidates.map((c, i) => ({
+  // Dedupe by handle in case base and own point at the same account.
+  const seen = new Set<string>();
+  const unique = candidates.filter((c) =>
+    seen.has(c.handle) ? false : (seen.add(c.handle), true),
+  );
+  return unique.map((c, i) => ({
     ...c,
     subIdSuffix: i === 0 ? "" : `#${c.handle}`,
   }));
