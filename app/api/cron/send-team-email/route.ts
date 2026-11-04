@@ -20,9 +20,11 @@ import { startCronRun, finishCronRun } from "@/lib/cron-runs";
 // outer loop over teams.
 //
 // Skips the actual send (but still records a `sends` row with no error) when
-// the team is in true-offseason emptiness — no game yesterday, no upcoming
-// games this week, no transactions on the date. Avoids waking subscribers up
-// to a digest that has nothing in it.
+// there's nothing to wake subscribers for: an empty in-season off-day shell, OR
+// the whole offseason. The season farewell promises subscribers the digest
+// pauses until spring training, so once the season's over we suppress every
+// team send — including offseason transaction updates, which otherwise slip
+// past the "empty shell" size check (see the mode==='offseason' gate below).
 
 export const runtime = "nodejs";
 // 800s to match the league send cron (send-email) and vercel.json's function
@@ -173,7 +175,14 @@ export async function GET(req: Request) {
         const isSignoff = cached.mode?.startsWith("signoff") ?? false;
         const isPlayoffPreview = cached.mode === "playoff-preview";
         const mustSend = isSignoff || isPlayoffPreview;
-        if (!mustSend && !cached.has_game && cached.html.length < 1500) {
+        // Honor the farewell's "paused until spring training" promise: suppress
+        // every offseason team send, even one carrying a transaction (those push
+        // the body past the 1500-byte "empty" shortcut and used to mail anyway).
+        // mode==='offseason' only applies once the season's over and flips back
+        // the day spring games appear, so sends self-resume then. signoff /
+        // playoff-preview carry their own modes, so they still go out.
+        const isOffseason = cached.mode === "offseason";
+        if (!mustSend && (isOffseason || (!cached.has_game && cached.html.length < 1500))) {
           totalEmpty++;
           perTeam.push({ team: teamId, sent: 0, skipped: 0, failed: 0, empty: true });
           continue;
