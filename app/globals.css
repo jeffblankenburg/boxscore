@@ -3839,13 +3839,13 @@ tr.cx-diff-hl > td { background: transparent; }
    balances them by height, so a light slate (one World Series game) is followed
    immediately by the next sport with no whitespace. Each box is kept whole
    (break-inside: avoid). Column count steps 1 → 2 → 3 at widths where each
-   column stays ≥ ~370px — the room a ten-column basketball box needs at the
-   home page's 13px type (see the size bump below) to render without clipping or
-   horizontal overflow. The box-score HTML reuses the digest classes, styled
-   above. */
+   column stays ≥ ~425px — the room the widest eleven-column basketball box
+   (shooting line FG/3PT/FT, long names) needs at the home page's 13px type (see
+   the size bump below) to render without clipping or horizontal overflow. The
+   box-score HTML reuses the digest classes, styled above. */
 .home-cols { column-count: 1; column-gap: 24px; margin-top: 12px; }
-@media (min-width: 810px)  { .home-cols { column-count: 2; } }
-@media (min-width: 1200px) { .home-cols { column-count: 3; } }
+@media (min-width: 920px)  { .home-cols { column-count: 2; } }
+@media (min-width: 1370px) { .home-cols { column-count: 3; } }
 .home-cell { break-inside: avoid; margin: 0 0 22px; }
 .home-game { margin: 0; }
 /* The cell owns the spacing — strip each sport's own box margins so every

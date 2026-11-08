@@ -121,15 +121,18 @@ export function playerNameLink(
   return playerLink(league, { id, slug: slugifyName(fullName) }, visible, web);
 }
 
-// 7-column box score per Jeff's call. The full ESPN set has 14; these are
-// the high-signal ones for a glance. Tweak this array to change the line.
+// Curated box line per Jeff's call. The full ESPN set has 14; these are the
+// high-signal ones for a glance. Tweak this array to change the line.
 const PLAYER_STAT_COLUMNS: ReadonlyArray<{ key: string; label: string }> = [
-  // Keys are ESPN's own box-score column names (the `names` array). Shooting
-  // is grouped after PTS (FG, then 3PT); TO trails the defensive counts.
+  // Keys are ESPN's own box-score column names (the `names` array). The full
+  // shooting line is grouped after PTS (FG, 3PT, FT — FT added so free-throw
+  // ATTEMPTS show, since makes are derivable from points but attempts aren't);
+  // TO trails the defensive counts.
   { key: "MIN", label: "MIN" },
   { key: "PTS", label: "PTS" },
   { key: "FG", label: "FG" },
   { key: "3PT", label: "3PT" },
+  { key: "FT", label: "FT" },
   { key: "REB", label: "REB" },
   { key: "AST", label: "AST" },
   { key: "STL", label: "STL" },
