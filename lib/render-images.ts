@@ -653,8 +653,12 @@ export async function renderShareImages(args: {
     const captures: Array<{ handle: typeof games[0]; entry: ManifestEntry }> = [];
 
     // Standings + leaders are MLB-only. Other sports ship scoreboard + per-game
-    // box scores only.
-    if (spec.standingsAndLeaders) {
+    // box scores only. Gate on the day actually having games: on a no-games day
+    // (offseason, or an in-season off-day) the page still renders the frozen
+    // final standings + season leaders, and without this we'd re-post those
+    // stale cards to social every single day. The scoreboard already skips
+    // empties and the bracket 404s off-season — this is the last quiet-day leak.
+    if (spec.standingsAndLeaders && gameCount > 0) {
       const standings = await page.$$(".col-standings");
       const leaders = await page.$$(".col-leaders");
       if (standings[0]) {
